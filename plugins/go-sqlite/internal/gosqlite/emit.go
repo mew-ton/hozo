@@ -59,10 +59,10 @@ const (
 	decoratorTransaction = "db.transaction"
 )
 
-// Emit は、要求の View の出力 (U, N) の db.go を作る（docs/plugin-go-sqlite.md）。root はプロジェクトのルート（go.mod を探す起点）。
+// Emit は、要求の View の出力 (U, N) の db.go を作る（docs/plugin-go-sqlite.md）。読むのは、要求だけ（ファイルも、環境変数も、読まない）。
 // 診断があれば、ファイルは返さない。誤り（error）を返すのは、利用者の仕様の誤りではないとき（View が欠けている、生成したコードを
 // 整形できない、型の置き場がない）で、プラグインは終了コード 1 で終わる。
-func Emit(req *plugin.EmitRequest, root string) (*plugin.EmitResponse, error) {
+func Emit(req *plugin.EmitRequest) (*plugin.EmitResponse, error) {
 	view := req.View
 	if view == nil || view.Program == nil || view.Program.Namespace(view.Viewer) == nil {
 		viewer := ""
@@ -71,7 +71,7 @@ func Emit(req *plugin.EmitRequest, root string) (*plugin.EmitResponse, error) {
 		}
 		return nil, fmt.Errorf("emit: View に、名前空間 %q の Program がない", viewer)
 	}
-	e := &emitter{view: view, root: root, p: view.Program, ns: view.Program.Namespace(view.Viewer)}
+	e := &emitter{view: view, p: view.Program, ns: view.Program.Namespace(view.Viewer)}
 	e.prepare()
 
 	// GOSQL-6: オプションはない
@@ -108,10 +108,10 @@ func Emit(req *plugin.EmitRequest, root string) (*plugin.EmitResponse, error) {
 		return &plugin.EmitResponse{Errors: e.errs}, nil
 	}
 
-	layout, err := golang.LayoutOf(view, root)
+	layout, err := golang.LayoutOf(view)
 	if err != nil {
-		if errors.Is(err, golang.ErrNoGoMod) {
-			// Dir(U, N) の上に go.mod がない。報告するのは基底（GO-1。docs/plugin-go.md「診断」）で、ここは何も出さない
+		if errors.Is(err, golang.ErrNoModule) {
+			// 基底のオプション module がない。報告するのは基底（GO-8。docs/plugin-go.md「診断」）で、ここは何も出さない
 			return &plugin.EmitResponse{}, nil
 		}
 		return nil, fmt.Errorf("emit: 名前空間 %s の出力先 %q の import パスを求められない: %w", view.Viewer, view.Config.Dir, err)
@@ -127,7 +127,6 @@ func Emit(req *plugin.EmitRequest, root string) (*plugin.EmitResponse, error) {
 // emitter は一つの出力 (U, N) の db.go を作る状態。
 type emitter struct {
 	view   *ir.View
-	root   string
 	layout *golang.Layout
 	shape  *golang.Shape
 	p      *ir.Program

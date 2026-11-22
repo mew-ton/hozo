@@ -26,7 +26,7 @@ func (e *emitter) newTestFile(name string, reserved []string) *fileGen {
 	f := &fileGen{e: e, name: name, inTest: true, pkg: e.layout.TestName, key: "test/" + name}
 	f.im = e.imports[f.key]
 	if f.im == nil {
-		f.im = golang.NewTestImports(e.view, e.layout, e.root)
+		f.im = golang.NewTestImports(e.view, e.layout)
 		f.im.Reserve(reserved...)
 		e.imports[f.key] = f.im
 	}

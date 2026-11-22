@@ -2,6 +2,9 @@
 [hozo]
 plugin_dirs = ["plugins"]
 
+[options.go]
+module = "example.com/app"
+
 # 1: gate。本体のあるデコレータを宣言する名前空間。自分の op にも付ける
 [[emit]]
 namespace   = "gate"

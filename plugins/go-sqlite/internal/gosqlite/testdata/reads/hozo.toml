@@ -1,3 +1,6 @@
+[options.go]
+module = "example.com/app"
+
 # plugins/go-sqlite の単体テストの入力（docs/testing.md「単体テスト」）: docs/plugin-go-sqlite.md「read の中身」の各行
 # （@db.find、@db.list、@db.where、@db.latest と、その組み合わせ）、「列と引数の型」、「メソッドの形とコメント」の read の句。
 [[emit]]

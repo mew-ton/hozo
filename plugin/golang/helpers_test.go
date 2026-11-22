@@ -1,10 +1,6 @@
 package golang
 
 import (
-	"os"
-	"path/filepath"
-	"testing"
-
 	"github.com/mew-ton/hozo/ir"
 )
 
@@ -158,7 +154,7 @@ func fileOf(fqn string) string {
 // conf は単位 index での名前空間の設定（基底は go、out と dir は dir）。
 func conf(index int, dir string) ir.NamespaceConfig {
 	return ir.NamespaceConfig{Index: index, Language: "go", Base: "go", Out: dir, Dir: dir, Transpilers: []string{"go"},
-		Options: map[string]map[string]any{}, Seams: map[string]string{}}
+		Options: map[string]map[string]any{"go": {"module": "example.com/app"}}, Seams: map[string]string{}}
 }
 
 // viewOf は、viewer を gen/<viewer> に出力する単位 1 の View。files は、Program のすべてのファイル（in を省いた単位）。
@@ -178,14 +174,4 @@ func viewOf(viewer string, nss ...ir.Namespace) *ir.View {
 	c := conf(1, "gen/"+viewer)
 	return &ir.View{Version: ir.Version, Viewer: viewer, Config: c, Files: files, Program: p,
 		Namespaces: map[string][]ir.NamespaceConfig{viewer: {c}}}
-}
-
-// projectRoot は go.mod（module example.com/app）を持つ一時のプロジェクトのルート。
-func projectRoot(t *testing.T) string {
-	t.Helper()
-	root := t.TempDir()
-	if err := os.WriteFile(filepath.Join(root, "go.mod"), []byte("module example.com/app\n\ngo 1.24\n"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	return root
 }

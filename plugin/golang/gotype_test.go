@@ -25,13 +25,12 @@ func typesView() *ir.View {
 
 // docs/plugin-go.md「型」の表の行に一つずつ。
 func TestGoType(t *testing.T) {
-	root := projectRoot(t)
 	v := typesView()
-	l, err := LayoutOf(v, root)
+	l, err := LayoutOf(v)
 	if err != nil {
 		t.Fatal(err)
 	}
-	im := NewImports(v, l, root, true)
+	im := NewImports(v, l, true)
 	tests := []struct {
 		t    ir.Type
 		want string
@@ -106,10 +105,9 @@ func TestIsNillable(t *testing.T) {
 
 // docs/plugin-go.md「呼び出し」の「零値」。
 func TestZero(t *testing.T) {
-	root := projectRoot(t)
 	v := typesView()
-	l, _ := LayoutOf(v, root)
-	im := NewImports(v, l, root, true)
+	l, _ := LayoutOf(v)
+	im := NewImports(v, l, true)
 	for _, tt := range []struct {
 		t    ir.Type
 		want string

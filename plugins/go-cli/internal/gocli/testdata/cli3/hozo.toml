@@ -1,3 +1,6 @@
+[options.go]
+module = "example.com/app"
+
 # plugins/go-cli の単体テストの入力（docs/testing.md「単体テスト」）: CLI-3（フィールドの型が受け付けられない）。
 [[emit]]
 namespace   = "app"

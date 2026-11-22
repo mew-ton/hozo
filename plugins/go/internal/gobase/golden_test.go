@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -156,14 +157,71 @@ func TestDiagnostics(t *testing.T) {
 	}
 }
 
-// TestNoGoMod は GO-1: Dir(U, N) の上に go.mod がない。位置なし。ファイルは返さない。
-func TestNoGoMod(t *testing.T) {
-	_, diags := emitViews(t, t.TempDir(), loadViews(t, "statements"))
-	if len(diags) != 1 || diags[0].Code != codeNoGoMod || diags[0].At != "" {
-		t.Fatalf("診断 = %+v, want GO-1 が一つ（位置なし）", diags)
+// withoutModule は、view の写しで、基底へのオプション module を持たないもの（Namespaces の、どの出力の設定も）。
+func withoutModule(view *ir.View) *ir.View {
+	strip := func(c ir.NamespaceConfig) ir.NamespaceConfig {
+		options := map[string]map[string]any{}
+		for name, table := range c.Options {
+			if name != c.Base {
+				options[name] = table
+			}
+		}
+		c.Options = options
+		return c
 	}
-	if !strings.Contains(diags[0].Message, "gen/app") || !strings.Contains(diags[0].Message, "go.mod") {
-		t.Errorf("メッセージが出力先と go.mod を示さない: %s", diags[0].Message)
+	v := *view
+	v.Config = strip(view.Config)
+	v.Namespaces = map[string][]ir.NamespaceConfig{}
+	for ns, list := range view.Namespaces {
+		for _, c := range list {
+			v.Namespaces[ns] = append(v.Namespaces[ns], strip(c))
+		}
+	}
+	return &v
+}
+
+// TestNoModule は GO-8: オプション module が、書かれていない、文字列でない、空。位置なし。ファイルは返さない。
+// メッセージは、hozo.toml の [options.go] に書くことを示す（docs/plugin-go.md「診断」）。
+func TestNoModule(t *testing.T) {
+	view := loadViews(t, "statements")[0]
+	for name, value := range map[string]any{"書かれていない": nil, "文字列でない": 1.0, "空": ""} {
+		v := withoutModule(view)
+		if value != nil {
+			v.Config.Options[TranspilerName] = map[string]any{"module": value}
+		}
+		files, diags := emitViews(t, "", []*ir.View{v})
+		if len(files) != 0 || len(diags) != 1 || diags[0].Code != "GO-8" || diags[0].At != "" {
+			t.Fatalf("%s: files=%d 診断 = %+v, want GO-8 が一つ（位置なし）", name, len(files), diags)
+		}
+		if !strings.Contains(diags[0].Message, "[options.go]") || !strings.Contains(diags[0].Message, "module") {
+			t.Errorf("%s: メッセージが、[options.go] の module を示さない: %s", name, diags[0].Message)
+		}
+	}
+	// 知らないキーは GO-5（module は、知っているキー）
+	v := withoutModule(view)
+	v.Config.Options[TranspilerName] = map[string]any{"module": "example.com/app", "modul": "x"}
+	if _, diags := emitViews(t, "", []*ir.View{v}); len(diags) != 1 || diags[0].Code != codeOption || !strings.Contains(diags[0].Message, "modul") {
+		t.Errorf("知らないキー: 診断 = %+v, want GO-5 が一つ", diags)
+	}
+}
+
+// TestReadsNothing は、プラグインが、ファイルも、環境変数も、読まないこと（docs/decisions.md「決めたこと」425、
+// docs/plugin-go.md「パッケージと import パス」）: go.mod のない、空の作業ディレクトリで、環境変数を空にしても、出力が同じ。
+func TestReadsNothing(t *testing.T) {
+	views := loadViews(t, "statements")
+	want, diags := emitViews(t, "", views)
+	if len(diags) != 0 {
+		t.Fatalf("診断: %+v", diags)
+	}
+	t.Chdir(t.TempDir())
+	for _, kv := range os.Environ() {
+		name, _, _ := strings.Cut(kv, "=")
+		t.Setenv(name, "")
+		os.Unsetenv(name)
+	}
+	got, diags := emitViews(t, "", views)
+	if len(diags) != 0 || !reflect.DeepEqual(got, want) {
+		t.Errorf("作業ディレクトリと環境を変えたら、出力が変わった（診断 %+v）", diags)
 	}
 }
 
@@ -174,24 +232,18 @@ func TestInternal(t *testing.T) {
 		"Program がない":          {Version: ir.Version, Viewer: "app", Config: view.Config},
 		"viewer が Program にない": {Version: ir.Version, Viewer: "nowhere", Config: view.Config, Program: view.Program},
 	} {
-		files, diags := Emit(request(v), newRoot(t), nil)
+		files, diags := Emit(request(v), nil)
 		if len(files) != 0 || len(diags) != 1 || diags[0].Code != codeInternal {
 			t.Errorf("%s: files=%d 診断=%+v, want GO-INTERNAL が一つ", name, len(files), diags)
 		}
 	}
 }
 
-// TestHandler は、プラグインの入口（Handler）: HOZO_PROJECT_ROOT をルートにして出力し、診断は応答の errors で返す
+// TestHandler は、プラグインの入口（Handler）: 要求の View から出力し、診断は応答の errors で返す
 // （docs/plugin-protocol.md「emit」）。check と import は持たない。
 func TestHandler(t *testing.T) {
 	view := loadViews(t, "statements")[0]
-	root := newRoot(t)
-	h := Handler{Getenv: func(key string) string {
-		if key == "HOZO_PROJECT_ROOT" {
-			return root
-		}
-		return ""
-	}}
+	h := Handler{}
 	resp, err := h.Emit(request(view))
 	if err != nil {
 		t.Fatal(err)
@@ -199,21 +251,19 @@ func TestHandler(t *testing.T) {
 	if len(resp.Files) == 0 || len(resp.Errors) != 0 || len(resp.Warnings) != 0 {
 		t.Fatalf("files=%d errors=%v warnings=%v", len(resp.Files), resp.Errors, resp.Warnings)
 	}
-	want, _ := emitViews(t, root, []*ir.View{view})
+	want, _ := emitViews(t, "", []*ir.View{view})
 	for _, f := range resp.Files {
 		if want[f.Path] != f.Content {
 			t.Errorf("%s が Emit の結果と違う", f.Path)
 		}
 	}
-	// go.mod のないルート: GO-1 を errors で返し、ファイルは返さない
-	empty := t.TempDir()
-	h.Getenv = func(string) string { return empty }
-	resp, err = h.Emit(request(view))
+	// module のない設定: GO-8 を errors で返し、ファイルは返さない
+	resp, err = h.Emit(request(withoutModule(view)))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(resp.Files) != 0 || len(resp.Errors) != 1 || resp.Errors[0].Code != codeNoGoMod {
-		t.Errorf("files=%d errors=%+v, want GO-1", len(resp.Files), resp.Errors)
+	if len(resp.Files) != 0 || len(resp.Errors) != 1 || resp.Errors[0].Code != codeNoModule {
+		t.Errorf("files=%d errors=%+v, want GO-8", len(resp.Files), resp.Errors)
 	}
 	// ほかのトランスパイラの名前は unsupported
 	other := request(view)

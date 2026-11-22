@@ -50,7 +50,7 @@ func (f *file) local(name string) string {
 // render は validate.go の全体を作り、go/format で整形する。import の名前を文書の決まりの順で決めるために、二度描く
 // （docs/plugin-go.md「パッケージと import パス」の「import の名前」。基底と同じ手順）。
 func (g *generator) render(targets []target) (string, error) {
-	first := &file{g: g, im: golang.NewTypesImports(g.view, g.layout, g.root)}
+	first := &file{g: g, im: golang.NewTypesImports(g.view, g.layout)}
 	first.draw(targets)
 	second := &file{g: g, im: first.im.Canonical(), reserved: map[string]bool{}}
 	for _, name := range second.im.Names() {

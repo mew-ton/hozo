@@ -1,3 +1,6 @@
+[options.go]
+module = "example.com/app"
+
 # plugins/go の単体テストの入力（docs/testing.md「単体テスト」）: docs/plugin-go.md「例外を受ける文」。
 [[emit]]
 namespace   = "app"

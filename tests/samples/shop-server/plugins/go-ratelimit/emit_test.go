@@ -138,7 +138,7 @@ func emitViews(t *testing.T, root string, views []*ir.View) (map[string]string, 
 	files := map[string]string{}
 	var diags []plugin.Diagnostic
 	for _, v := range views {
-		out, err := Emit(request(v), root)
+		out, err := Emit(request(v))
 		if err != nil {
 			t.Fatalf("%s: %v", v.Viewer, err)
 		}
@@ -300,7 +300,7 @@ func basePlugin(t *testing.T) string {
 }
 
 // writeProject は、入力 name のすべての出力（基底のファイルと、go-ratelimit のファイル files）を root に書く。基底のプラグインは、
-// hozoc と同じ約束（標準入力に要求、標準出力に応答、HOZO_PROJECT_ROOT。docs/plugin-protocol.md「起動」）で、View ごとに起動する。
+// hozoc と同じ約束（標準入力に要求、標準出力に応答。docs/plugin-protocol.md「起動」）で、View ごとに起動する。
 func writeProject(t *testing.T, root, name string, files map[string]string) {
 	t.Helper()
 	bin := basePlugin(t)
@@ -311,7 +311,7 @@ func writeProject(t *testing.T, root, name string, files map[string]string) {
 		}
 		cmd := exec.Command(bin)
 		cmd.Dir = root
-		cmd.Env = append(os.Environ(), "HOZO_PROJECT_ROOT="+root)
+		cmd.Env = os.Environ()
 		cmd.Stdin = bytes.NewReader(req)
 		var stdout, stderr bytes.Buffer
 		cmd.Stdout, cmd.Stderr = &stdout, &stderr
@@ -435,24 +435,19 @@ func TestDiagnostics(t *testing.T) {
 	}
 }
 
-// TestNoGoMod は、Dir(U, N) の上に go.mod がないとき: 報告するのは基底（GO-1）で、go-ratelimit は、ファイルも診断も返さない。
-func TestNoGoMod(t *testing.T) {
-	files, diags := emitViews(t, t.TempDir(), ours(t, loadViews(t, "seams")))
+// TestNoModule は、基底のオプション module がないとき: 報告するのは基底（GO-8）で、go-ratelimit は、ファイルも診断も返さない。
+func TestNoModule(t *testing.T) {
+	files, diags := emitViews(t, "", noModule(ours(t, loadViews(t, "seams"))))
 	if len(files) != 0 || len(diags) != 0 {
 		t.Fatalf("files=%d 診断=%v, want どちらも空", len(files), diags)
 	}
 }
 
-// TestHandler は、プラグインの入口（Handler）: HOZO_PROJECT_ROOT をルートにして出力する。ほかのトランスパイラの名前と、
+// TestHandler は、プラグインの入口（Handler）: 要求の View から出力する。ほかのトランスパイラの名前と、
 // check、import は unsupported。View の欠けた要求は、診断ではなく誤り。
 func TestHandler(t *testing.T) {
 	root := newRoot(t)
-	h := Handler{Getenv: func(key string) string {
-		if key == "HOZO_PROJECT_ROOT" {
-			return root
-		}
-		return ""
-	}}
+	h := Handler{}
 	view := ours(t, loadViews(t, "seams"))[0]
 	resp, err := h.Emit(request(view))
 	if err != nil {
@@ -474,7 +469,7 @@ func TestHandler(t *testing.T) {
 	if _, err := h.Import(&plugin.ImportRequest{}); err != plugin.ErrUnsupported {
 		t.Errorf("Import の err = %v, want ErrUnsupported", err)
 	}
-	if _, err := Emit(request(&ir.View{Version: ir.Version, Viewer: "shop", Config: view.Config}), root); err == nil {
+	if _, err := Emit(request(&ir.View{Version: ir.Version, Viewer: "shop", Config: view.Config})); err == nil {
 		t.Error("Program のない View で、誤りを返さない")
 	}
 }
@@ -487,13 +482,7 @@ func TestCheckMatchesEmit(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	root := newRoot(t)
-	h := Handler{Getenv: func(name string) string {
-		if name == "HOZO_PROJECT_ROOT" {
-			return root
-		}
-		return ""
-	}}
+	h := Handler{}
 	views, withErrors := 0, 0
 	for _, e := range entries {
 		if !e.IsDir() {
@@ -532,4 +521,32 @@ func TestCheckMatchesEmit(t *testing.T) {
 	if views == 0 || withErrors == 0 {
 		t.Fatalf("確かめた View が %d、誤りを返した View が %d（どちらも、一つ以上のはず）", views, withErrors)
 	}
+}
+
+// noModule は、views の写しで、どの出力の設定も、基底へのオプション module を持たないもの（基底が GO-8 を返す設定。
+// docs/plugin-go.md「診断」）。
+func noModule(views []*ir.View) []*ir.View {
+	strip := func(c ir.NamespaceConfig) ir.NamespaceConfig {
+		options := map[string]map[string]any{}
+		for name, table := range c.Options {
+			if name != c.Base {
+				options[name] = table
+			}
+		}
+		c.Options = options
+		return c
+	}
+	out := make([]*ir.View, len(views))
+	for i, view := range views {
+		v := *view
+		v.Config = strip(view.Config)
+		v.Namespaces = map[string][]ir.NamespaceConfig{}
+		for ns, list := range view.Namespaces {
+			for _, c := range list {
+				v.Namespaces[ns] = append(v.Namespaces[ns], strip(c))
+			}
+		}
+		out[i] = &v
+	}
+	return out
 }

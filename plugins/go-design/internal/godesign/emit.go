@@ -47,11 +47,11 @@ type Output struct {
 	Errors   []plugin.Diagnostic
 }
 
-// Emit は、要求の View の出力 (U, N) の、テストのパッケージの design.go（docs/plugin-go-design.md「出力」）を作る。root は
-// プロジェクトのルート（go.mod を探す起点）。診断があれば、ファイルも warning も返さない。フローも、要求もなければ、ファイルを
+// Emit は、要求の View の出力 (U, N) の、テストのパッケージの design.go（docs/plugin-go-design.md「出力」）を作る。読むのは、要求だけ
+// （ファイルも、環境変数も、読まない）。診断があれば、ファイルも warning も返さない。フローも、要求もなければ、ファイルを
 // 出さず warning を一つ返す。どこからも指されていない要求ごとに、warning を一つ返す。
 // 戻り値の error は、利用者の仕様の誤りでないもの（View が欠けている、生成したコードを整形できない）。
-func Emit(req *plugin.EmitRequest, root string) (*Output, error) {
+func Emit(req *plugin.EmitRequest) (*Output, error) {
 	view := req.View
 	if view == nil || view.Program == nil || view.Program.Namespace(view.Viewer) == nil {
 		viewer := ""
@@ -60,18 +60,18 @@ func Emit(req *plugin.EmitRequest, root string) (*Output, error) {
 		}
 		return nil, fmt.Errorf("View に、名前空間 %s の Program がない", viewer)
 	}
-	g := &generator{view: view, root: root, p: view.Program, ns: view.Program.Namespace(view.Viewer)}
+	g := &generator{view: view, p: view.Program, ns: view.Program.Namespace(view.Viewer)}
 	g.prepare()
 
 	// GODESIGN-5
 	classes := g.requirementClasses(req)
 
-	// 置き場。go.mod がなければ、基底が GO-1 を返すので、ここでは何も返さない（診断と warning は、そのときも返す）
-	layout, err := golang.LayoutOf(view, root)
-	if err != nil && !errors.Is(err, golang.ErrNoGoMod) {
+	// 置き場。基底のオプション module がなければ、基底が GO-8 を返すので、ここでは何も返さない（診断と warning は、そのときも返す）
+	layout, err := golang.LayoutOf(view)
+	if err != nil && !errors.Is(err, golang.ErrNoModule) {
 		return nil, fmt.Errorf("名前空間 %s の出力先 %q の import パスを求められない: %w", view.Viewer, view.Config.Dir, err)
 	}
-	g.layout = layout // go.mod がなければ nil
+	g.layout = layout // module がなければ nil
 
 	// GODESIGN-1〜GODESIGN-4
 	flows := g.flows()
@@ -116,7 +116,6 @@ func Emit(req *plugin.EmitRequest, root string) (*Output, error) {
 // generator は一つの出力 (U, N) の design.go を作る状態。
 type generator struct {
 	view   *ir.View
-	root   string
 	p      *ir.Program
 	ns     *ir.Namespace // N
 	layout *golang.Layout
@@ -459,7 +458,7 @@ func short(fqn string) string {
 
 // checkTestDir は GODESIGN-7: テストのパッケージのディレクトリが、同じ単位が出力する子の名前空間 N.<テストのパッケージの名前> の
 // 出力先と重なる。基底が、同じことを GO-4 で返す出力（基底も、テストのパッケージを作る）では、返さない。位置は、最初のフローの op。
-// フローがなければ、最初の要求の分類。置き場が要るので、go.mod がない（layout が nil）ときは、見ない（基底が GO-1 を返し、何も
+// フローがなければ、最初の要求の分類。置き場が要るので、module がない（layout が nil）ときは、見ない（基底が GO-8 を返し、何も
 // 書き出されない）。
 func (g *generator) checkTestDir(flows []flow, classes []class) {
 	if g.layout == nil || len(golang.PublicTestNames(g.view)) > 0 {

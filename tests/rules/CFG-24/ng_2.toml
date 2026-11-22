@@ -1,0 +1,7 @@
+# 単位がない: [options.go] の go は、どの単位の transpilers にもない → CFG-24
+# ERROR: CFG-24
+[hozo]
+plugin_dirs = ["plugins"]
+
+[options.go]
+module = "example.com/app"

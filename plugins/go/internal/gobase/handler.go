@@ -17,9 +17,6 @@ const TranspilerName = "go"
 
 // Handler は go の plugin.Handler。emit と coverage を実装する。
 type Handler struct {
-	// Getenv は環境変数を引く関数。nil なら os.Getenv。HOZO_PROJECT_ROOT（docs/plugin-protocol.md「起動」）を、import パスを
-	// 求めるルートに使う。空なら作業ディレクトリ（= プロジェクトのルート）。
-	Getenv func(string) string
 	// Stderr は、整形に失敗したとき（GO-INTERNAL）に、整形前の内容を書く先。nil なら os.Stderr。
 	Stderr interface{ Write([]byte) (int, error) }
 }
@@ -35,19 +32,11 @@ func (h Handler) Emit(req *plugin.EmitRequest) (*plugin.EmitResponse, error) {
 	if req.Transpiler != TranspilerName {
 		return nil, fmt.Errorf("transpiler %q is not provided by go (it provides %q): %w", req.Transpiler, TranspilerName, plugin.ErrUnsupported)
 	}
-	getenv := h.Getenv
-	if getenv == nil {
-		getenv = os.Getenv
-	}
-	root := getenv("HOZO_PROJECT_ROOT")
-	if root == "" {
-		root = "."
-	}
 	stderr := h.Stderr
 	if stderr == nil {
 		stderr = os.Stderr
 	}
-	files, errs := Emit(req, root, stderr)
+	files, errs := Emit(req, stderr)
 	if len(errs) > 0 {
 		return &plugin.EmitResponse{Errors: errs}, nil
 	}
@@ -71,13 +60,5 @@ func (h Handler) Coverage(req *plugin.CoverageRequest) (*plugin.CoverageResponse
 	if req == nil {
 		return nil, fmt.Errorf("coverage: no request")
 	}
-	getenv := h.Getenv
-	if getenv == nil {
-		getenv = os.Getenv
-	}
-	root := getenv("HOZO_PROJECT_ROOT")
-	if root == "" {
-		root = "."
-	}
-	return Coverage(req, root)
+	return Coverage(req)
 }

@@ -420,7 +420,7 @@ func TestNoRoutes(t *testing.T) {
 	if warnings[0].At != "app" || !strings.Contains(warnings[0].Message, "@http.get") {
 		t.Errorf("warning = %+v", warnings[0])
 	}
-	resp, err := Handler{Getenv: func(string) string { return root }}.Emit(request(loadViews(t, "noroutes")[0], TranspilerName))
+	resp, err := Handler{}.Emit(request(loadViews(t, "noroutes")[0], TranspilerName))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -560,7 +560,7 @@ func TestDiagnosticPositions(t *testing.T) {
 }
 
 // TestValidateHome は GOHTTP-11 の条件: 診断を返すのは、validate = true の単位の出力だけ。同じ名前空間を validate = false で出力する
-// 単位は、制約を確かめないので、診断なしにファイルを返す。置き場は View だけから求まるので、go.mod がなくても返す。
+// 単位は、制約を確かめないので、診断なしにファイルを返す。置き場は View だけから求まるので、module がなくても返す。
 func TestValidateHome(t *testing.T) {
 	views := loadViews(t, "gohttp11")
 	files, diags, _ := emitViews(t, newRoot(t), views)
@@ -578,8 +578,8 @@ func TestValidateHome(t *testing.T) {
 			t.Errorf("メッセージが、置き場の単位と入力の model を示さない: %s", d.Message)
 		}
 	}
-	if _, diags, _ = emitViews(t, t.TempDir(), views); len(diags) != 2 || diags[0].Code != codeHTTPValidate {
-		t.Errorf("go.mod がないとき: 診断 = %+v, want GOHTTP-11 が二つ", diags)
+	if _, diags, _ = emitViews(t, "", noModule(views)); len(diags) != 2 || diags[0].Code != codeHTTPValidate {
+		t.Errorf("module がないとき: 診断 = %+v, want GOHTTP-11 が二つ", diags)
 	}
 }
 
@@ -595,7 +595,7 @@ func TestOptionValidate(t *testing.T) {
 	root := newRoot(t)
 	emit := func(opts map[string]any) string {
 		v := *strict
-		v.Config.Options = map[string]map[string]any{}
+		v.Config.Options = map[string]map[string]any{"go": strict.Config.Options["go"]} // 基底の module は、そのまま
 		if opts != nil {
 			v.Config.Options[TranspilerName] = opts
 		}
@@ -626,14 +626,14 @@ func TestOptionValidate(t *testing.T) {
 	}
 }
 
-// TestNoGoMod: Dir(U, N) の上に go.mod がないとき（基底が GO-1 を返す）、go-http は、ファイルも診断も返さない。
-// 仕様だけで決まる診断は、go.mod がなくても返す。
-func TestNoGoMod(t *testing.T) {
-	files, diags, warnings := emitViews(t, t.TempDir(), loadViews(t, "routes"))
+// TestNoModule: 基底のオプション module がないとき（基底が GO-8 を返す）、go-http は、ファイルも診断も返さない。
+// 仕様だけで決まる診断は、module がなくても返す。
+func TestNoModule(t *testing.T) {
+	files, diags, warnings := emitViews(t, "", noModule(loadViews(t, "routes")))
 	if len(files) != 0 || len(diags) != 0 || len(warnings) != 0 {
-		t.Errorf("files=%v 診断=%+v warnings=%+v, want どれも空（GO-1 は基底が返す）", sortedPaths(files), diags, warnings)
+		t.Errorf("files=%v 診断=%+v warnings=%+v, want どれも空（GO-8 は基底が返す）", sortedPaths(files), diags, warnings)
 	}
-	_, diags, _ = emitViews(t, t.TempDir(), loadViews(t, "gohttp1"))
+	_, diags, _ = emitViews(t, "", noModule(loadViews(t, "gohttp1")))
 	if len(diags) == 0 || diags[0].Code != codeHTTPExport {
 		t.Errorf("診断 = %+v, want GOHTTP-1", diags)
 	}
@@ -647,24 +647,19 @@ func TestBrokenView(t *testing.T) {
 		"Program がない":          {Version: ir.Version, Viewer: "api", Config: view.Config},
 		"viewer が Program にない": {Version: ir.Version, Viewer: "nowhere", Config: view.Config, Program: view.Program},
 	} {
-		out, err := Emit(request(v, TranspilerName), newRoot(t))
+		out, err := Emit(request(v, TranspilerName))
 		if err == nil || out != nil {
 			t.Errorf("%s: out=%+v err=%v, want error だけ", name, out, err)
 		}
 	}
 }
 
-// TestHandler は、プラグインの入口（Handler）: HOZO_PROJECT_ROOT をルートにして出力し、診断は応答の errors で返す
+// TestHandler は、プラグインの入口（Handler）: 要求の View から出力し、診断は応答の errors で返す
 // （docs/plugin-protocol.md「emit」）。check と import は持たない。
 func TestHandler(t *testing.T) {
 	view := loadViews(t, "routes")[1]
 	root := newRoot(t)
-	h := Handler{Getenv: func(key string) string {
-		if key == "HOZO_PROJECT_ROOT" {
-			return root
-		}
-		return ""
-	}}
+	h := Handler{}
 	resp, err := h.Emit(request(view, TranspilerName))
 	if err != nil {
 		t.Fatal(err)

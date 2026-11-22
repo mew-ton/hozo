@@ -1,3 +1,6 @@
+[options.go]
+module = "example.com/app"
+
 # plugins/go-valid の単体テストの入力: Validate を持つ型が一つもない名前空間（何も出さない。warning もない）。
 [[emit]]
 namespace   = "app"

@@ -160,7 +160,7 @@ func Options(req *EmitRequest, into any) ([]string, error)         // req.View.C
                                                                    // 知らないキーと error を診断にするのは呼ぶ側（docs/config.md「オプション」）
 const Version = "0.0.0-dev"                                         // このリポジトリのプラグインの版。生成したファイルのヘッダに書く（docs/plugin-go.md「ファイル」）
 // CheckRequest / CheckResponse / ImportRequest / ImportResponse / File / Warning / Diagnostic も同じ形
-type CoverageRequest struct { Protocol string; Direction string; Coverage File; Files []string }   // docs/plugin-protocol.md「coverage」
+type CoverageRequest struct { Protocol string; Direction string; Coverage File; Files []string; Outputs []ir.NamespaceConfig }   // docs/plugin-protocol.md「coverage」
 type CoverageResponse struct { Recognized bool; Files []CoveredFile }
 type CoveredFile struct { Path string; Lines [][2]int }             // 実行された所の、行の範囲（始まり、終わり）
 
@@ -218,8 +218,9 @@ func RowDisplay(e *ir.Effect) string              // コメントの中の行の
 func NarrowedParamsDisplay(e *ir.Effect) string   // コメントの中の、絞り込んだ引数（同「コメント」の「絞り込んだ引数の表示」）。なければ ""
 
 // 置き場（同「配置」）
-func ImportPath(root, dir string) (string, error) // go.mod を探す。見つからなければ ErrNoGoMod（GO-1）
-var ErrNoGoMod error
+func ModuleOf(cfg ir.NamespaceConfig) (string, error) // 出力の設定の、Go のモジュールの名前（基底へのオプション module。同「マニフェスト」）。なければ ErrNoModule（GO-8）
+func ImportPath(module, dir string) string        // module に、dir（プロジェクトのルートからの相対パス）を `/` でつないだもの。ファイルは、読まない
+var ErrNoModule error
 type Layout struct {                              // 一つの出力 (U, N) の置き場
     Namespace string
     Dir       string                              // Dir(U, N)。入口のパッケージのディレクトリ
@@ -230,12 +231,12 @@ type Layout struct {                              // 一つの出力 (U, N) の�
     TypesDir, TypesPath, TypesName string         // 型のパッケージ（HasTypes なら <Dir>/types と "types"、そうでなければ入口と同じ）
     TestDir, TestPath, TestName string            // テストのパッケージ（<Dir>/<EntryName>test と "<EntryName>test"。同「単体テストの口」の「テストのパッケージ」）
 }
-func LayoutOf(view *ir.View, root string) (*Layout, error)                  // この View の出力の置き場
-func HomeOf(view *ir.View, namespace, root string) (*Layout, bool, error)   // view の単位から見た、別の名前空間の型の置き場（docs/config.md「型の置き場」）。なければ false
+func LayoutOf(view *ir.View) (*Layout, error)                               // この View の出力の置き場。module がなければ ErrNoModule
+func HomeOf(view *ir.View, namespace string) (*Layout, bool, error)         // view の単位から見た、別の名前空間の型の置き場（docs/config.md「型の置き場」）。なければ false
 type Imports struct{ … }                          // 一つのファイルの import。名前の決め方は同「パッケージと import パス」
-func NewImports(view *ir.View, layout *Layout, root string, inDef bool) *Imports   // inDef は、書くファイルが定義のパッケージのものか（入口のものなら、N の型は入口の名前で修飾なし）
-func NewTypesImports(view *ir.View, layout *Layout, root string) *Imports          // 型のパッケージ（docs/plugin-go.md「型のパッケージ」）のファイルの import。N の型は、修飾なし
-func NewTestImports(view *ir.View, layout *Layout, root string) *Imports           // テストのパッケージのファイルの import。N の宣言も、入口のパッケージの名前で修飾し、その import は、いつも名前を書く
+func NewImports(view *ir.View, layout *Layout, inDef bool) *Imports   // inDef は、書くファイルが定義のパッケージのものか（入口のものなら、N の型は入口の名前で修飾なし）
+func NewTypesImports(view *ir.View, layout *Layout) *Imports          // 型のパッケージ（docs/plugin-go.md「型のパッケージ」）のファイルの import。N の型は、修飾なし
+func NewTestImports(view *ir.View, layout *Layout) *Imports           // テストのパッケージのファイルの import。N の宣言も、入口のパッケージの名前で修飾し、その import は、いつも名前を書く
 func (*Imports) Reserve(names ...string)              // このファイルの import の名前に使わせない名前を足す（ファイルを書くトランスパイラが、関数の本体の中で決まった名前で使う識別子。
                                                       // 基底の o、ctx、err）。基底の非公開の名前 ops と ptr は、Reserve しなくても、どのファイルでも使わせない
 func (*Imports) Add(pkgPath, pkgName string) string   // import に足し、修飾に使う名前を返す
@@ -316,7 +317,7 @@ type TestName struct {
 }
 func PublicTestNames(view *ir.View) []TestName    // 出力 (U, N) の、テストのパッケージに、基底が出す公開の名前のすべて。口も、にせものも、ない出力では、空
 func TestFakeNames(view *ir.View) []TestName      // そのうち、fakes.go の名前: にせものの型（New の引数の順）、Fakes、NewOps。fakes.go を持たない出力では、空
-func TestKitOf(view *ir.View, root string) (*TestKit, error)   // 出力 (U, N) の、テストのにせものと、テストの中の組み立ての形（docs/plugin-go.md「テストのにせもの」）。root が "" なら、Layout は nil
+func TestKitOf(view *ir.View) (*TestKit, error)   // 出力 (U, N) の、テストのにせものと、テストの中の組み立ての形（docs/plugin-go.md「テストのにせもの」）。module のない出力の Layout は nil で、そのときは、TestKit と一緒に、ErrNoModule を返す
 type TestKit struct {
     Namespace, Dir string                         // 出力する名前空間と、Dir(U, N)
     Shape  *Shape                                 // その出力の、op と口（別の単位の出力なら、その単位の in を省いたものとして求めた形）
@@ -504,9 +505,9 @@ func Views(p *ir.Program, cfg *config.Config, units []Unit) []map[string]*ir.Vie
 `docs/config.md`。
 
 ```go
-type Config struct { Root, Path string; Hozo HozoTable; Units []Unit }
-type Unit struct { Index int; In []string; Namespace string; Transpilers []string; Out string; Options map[string]map[string]any }   // [[emit]] 一つ。Index は何番目か（1 始まり）。In は省略なら nil。Options は [emit.options.<名前>]（なければ空）
-func Load(path string) (*Config, []diag.Diagnostic)        // CFG-7 / CFG-12 / CFG-17 / CFG-21 はここで出る。Config は常に返す（既定値で補う。CFG-7 か CFG-12 の単位は Units に入れない）
+type Config struct { Root, Path string; Hozo HozoTable; Options map[string]map[string]any; Units []Unit }   // Options は、プロジェクト全体の [options.<名前>]（書かれたまま）
+type Unit struct { Index int; In []string; Namespace string; Transpilers []string; Out string; Options map[string]map[string]any }   // [[emit]] 一つ。Index は何番目か（1 始まり）。In は省略なら nil。Options は [emit.options.<名前>] に、プロジェクト全体のオプションを混ぜたもの（docs/config.md「プロジェクト全体のオプション」。なければ空）
+func Load(path string) (*Config, []diag.Diagnostic)        // CFG-7 / CFG-12 / CFG-17 / CFG-21 / CFG-24 はここで出る。Config は常に返す（既定値で補う。CFG-7 か CFG-12 の単位は Units に入れない）
 func Find(startDir string) (string, bool)
 func Default(root string) *Config                           // hozo.toml がないとき（Project.NoConfig）
 func (c *Config) Covering(namespace string) []int           // 名前空間を対象にする単位（Units の添字、設定の順）。CFG-13（docs/config.md「単位の対象」）
@@ -522,7 +523,7 @@ func Under(a, dir string) bool                              // 相対パス a �
 
 | 規則 | 出すパッケージ | 要るもの |
 |---|---|---|
-| CFG-7、CFG-12、CFG-17、CFG-21 | `internal/config`（`Load`） | `hozo.toml` だけ |
+| CFG-7、CFG-12、CFG-17、CFG-21、CFG-24 | `internal/config`（`Load`） | `hozo.toml` だけ |
 | CFG-10 | `internal/check`（`Check`） | プログラム（名前空間） |
 | CFG-6 | `internal/check`（`CheckUnsupported`。呼ぶのは `internal/project`） | プログラムと、マニフェストの `unsupported` |
 | CFG-22 | `internal/check`（`CheckHomes`。呼ぶのは `internal/project`） | プログラムと、単位ごとの基底と `in` に合ったファイル |
@@ -639,7 +640,7 @@ Go のプラグインは、どれも同じ形: `main` パッケージが `plugin
 `internal/gen/hozoc` と `internal/gen/proc`（以下、合わせて「置き場」）は `cmd/hozoc` が import するパッケージなので、hozoc がそこへ直に書くと、プラグインの不具合でコンパイルできない Go が出たときに hozoc 自身がビルドできなくなり、生成し直すこともできなくなる。そうならないように、`make generate`（`go run ./internal/tools/selfgen`）は、置き場に、コンパイルできると確かめたものしか置かない。
 
 1. 今のソース（今の置き場を含む）で `hozoc` を一時ディレクトリにビルドする。
-2. 別の一時ディレクトリに `cli.hozo`、`hozo.toml`、`go.mod`、`go.sum` を写し、プラグイン（`plugins/` の `go`、`go-valid`、`go-cli`）を `go run` で動かすのに要る `ir`、`plugin`、`plugins`、`runtime` をシンボリックリンクで足して、そこで 1 の `hozoc emit` を走らせる（`tests/generated_test.go` と同じ組み立て。`go.mod` が同じなので import パスも同じになる）。プラグインの探索が見るプロジェクトの外の場所（`HOZO_PLUGIN_PATH`、ホーム）は空にして、生成物が実行する人の環境に左右されないようにする。
+2. 別の一時ディレクトリに `cli.hozo`、`hozo.toml`、`go.mod`、`go.sum` を写し、プラグイン（`plugins/` の `go`、`go-valid`、`go-cli`）を `go run` で動かすのに要る `ir`、`plugin`、`plugins`、`runtime` をシンボリックリンクで足して、そこで 1 の `hozoc emit` を走らせる（`tests/generated_test.go` と同じ組み立て。import パスは、`hozo.toml` の `[options.go]` の `module` から決まるので、同じになる。`go.mod` は、3 の vet とビルドのために写す）。プラグインの探索が見るプロジェクトの外の場所（`HOZO_PLUGIN_PATH`、ホーム）は空にして、生成物が実行する人の環境に左右されないようにする。
 3. 生成した `internal/gen/hozoc/**` と `internal/gen/proc/**` を、その一時ディレクトリで `go vet` に通し、次に、リポジトリの今のものの代わりに置いたつもりで（`go build -overlay`。ディスクの上の置き場には触れない）、それを import するパッケージ（`cmd/hozoc`、`internal/app`）ごと `go build` する。
 4. 3 が通ったときだけ、置き場の中身を生成したものに置き換える（なくなったファイルは消し、同じ内容のファイルには触れない）。通らなければ何も変えず、生成したものを残した一時ディレクトリの場所を示して失敗する。
 

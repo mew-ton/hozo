@@ -60,10 +60,10 @@ type Output struct {
 	Errors   []plugin.Diagnostic
 }
 
-// Emit は、要求の View の出力 (U, N) の cli/cli.go を作る（docs/plugin-go-cli.md「出力」）。root はプロジェクトのルート
-// （go.mod を探す起点）。診断があれば、ファイルは返さない。@cli.command の op が一つもなければ、ファイルを出さず warning を一つ返す。
+// Emit は、要求の View の出力 (U, N) の cli/cli.go を作る（docs/plugin-go-cli.md「出力」）。読むのは、要求だけ
+// （ファイルも、環境変数も、読まない）。診断があれば、ファイルは返さない。@cli.command の op が一つもなければ、ファイルを出さず warning を一つ返す。
 // 戻り値の error は、利用者の仕様の誤りでないもの（View が欠けている、生成したコードを整形できない）。
-func Emit(req *plugin.EmitRequest, root string) (*Output, error) {
+func Emit(req *plugin.EmitRequest) (*Output, error) {
 	view := req.View
 	if view == nil || view.Program == nil || view.Program.Namespace(view.Viewer) == nil {
 		viewer := ""
@@ -72,7 +72,7 @@ func Emit(req *plugin.EmitRequest, root string) (*Output, error) {
 		}
 		return nil, fmt.Errorf("View に、名前空間 %s の Program がない", viewer)
 	}
-	g := &generator{view: view, root: root, p: view.Program}
+	g := &generator{view: view, p: view.Program}
 	g.prepare()
 
 	// CLI-8: オプションはない
@@ -94,10 +94,10 @@ func Emit(req *plugin.EmitRequest, root string) (*Output, error) {
 		return &Output{Warnings: []plugin.Warning{{At: view.Viewer,
 			Message: fmt.Sprintf("名前空間 %s の単位の対象に @%s の付いた op がないので、%s を出さない", view.Viewer, cliCommand, OutputPath)}}}, nil
 	}
-	// 置き場。go.mod がなければ、基底が GO-1 を返すので、ここでは何も返さない
-	layout, err := golang.LayoutOf(view, root)
+	// 置き場。基底のオプション module がなければ、基底が GO-8 を返すので、ここでは何も返さない
+	layout, err := golang.LayoutOf(view)
 	if err != nil {
-		if errors.Is(err, golang.ErrNoGoMod) {
+		if errors.Is(err, golang.ErrNoModule) {
 			return &Output{}, nil
 		}
 		return nil, fmt.Errorf("名前空間 %s の出力先 %q の import パスを求められない: %w", view.Viewer, view.Config.Dir, err)
@@ -113,7 +113,6 @@ func Emit(req *plugin.EmitRequest, root string) (*Output, error) {
 // generator は一つの出力 (U, N) の cli.go を作る状態。
 type generator struct {
 	view   *ir.View
-	root   string
 	p      *ir.Program
 	layout *golang.Layout
 

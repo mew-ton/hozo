@@ -1,6 +1,10 @@
 # 単位のコーパス（docs/testing.md「コーパス」、README.md）: hozo.toml は出力の単位の一覧（docs/config.md「単位」）。
 # 四つの単位とも、トランスパイラは Go の基底 go（リポジトリの plugins/ のプラグイン。テストが HOZO_PLUGIN_PATH として渡す）。
 
+# Go のモジュールの名前（go.mod の module と同じもの。docs/plugin-go.md「マニフェスト」）。プロジェクト全体のオプション
+[options.go]
+module = "github.com/mew-ton/hozo"
+
 # 1: stock。shop の出力が、この出力の型（ItemId、Short）を import する（単位をまたぐ一方向の import）
 [[emit]]
 namespace   = "stock"

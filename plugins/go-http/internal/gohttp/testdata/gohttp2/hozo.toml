@@ -1,3 +1,6 @@
+[options.go]
+module = "example.com/app"
+
 # plugins/go-http の単体テストの入力（docs/testing.md「単体テスト」）: GOHTTP-2（経路の op の引数が、0 個でも model 一つでもない）。
 [[emit]]
 namespace   = "app"

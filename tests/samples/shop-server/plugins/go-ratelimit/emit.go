@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"go/format"
-	"os"
 	"path"
 	"strings"
 
@@ -37,9 +36,6 @@ const (
 
 // Handler は go-ratelimit の plugin.Handler。emit と、emit と同じ検査で答える check を実装する。
 type Handler struct {
-	// Getenv は環境変数を引く関数。nil なら os.Getenv。HOZO_PROJECT_ROOT（docs/plugin-protocol.md「起動」）を、型のパッケージの
-	// import パスを求めるルートに使う。空なら作業ディレクトリ（= プロジェクトのルート）。
-	Getenv func(string) string
 }
 
 var _ plugin.Handler = Handler{}
@@ -53,15 +49,7 @@ func (h Handler) Emit(req *plugin.EmitRequest) (*plugin.EmitResponse, error) {
 	if req.Transpiler != TranspilerName {
 		return nil, fmt.Errorf("transpiler %q is not provided by go-ratelimit (it provides %q): %w", req.Transpiler, TranspilerName, plugin.ErrUnsupported)
 	}
-	getenv := h.Getenv
-	if getenv == nil {
-		getenv = os.Getenv
-	}
-	root := getenv("HOZO_PROJECT_ROOT")
-	if root == "" {
-		root = "."
-	}
-	return Emit(req, root)
+	return Emit(req)
 }
 
 // Check は、emit と同じ検査をして、emit が errors で返す誤りを、検査の段でも返す（docs/plugin-protocol.md「check」、
@@ -80,10 +68,10 @@ func (Handler) Coverage(*plugin.CoverageRequest) (*plugin.CoverageResponse, erro
 	return nil, plugin.ErrUnsupported
 }
 
-// Emit は、要求の View の出力 (U, N) の ratelimit.go を作る。root はプロジェクトのルート（go.mod を探す起点）。
+// Emit は、要求の View の出力 (U, N) の ratelimit.go を作る。読むのは、要求だけ（ファイルも、環境変数も、読まない）。
 // 対象（自分が宣言した継ぎ目）が一つもなければ、ファイルを出さない。診断があれば、ファイルは返さない。誤り（error）を返すのは、
 // 利用者の仕様の誤りではないとき（View が欠けている、生成したコードを整形できない、型の置き場がない）。
-func Emit(req *plugin.EmitRequest, root string) (*plugin.EmitResponse, error) {
+func Emit(req *plugin.EmitRequest) (*plugin.EmitResponse, error) {
 	view := req.View
 	if view == nil || view.Program == nil || view.Program.Namespace(view.Viewer) == nil {
 		viewer := ""
@@ -92,7 +80,7 @@ func Emit(req *plugin.EmitRequest, root string) (*plugin.EmitResponse, error) {
 		}
 		return nil, fmt.Errorf("emit: View に、名前空間 %q の Program がない", viewer)
 	}
-	e := &emitter{view: view, root: root, shape: golang.ShapeOf(view)}
+	e := &emitter{view: view, shape: golang.ShapeOf(view)}
 
 	// GORATE-1: オプションはない
 	var none struct{}
@@ -120,10 +108,10 @@ func Emit(req *plugin.EmitRequest, root string) (*plugin.EmitResponse, error) {
 		return &plugin.EmitResponse{}, nil
 	}
 
-	layout, err := golang.LayoutOf(view, root)
+	layout, err := golang.LayoutOf(view)
 	if err != nil {
-		if errors.Is(err, golang.ErrNoGoMod) {
-			// Dir(U, N) の上に go.mod がない。報告するのは基底（GO-1。docs/plugin-go.md「診断」）で、ここは何も出さない
+		if errors.Is(err, golang.ErrNoModule) {
+			// 基底のオプション module がない。報告するのは基底（GO-8。docs/plugin-go.md「診断」）で、ここは何も出さない
 			return &plugin.EmitResponse{}, nil
 		}
 		return nil, fmt.Errorf("emit: 名前空間 %s の出力先 %q の import パスを求められない: %w", view.Viewer, view.Config.Dir, err)
@@ -139,7 +127,6 @@ func Emit(req *plugin.EmitRequest, root string) (*plugin.EmitResponse, error) {
 // emitter は一つの出力 (U, N) の ratelimit.go を作る状態。
 type emitter struct {
 	view   *ir.View
-	root   string
 	layout *golang.Layout
 	shape  *golang.Shape
 	mine   []golang.Seam // 対象の継ぎ目（基底の Seams の並びのまま）
@@ -153,7 +140,7 @@ func (e *emitter) errorf(code, at, format string, args ...any) {
 // generate は ratelimit.go の内容を作る。import の名前と、局所の名前が避ける名前を決めるために、二度作る（基底と同じ。
 // docs/plugin-go.md「パッケージと import パス」の「import の名前」）。go/format で整形する。
 func (e *emitter) generate() (string, error) {
-	im := golang.NewImports(e.view, e.layout, e.root, false)
+	im := golang.NewImports(e.view, e.layout, false)
 	e.build(im)
 	im = im.Canonical()
 	body := e.build(im)

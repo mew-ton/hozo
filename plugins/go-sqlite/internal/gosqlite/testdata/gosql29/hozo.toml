@@ -1,3 +1,6 @@
+[options.go]
+module = "example.com/app"
+
 # plugins/go-sqlite の単体テストの入力（docs/testing.md「単体テスト」）: GOSQL-29（op に @db.transaction が付いているのに、N に表の状態が一つもない）。
 [[emit]]
 namespace   = "app"

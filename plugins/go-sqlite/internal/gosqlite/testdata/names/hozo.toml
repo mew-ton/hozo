@@ -1,3 +1,6 @@
+[options.go]
+module = "example.com/app"
+
 # plugins/go-sqlite の単体テストの入力（docs/testing.md「単体テスト」）: docs/plugin-go-sqlite.md「補助」の、当たる名前
 # （引数、同じ名前の model、補助と継ぎ目のメソッドの中の局所の名前と同じ名前のパッケージ）と、内側のフォルダを持つ出力
 # （db.go は入口のパッケージ）。

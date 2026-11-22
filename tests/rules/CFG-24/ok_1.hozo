@@ -1,0 +1,8 @@
+// CFG-24（docs/config.md「プロジェクト全体のオプション」）: [options.<名前>] の <名前> を、どれかの単位が transpilers に書いている。
+// 単位の [emit.options.<名前>] に同じキーがあれば、単位のものが勝つ（ok_1.toml）
+namespace a {
+  fn f();
+}
+namespace a.sub {
+  fn g();
+}

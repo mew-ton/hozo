@@ -2,6 +2,10 @@
 # check と、Go の基底 go の出力（docs/plugin-go.md「状態の単位」「分類」「match」）のゴールデンを確かめる。
 # go は、リポジトリの plugins/ のプラグイン。テストが HOZO_PLUGIN_PATH として渡す。
 
+# Go のモジュールの名前（go.mod の module と同じもの。docs/plugin-go.md「マニフェスト」）。プロジェクト全体のオプション
+[options.go]
+module = "github.com/mew-ton/hozo"
+
 [[emit]]
 namespace   = "shop"
 transpilers = ["go"]

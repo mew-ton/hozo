@@ -52,7 +52,7 @@ func newPluginProject(t *testing.T, text string) *pluginProject {
 	p := &pluginProject{t: t, root: root, dir: filepath.Join(root, "plugins", "chk"), uri: fileURI(filepath.Join(root, "a.hozo"))}
 	script := filepath.Join(p.dir, "run.sh")
 	writeFile(t, script, `cat >/dev/null
-d="$HOZO_PLUGIN_DIR"
+d=$(dirname "$0")
 echo x >> "$d/calls"
 n=$(wc -l < "$d/calls" | tr -d ' ')
 while [ -f "$d/gate" ] && [ ! -f "$d/open" ]; do sleep 0.01; done

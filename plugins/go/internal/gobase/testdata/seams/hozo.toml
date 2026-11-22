@@ -2,6 +2,9 @@
 [hozo]
 plugin_dirs = ["plugins"]
 
+[options.go]
+module = "example.com/app"
+
 # 1: shop。単位の継ぎ目は t.limited（go-rate）と、t.traced、t.unused（go-trace）
 [[emit]]
 namespace   = "shop"

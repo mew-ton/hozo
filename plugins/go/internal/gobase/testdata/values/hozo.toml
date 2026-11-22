@@ -1,3 +1,6 @@
+[options.go]
+module = "example.com/app"
+
 # plugins/go の単体テストの入力（docs/testing.md「単体テスト」）: docs/plugin-go.md「値」の表の各行、型をそろえる、省略可能を通るパス。
 [[emit]]
 namespace   = "app"

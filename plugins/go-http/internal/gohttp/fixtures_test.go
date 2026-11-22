@@ -109,7 +109,7 @@ func emitViews(t *testing.T, root string, views []*ir.View) (map[string]string, 
 		if !listed(v, TranspilerName) {
 			continue
 		}
-		out, err := Emit(request(v, TranspilerName), root)
+		out, err := Emit(request(v, TranspilerName))
 		if err != nil {
 			t.Fatalf("%s: %v", v.Viewer, err)
 		}
@@ -433,7 +433,7 @@ func dependencyFiles(t *testing.T, root string, views []*ir.View) map[string]str
 			}
 			cmd := exec.Command(filepath.Join(built.dir, dep.transpiler))
 			cmd.Dir = root
-			cmd.Env = append(os.Environ(), "HOZO_PROJECT_ROOT="+root)
+			cmd.Env = os.Environ()
 			cmd.Stdin = bytes.NewReader(req)
 			var stdout, stderr bytes.Buffer
 			cmd.Stdout, cmd.Stderr = &stdout, &stderr
@@ -481,4 +481,32 @@ func vet(t *testing.T, root string, views []*ir.View, files map[string]string) {
 	if out, err := runGo(t, root, "vet", "./..."); err != nil {
 		t.Errorf("生成したコードが go vet を通らない: %v\n%s", err, out)
 	}
+}
+
+// noModule は、views の写しで、どの出力の設定も、基底へのオプション module を持たないもの（基底が GO-8 を返す設定。
+// docs/plugin-go.md「診断」）。
+func noModule(views []*ir.View) []*ir.View {
+	strip := func(c ir.NamespaceConfig) ir.NamespaceConfig {
+		options := map[string]map[string]any{}
+		for name, table := range c.Options {
+			if name != c.Base {
+				options[name] = table
+			}
+		}
+		c.Options = options
+		return c
+	}
+	out := make([]*ir.View, len(views))
+	for i, view := range views {
+		v := *view
+		v.Config = strip(view.Config)
+		v.Namespaces = map[string][]ir.NamespaceConfig{}
+		for ns, list := range view.Namespaces {
+			for _, c := range list {
+				v.Namespaces[ns] = append(v.Namespaces[ns], strip(c))
+			}
+		}
+		out[i] = &v
+	}
+	return out
 }

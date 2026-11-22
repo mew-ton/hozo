@@ -18,13 +18,7 @@ func TestCheckMatchesEmit(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	root := newRoot(t)
-	h := Handler{Getenv: func(name string) string {
-		if name == "HOZO_PROJECT_ROOT" {
-			return root
-		}
-		return ""
-	}}
+	h := Handler{}
 	views, withErrors := 0, 0
 	for _, e := range entries {
 		if !e.IsDir() {

@@ -1,4 +1,7 @@
-# plugins/go の単体テストの入力（docs/testing.md「単体テスト」）: GO-5（[emit.options.go] に、知らないキーがある）。
+[options.go]
+module = "example.com/app"
+
+# plugins/go の単体テストの入力（docs/testing.md「単体テスト」）: GO-5（トランスパイラ go へのオプションに、知らないキーがある。module は、知っているキー）。
 [[emit]]
 namespace   = "a"
 transpilers = ["go"]

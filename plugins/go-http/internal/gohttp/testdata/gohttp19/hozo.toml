@@ -1,3 +1,6 @@
+[options.go]
+module = "example.com/app"
+
 # plugins/go-http の単体テストの入力（docs/testing.md「単体テスト」）: GOHTTP-19（@http.default の値が、フィールドの制約に合わない）。
 [[emit]]
 namespace   = "app"

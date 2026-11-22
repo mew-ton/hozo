@@ -43,7 +43,7 @@ type file struct {
 }
 
 func (g *generator) newFile() *file {
-	return &file{g: g, im: golang.NewImports(g.view, g.layout, g.root, false), reserved: map[string]bool{}, std: map[string]bool{}, spaces: map[string]bool{},
+	return &file{g: g, im: golang.NewImports(g.view, g.layout, false), reserved: map[string]bool{}, std: map[string]bool{}, spaces: map[string]bool{},
 		usesLine: map[string]bool{}}
 }
 

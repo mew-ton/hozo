@@ -426,14 +426,14 @@ func TestAllErrorsAreReported(t *testing.T) {
 	}
 }
 
-// TestNoGoMod: Dir(U, N) の上に go.mod がないとき（基底が GO-1 を返す）、go-cli は、ファイルも診断も返さない。
-// 仕様だけで決まる診断は、go.mod がなくても返す。
-func TestNoGoMod(t *testing.T) {
-	files, diags, warnings := emitViews(t, t.TempDir(), loadViews(t, "commands"))
+// TestNoModule: 基底のオプション module がないとき（基底が GO-8 を返す）、go-cli は、ファイルも診断も返さない。
+// 仕様だけで決まる診断は、module がなくても返す。
+func TestNoModule(t *testing.T) {
+	files, diags, warnings := emitViews(t, "", noModule(loadViews(t, "commands")))
 	if len(files) != 0 || len(diags) != 0 || len(warnings) != 0 {
-		t.Errorf("files=%v 診断=%+v warnings=%+v, want どれも空（GO-1 は基底が返す）", sortedPaths(files), diags, warnings)
+		t.Errorf("files=%v 診断=%+v warnings=%+v, want どれも空（GO-8 は基底が返す）", sortedPaths(files), diags, warnings)
 	}
-	_, diags, _ = emitViews(t, t.TempDir(), loadViews(t, "cli6"))
+	_, diags, _ = emitViews(t, "", noModule(loadViews(t, "cli6")))
 	if len(diags) == 0 || diags[0].Code != codeCLIExport {
 		t.Errorf("診断 = %+v, want CLI-6", diags)
 	}
@@ -447,24 +447,19 @@ func TestBrokenView(t *testing.T) {
 		"Program がない":          {Version: ir.Version, Viewer: "tool", Config: view.Config},
 		"viewer が Program にない": {Version: ir.Version, Viewer: "nowhere", Config: view.Config, Program: view.Program},
 	} {
-		out, err := Emit(request(v, TranspilerName), newRoot(t))
+		out, err := Emit(request(v, TranspilerName))
 		if err == nil || out != nil {
 			t.Errorf("%s: out=%+v err=%v, want error だけ", name, out, err)
 		}
 	}
 }
 
-// TestHandler は、プラグインの入口（Handler）: HOZO_PROJECT_ROOT をルートにして出力し、診断は応答の errors で返す
+// TestHandler は、プラグインの入口（Handler）: 要求の View から出力し、診断は応答の errors で返す
 // （docs/plugin-protocol.md「emit」）。提供するトランスパイラは go-cli の一つ。check と import は持たない。
 func TestHandler(t *testing.T) {
 	view := loadViews(t, "commands")[0]
 	root := newRoot(t)
-	h := Handler{Getenv: func(key string) string {
-		if key == "HOZO_PROJECT_ROOT" {
-			return root
-		}
-		return ""
-	}}
+	h := Handler{}
 	resp, err := h.Emit(request(view, TranspilerName))
 	if err != nil {
 		t.Fatal(err)
@@ -504,8 +499,7 @@ func TestHandler(t *testing.T) {
 
 // TestProtocol は、JSON の要求を plugin.Run に通したときの応答の形（docs/plugin-protocol.md「emit」「要求と応答」）。
 func TestProtocol(t *testing.T) {
-	root := newRoot(t)
-	h := Handler{Getenv: func(string) string { return root }}
+	h := Handler{}
 	run := func(view *ir.View) string {
 		t.Helper()
 		req, err := json.Marshal(request(view, TranspilerName))
@@ -556,7 +550,7 @@ func TestPluginBinary(t *testing.T) {
 	}
 	cmd := exec.Command(goBin, "run", "github.com/mew-ton/hozo/plugins/go-cli")
 	cmd.Dir = repoRoot(t)
-	cmd.Env = append(os.Environ(), "HOZO_PROJECT_ROOT="+root, "HOZO_PLUGIN_DIR="+filepath.Join(repoRoot(t), "plugins", "go-cli"))
+	cmd.Env = os.Environ()
 	cmd.Stdin = bytes.NewReader(req)
 	var out, errOut bytes.Buffer
 	cmd.Stdout, cmd.Stderr = &out, &errOut

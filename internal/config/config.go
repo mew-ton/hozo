@@ -9,6 +9,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 
@@ -38,6 +39,9 @@ type Config struct {
 	Hozo HozoTable
 	// Units は出力の単位（[[emit]]）。書いた順（設定の順）。必須のキーを欠いた単位（CFG-12）は入れない。
 	Units []Unit
+	// Options は [options.<名前>]（docs/config.md「プロジェクト全体のオプション」）: トランスパイラの名前 → プロジェクト全体の
+	// オプションのテーブル（書かれたまま）。なければ空（nil ではない）。単位の Options には、これを合わせた後のものが入っている。
+	Options map[string]map[string]any
 }
 
 // HozoTable は [hozo] テーブル（docs/config.md「形」）。
@@ -74,8 +78,9 @@ func (u *Unit) Label() string {
 // root をルートにし、[hozo] は既定値、単位はなし。
 func Default(root string) *Config {
 	return &Config{
-		Root: root,
-		Hozo: HozoTable{Sources: append([]string(nil), DefaultSources...), PluginDirs: []string{}, MaxBindings: DefaultMaxBindings},
+		Root:    root,
+		Hozo:    HozoTable{Sources: append([]string(nil), DefaultSources...), PluginDirs: []string{}, MaxBindings: DefaultMaxBindings},
+		Options: map[string]map[string]any{},
 	}
 }
 
@@ -249,8 +254,65 @@ func (l *loader) load(raw map[string]any) {
 			for i, t := range units {
 				l.loadUnit(i+1, t)
 			}
+		case "options":
+			l.loadProjectOptions(value)
 		default:
-			l.errorf("CFG-7", "知らないキー %s（トップレベルに書けるのは [hozo] と [[emit]] だけ）", key)
+			l.errorf("CFG-7", "知らないキー %s（トップレベルに書けるのは [hozo] と [options.<名前>] と [[emit]] だけ）", key)
+		}
+	}
+	l.mergeProjectOptions()
+}
+
+// loadProjectOptions は [options.<名前>]（docs/config.md「プロジェクト全体のオプション」）を cfg.Options に読む。形の決まりは、
+// 単位のオプションと同じ（CFG-7）。
+func (l *loader) loadProjectOptions(raw any) {
+	table, ok := raw.(map[string]any)
+	if !ok {
+		l.errorf("CFG-7", "options はテーブルでなければならない（%s）", typeName(raw))
+		return
+	}
+	for _, name := range sortedKeys(table) {
+		opts, ok := table[name].(map[string]any)
+		if !ok {
+			l.errorf("CFG-7", "options.%s はテーブルでなければならない（%s）", name, typeName(table[name]))
+			continue
+		}
+		clean, bad := optionValue(opts, "options."+name)
+		if bad != "" {
+			l.errorf("CFG-7", "%s に日時は書けない（オプションの値は、文字列、整数、小数、真偽値、それらの配列とテーブル）", bad)
+			continue
+		}
+		l.cfg.Options[name] = clean.(map[string]any)
+	}
+}
+
+// mergeProjectOptions は、プロジェクト全体のオプションを、そのトランスパイラを並べた単位の Options に合わせる: 単位が同じキーを
+// 書いていれば、単位の値（キーごと。テーブルの中は合わせない）。どの単位の transpilers にもない名前は CFG-24。
+func (l *loader) mergeProjectOptions() {
+	names := make([]string, 0, len(l.cfg.Options))
+	for name := range l.cfg.Options {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	for _, name := range names {
+		used := false
+		for i := range l.cfg.Units {
+			u := &l.cfg.Units[i]
+			if !slices.Contains(u.Transpilers, name) {
+				continue
+			}
+			used = true
+			merged := map[string]any{}
+			for k, v := range l.cfg.Options[name] {
+				merged[k] = v
+			}
+			for k, v := range u.Options[name] {
+				merged[k] = v
+			}
+			u.Options[name] = merged
+		}
+		if !used {
+			l.errorf("CFG-24", "[options.%s] の %s が、どの単位の transpilers にもない", name, name)
 		}
 	}
 }

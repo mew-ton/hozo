@@ -74,10 +74,10 @@ type Output struct {
 }
 
 // Emit は、要求の View の出力 (U, N) の、入口のパッケージの http.go（docs/plugin-go-http.md「出力」）と、テストのパッケージの http.go
-// （同「インテグレーションテストの口」）を作る。root はプロジェクトのルート
-// （go.mod を探す起点）。診断があれば、ファイルは返さない。経路の op が一つもなければ、ファイルを出さず warning を一つ返す。
+// （同「インテグレーションテストの口」）を作る。読むのは、要求だけ
+// （ファイルも、環境変数も、読まない）。診断があれば、ファイルは返さない。経路の op が一つもなければ、ファイルを出さず warning を一つ返す。
 // 戻り値の error は、利用者の仕様の誤りでないもの（View が欠けている、生成したコードを整形できない）。
-func Emit(req *plugin.EmitRequest, root string) (*Output, error) {
+func Emit(req *plugin.EmitRequest) (*Output, error) {
 	view := req.View
 	if view == nil || view.Program == nil || view.Program.Namespace(view.Viewer) == nil {
 		viewer := ""
@@ -86,7 +86,7 @@ func Emit(req *plugin.EmitRequest, root string) (*Output, error) {
 		}
 		return nil, fmt.Errorf("View に、名前空間 %s の Program がない", viewer)
 	}
-	g := &generator{view: view, root: root, p: view.Program, ns: view.Program.Namespace(view.Viewer)}
+	g := &generator{view: view, p: view.Program, ns: view.Program.Namespace(view.Viewer)}
 	g.prepare()
 
 	// GOHTTP-9
@@ -101,18 +101,15 @@ func Emit(req *plugin.EmitRequest, root string) (*Output, error) {
 		g.errorf(codeHTTPOption, "", "%d 番目の [[emit]] の [emit.options.%s] に、知らないキー %s がある（あるのは validate）", view.Config.Index, TranspilerName, key)
 	}
 
-	// 置き場。go.mod がなければ、基底が GO-1 を返すので、ここでは何も返さない（診断は、そのときも返す）
-	layout, err := golang.LayoutOf(view, root)
-	if err != nil && !errors.Is(err, golang.ErrNoGoMod) {
+	// 置き場。基底のオプション module がなければ、基底が GO-8 を返すので、ここでは何も返さない（診断は、そのときも返す）
+	layout, err := golang.LayoutOf(view)
+	if err != nil && !errors.Is(err, golang.ErrNoModule) {
 		return nil, fmt.Errorf("名前空間 %s の出力先 %q の import パスを求められない: %w", view.Viewer, view.Config.Dir, err)
 	}
-	g.layout = layout // go.mod がなければ nil
-	root_ := root
-	if layout == nil {
-		root_ = "" // go.mod がない: 置き場は、求めない
-	}
-	kit, err := golang.TestKitOf(view, root_)
-	if err != nil {
+	g.layout = layout // module がなければ nil
+	// テストの中の組み立て。module のない出力の置き場は、nil のまま（そのときは、ファイルを返さない）
+	kit, err := golang.TestKitOf(view)
+	if err != nil && !errors.Is(err, golang.ErrNoModule) {
 		return nil, fmt.Errorf("名前空間 %s の、テストの中の組み立てに使う出力の import パスを求められない: %w", view.Viewer, err)
 	}
 	g.kit = kit
@@ -164,7 +161,6 @@ func Emit(req *plugin.EmitRequest, root string) (*Output, error) {
 // generator は一つの出力 (U, N) の、二つの http.go を作る状態。
 type generator struct {
 	view   *ir.View
-	root   string
 	p      *ir.Program
 	ns     *ir.Namespace // N
 	opts   options

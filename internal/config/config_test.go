@@ -403,3 +403,69 @@ func TestOptionsShape(t *testing.T) {
 		})
 	}
 }
+
+// docs/config.md「プロジェクト全体のオプション」: [options.<名前>] は、そのトランスパイラを並べた、どの単位にも渡る。単位が同じキーを
+// 書いていれば、単位の値（キーごと。テーブルの中は合わせない）。並べていない単位には、渡らない。
+func TestProjectOptions(t *testing.T) {
+	cfg, diags := Load(write(t, `
+[options.go]
+module = "example.com/app"
+tags   = { a = 1, b = 2 }
+
+[[emit]]
+namespace   = "server"
+transpilers = ["go", "go-http"]
+out         = "gen/server"
+
+[emit.options.go]
+tags = { a = 9 }
+
+[[emit]]
+namespace   = "type"
+transpilers = ["go"]
+out         = "gen/type"
+
+[[emit]]
+namespace   = "web"
+transpilers = ["ts"]
+out         = "gen/web"
+`))
+	if len(diags) != 0 {
+		t.Fatalf("diags = %+v", diags)
+	}
+	if want := (map[string]map[string]any{"go": {"module": "example.com/app", "tags": map[string]any{"a": int64(1), "b": int64(2)}}}); !reflect.DeepEqual(cfg.Options, want) {
+		t.Errorf("Config.Options = %#v（期待は、書かれたまま %#v）", cfg.Options, want)
+	}
+	// 単位 1: module は、プロジェクトのもの。tags は、単位が書いたので、丸ごと、単位の値
+	if want := (map[string]map[string]any{"go": {"module": "example.com/app", "tags": map[string]any{"a": int64(9)}}}); !reflect.DeepEqual(cfg.Units[0].Options, want) {
+		t.Errorf("単位 1 の Options = %#v（期待は %#v）", cfg.Units[0].Options, want)
+	}
+	// 単位 2: 何も書いていないので、プロジェクトのもの、そのまま
+	if want := (map[string]map[string]any{"go": {"module": "example.com/app", "tags": map[string]any{"a": int64(1), "b": int64(2)}}}); !reflect.DeepEqual(cfg.Units[1].Options, want) {
+		t.Errorf("単位 2 の Options = %#v（期待は %#v）", cfg.Units[1].Options, want)
+	}
+	// 単位 3: go を並べていないので、渡らない
+	if len(cfg.Units[2].Options) != 0 {
+		t.Errorf("単位 3 の Options = %#v（期待は、空）", cfg.Units[2].Options)
+	}
+}
+
+// docs/config.md「診断」の CFG-24: [options.<名前>] の <名前> が、どの単位の transpilers にもない。単位のない設定でも。
+// 形の決まりは、単位のオプションと同じ（CFG-7）。
+func TestProjectOptionsDiagnostics(t *testing.T) {
+	unit := "[[emit]]\nnamespace = \"a\"\ntranspilers = [\"go\"]\nout = \"gen\"\n"
+	for name, tc := range map[string]struct{ body, code string }{
+		"どの単位にもない名前":            {"[options.go-htpp]\nvalidate = true\n" + unit, "CFG-24"},
+		"単位のない設定":               {"[options.go]\nmodule = \"m\"\n", "CFG-24"},
+		"options がテーブルでない":      {"options = 1\n" + unit, "CFG-7"},
+		"options.<名前> がテーブルでない": {"[options]\ngo = true\n" + unit, "CFG-7"},
+		"値が日時":                  {"[options.go]\nat = 2024-01-02T03:04:05Z\n" + unit, "CFG-7"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			_, diags := Load(write(t, tc.body))
+			if got := codes(diags); !reflect.DeepEqual(got, []string{tc.code}) {
+				t.Fatalf("codes = %v（期待は %s）: %+v", got, tc.code, diags)
+			}
+		})
+	}
+}

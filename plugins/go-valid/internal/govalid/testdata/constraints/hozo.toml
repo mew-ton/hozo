@@ -1,6 +1,9 @@
 # plugins/go-valid の単体テストの入力（docs/testing.md「単体テスト」）: docs/plugin-go-valid.md「制約」の表の各行と、
 # 「scalar」「model」の形（サンプルが使わない pattern / max / record / 省略可能 を含む）。
 
+[options.go]
+module = "example.com/app"
+
 # 1: 共有の型。app の Validate が、ここの型のメソッドを呼ぶ
 [[emit]]
 namespace   = "type"

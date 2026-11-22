@@ -144,13 +144,12 @@ func TestShapeStateUnits(t *testing.T) {
 // docs/plugin-go.md「状態の単位」のメソッドの形: read は (<結果の型>, error)、効果は error、形で決まる命令は value 一つか、なし。
 // どれも ctx を取る。
 func TestUnitSignatures(t *testing.T) {
-	root := projectRoot(t)
 	v := typesView()
-	l, _ := LayoutOf(v, root)
+	l, _ := LayoutOf(v)
 	user, email := ir.Ref("server.User"), ir.Ref("server.Email")
 	reserved := map[string]bool{"o": true, "ctx": true, "err": true, "ptr": true}
 	sig := func(f func(im *Imports) (string, string)) string {
-		im := NewImports(v, l, root, true)
+		im := NewImports(v, l, true)
 		params, results := f(im)
 		if im.Name("context") == "" {
 			t.Errorf("(%s) %s: context を import していない", params, results)
@@ -197,9 +196,8 @@ func TestUnitSignatures(t *testing.T) {
 // docs/plugin-go.md「op の形」: どの op も、最初の引数に ctx を取り、最後の戻り値に error を返す。純粋かどうか
 // （Op.signature.pure）でも、throws の有無でも、形は変わらない。
 func TestSignature(t *testing.T) {
-	root := projectRoot(t)
 	v := typesView()
-	l, _ := LayoutOf(v, root)
+	l, _ := LayoutOf(v)
 	user, email := ir.Ref("server.User"), ir.Ref("server.Email")
 	tests := []struct {
 		name            string
@@ -226,7 +224,7 @@ func TestSignature(t *testing.T) {
 	reserved := map[string]bool{"o": true, "ctx": true, "err": true, "ptr": true}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			im := NewImports(v, l, root, true)
+			im := NewImports(v, l, true)
 			params, results := Signature(tt.op, im, reserved)
 			if params != tt.params || results != tt.results {
 				t.Errorf("Signature = (%q, %q), want (%q, %q)", params, results, tt.params, tt.results)
@@ -246,12 +244,11 @@ func TestSignature(t *testing.T) {
 // docs/plugin-go.md「op の形」: 形は op の宣言だけで決まる。純粋さ（Signature.pure）と、計算した例外（Signature.exceptions）を
 // 変えても、メソッドのテキストは一バイトも変わらない。
 func TestSignatureIgnoresPurity(t *testing.T) {
-	root := projectRoot(t)
 	v := typesView()
-	l, _ := LayoutOf(v, root)
+	l, _ := LayoutOf(v)
 	user := ir.Ref("server.User")
 	text := func(o *ir.Op) string {
-		params, results := Signature(o, NewImports(v, l, root, true), nil)
+		params, results := Signature(o, NewImports(v, l, true), nil)
 		return "(" + params + ") " + results
 	}
 	for _, returns := range []ir.Type{nil, user, ir.Never()} {
@@ -408,10 +405,9 @@ func TestShapeSeams(t *testing.T) {
 // docs/plugin-go.md「Seams」のメソッドの形: 引数は、op の形の引数の後ろに body func(<op の形の引数>) <op の形の戻り値>。
 // body という名前が op の引数の局所の名前と当たれば、当たらなくなるまで、body の方の末尾に _ を足す。
 func TestSeamSignature(t *testing.T) {
-	root := projectRoot(t)
 	v := typesView()
-	l, _ := LayoutOf(v, root)
-	im := NewImports(v, l, root, true)
+	l, _ := LayoutOf(v)
+	im := NewImports(v, l, true)
 	login := with(op("server.login", ir.Ref("server.User"), param("in", ir.Ref("server.Email"))), impure())
 	params, results := SeamSignature(login, im, nil)
 	if params != "ctx context.Context, in Email, body func(ctx context.Context, in Email) (User, error)" || results != "(User, error)" {

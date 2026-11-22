@@ -857,7 +857,7 @@
     },
     "CoverageRequest": {
       "additionalProperties": false,
-      "description": "direction \"coverage\" の要求（docs/plugin-protocol.md「coverage」）。coverage はカバレッジのファイル、files は実行された行を知りたいファイル。",
+      "description": "direction \"coverage\" の要求（docs/plugin-protocol.md「coverage」）。coverage はカバレッジのファイル、files は実行された行を知りたいファイル、outputs は files を出した出力の設定。",
       "properties": {
         "coverage": {
           "$ref": "#/$defs/File"
@@ -871,6 +871,12 @@
           },
           "type": "array"
         },
+        "outputs": {
+          "items": {
+            "$ref": "#/$defs/NamespaceConfig"
+          },
+          "type": "array"
+        },
         "protocol": {
           "const": "0.21"
         }
@@ -879,7 +885,8 @@
         "protocol",
         "direction",
         "coverage",
-        "files"
+        "files",
+        "outputs"
       ],
       "type": "object"
     },

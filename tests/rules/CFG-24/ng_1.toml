@@ -1,0 +1,15 @@
+# [options.go-x] の go-x を、どの単位も、transpilers に書いていない → CFG-24
+# ERROR: CFG-24
+[hozo]
+plugin_dirs = ["plugins"]
+
+[options.go]
+module = "example.com/app"
+
+[options.go-x]
+strict = true
+
+[[emit]]
+namespace   = "a"
+transpilers = ["go"]
+out         = "gen/a"

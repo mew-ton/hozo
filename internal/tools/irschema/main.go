@@ -270,7 +270,7 @@ var descriptions = map[string]string{
 	"CheckResponse":        "\"check\" の応答（docs/plugin-protocol.md「check」）。",
 	"ImportRequest":        "direction \"import\" の要求（docs/plugin-protocol.md「import」）。",
 	"ImportResponse":       "\"import\" の応答（docs/plugin-protocol.md「import」）。",
-	"CoverageRequest":      "direction \"coverage\" の要求（docs/plugin-protocol.md「coverage」）。coverage はカバレッジのファイル、files は実行された行を知りたいファイル。",
+	"CoverageRequest":      "direction \"coverage\" の要求（docs/plugin-protocol.md「coverage」）。coverage はカバレッジのファイル、files は実行された行を知りたいファイル、outputs は files を出した出力の設定。",
 	"CoverageResponse":     "\"coverage\" の応答（docs/plugin-protocol.md「coverage」）。recognized が false なら、読める形のファイルではなかった。",
 	"CoveredFile":          "カバレッジが測っていたファイル一つの、実行された所の行の範囲（docs/plugin-protocol.md「coverage」）。lines の要素は、始まりの行と終わりの行。",
 	"TestMap":              "テストの対応表（docs/plugin-protocol.md「テストの対応表」）。emit の応答の files に足すファイル hozo-tests.<トランスパイラの名前>.json の中身。",

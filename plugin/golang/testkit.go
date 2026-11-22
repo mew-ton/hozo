@@ -33,7 +33,7 @@ type TestKit struct {
 	Namespace, Dir string
 	// Shape は、その出力の、op と口。別の単位の出力なら、その単位の in を省いたものとして求めた形。
 	Shape *Shape
-	// Layout は、その出力の置き場。TestKitOf に root を渡さなかったとき（""）は nil。
+	// Layout は、その出力の置き場。設定に module がない出力では nil。
 	Layout *Layout
 	// Blocked は、テストの中の組み立てを、作れない理由（日本語の句。作れるなら ""）。作れない出力は、fakes.go を持たない。
 	Blocked string
@@ -86,20 +86,19 @@ func (k *TestKit) Fakes() []KitParam {
 	return out
 }
 
-// TestKitOf は、view の出力 (U, N) の、テストのにせものと組み立て。root は、プロジェクトのルート（置き場 Layout を求めるのに使う。
-// "" なら、Layout は nil のまま）。置き場を求められなければ、誤り（LayoutOf と同じ）。
-func TestKitOf(view *ir.View, root string) (*TestKit, error) {
+// TestKitOf は、view の出力 (U, N) の、テストのにせものと組み立て。置き場 Layout を求められない出力（設定に module がない）では、
+// その Layout は nil のままで、最初の誤り（LayoutOf と同じ。ErrNoModule を包む）を、一緒に返す（TestKit は、そのときも返す）。
+func TestKitOf(view *ir.View) (*TestKit, error) {
 	if view == nil || view.Program == nil {
 		return &TestKit{Shape: &Shape{}}, nil
 	}
-	b := &kitBuilder{view: view, root: root, building: map[string]bool{}, done: map[string]*TestKit{}}
+	b := &kitBuilder{view: view, building: map[string]bool{}, done: map[string]*TestKit{}}
 	k := b.kit(view.Viewer, view.Config, fileSet(view.Files))
 	return k, b.err
 }
 
 type kitBuilder struct {
 	view     *ir.View
-	root     string
 	building map[string]bool     // 作っている途中の出力（輪を見つける）
 	done     map[string]*TestKit // 出来上がった出力
 	err      error
@@ -136,17 +135,15 @@ func (b *kitBuilder) kit(ns string, cfg ir.NamespaceConfig, inUnit func(*ir.Op) 
 	p := b.view.Program
 	s := shapeOf(p, ns, inUnit, cfg.Seams)
 	k := &TestKit{Namespace: ns, Dir: cfg.Dir, Shape: s}
-	if b.root != "" {
-		hasInner := false
-		for _, o := range s.Ops {
-			hasInner = hasInner || !o.Exported
-		}
-		l, err := layout(ns, cfg.Dir, b.root, hasInner, HasFuncs(b.view.Program, ns))
-		if err != nil && b.err == nil {
-			b.err = err
-		}
-		k.Layout = l
+	hasInner := false
+	for _, o := range s.Ops {
+		hasInner = hasInner || !o.Exported
 	}
+	l, err := layout(ns, cfg, hasInner, HasFuncs(b.view.Program, ns))
+	if err != nil && b.err == nil {
+		b.err = err
+	}
+	k.Layout = l
 	b.building[key] = true
 	defer func() { delete(b.building, key); b.done[key] = k }()
 
@@ -261,7 +258,7 @@ func allEntries(p *ir.Program, ops []string) bool {
 // TestFakeNames は、view の出力 (U, N) の fakes.go の、公開の名前（docs/plugin-go.md「テストのにせもの」）: にせものの型（New の引数の順）、
 // `Fakes`、`NewOps`。fakes.go を持たない出力では、空。
 func TestFakeNames(view *ir.View) []TestName {
-	k, _ := TestKitOf(view, "")
+	k, _ := TestKitOf(view)
 	if !k.HasFakes() {
 		return nil
 	}

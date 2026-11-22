@@ -1,3 +1,6 @@
+[options.go]
+module = "example.com/app"
+
 # plugins/go-design の単体テストの入力（docs/testing.md「単体テスト」）: フローも、要求もない単位（docs/plugin-go-design.md「対象」）。
 # ファイルを出さず、warning を一つ返す。
 [[emit]]

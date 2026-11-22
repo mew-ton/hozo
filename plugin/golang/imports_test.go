@@ -60,14 +60,13 @@ func collisionView() *ir.View {
 // 一つのファイルの中で名前が当たるときは、名前空間の FQN の辞書順に名前を決めていき、当たった方に 2、3、… を付ける。
 // 標準ライブラリ、runtime、inner の名前は変えない。Canonical が、足した順によらず、その名前にする。
 func TestImportsCollision(t *testing.T) {
-	root := projectRoot(t)
 	v := collisionView()
-	l, err := LayoutOf(v, root)
+	l, err := LayoutOf(v)
 	if err != nil || !l.HasInner {
 		t.Fatalf("layout = %+v, %v", l, err)
 	}
 	// 入口のパッケージのファイル。型を書いた順は、辞書順と逆
-	im := NewImports(v, l, root, false)
+	im := NewImports(v, l, false)
 	for _, fqn := range []string{"x.inner.I", "time.Slot", "b.store.B", "a.store.A"} {
 		GoType(ir.Ref(fqn), im)
 	}
@@ -103,7 +102,7 @@ func TestImportsCollision(t *testing.T) {
 		}
 	}
 	// 同じ import の集まりなら、Canonical は足した順によらず同じ
-	im2 := NewImports(v, l, root, false)
+	im2 := NewImports(v, l, false)
 	im2.Add(l.DefPath, l.DefName)
 	GoType(ir.Datetime(), im2)
 	for _, fqn := range []string{"a.store.A", "b.store.B", "time.Slot", "x.inner.I"} {
@@ -113,12 +112,12 @@ func TestImportsCollision(t *testing.T) {
 		t.Errorf("Canonical が足した順による:\n%s\n%s", im2.Canonical().Render(), got)
 	}
 	// 入口のファイルでは、内側のパッケージを import していなくても、inner の名前は使わせない
-	im3 := NewImports(v, l, root, false)
+	im3 := NewImports(v, l, false)
 	if got := GoType(ir.Ref("x.inner.I"), im3); got != "inner2.I" {
 		t.Errorf("入口のファイルの x.inner: %q", got)
 	}
 	// 定義のパッケージ（内側）のファイルでは、当たるものがなければそのまま
-	im4 := NewImports(v, l, root, true)
+	im4 := NewImports(v, l, true)
 	if got := GoType(ir.Ref("x.inner.I"), im4); got != "inner.I" {
 		t.Errorf("定義のファイルの x.inner: %q", got)
 	}
@@ -127,7 +126,6 @@ func TestImportsCollision(t *testing.T) {
 // 基底が定義のパッケージに宣言する非公開の名前（New が返す構造体 ops、補助 ptr）は、import の名前に使わない: パッケージ名が
 // それと同じ名前空間は、どのファイルでも（定義でも入口でも）2、3、… を付けて import する。
 func TestImportsBasePrivateNames(t *testing.T) {
-	root := projectRoot(t)
 	v := viewOf("server",
 		namespace("server", with(op("server.f", nil), internal())),
 		namespace("ops", model("ops.Job")), namespace("more.ops", model("more.ops.Step")), namespace("ptr", model("ptr.Target")),
@@ -135,12 +133,12 @@ func TestImportsBasePrivateNames(t *testing.T) {
 	for i, ns := range []string{"ops", "more.ops", "ptr"} {
 		v.Namespaces[ns] = []ir.NamespaceConfig{conf(i+2, "gen/"+strings.ReplaceAll(ns, ".", "/"))}
 	}
-	l, err := LayoutOf(v, root)
+	l, err := LayoutOf(v)
 	if err != nil {
 		t.Fatal(err)
 	}
 	for _, inDef := range []bool{true, false} {
-		im := NewImports(v, l, root, inDef)
+		im := NewImports(v, l, inDef)
 		for _, fqn := range []string{"ptr.Target", "ops.Job", "more.ops.Step"} {
 			GoType(ir.Ref(fqn), im)
 		}
@@ -166,7 +164,6 @@ func TestImportsBasePrivateNames(t *testing.T) {
 // Reserve は、ファイルを書くトランスパイラが、関数の本体の中で決まった名前で使う識別子を、import の名前に使わせない。
 // Canonical にも引き継ぐ。Reserve していないファイルの名前は変わらない。
 func TestImportsReserve(t *testing.T) {
-	root := projectRoot(t)
 	v := viewOf("server",
 		namespace("server", op("server.f", nil)),
 		namespace("ctx", model("ctx.Info")), namespace("a.err", model("a.err.Fault")), namespace("err", model("err.Fault")),
@@ -174,11 +171,11 @@ func TestImportsReserve(t *testing.T) {
 	for i, ns := range []string{"ctx", "a.err", "err"} {
 		v.Namespaces[ns] = []ir.NamespaceConfig{conf(i+2, "gen/"+strings.ReplaceAll(ns, ".", "/"))}
 	}
-	l, err := LayoutOf(v, root)
+	l, err := LayoutOf(v)
 	if err != nil {
 		t.Fatal(err)
 	}
-	im := NewImports(v, l, root, true)
+	im := NewImports(v, l, true)
 	im.Reserve("o", "ctx", "err")
 	for _, fqn := range []string{"err.Fault", "ctx.Info", "a.err.Fault"} {
 		GoType(ir.Ref(fqn), im)
@@ -194,7 +191,7 @@ func TestImportsReserve(t *testing.T) {
 		}
 	}
 	// Reserve していないファイルでは、そのままの名前
-	plain := NewImports(v, l, root, true)
+	plain := NewImports(v, l, true)
 	if got := GoType(ir.Ref("ctx.Info"), plain); got != "ctx.Info" {
 		t.Errorf("Reserve していないファイル: %q", got)
 	}
@@ -202,10 +199,9 @@ func TestImportsReserve(t *testing.T) {
 
 // Qualifier は、別の名前空間の宣言を書くときの前置き。N の宣言は修飾なし。置き場がなければ Err。
 func TestImportsQualifier(t *testing.T) {
-	root := projectRoot(t)
 	v := typesView()
-	l, _ := LayoutOf(v, root)
-	im := NewImports(v, l, root, true)
+	l, _ := LayoutOf(v)
+	im := NewImports(v, l, true)
 	if got := im.Qualifier("server"); got != "" {
 		t.Errorf("Qualifier(viewer) = %q", got)
 	}
@@ -214,7 +210,7 @@ func TestImportsQualifier(t *testing.T) {
 	}
 	// 置き場のない名前空間: 修飾なしの名前を返し、Err が報告する（CFG-22 が通したはずのもの）
 	v.Program.Namespaces = append(v.Program.Namespaces, namespace("lost", model("lost.M")))
-	im = NewImports(v, l, root, true)
+	im = NewImports(v, l, true)
 	if got := GoType(ir.Ref("lost.M"), im); got != "M" || im.Err() == nil || !strings.Contains(im.Err().Error(), "lost") {
 		t.Errorf("置き場がない: %q, %v", got, im.Err())
 	}
@@ -224,10 +220,9 @@ func TestImportsQualifier(t *testing.T) {
 // 修飾する。入口の import は、名前がパスの最後の要素と同じでも、名前を書く（Canonical で足し直しても）。別の名前空間の import は、
 // ほかのファイルと同じ。
 func TestTestImports(t *testing.T) {
-	root := projectRoot(t)
 	v := typesView()
-	l, _ := LayoutOf(v, root)
-	im := NewTestImports(v, l, root)
+	l, _ := LayoutOf(v)
+	im := NewTestImports(v, l)
 	if got := GoType(ir.Ref("server.User"), im); got != "server.User" {
 		t.Errorf("N の型 = %q, want server.User", got)
 	}
@@ -245,7 +240,7 @@ func TestTestImports(t *testing.T) {
 		t.Errorf("Canonical().Render =\n%s\nwant\n%s", got, want)
 	}
 	// 本体が決まった名前で使う識別子と同じ名前のパッケージは、2 を付ける（入口のパッケージでも）
-	im = NewTestImports(v, l, root)
+	im = NewTestImports(v, l)
 	im.Reserve("server")
 	if got := im.Qualifier("server"); got != "server2." {
 		t.Errorf("Reserve の後の Qualifier(viewer) = %q, want server2.", got)

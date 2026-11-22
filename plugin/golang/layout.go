@@ -46,14 +46,13 @@ type Layout struct {
 }
 
 // LayoutOf は、この View の出力 (U, N) の置き場（docs/plugin-go.md「パッケージと import パス」「内側のフォルダと入口」）。
-// root はプロジェクトのルート（HOZO_PROJECT_ROOT。go.mod を探す起点）。Dir(U, N) の上に go.mod がなければ ErrNoGoMod を
-// 包んだ誤り（GO-1）。
-func LayoutOf(view *ir.View, root string) (*Layout, error) {
+// import パスは、設定のオプション module から作る（ModuleOf）。module がなければ ErrNoModule を包んだ誤り（GO-8）。
+func LayoutOf(view *ir.View) (*Layout, error) {
 	hasInner := false
 	for _, o := range ShapeOf(view).Ops {
 		hasInner = hasInner || !o.Exported
 	}
-	return layout(view.Viewer, view.Config.Dir, root, hasInner, HasFuncs(view.Program, view.Viewer))
+	return layout(view.Viewer, view.Config, hasInner, HasFuncs(view.Program, view.Viewer))
 }
 
 // HasFuncs は、名前空間 namespace が、関数を持つか（docs/plugin-go.md「型のパッケージ」）: op、read、効果、状態の宣言を、一つでも
@@ -82,9 +81,9 @@ func HasFuncs(p *ir.Program, namespace string) bool {
 //
 // 使う側が import するのは、置き場の入口のパッケージ（EntryPath、EntryName）。別の単位の置き場では、その単位の in が View に
 // ないので、HasInner と Def* は、in を省いた単位として求めた値（入口の import には効かない）。
-func HomeOf(view *ir.View, namespace, root string) (*Layout, bool, error) {
+func HomeOf(view *ir.View, namespace string) (*Layout, bool, error) {
 	if namespace == view.Viewer {
-		l, err := LayoutOf(view, root)
+		l, err := LayoutOf(view)
 		return l, err == nil, err
 	}
 	var home *ir.NamespaceConfig
@@ -111,17 +110,18 @@ func HomeOf(view *ir.View, namespace, root string) (*Layout, bool, error) {
 	for _, o := range shapeOf(view.Program, namespace, inUnit, home.Seams).Ops {
 		hasInner = hasInner || !o.Exported
 	}
-	l, err := layout(namespace, home.Dir, root, hasInner, HasFuncs(view.Program, namespace))
+	l, err := layout(namespace, *home, hasInner, HasFuncs(view.Program, namespace))
 	return l, err == nil, err
 }
 
-// layout は、名前空間 namespace を dir（Dir(U, N)）に出力するときの置き場。
-func layout(namespace, dir, root string, hasInner, hasTypes bool) (*Layout, error) {
-	dir = path.Clean(filepath.ToSlash(dir))
-	entry, err := ImportPath(root, dir)
+// layout は、名前空間 namespace を、設定 cfg の出力（cfg.Dir が Dir(U, N)）に出力するときの置き場。
+func layout(namespace string, cfg ir.NamespaceConfig, hasInner, hasTypes bool) (*Layout, error) {
+	dir := path.Clean(filepath.ToSlash(cfg.Dir))
+	module, err := ModuleOf(cfg)
 	if err != nil {
 		return nil, err
 	}
+	entry := ImportPath(module, dir)
 	l := &Layout{Namespace: namespace, Dir: dir, EntryPath: entry, EntryName: PackageName(namespace), HasInner: hasInner}
 	l.DefDir, l.DefPath, l.DefName = l.Dir, l.EntryPath, l.EntryName
 	l.TestName = l.EntryName + testSuffix

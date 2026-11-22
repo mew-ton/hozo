@@ -3,6 +3,9 @@
 [hozo]
 plugin_dirs = ["plugins"]       # 継ぎ目を宣言する、もう一つのトランスパイラ go-trace（起動しない代役）
 
+[options.go]
+module = "example.com/app"
+
 # 1: shop。Seams のメソッドは、どれも @rate.limited のもの（RateSeams だけで Seams を満たす）
 [[emit]]
 namespace   = "shop"

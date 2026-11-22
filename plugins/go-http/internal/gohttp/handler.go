@@ -12,7 +12,6 @@ package gohttp
 
 import (
 	"fmt"
-	"os"
 
 	"github.com/mew-ton/hozo/plugin"
 )
@@ -22,9 +21,6 @@ const TranspilerName = "go-http"
 
 // Handler は go-http の plugin.Handler。emit と、emit と同じ検査で答える check を実装する。
 type Handler struct {
-	// Getenv は環境変数を引く関数。nil なら os.Getenv。HOZO_PROJECT_ROOT（docs/plugin-protocol.md「起動」）を、import パスを
-	// 求めるルートに使う。空なら作業ディレクトリ（= プロジェクトのルート）。
-	Getenv func(string) string
 }
 
 var _ plugin.Handler = Handler{}
@@ -39,15 +35,7 @@ func (h Handler) Emit(req *plugin.EmitRequest) (*plugin.EmitResponse, error) {
 	if req.Transpiler != TranspilerName {
 		return nil, fmt.Errorf("transpiler %q is not provided by go-http (it provides %q): %w", req.Transpiler, TranspilerName, plugin.ErrUnsupported)
 	}
-	getenv := h.Getenv
-	if getenv == nil {
-		getenv = os.Getenv
-	}
-	root := getenv("HOZO_PROJECT_ROOT")
-	if root == "" {
-		root = "."
-	}
-	out, err := Emit(req, root)
+	out, err := Emit(req)
 	if err != nil {
 		return nil, fmt.Errorf("emit: %w", err)
 	}

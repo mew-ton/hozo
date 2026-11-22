@@ -13,13 +13,20 @@ import (
 	"github.com/mew-ton/hozo/plugin"
 )
 
-// direction "coverage"（docs/plugin-go.md「カバレッジを読む」）: 要求のファイルごとに、<そのディレクトリの import パス>/<ファイル名>
-// の行を探し、回数が 1 以上の区切りの行の範囲を返す。測られていないファイルは、出さない。
-func TestCoverage(t *testing.T) {
-	root := t.TempDir()
-	if err := os.WriteFile(filepath.Join(root, "go.mod"), []byte("module example.com/shop\n\ngo 1.22\n"), 0o644); err != nil {
-		t.Fatal(err)
+// coverOutput は、カバレッジの要求の outputs の一つ: 出力先 dir の、モジュール module の出力の設定。
+func coverOutput(index int, dir, module string) ir.NamespaceConfig {
+	c := ir.NamespaceConfig{Index: index, Language: "go", Base: "go", Out: dir, Dir: dir, Transpilers: []string{"go"},
+		Options: map[string]map[string]any{}, Seams: map[string]string{}}
+	if module != "" {
+		c.Options["go"] = map[string]any{"module": module}
 	}
+	return c
+}
+
+// direction "coverage"（docs/plugin-go.md「カバレッジを読む」）: 要求のファイルごとに、<そのディレクトリの import パス>/<ファイル名>
+// の行を探し、回数が 1 以上の区切りの行の範囲を返す。測られていないファイルは、出さない。モジュールの名前は、要求の outputs
+// （ファイルを出した出力の設定）から取る: ファイルは、読まない。
+func TestCoverage(t *testing.T) {
 	profile := "mode: set\n" +
 		"example.com/shop/gen/server/servertest/leaves.go:156.65,157.51 1 1\n" +
 		"example.com/shop/gen/server/servertest/leaves.go:157.51,159.34 2 1\n" +
@@ -30,8 +37,9 @@ func TestCoverage(t *testing.T) {
 		"example.com/shop/app/leaves.go:1.1,9.2 3 1\n"
 	req := &plugin.CoverageRequest{Protocol: ir.Version, Direction: "coverage",
 		Coverage: plugin.File{Path: "/tmp/cover.out", Content: profile},
-		Files:    []string{"gen/server/servertest/http.go", "gen/server/servertest/leaves.go", "gen/flows/flowstest/design.go"}}
-	got, err := Coverage(req, root)
+		Files:    []string{"gen/server/servertest/http.go", "gen/server/servertest/leaves.go", "gen/flows/flowstest/design.go"},
+		Outputs:  []ir.NamespaceConfig{coverOutput(1, "gen/server", "example.com/shop"), coverOutput(2, "gen/flows", "example.com/shop")}}
+	got, err := Coverage(req)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -46,36 +54,44 @@ func TestCoverage(t *testing.T) {
 
 	// 読める形でないファイル
 	req.Coverage.Content = "TN:\nSF:src/a.ts\nend_of_record\n"
-	if got, err := Coverage(req, root); err != nil || got.Recognized || len(got.Files) != 0 {
+	if got, err := Coverage(req); err != nil || got.Recognized || len(got.Files) != 0 {
 		t.Errorf("lcov: %+v, %v", got, err)
 	}
 	// 壊れた行: 誤り（どのファイルの、何行目か）
 	req.Coverage.Content = "mode: count\nexample.com/shop/gen/a.go:1.1,2.2 1\n"
-	if _, err := Coverage(req, root); err == nil || !strings.Contains(err.Error(), "/tmp/cover.out") || !strings.Contains(err.Error(), "2 行目") {
+	if _, err := Coverage(req); err == nil || !strings.Contains(err.Error(), "/tmp/cover.out") || !strings.Contains(err.Error(), "2 行目") {
 		t.Errorf("broken line: err = %v", err)
 	}
-	// go.mod が見つからないルート: どのファイルも、測られていない
+	// ファイルのディレクトリか、その上にある dir のうち、いちばん深い出力の module を使う
 	req.Coverage.Content = profile
-	if got, err := Coverage(req, t.TempDir()); err != nil || !got.Recognized || len(got.Files) != 0 {
-		t.Errorf("no go.mod: %+v, %v", got, err)
+	req.Outputs = []ir.NamespaceConfig{coverOutput(1, "gen", "example.com/wrong"), coverOutput(2, "gen/server", "example.com/shop"),
+		coverOutput(3, "gen/server/servertest/deeper", "example.com/wrong")}
+	if got, err := Coverage(req); err != nil || len(got.Files) != 2 {
+		t.Errorf("いちばん深い出力: %+v, %v", got, err)
+	}
+	// ルートが出力先（dir が "."）の出力は、どのファイルの上にもある
+	req.Outputs = []ir.NamespaceConfig{coverOutput(1, ".", "example.com/shop")}
+	if got, err := Coverage(req); err != nil || len(got.Files) != 2 {
+		t.Errorf("dir が .: %+v, %v", got, err)
+	}
+	// 出力が分からない（outputs にない）、module がない: どのファイルも、測られていない
+	for name, outputs := range map[string][]ir.NamespaceConfig{
+		"outputs がない": nil, "別の出力先": {coverOutput(1, "gen/other", "example.com/shop")}, "module がない": {coverOutput(1, "gen/server", "")},
+	} {
+		req.Outputs = outputs
+		if got, err := Coverage(req); err != nil || !got.Recognized || len(got.Files) != 0 {
+			t.Errorf("%s: %+v, %v", name, got, err)
+		}
 	}
 }
 
-// Handler を通して: ルートは HOZO_PROJECT_ROOT。応答の files と lines は、空でも [] で出る（docs/plugin-protocol.md「応答の形」）。
+// Handler を通して: 応答の files と lines は、空でも [] で出る（docs/plugin-protocol.md「応答の形」）。
 func TestCoverageHandler(t *testing.T) {
-	root := t.TempDir()
-	if err := os.WriteFile(filepath.Join(root, "go.mod"), []byte("module example.com/shop\n"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	h := Handler{Getenv: func(k string) string {
-		if k == "HOZO_PROJECT_ROOT" {
-			return root
-		}
-		return ""
-	}}
+	h := Handler{}
 	request := func(content string) string {
 		data, err := json.Marshal(plugin.CoverageRequest{Protocol: ir.Version, Direction: "coverage",
-			Coverage: plugin.File{Path: "cover.out", Content: content}, Files: []string{"gen/x/xtest/leaves.go"}})
+			Coverage: plugin.File{Path: "cover.out", Content: content}, Files: []string{"gen/x/xtest/leaves.go"},
+			Outputs: []ir.NamespaceConfig{coverOutput(1, "gen/x", "example.com/shop")}})
 		if err != nil {
 			t.Fatal(err)
 		}

@@ -1,3 +1,6 @@
+[options.go]
+module = "example.com/app"
+
 # plugins/go-sqlite の単体テストの入力（docs/testing.md「単体テスト」）: GOSQL-27（@db.latest の列のしまい方が、@db.time / @db.int / @db.float のどれでもない）。
 [[emit]]
 namespace   = "app"

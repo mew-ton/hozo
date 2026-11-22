@@ -199,12 +199,14 @@ type ImportResponse struct {
 
 // CoverageRequest は direction "coverage" の要求（docs/plugin-protocol.md「coverage」）。
 // Coverage は hozoc tests に渡されたカバレッジのファイル（Path は絶対パス）。Files は、実行された行を知りたいファイル
-// （プロジェクトのルートからの相対パス）。
+// （プロジェクトのルートからの相対パス）。Outputs は、Files を出した出力の設定（単位の設定の順、その中は名前空間の IR の順）。
+// プラグインは、ファイルを読まないので、設定から決まるもの（Go のモジュールの名前など）は、ここから取る。
 type CoverageRequest struct {
-	Protocol  string   `json:"protocol"`
-	Direction string   `json:"direction"`
-	Coverage  File     `json:"coverage"`
-	Files     []string `json:"files"`
+	Protocol  string               `json:"protocol"`
+	Direction string               `json:"direction"`
+	Coverage  File                 `json:"coverage"`
+	Files     []string             `json:"files"`
+	Outputs   []ir.NamespaceConfig `json:"outputs"`
 }
 
 // CoverageResponse は "coverage" の応答。Recognized が false なら、このプラグインが読める形のファイルではなかった。

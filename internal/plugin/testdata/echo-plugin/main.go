@@ -2,7 +2,7 @@
 // 標準入力の JSON の "mode" で振る舞いを変える:
 //
 //	echo（既定）  要求をそのまま応答に写す
-//	env           作業ディレクトリと HOZO_PROJECT_ROOT / HOZO_PLUGIN_DIR と引数を返す
+//	env           作業ディレクトリと、環境変数の名前の並びと、引数を返す
 //	crash         終了コード 1 で終わる
 //	garbage       JSON でないものを書いて 0 で終わる
 //	trailing      JSON の後ろに余計なものを書いて 0 で終わる
@@ -44,8 +44,7 @@ func main() {
 		cwd, _ := os.Getwd()
 		json.NewEncoder(os.Stdout).Encode(map[string]any{
 			"cwd":  cwd,
-			"root": os.Getenv("HOZO_PROJECT_ROOT"),
-			"dir":  os.Getenv("HOZO_PLUGIN_DIR"),
+			"env":  os.Environ(),
 			"args": os.Args[1:],
 		})
 	case "crash":

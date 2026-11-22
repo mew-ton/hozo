@@ -45,7 +45,7 @@ func (f *file) use(path string) string {
 // （docs/plugin-go.md「パッケージと import パス」の「import の名前」。基底と同じ手順）。
 func (g *generator) render(flows []flow, classes []class) (string, error) {
 	where := g.layout.TestName + "/" + FileName
-	im := golang.NewTestImports(g.view, g.layout, g.root)
+	im := golang.NewTestImports(g.view, g.layout)
 	im.Reserve(bodyNames...)
 	first := &file{g: g, im: im}
 	first.draw(flows, classes)

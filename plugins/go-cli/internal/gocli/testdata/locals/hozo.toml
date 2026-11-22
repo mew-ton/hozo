@@ -1,3 +1,6 @@
+[options.go]
+module = "example.com/app"
+
 # plugins/go-cli の単体テストの入力（docs/testing.md「単体テスト」）: 名前空間のパッケージの名前が、生成した cli.go の局所の名前や、
 # cli.go が import する標準ライブラリのパッケージの名前と当たるとき（docs/plugin-go.md「パッケージと import パス」の import の名前、「名前」の局所の名前）。
 [[emit]]

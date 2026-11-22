@@ -123,6 +123,9 @@ type plannedTest struct {
 	mapPath string
 	// unit は、その対応表を出した単位（Project.Units の添字）。カバレッジを読む相手（単位の基底のプラグイン）を決める。
 	unit int
+	// config は、その対応表を出した出力の設定（View の config）。カバレッジの要求の outputs に載せる
+	// （docs/plugin-protocol.md「coverage」）。
+	config ir.NamespaceConfig
 }
 
 // record は出力先 dir の .hozoc-outputs.json の中身（今回書くパスの一覧。辞書順の JSON の配列）。
@@ -268,7 +271,7 @@ func (a *App) collect(ctx context.Context, p *project.Project, namespaces []stri
 				}
 				for _, e := range m.Tests {
 					e.File, _ = pluginPath(e.File, dir)
-					pl.tests = append(pl.tests, plannedTest{Test: testmap.Test{Transpiler: t.Name, TestEntry: e}, mapPath: rel, unit: k.unit})
+					pl.tests = append(pl.tests, plannedTest{Test: testmap.Test{Transpiler: t.Name, TestEntry: e}, mapPath: rel, unit: k.unit, config: view.Config})
 				}
 			}
 		}

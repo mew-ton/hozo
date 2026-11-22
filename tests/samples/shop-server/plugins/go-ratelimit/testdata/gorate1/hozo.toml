@@ -1,3 +1,6 @@
+[options.go]
+module = "example.com/app"
+
 # go-ratelimit の単体テストの入力: GORATE-1（[emit.options.go-ratelimit] に、知らないキーがある）。
 [[emit]]
 namespace   = "shop"

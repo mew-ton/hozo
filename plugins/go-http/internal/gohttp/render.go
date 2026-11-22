@@ -56,7 +56,7 @@ func (f *file) http() string { return f.use("net/http") }
 // render は http.go の全体を作り、go/format で整形する。import の名前を文書の決まりの順で決めるために、二度描く
 // （docs/plugin-go.md「パッケージと import パス」の「import の名前」。基底と同じ手順）。
 func (g *generator) render(routes []route) (string, error) {
-	first := &file{g: g, im: golang.NewImports(g.view, g.layout, g.root, false)}
+	first := &file{g: g, im: golang.NewImports(g.view, g.layout, false)}
 	first.draw(routes)
 	second := &file{g: g, im: first.im.Canonical(), reserved: map[string]bool{}}
 	for _, name := range second.im.Names() {

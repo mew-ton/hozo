@@ -1,5 +1,8 @@
 # plugins/go-cli の単体テストの入力（docs/testing.md「単体テスト」）: CLI-7（ディレクトリ cli が、同じ単位が出力する子の名前空間 N.cli の出力先と重なる）。
 
+[options.go]
+module = "example.com/app"
+
 # 1: app と、その子の app.cli を出力する（Dir(U, app.cli) は gen/app/cli）
 [[emit]]
 namespace   = "app"

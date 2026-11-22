@@ -1,6 +1,9 @@
 # plugins/go-http の単体テストの入力（docs/testing.md「単体テスト」）: GOHTTP-11（validate = true で、Validate を持つ入力の model が
 # 別の名前空間のもので、その型の置き場の単位が go-valid を並べていない）。
 
+[options.go]
+module = "example.com/app"
+
 # 1: 入力の model の置き場。go-valid を並べていない（Validate を出さない）
 [[emit]]
 namespace   = "plain"

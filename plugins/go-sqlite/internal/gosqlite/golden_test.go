@@ -276,10 +276,10 @@ func TestDiagnosedOutputsOnly(t *testing.T) {
 	}
 }
 
-// TestNoGoMod は、Dir(U, N) の上に go.mod がないとき: 報告するのは基底（GO-1。docs/plugin-go.md「診断」）で、go-sqlite は、
+// TestNoModule は、基底のオプション module がないとき: 報告するのは基底（GO-8。docs/plugin-go.md「診断」）で、go-sqlite は、
 // ファイルも診断も返さない（型のパッケージの import パスを求められないので、何も出せない）。
-func TestNoGoMod(t *testing.T) {
-	res := emitViews(t, t.TempDir(), ours(t, loadViews(t, "reads")))
+func TestNoModule(t *testing.T) {
+	res := emitViews(t, "", noModule(ours(t, loadViews(t, "reads"))))
 	if len(res.files) != 0 || len(res.errors) != 0 || len(res.warnings) != 0 {
 		t.Fatalf("files=%d errors=%v warnings=%v, want どれも空", len(res.files), res.errors, res.warnings)
 	}
@@ -293,22 +293,17 @@ func TestMalformedView(t *testing.T) {
 		"Program がない":          {Version: ir.Version, Viewer: "shop", Config: view.Config},
 		"viewer が Program にない": {Version: ir.Version, Viewer: "nowhere", Config: view.Config, Program: view.Program},
 	} {
-		if resp, err := Emit(request(v), newRoot(t)); err == nil {
+		if resp, err := Emit(request(v)); err == nil {
 			t.Errorf("%s: 誤りを返さない（応答 %+v）", name, resp)
 		}
 	}
 }
 
-// TestHandler は、プラグインの入口（Handler）: HOZO_PROJECT_ROOT をルートにして出力し、診断は応答の errors で、warning は
+// TestHandler は、プラグインの入口（Handler）: 要求の View から出力し、診断は応答の errors で、warning は
 // warnings で返す（docs/plugin-protocol.md「emit」）。check と import は持たない。
 func TestHandler(t *testing.T) {
 	root := newRoot(t)
-	h := Handler{Getenv: func(key string) string {
-		if key == "HOZO_PROJECT_ROOT" {
-			return root
-		}
-		return ""
-	}}
+	h := Handler{}
 	view := ours(t, loadViews(t, "reads"))[0]
 	resp, err := h.Emit(request(view))
 	if err != nil {

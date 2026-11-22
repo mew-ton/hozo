@@ -38,7 +38,8 @@ func testsProject(t *testing.T, manifestExtra, emitResponse, coverage string) st
 	t.Helper()
 	dir := t.TempDir()
 	write(t, filepath.Join(dir, "shop.hozo"), testsSpec)
-	write(t, filepath.Join(dir, "hozo.toml"), pluginDirs+unit("shop", "gen/shop", `"base"`))
+	// プロジェクト全体のオプション（docs/config.md「プロジェクト全体のオプション」）は、カバレッジの要求の outputs に届く
+	write(t, filepath.Join(dir, "hozo.toml"), pluginDirs+"[options.base]\nmodule = \"example.com/shop\"\n\n"+unit("shop", "gen/shop", `"base"`))
 	fakePlugin(t, dir, "base", "go", manifestExtra, emitResponse, 0)
 	write(t, filepath.Join(dir, "plugins", "base", "coverage.json"), coverage)
 	if code, stdout, stderr := run(t, dir, nil, "emit"); code != 0 {
@@ -95,6 +96,17 @@ func TestTestsAllRan(t *testing.T) {
 	}
 	if files, _ := json.Marshal(reqs[0]["files"]); string(files) != `["`+leavesPath+`"]` {
 		t.Errorf("coverage の要求の files = %s", files)
+	}
+	// outputs: files を出した出力の設定（docs/plugin-protocol.md「coverage」）。プラグインは、ファイルを読まないので、設定から決まる
+	// もの（Go なら、モジュールの名前）は、ここから取る
+	outputs, _ := reqs[0]["outputs"].([]any)
+	if len(outputs) != 1 {
+		t.Fatalf("coverage の要求の outputs = %v（want 出力が一つ）", reqs[0]["outputs"])
+	}
+	output, _ := outputs[0].(map[string]any)
+	options, _ := json.Marshal(output["options"])
+	if output["dir"] != "gen/shop" || output["base"] != "base" || string(options) != `{"base":{"module":"example.com/shop"}}` {
+		t.Errorf("coverage の要求の outputs[0] = %v", output)
 	}
 
 	// json

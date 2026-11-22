@@ -1,3 +1,6 @@
+[options.go]
+module = "example.com/app"
+
 # plugins/go-valid の単体テストの入力（docs/testing.md「単体テスト」）: GOVALID-4（フィールドの型が union で、そのアームに Validate を持つ型がある）。
 [[emit]]
 namespace   = "app"

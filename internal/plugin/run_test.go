@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"runtime"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -64,7 +65,7 @@ func TestRunEcho(t *testing.T) {
 	}
 }
 
-// docs/plugin-protocol.md「起動」: 作業ディレクトリはルート、HOZO_PROJECT_ROOT と HOZO_PLUGIN_DIR を足す。
+// docs/plugin-protocol.md「起動」: 作業ディレクトリはルート。環境変数は、hozoc のものを、そのまま渡す（足すものはない）。
 func TestRunEnv(t *testing.T) {
 	root := t.TempDir()
 	dir := filepath.Join(root, "plugins", "echo")
@@ -72,24 +73,29 @@ func TestRunEnv(t *testing.T) {
 		t.Fatal(err)
 	}
 	var resp struct {
-		Cwd, Root, Dir string
-		Args           []string
+		Cwd  string
+		Env  []string
+		Args []string
 	}
 	m := echoManifest("--flag", "x")
-	if err := (Runner{Root: root, Env: []string{"PATH=" + os.Getenv("PATH")}}).Run(m, dir, echoReq{Mode: "env"}, &resp); err != nil {
+	env := []string{"PATH=" + os.Getenv("PATH"), "HOZO_TEST_MARK=1"}
+	if err := (Runner{Root: root, Env: env}).Run(m, dir, echoReq{Mode: "env"}, &resp); err != nil {
 		t.Fatal(err)
 	}
 	// TempDir はシンボリックリンクを含みうるので EvalSymlinks で比べる
-	eq := func(a, b string) bool {
-		ra, _ := filepath.EvalSymlinks(a)
-		rb, _ := filepath.EvalSymlinks(b)
-		return ra == rb
+	ra, _ := filepath.EvalSymlinks(resp.Cwd)
+	rb, _ := filepath.EvalSymlinks(root)
+	if ra != rb {
+		t.Errorf("cwd=%q (want root %q)", resp.Cwd, root)
 	}
-	if !eq(resp.Cwd, root) || !eq(resp.Root, root) || !eq(resp.Dir, dir) {
-		t.Errorf("cwd=%q root=%q dir=%q (want root %q, dir %q)", resp.Cwd, resp.Root, resp.Dir, root, dir)
+	// 足された環境変数は、ない: HOZO_ で始まるのは、渡したものだけ
+	for _, kv := range resp.Env {
+		if strings.HasPrefix(kv, "HOZO_") && kv != "HOZO_TEST_MARK=1" {
+			t.Errorf("hozoc が、環境変数 %q を足した", kv)
+		}
 	}
-	if !filepath.IsAbs(resp.Root) || !filepath.IsAbs(resp.Dir) {
-		t.Errorf("env vars must be absolute: %q %q", resp.Root, resp.Dir)
+	if !slices.Contains(resp.Env, "HOZO_TEST_MARK=1") {
+		t.Errorf("渡した環境変数が、届いていない: %v", resp.Env)
 	}
 	if !reflect.DeepEqual(resp.Args, []string{"--flag", "x"}) {
 		t.Errorf("args = %v", resp.Args)

@@ -560,5 +560,5 @@ func RunHTTP(t *testing.T, leaves server.Leaves, c HTTPCases) {
 warning（コードは `PLUGIN`）は二つ: 経路の op が一つもない。N の出力の、テストの中の組み立てを、作れない（「インテグレーションテストの口」の「置き場と名前」。メッセージに、理由を入れる。テストのパッケージの `http.go` と、対応表は、出さない）。
 
 - GOHTTP-3〜GOHTTP-6、GOHTTP-11〜GOHTTP-19 は、書いたものの整合の検査: デコレータが言ったことと、model と op の宣言が食い違っていれば、出力を型に合わせて変えずに error にする（`docs/requirements.md`「出力を推論しない」）。
-- Dir(U, N) の上に `go.mod` がないとき（同じ単位の基底が GO-1 を返し、何も書き出されない。`docs/plugin-go.md`「診断」）は、ファイルを返さず、GO-1 も重ねて返さない。上の診断は、GOHTTP-21 のほかは、そのときも返す。
+- 基底のオプション `module` がないとき（同じ単位の基底が GO-8 を返し、何も書き出されない。`docs/plugin-go.md`「診断」）は、ファイルを返さず、GO-8 も重ねて返さない。上の診断は、GOHTTP-21 のほかは、そのときも返す。
 - 生成器の不具合（`View` が欠けている、生成したコードを `go/format` で整形できない）は、診断にせず、異常終了する（`proc.Crashed`。`docs/plugin-protocol.md`「起動」）。

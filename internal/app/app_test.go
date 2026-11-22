@@ -1146,19 +1146,32 @@ const requestsFile = "requests.jsonl"
 
 // fakeScript は fakePlugin の中身（sh）。要求を requestsFile に足し、応答のひな形 response.json の @DIR@ を要求の
 // view.config.dir（Dir(U, N)）に、@NS@ を view.viewer に置き換えて返す。終了コードは exit ファイルの中身。
-// direction が coverage の要求には、coverage.json をそのまま返す（終了コード 0。tests_test.go）。
+// direction が coverage の要求には、coverage.json をそのまま返す（終了コード 0。tests_test.go）。先頭に fakeHeader を置いて使う。
+// fakeHeader は、シェルで動く、テストのプラグインの先頭: 自分のディレクトリ（マニフェストのディレクトリ）を d に入れる。hozoc は、
+// プラグインに、環境変数を足さない（docs/plugin-protocol.md「起動」）ので、置き場は、起動されたパス（$0）から求める。
+const fakeHeader = "#!/bin/sh\nd=$(dirname \"$0\")\n"
+
+// writeScript は、実行できるシェルスクリプトを置く（マニフェストの command は `["./plugin.sh"]`）。
+func writeScript(t *testing.T, path, body string) {
+	t.Helper()
+	write(t, path, fakeHeader+body)
+	if err := os.Chmod(path, 0o755); err != nil {
+		t.Fatal(err)
+	}
+}
+
 const fakeScript = `req=$(cat)
-printf '%s\n' "$req" >>"$HOZO_PLUGIN_DIR/requests.jsonl"
+printf '%s\n' "$req" >>"$d/requests.jsonl"
 case "$req" in
 *'"direction":"coverage"'*)
-  cat "$HOZO_PLUGIN_DIR/coverage.json"
+  cat "$d/coverage.json"
   exit 0
   ;;
 esac
 ns=$(printf '%s' "$req" | sed -n 's/^.*"view":{"version":"[^"]*","viewer":"\([^"]*\)".*$/\1/p')
 dir=$(printf '%s' "$req" | sed -n 's/^.*"view":{"version":"[^"]*","viewer":"[^"]*","config":{"index":[0-9]*,"language":"[^"]*","base":"[^"]*","out":"[^"]*","dir":"\([^"]*\)".*$/\1/p')
-sed -e "s|@DIR@|$dir|g" -e "s|@NS@|$ns|g" "$HOZO_PLUGIN_DIR/response.json"
-exit "$(cat "$HOZO_PLUGIN_DIR/exit")"
+sed -e "s|@DIR@|$dir|g" -e "s|@NS@|$ns|g" "$d/response.json"
+exit "$(cat "$d/exit")"
 `
 
 // fakePlugin はシェルで動く小さなプラグインを plugins/<name> に置く。提供するトランスパイラは、プラグインと同じ名前の基底一つ
@@ -1181,10 +1194,10 @@ func fakeTranspiler(t *testing.T, dir, name, lang, extra, transpilerExtra, stdou
 		t.Skip("sh がない")
 	}
 	pluginDir := filepath.Join(dir, "plugins", name)
-	write(t, filepath.Join(pluginDir, "plugin.sh"), fakeScript)
+	writeScript(t, filepath.Join(pluginDir, "plugin.sh"), fakeScript)
 	write(t, filepath.Join(pluginDir, "response.json"), stdout)
 	write(t, filepath.Join(pluginDir, "exit"), string(rune('0'+exit)))
-	manifest := "name = \"" + name + "\"\ncommand = [\"sh\", \"-c\", \". \\\"$HOZO_PLUGIN_DIR/plugin.sh\\\"\"]\nprotocol = \"0.21\"\n" + extra +
+	manifest := "name = \"" + name + "\"\ncommand = [\"./plugin.sh\"]\nprotocol = \"0.21\"\n" + extra +
 		"\n[[transpiler]]\nname = \"" + name + "\"\nlanguage = \"" + lang + "\"\n" + transpilerExtra
 	write(t, filepath.Join(pluginDir, "hozo-plugin.toml"), manifest)
 }
@@ -1393,8 +1406,8 @@ func TestEmitUnits(t *testing.T) {
 		// rider と api は、同じ出力について一回ずつ。書いた順（rider が先）は、応答のファイルを変えない
 		write(t, filepath.Join(dir, "plugins", "order.txt"), "")
 		for _, name := range []string{"api", "rider", "admin"} {
-			script := "printf '%s\\n' " + name + " >>\"$HOZO_PLUGIN_DIR/../order.txt\"\n" + fakeScript
-			write(t, filepath.Join(dir, "plugins", name, "plugin.sh"), script)
+			script := "printf '%s\\n' " + name + " >>\"$d/../order.txt\"\n" + fakeScript
+			writeScript(t, filepath.Join(dir, "plugins", name, "plugin.sh"), script)
 		}
 		emitAll(t, dir)
 		order, err := os.ReadFile(filepath.Join(dir, "plugins", "order.txt"))
@@ -1552,15 +1565,14 @@ func TestRunEmit(t *testing.T) {
 	root := t.TempDir()
 	dir := filepath.Join(root, "plugins", "echo")
 	// 受け取った要求と、作業ディレクトリを記録して、決まった応答を返す
-	write(t, filepath.Join(dir, "plugin.sh"), `cat >"$HOZO_PLUGIN_DIR/request.json"
-pwd >"$HOZO_PLUGIN_DIR/cwd"
-printf '%s' "$HOZO_PROJECT_ROOT" >"$HOZO_PLUGIN_DIR/root"
-cat "$HOZO_PLUGIN_DIR/response.json"
-exit "$(cat "$HOZO_PLUGIN_DIR/exit")"
+	writeScript(t, filepath.Join(dir, "plugin.sh"), `cat >"$d/request.json"
+pwd >"$d/cwd"
+cat "$d/response.json"
+exit "$(cat "$d/exit")"
 `)
 	write(t, filepath.Join(dir, "response.json"), `{"files":[{"path":"gen/a/x.go","content":"package a\n"}],"warnings":[{"at":"a.f","message":"w"}],"errors":[{"code":"X-1","at":"a.g","message":"e"}]}`)
 	write(t, filepath.Join(dir, "exit"), "0")
-	plugin := hozoc.Plugin{Name: "echo", Command: []string{"sh", "-c", `. "$HOZO_PLUGIN_DIR/plugin.sh"`}, Dir: hozoc.Path(dir), Root: hozoc.Path(root)}
+	plugin := hozoc.Plugin{Name: "echo", Command: []string{"./plugin.sh"}, Dir: hozoc.Path(dir), Root: hozoc.Path(root)}
 	req := hozoc.EmitRequest{Protocol: "0.21", Direction: "emit", Transpiler: "echo"}
 	ctx := context.Background()
 	a := &App{Stderr: &bytes.Buffer{}}
@@ -1586,7 +1598,7 @@ exit "$(cat "$HOZO_PLUGIN_DIR/exit")"
 		t.Errorf("送った要求 = %s", got)
 	}
 	absRoot, _ := filepath.EvalSymlinks(root)
-	for _, name := range []string{"cwd", "root"} {
+	for _, name := range []string{"cwd"} {
 		got, _ := os.ReadFile(filepath.Join(dir, name))
 		if real, _ := filepath.EvalSymlinks(strings.TrimSpace(string(got))); real != absRoot {
 			t.Errorf("%s = %q, want %q", name, got, absRoot)

@@ -294,7 +294,7 @@ func (g *generator) checkTestNames(entries []entry) {
 
 // checkTestDir は GOHTTP-21: テストのパッケージのディレクトリが、同じ単位が出力する子の名前空間 N.<テストのパッケージの名前> の
 // 出力先と重なる。基底が、同じことを GO-4 で返す出力（基底も、テストのパッケージを作る）では、返さない。位置は、最初の経路の op。
-// 置き場が要るので、go.mod がない（layout が nil）ときは、見ない（基底が GO-1 を返し、何も書き出されない）。
+// 置き場が要るので、module がない（layout が nil）ときは、見ない（基底が GO-8 を返し、何も書き出されない）。
 func (g *generator) checkTestDir(entries []entry) {
 	if g.layout == nil || len(golang.PublicTestNames(g.view)) > 0 {
 		return
@@ -331,7 +331,7 @@ func (f *testFile) use(path string) string {
 // 二度描く（render と同じ手順）。
 func (g *generator) renderTest(entries []entry) (string, error) {
 	where := g.layout.TestName + "/" + TestFileName
-	im := golang.NewTestImports(g.view, g.layout, g.root)
+	im := golang.NewTestImports(g.view, g.layout)
 	im.Reserve(testBodyNames...)
 	first := &testFile{g: g, im: im}
 	first.draw(entries)

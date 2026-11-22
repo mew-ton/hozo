@@ -2,6 +2,9 @@
 # 名前空間のパッケージ名が、基底が決まった名前で使う識別子と同じとき: 定義のパッケージに宣言する非公開の名前（構造体 ops、補助 ptr）と、
 # 関数の本体の中の名前（レシーバ o、ctx、err、途中の値 v0、判定の結果 k0）。
 
+[options.go]
+module = "example.com/app"
+
 # 1: flat。内部の op を持たない（定義のパッケージが入口でもある）。ops と ptr の型を使い、ops の op を呼ぶ
 [[emit]]
 namespace   = "flat"

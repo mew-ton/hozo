@@ -1,6 +1,9 @@
 # plugins/go-design の単体テストの入力（docs/testing.md「単体テスト」）: テストのパッケージの design.go の、ゴールデンと、振る舞い。
 # 名前空間 design（担い手と、要求の分類）と data（状態と、read と、効果）には、単位を置かない。
 
+[options.go]
+module = "example.com/app"
+
 # 操作の op（どれも、人が書く葉）。基底は、テストのパッケージを作る（葉がある）が、go-design は並べない
 [[emit]]
 namespace   = "act"

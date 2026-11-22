@@ -1,3 +1,6 @@
+[options.go]
+module = "example.com/app"
+
 # plugins/go-sqlite の単体テストの入力（docs/testing.md「単体テスト」）: docs/plugin-go-sqlite.md「補助」の「使うものだけ」。
 # read も効果も一つも持たない表一つ: 出る補助と import が、いちばん少ない（使わない import が残れば、コンパイルできない）。
 [[emit]]

@@ -45,7 +45,7 @@ const (
 // docs/plugin-go.md「パッケージと import パス」の「import の名前」）: 一度目で import の集まりを知り、名前を文書の順で決め直してから、
 // その名前でもう一度作る。go/format で整形する。
 func (e *emitter) generate() (string, error) {
-	im := golang.NewImports(e.view, e.layout, e.root, false)
+	im := golang.NewImports(e.view, e.layout, false)
 	e.build(im)
 	im = im.Canonical()
 	body := e.build(im)

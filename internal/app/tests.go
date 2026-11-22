@@ -15,6 +15,7 @@ import (
 	hostplugin "github.com/mew-ton/hozo/internal/plugin"
 	"github.com/mew-ton/hozo/internal/project"
 	"github.com/mew-ton/hozo/internal/testmap"
+	"github.com/mew-ton/hozo/ir"
 	sdk "github.com/mew-ton/hozo/plugin"
 )
 
@@ -152,6 +153,8 @@ func (a *App) readCoverage(ctx context.Context, p *project.Project, pl *outputPl
 	// 相手: 対応表を持つ単位の基底のプラグイン（単位の設定の順）と、そのプラグインに聞くファイル
 	var plugins []*hostplugin.Plugin
 	files := map[string]map[string]bool{}
+	outputs := map[string][]ir.NamespaceConfig{} // プラグインの名前 → files を出した出力の設定（単位の設定の順、名前空間の IR の順）
+	seenOutput := map[string]bool{}
 	for u := range p.Units {
 		for _, t := range pl.tests {
 			if t.unit != u {
@@ -163,6 +166,10 @@ func (a *App) readCoverage(ctx context.Context, p *project.Project, pl *outputPl
 				plugins = append(plugins, pg)
 			}
 			files[pg.Name][t.File] = true
+			if key := pg.Name + "\x00" + t.config.Dir; !seenOutput[key] {
+				seenOutput[key] = true
+				outputs[pg.Name] = append(outputs[pg.Name], t.config)
+			}
 		}
 	}
 	covered = map[string][]sdk.CoveredFile{}
@@ -175,7 +182,7 @@ func (a *App) readCoverage(ctx context.Context, p *project.Project, pl *outputPl
 				fmt.Sprintf("基底のプラグイン %s は、カバレッジを読めない（マニフェストの [coverage] enabled が true でない）", pg.Name)))
 			continue
 		}
-		req := sdk.CoverageRequest{Protocol: hostplugin.Protocol, Direction: "coverage", Coverage: sdk.File{Path: abs, Content: string(content)}}
+		req := sdk.CoverageRequest{Protocol: hostplugin.Protocol, Direction: "coverage", Coverage: sdk.File{Path: abs, Content: string(content)}, Outputs: outputs[pg.Name]}
 		for f := range files[pg.Name] {
 			req.Files = append(req.Files, f)
 		}

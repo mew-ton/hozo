@@ -30,15 +30,15 @@ const vocabulary = "valid"
 // method は、このトランスパイラが型に足すメソッドの名前。
 const method = "Validate"
 
-// Emit は、要求の View の出力 (U, N) の validate.go を作る（docs/plugin-go-valid.md「出力」）。root はプロジェクトのルート
-// （go.mod を探す起点）。診断があれば、ファイルは返さない。`Validate` を持つ型が N に一つもなければ、何も返さない。
+// Emit は、要求の View の出力 (U, N) の validate.go を作る（docs/plugin-go-valid.md「出力」）。読むのは、要求だけ
+// （ファイルも、環境変数も、読まない）。診断があれば、ファイルは返さない。`Validate` を持つ型が N に一つもなければ、何も返さない。
 // 戻り値の error は、利用者の仕様の誤りでないもの（View が欠けている、生成したコードを整形できない）。
-func Emit(req *plugin.EmitRequest, root string) ([]plugin.File, []plugin.Diagnostic, error) {
+func Emit(req *plugin.EmitRequest) ([]plugin.File, []plugin.Diagnostic, error) {
 	view := req.View
 	if view == nil || view.Program == nil || view.Program.Namespace(view.Viewer) == nil {
 		return nil, nil, fmt.Errorf("View に、名前空間 %s の Program がない", viewerOf(view))
 	}
-	g := &generator{view: view, root: root, p: view.Program, ns: view.Program.Namespace(view.Viewer)}
+	g := &generator{view: view, p: view.Program, ns: view.Program.Namespace(view.Viewer)}
 	g.prepare()
 
 	// GOVALID-7: オプションはない
@@ -52,9 +52,9 @@ func Emit(req *plugin.EmitRequest, root string) ([]plugin.File, []plugin.Diagnos
 			view.Config.Index, TranspilerName, key, TranspilerName)
 	}
 
-	// 置き場。go.mod がなければ、基底が GO-1 を返すので、ここでは、仕様だけで決まる診断を返して終わる
-	layout, layoutErr := golang.LayoutOf(view, root)
-	if layoutErr != nil && !errors.Is(layoutErr, golang.ErrNoGoMod) {
+	// 置き場。基底のオプション module がなければ、基底が GO-8 を返すので、ここでは、仕様だけで決まる診断を返して終わる
+	layout, layoutErr := golang.LayoutOf(view)
+	if layoutErr != nil && !errors.Is(layoutErr, golang.ErrNoModule) {
 		return nil, nil, fmt.Errorf("名前空間 %s の出力先 %q の import パスを求められない: %w", view.Viewer, view.Config.Dir, layoutErr)
 	}
 	g.layout = layout
@@ -86,10 +86,9 @@ func viewerOf(view *ir.View) string {
 // generator は一つの出力 (U, N) の validate.go を作る状態。
 type generator struct {
 	view   *ir.View
-	root   string
 	p      *ir.Program
 	ns     *ir.Namespace  // N
-	layout *golang.Layout // go.mod がなければ nil
+	layout *golang.Layout // module がなければ nil
 
 	declNS map[string]string // 宣言の FQN → 宣言した名前空間
 	vocab  map[string]bool   // valid の語彙のデコレータの FQN（標準のものと、利用者が足したもの）
@@ -429,9 +428,9 @@ func (g *generator) checkHome(fqn, at, what string) {
 	if m == g.view.Viewer || g.layout == nil {
 		return
 	}
-	_, ok, err := golang.HomeOf(g.view, m, g.root)
+	_, ok, err := golang.HomeOf(g.view, m)
 	if err != nil {
-		if !errors.Is(err, golang.ErrNoGoMod) && g.fatal == nil {
+		if !errors.Is(err, golang.ErrNoModule) && g.fatal == nil {
 			g.fatal = fmt.Errorf("名前空間 %s の型の置き場を求められない: %w", m, err)
 		}
 		return

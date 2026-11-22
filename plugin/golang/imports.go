@@ -21,7 +21,6 @@ import (
 type Imports struct {
 	view   *ir.View
 	layout *Layout
-	root   string
 	inDef  bool
 	// inTypes は、書くファイルが、型のパッケージ（docs/plugin-go.md「型のパッケージ」）のものか。
 	inTypes bool
@@ -45,26 +44,26 @@ type Imports struct {
 // （同「パッケージと import パス」の「import の名前」）。
 var basePrivateNames = []string{"ops", "ptr"}
 
-// NewImports は、view の出力の一つのファイルの import を作る。layout は、その出力の置き場（LayoutOf(view, root)）、
-// root はプロジェクトのルート。inDef は、書くファイルが定義のパッケージのものか。入口のパッケージのファイル（分けた出力の
+// NewImports は、view の出力の一つのファイルの import を作る。layout は、その出力の置き場（LayoutOf(view)）、
+// inDef は、書くファイルが定義のパッケージのものか。入口のパッケージのファイル（分けた出力の
 // 入口の再公開と、相乗りのファイル）なら false で、そのとき、内側のパッケージ `inner` の名前は、ほかの import に使わせない。
 // どちらでも、N の型は修飾なしの名前になる（入口は、定義のすべての型の別名を持つ）。
-func NewImports(view *ir.View, layout *Layout, root string, inDef bool) *Imports {
-	return &Imports{view: view, layout: layout, root: root, inDef: inDef}
+func NewImports(view *ir.View, layout *Layout, inDef bool) *Imports {
+	return &Imports{view: view, layout: layout, inDef: inDef}
 }
 
 // NewTypesImports は、view の出力の、型のパッケージ（docs/plugin-go.md「型のパッケージ」）の、一つのファイルの import を作る。
 // N の型は、修飾なしの名前になる。型のパッケージを分けない出力（Layout.HasTypes が偽）では、NewImports(…, true) と同じ。
-func NewTypesImports(view *ir.View, layout *Layout, root string) *Imports {
-	return &Imports{view: view, layout: layout, root: root, inDef: true, inTypes: true}
+func NewTypesImports(view *ir.View, layout *Layout) *Imports {
+	return &Imports{view: view, layout: layout, inDef: true, inTypes: true}
 }
 
 // NewTestImports は、view の出力の、テストのパッケージ（docs/plugin-go.md「単体テストの口」の「テストのパッケージ」）の、一つの
 // ファイルの import を作る。テストのパッケージは、N の入口のパッケージを import するので、N の型も、入口のパッケージの名前で
 // 修飾する（Qualifier(N) が、入口を import して `<名前>.` を返す）。その import は、名前がパスの最後の要素と同じでも、名前を書く
 // （出力先のディレクトリの名前で、ファイルの中身が変わらないように: 同「決定性」）。
-func NewTestImports(view *ir.View, layout *Layout, root string) *Imports {
-	return &Imports{view: view, layout: layout, root: root, outside: true}
+func NewTestImports(view *ir.View, layout *Layout) *Imports {
+	return &Imports{view: view, layout: layout, outside: true}
 }
 
 func (im *Imports) init() {
@@ -204,7 +203,7 @@ func (im *Imports) Render() string {
 // その後に、名前空間のパッケージを、名前空間の FQN の辞書順に。名前が当たれば、後の方に 2、3、… が付く。
 // ファイルを一度作って import の集まりを知り、返った Imports で作り直せば、名前は、足した順（型を書いた順）によらない。
 func (im *Imports) Canonical() *Imports {
-	out := &Imports{view: im.view, layout: im.layout, root: im.root, inDef: im.inDef, inTypes: im.inTypes, outside: im.outside, declNS: im.declNS, homes: im.homes,
+	out := &Imports{view: im.view, layout: im.layout, inDef: im.inDef, inTypes: im.inTypes, outside: im.outside, declNS: im.declNS, homes: im.homes,
 		reserved: append([]string(nil), im.reserved...)}
 	out.init()
 	var plain, spaces []string
@@ -263,7 +262,7 @@ func (im *Imports) Qualifier(namespace string) string {
 }
 
 // Err は、GoType / Zero / Qualifier が、型の置き場を求められなかった名前空間があれば、その誤り（最初の一つ）。なければ nil。
-// 置き場があることは hozoc が確かめている（CFG-22）ので、基底は GO-INTERNAL にする。go.mod がないとき（ErrNoGoMod）もここに出る。
+// 置き場があることは hozoc が確かめている（CFG-22）ので、基底は GO-INTERNAL にする。module がないとき（ErrNoModule）もここに出る。
 func (im *Imports) Err() error {
 	if im == nil {
 		return nil
@@ -307,7 +306,7 @@ func (im *Imports) home(namespace string) *Layout {
 	if l, ok := im.homes[namespace]; ok {
 		return l
 	}
-	l, ok, err := HomeOf(im.view, namespace, im.root)
+	l, ok, err := HomeOf(im.view, namespace)
 	switch {
 	case err != nil:
 		if im.err == nil {

@@ -303,7 +303,7 @@ func TestWarnings(t *testing.T) {
 			t.Errorf("empty: warning = %+v", warnings[i])
 		}
 	}
-	resp, err := Handler{Getenv: func(string) string { return root }}.Emit(request(loadViews(t, "empty")[0], TranspilerName))
+	resp, err := Handler{}.Emit(request(loadViews(t, "empty")[0], TranspilerName))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -426,26 +426,26 @@ func TestFlowShapeMessages(t *testing.T) {
 }
 
 // TestTestDir は GODESIGN-7 の条件: 基底も、テストのパッケージを作る出力（葉の op がある）では、基底が GO-4 を返すので、重ねて返さない。
-// 置き場が要るので、go.mod がないときも、返さない（基底が GO-1 を返す）。
+// 置き場が要るので、module がないときも、返さない（基底が GO-8 を返す）。
 func TestTestDir(t *testing.T) {
 	views := loadViews(t, "godesign7")
 	_, diags, _ := emitViews(t, newRoot(t), views)
 	if len(diags) != 2 || diags[0].Code != codeTestDir || diags[0].At != "n.first" || diags[1].At != "design.Req" {
 		t.Errorf("診断 = %+v, want n.first と design.Req の GODESIGN-7（m は、基底が GO-4 を返す）", diags)
 	}
-	if _, diags, _ = emitViews(t, t.TempDir(), views); len(diags) != 0 {
-		t.Errorf("go.mod がないとき: 診断 = %+v, want なし", diags)
+	if _, diags, _ = emitViews(t, "", noModule(views)); len(diags) != 0 {
+		t.Errorf("module がないとき: 診断 = %+v, want なし", diags)
 	}
 }
 
-// TestNoGoMod: Dir(U, N) の上に go.mod がないとき（基底が GO-1 を返す）、go-design は、ファイルを返さない。仕様だけで決まる診断と、
-// warning は、go.mod がなくても返す。
-func TestNoGoMod(t *testing.T) {
-	files, diags, warnings := emitViews(t, t.TempDir(), loadViews(t, "flows"))
+// TestNoModule: 基底のオプション module がないとき（基底が GO-8 を返す）、go-design は、ファイルを返さない。仕様だけで決まる診断と、
+// warning は、module がなくても返す。
+func TestNoModule(t *testing.T) {
+	files, diags, warnings := emitViews(t, "", noModule(loadViews(t, "flows")))
 	if len(files) != 0 || len(diags) != 0 || len(warnings) != 2 {
-		t.Errorf("files=%v 診断=%+v warnings=%+v, want ファイルも診断もなく、warning が二つ（GO-1 は基底が返す）", sortedPaths(files), diags, warnings)
+		t.Errorf("files=%v 診断=%+v warnings=%+v, want ファイルも診断もなく、warning が二つ（GO-8 は基底が返す）", sortedPaths(files), diags, warnings)
 	}
-	_, diags, _ = emitViews(t, t.TempDir(), loadViews(t, "godesign1"))
+	_, diags, _ = emitViews(t, "", noModule(loadViews(t, "godesign1")))
 	if len(diags) == 0 || diags[0].Code != codeFlowExport {
 		t.Errorf("診断 = %+v, want GODESIGN-1", diags)
 	}
@@ -475,7 +475,7 @@ func TestUnitTargets(t *testing.T) {
 		t.Fatalf("View.files に、app.hozo がない: %v", flows.Files)
 	}
 	flows.Files = kept
-	out, err := Emit(request(flows, TranspilerName), newRoot(t))
+	out, err := Emit(request(flows, TranspilerName))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -492,14 +492,14 @@ func TestBrokenView(t *testing.T) {
 		"Program がない":          {Version: ir.Version, Viewer: "flows", Config: view.Config},
 		"viewer が Program にない": {Version: ir.Version, Viewer: "nowhere", Config: view.Config, Program: view.Program},
 	} {
-		out, err := Emit(request(v, TranspilerName), newRoot(t))
+		out, err := Emit(request(v, TranspilerName))
 		if err == nil || out != nil {
 			t.Errorf("%s: out=%+v err=%v, want error だけ", name, out, err)
 		}
 	}
 }
 
-// TestHandler は、プラグインの入口（Handler）: HOZO_PROJECT_ROOT をルートにして出力し、診断は応答の errors で返す
+// TestHandler は、プラグインの入口（Handler）: 要求の View から出力し、診断は応答の errors で返す
 // （docs/plugin-protocol.md「emit」）。check と import は持たない。
 func TestHandler(t *testing.T) {
 	var view *ir.View
@@ -512,12 +512,7 @@ func TestHandler(t *testing.T) {
 		t.Fatal("入力 flows に、名前空間 flows の View がない")
 	}
 	root := newRoot(t)
-	h := Handler{Getenv: func(key string) string {
-		if key == "HOZO_PROJECT_ROOT" {
-			return root
-		}
-		return ""
-	}}
+	h := Handler{}
 	resp, err := h.Emit(request(view, TranspilerName))
 	if err != nil {
 		t.Fatal(err)

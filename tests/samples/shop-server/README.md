@@ -403,7 +403,7 @@ HOZO_PLUGIN_PATH="$PWD/../../../plugins" /tmp/hozoc tests --coverage /tmp/cover.
 | `client.hozo` | `client` | 操作の op（ユースケース）三つ。機能入口の op を呼ぶ配線（同） |
 | `flows.hozo` | `flows` | フロー一つと、その結果の model。操作の op を、順に呼ぶ配線（同） |
 
-`hozo.toml` は、`[hozo]` の `plugin_dirs = ["plugins"]`（サンプルの中のプラグインの置き場）と、七つの単位。`mailer`、`smtp`、`design` には単位を置かないので、コードは出ない。
+`hozo.toml` は、`[hozo]` の `plugin_dirs = ["plugins"]`（サンプルの中のプラグインの置き場）と、プロジェクト全体のオプション `[options.go]` の `module = "example.com/shop-server"`（Go のモジュールの名前。`go.mod` の `module` と同じもの。`docs/plugin-go.md`「マニフェスト」）と、七つの単位。`mailer`、`smtp`、`design` には単位を置かないので、コードは出ない。
 
 | # | 単位の `out` | `namespace` | `transpilers` | 中身を埋める者 |
 |---|---|---|---|---|

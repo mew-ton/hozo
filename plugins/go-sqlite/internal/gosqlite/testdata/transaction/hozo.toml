@@ -3,6 +3,9 @@
 [hozo]
 plugin_dirs = ["plugins"]
 
+[options.go]
+module = "example.com/app"
+
 # 1: bank。@db.transaction の付いた op を持つ。継ぎ目を宣言したのは go-sqlite だけ（var _ Seams を出す）
 [[emit]]
 namespace   = "bank"

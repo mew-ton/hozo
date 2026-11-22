@@ -1,85 +1,40 @@
 package golang
 
 import (
-	"bufio"
 	"errors"
 	"fmt"
-	"os"
+	"path"
 	"path/filepath"
-	"strconv"
-	"strings"
+
+	"github.com/mew-ton/hozo/ir"
 )
 
-// ErrNoGoMod は ImportPath が go.mod を見つけられなかったこと。基底のプラグインは GO-1 にする（docs/plugin-go.md「診断」）。
-var ErrNoGoMod = errors.New("no go.mod found")
+// ErrNoModule は、出力の設定に、Go のモジュールの名前（基底へのオプション module）がないこと。基底のプラグインは GO-8 にする
+// （docs/plugin-go.md「診断」）。
+var ErrNoModule = errors.New("no Go module name in the options")
 
-// ImportPath は `<root>/<dir>` に置くパッケージの import パス（docs/plugin-go.md「パッケージと import パス」）。
-// `<root>/<dir>` から親へ向かって最初に見つかる go.mod の `module` に、そのディレクトリから
-// `<root>/<dir>` への相対パスを `/` でつないだもの。dir には、出力先 Dir(U, N)（View.config.dir。docs/config.md「単位の対象」）か、
-// その下のディレクトリを渡す。root はプロジェクトのルート（HOZO_PROJECT_ROOT）。go.mod が見つからなければ ErrNoGoMod を
-// 包んだ誤り（GO-1）。go.mod が読めない、または `module` 行がなければその誤り。ディレクトリは存在しなくてよい。
-func ImportPath(root, dir string) (string, error) {
-	return importPath(root, dir)
+// ModuleOf は、出力の設定 cfg の、Go のモジュールの名前（docs/plugin-go.md「マニフェスト」のオプション module:
+// cfg.Options[cfg.Base]["module"]）。書かれていない、文字列でない、空なら ErrNoModule を包んだ誤り（GO-8）。
+// ファイル（go.mod）は、読まない（docs/decisions.md「決めたこと」425）。
+func ModuleOf(cfg ir.NamespaceConfig) (string, error) {
+	v, written := cfg.Options[cfg.Base]["module"]
+	if !written {
+		return "", fmt.Errorf("%w: [options.%s] に module がない", ErrNoModule, cfg.Base)
+	}
+	s, isString := v.(string)
+	if !isString || s == "" {
+		return "", fmt.Errorf("%w: [options.%s] の module が、空でない文字列でない（%v）", ErrNoModule, cfg.Base, v)
+	}
+	return s, nil
 }
 
-func importPath(root, out string) (string, error) {
-	dir, err := filepath.Abs(filepath.Join(root, out))
-	if err != nil {
-		return "", err
+// ImportPath は、モジュール module の、ディレクトリ dir（プロジェクトのルートからの相対パス。出力先 Dir(U, N) か、その下）に置く
+// パッケージの import パス（docs/plugin-go.md「パッケージと import パス」）: module に、dir を `/` でつないだもの。dir がルート
+// そのもの（"."、""）なら module。モジュールのルートは、プロジェクトのルート。
+func ImportPath(module, dir string) string {
+	dir = path.Clean(filepath.ToSlash(dir))
+	if dir == "." || dir == "" || dir == "/" {
+		return module
 	}
-	for d := dir; ; {
-		gomod := filepath.Join(d, "go.mod")
-		if _, err := os.Stat(gomod); err == nil {
-			module, err := modulePath(gomod)
-			if err != nil {
-				return "", err
-			}
-			rel, err := filepath.Rel(d, dir)
-			if err != nil {
-				return "", err
-			}
-			if rel == "." {
-				return module, nil
-			}
-			return module + "/" + filepath.ToSlash(rel), nil
-		}
-		parent := filepath.Dir(d)
-		if parent == d {
-			return "", fmt.Errorf("%w above %s", ErrNoGoMod, dir)
-		}
-		d = parent
-	}
-}
-
-// modulePath は go.mod の `module` 行のパスを読む。
-func modulePath(gomod string) (string, error) {
-	f, err := os.Open(gomod)
-	if err != nil {
-		return "", err
-	}
-	defer f.Close()
-	sc := bufio.NewScanner(f)
-	for sc.Scan() {
-		line := strings.TrimSpace(sc.Text())
-		if i := strings.Index(line, "//"); i >= 0 {
-			line = strings.TrimSpace(line[:i])
-		}
-		if !strings.HasPrefix(line, "module") {
-			continue
-		}
-		rest := strings.TrimSpace(strings.TrimPrefix(line, "module"))
-		if rest == "" || rest == line {
-			continue
-		}
-		if strings.HasPrefix(rest, `"`) {
-			if s, err := strconv.Unquote(rest); err == nil {
-				rest = s
-			}
-		}
-		return rest, nil
-	}
-	if err := sc.Err(); err != nil {
-		return "", err
-	}
-	return "", fmt.Errorf("%s: no module line", gomod)
+	return module + "/" + dir
 }

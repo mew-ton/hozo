@@ -1,0 +1,4 @@
+// CFG-24（docs/config.md「診断」）: [options.<名前>] の <名前> が、どの単位の transpilers にもない（ng_1.toml）
+namespace a {
+  fn f();
+}

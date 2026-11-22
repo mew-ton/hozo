@@ -1,3 +1,6 @@
+[options.go]
+module = "example.com/app"
+
 # plugins/go-http の単体テストの入力（docs/testing.md「単体テスト」の「型に依らない形の確かめ」）: uniforma と uniformb は、
 # フィールドの型、例外が運ぶ値、戻り値の型だけが違う。二つの http.go は、同じテキストになる。
 [[emit]]

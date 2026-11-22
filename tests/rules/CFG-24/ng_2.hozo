@@ -1,0 +1,4 @@
+// CFG-24（docs/config.md「診断」）: 単位が一つもないのに、[options.<名前>] がある（ng_2.toml）
+namespace a {
+  fn f();
+}

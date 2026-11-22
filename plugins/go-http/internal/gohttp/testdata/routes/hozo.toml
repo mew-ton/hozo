@@ -2,6 +2,9 @@
 # （サンプルが使わない、三つの場所の二つの形・名前を書いた項目と省いた項目・複数の本文の項目・項目がないときの三つの扱い・
 # クエリの各型・引数を持つ例外（一つと、二つ以上。省略可能な引数）・record の結果・validate = false を含む）。
 
+[options.go]
+module = "example.com/app"
+
 # 1: 共有の型と例外。api と strict の Validate が、ここの型のメソッドを呼ぶ
 [[emit]]
 namespace   = "type"

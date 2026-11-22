@@ -1,3 +1,6 @@
+[options.go]
+module = "example.com/app"
+
 # plugins/go-http の単体テストの入力（docs/testing.md「単体テスト」）: 経路の op が一つもない名前空間（ファイルを出さず、warning を一つ返す）。
 [[emit]]
 namespace   = "app"

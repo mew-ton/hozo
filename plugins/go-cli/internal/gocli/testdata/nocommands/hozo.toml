@@ -1,3 +1,6 @@
+[options.go]
+module = "example.com/app"
+
 # plugins/go-cli の単体テストの入力（docs/testing.md「単体テスト」）: @cli.command の op が一つもない（docs/plugin-go-cli.md「出力」）。
 [[emit]]
 namespace   = "app"

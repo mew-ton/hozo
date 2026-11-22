@@ -16,11 +16,11 @@ import (
 
 // 診断のコード（docs/plugin-go.md「診断」）。
 const (
-	codeNoGoMod     = "GO-1"        // Dir(U, N) の上に go.mod がない
+	codeNoModule    = "GO-8"        // オプション module が、書かれていない、文字列でない、空（GO-1 は欠番）
 	codeCollision   = "GO-2"        // 生成する名前が当たる
 	codeImportCycle = "GO-3"        // 出力どうしの import が循環する
 	codeInnerDir    = "GO-4"        // 内側のフォルダが、子の名前空間 N.inner の出力先と重なる
-	codeOption      = "GO-5"        // [emit.options.go] に知らないキーがある
+	codeOption      = "GO-5"        // トランスパイラ go へのオプションに、知らないキーがある
 	codeVariant     = "GO-6"        // variant の絞り込みの as の型と等しい型のアームが、union に二つ以上ある
 	codeSeamOnBody  = "GO-7"        // 単位のトランスパイラが、本体のあるデコレータに、継ぎ目を宣言している
 	codeInternal    = "GO-INTERNAL" // 生成器の不具合
@@ -39,36 +39,38 @@ const (
 	fileWiring   = "wiring.go"
 )
 
-// Emit は、要求の View の出力 (U, N) のファイルを作る（docs/plugin-go.md）。root はプロジェクトのルート（go.mod を探す起点）、
+// Emit は、要求の View の出力 (U, N) のファイルを作る（docs/plugin-go.md）。読むのは、要求だけ（ファイルも、環境変数も、読まない）。
 // stderr は、整形に失敗したときに整形前の内容を書く先。診断があれば、ファイルは返さない。ファイルはパスの辞書順。
-func Emit(req *plugin.EmitRequest, root string, stderr io.Writer) ([]plugin.File, []plugin.Diagnostic) {
+func Emit(req *plugin.EmitRequest, stderr io.Writer) ([]plugin.File, []plugin.Diagnostic) {
 	view := req.View
-	e := &emitter{view: view, root: root, stderr: stderr}
+	e := &emitter{view: view, stderr: stderr}
 	if view.Program == nil || view.Program.Namespace(view.Viewer) == nil {
 		e.errorf(codeInternal, "", "View に、名前空間 %s の Program がない", view.Viewer)
 		return nil, e.errs
 	}
-	// GO-5: オプションはない
-	var none struct{}
-	unknown, err := plugin.Options(req, &none)
+	// GO-5: オプションは module だけ。module の値（型と、空でないこと）は、ModuleOf が確かめる（GO-8）
+	var known struct {
+		Module any `json:"module"`
+	}
+	unknown, err := plugin.Options(req, &known)
 	if err != nil {
-		e.errorf(codeOption, "", "[emit.options.go] を読めない: %v", err)
+		e.errorf(codeOption, "", "トランスパイラ go へのオプションを読めない: %v", err)
 	}
 	for _, key := range unknown {
-		e.errorf(codeOption, "", "%d 番目の [[emit]] の [emit.options.go] に、知らないキー %s がある（go にオプションはない）", view.Config.Index, key)
+		e.errorf(codeOption, "", "%d 番目の [[emit]] の、トランスパイラ go へのオプションに、知らないキー %s がある（あるのは module）", view.Config.Index, key)
 	}
-	// GO-1
-	layout, err := golang.LayoutOf(view, root)
+	// GO-8
+	layout, err := golang.LayoutOf(view)
 	if err != nil {
-		if errors.Is(err, golang.ErrNoGoMod) {
-			e.errorf(codeNoGoMod, "", "名前空間 %s の出力先 %q の上に go.mod がない（%v）", view.Viewer, view.Config.Dir, err)
+		if errors.Is(err, golang.ErrNoModule) {
+			e.errorf(codeNoModule, "", "名前空間 %s の出力（%d 番目の [[emit]]）に、Go のモジュールの名前がない: hozo.toml の [options.go] に、module = \"<go.mod の module と同じ名前>\" を書く（%v）", view.Viewer, view.Config.Index, err)
 		} else {
 			e.errorf(codeInternal, "", "名前空間 %s の出力先 %q の import パスを求められない: %v", view.Viewer, view.Config.Dir, err)
 		}
 		return nil, e.errs
 	}
 	e.layout = layout
-	kit, err := golang.TestKitOf(view, root)
+	kit, err := golang.TestKitOf(view)
 	if err != nil {
 		e.errorf(codeInternal, "", "名前空間 %s の、テストの中の組み立てに使う出力の import パスを求められない: %v", view.Viewer, err)
 		return nil, e.errs
@@ -94,7 +96,6 @@ func Emit(req *plugin.EmitRequest, root string, stderr io.Writer) ([]plugin.File
 // emitter は一つの出力 (U, N) を作る状態。
 type emitter struct {
 	view   *ir.View
-	root   string
 	stderr io.Writer
 	layout *golang.Layout
 	shape  *golang.Shape
@@ -412,7 +413,7 @@ func (e *emitter) newFile(name string, inDef bool) *fileGen {
 	}
 	f.im = e.imports[f.key]
 	if f.im == nil {
-		f.im = golang.NewImports(e.view, e.layout, e.root, inDef)
+		f.im = golang.NewImports(e.view, e.layout, inDef)
 		f.im.Reserve(bodyNames...)
 		e.imports[f.key] = f.im
 	}
@@ -428,7 +429,7 @@ func (e *emitter) newTypesFile(name string) *fileGen {
 	f := &fileGen{e: e, name: name, inDef: true, inTypes: true, pkg: e.layout.TypesName, key: "types/" + name}
 	f.im = e.imports[f.key]
 	if f.im == nil {
-		f.im = golang.NewTypesImports(e.view, e.layout, e.root)
+		f.im = golang.NewTypesImports(e.view, e.layout)
 		f.im.Reserve(bodyNames...)
 		e.imports[f.key] = f.im
 	}

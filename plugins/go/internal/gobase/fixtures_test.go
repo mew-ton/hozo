@@ -90,7 +90,7 @@ func emitViews(t *testing.T, root string, views []*ir.View) (map[string]string, 
 	var diags []plugin.Diagnostic
 	for _, v := range views {
 		var stderr bytes.Buffer
-		out, errs := Emit(request(v), root, &stderr)
+		out, errs := Emit(request(v), &stderr)
 		diags = append(diags, errs...)
 		if len(errs) > 0 && len(out) > 0 {
 			t.Errorf("%s: 診断があるのに、ファイルを返した", v.Viewer)

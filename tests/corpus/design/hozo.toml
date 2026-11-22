@@ -6,6 +6,10 @@
 [hozo]
 sources = ["**/*.hozo"]
 
+# Go のモジュールの名前（go.mod の module と同じもの。docs/plugin-go.md「マニフェスト」）。プロジェクト全体のオプション
+[options.go]
+module = "github.com/mew-ton/hozo"
+
 [[emit]]
 namespace   = "server"
 transpilers = ["go"]

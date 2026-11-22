@@ -1,3 +1,6 @@
+[options.go]
+module = "example.com/app"
+
 # plugins/go-sqlite の単体テストの入力（docs/testing.md「単体テスト」）: GOSQL-30（@db.update の効果の行の遷移の、後のケースが、前のケースの並びにない）。
 [[emit]]
 namespace   = "app"

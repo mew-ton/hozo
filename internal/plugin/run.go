@@ -15,12 +15,6 @@ import (
 	"github.com/mew-ton/hozo/internal/diag"
 )
 
-// 起動（docs/plugin-protocol.md「起動」）で足す環境変数。
-const (
-	EnvProjectRoot = "HOZO_PROJECT_ROOT" // ルートの絶対パス
-	EnvPluginDir   = "HOZO_PLUGIN_DIR"   // マニフェストのディレクトリの絶対パス
-)
-
 // ErrCrashed はプラグインの異常終了（例外 proc.Crashed。docs/plugin-protocol.md「起動」の「それ以外」の終了コード、
 // または起動できなかった）。*CrashedError が Unwrap する。
 var ErrCrashed = errors.New("proc.Crashed")
@@ -103,11 +97,11 @@ type errorResponse struct {
 
 // Runner はプラグインを起動する側の設定（docs/plugin-protocol.md「起動」）。
 type Runner struct {
-	// Root はプロジェクトのルート。起動したプロセスの作業ディレクトリと HOZO_PROJECT_ROOT。
+	// Root はプロジェクトのルート。起動したプロセスの作業ディレクトリ。
 	Root string
 	// Stderr はプラグインの標準エラーを流す先。nil なら os.Stderr。各行の先頭に "[<プラグイン名>] " を付ける。
 	Stderr io.Writer
-	// Env は元にする環境変数。nil なら os.Environ()。
+	// Env は起動したプロセスの環境変数。nil なら os.Environ()。足すものはない（プラグインは、要求のほかに頼らない）。
 	Env []string
 }
 
@@ -144,7 +138,7 @@ func (r Runner) Run(m *Manifest, dir string, req any, resp any) error {
 	if env == nil {
 		env = os.Environ()
 	}
-	cmd.Env = append(append([]string{}, env...), EnvProjectRoot+"="+absRoot, EnvPluginDir+"="+absDir)
+	cmd.Env = append([]string{}, env...)
 	cmd.Stdin = bytes.NewReader(input)
 	var stdout bytes.Buffer
 	cmd.Stdout = &stdout

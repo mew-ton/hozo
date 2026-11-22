@@ -465,7 +465,7 @@ func TestBlockedComposition(t *testing.T) {
 		t.Errorf("warning = %+v, want At が app、文面が %q", warnings[0], want)
 	}
 	// 応答でも、warning（コードは、hozoc が PLUGIN を付ける: docs/plugin-go-http.md「診断」）で、errors は、ない
-	resp, err := Handler{Getenv: func(string) string { return root }}.Emit(request(app, TranspilerName))
+	resp, err := Handler{}.Emit(request(app, TranspilerName))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -612,14 +612,14 @@ func TestIncompleteHTTPCasesDoNotCompile(t *testing.T) {
 }
 
 // TestHTTPCaseDir は GOHTTP-21 の条件: 基底も、テストのパッケージを作る出力（葉の op がある）では、基底が GO-4 を返すので、重ねて返さない。
-// 置き場が要るので、go.mod がないときも、返さない（基底が GO-1 を返す）。
+// 置き場が要るので、module がないときも、返さない（基底が GO-8 を返す）。
 func TestHTTPCaseDir(t *testing.T) {
 	views := loadViews(t, "gohttp21")
 	_, diags, _ := emitViews(t, newRoot(t), views)
 	if len(diags) != 1 || diags[0].Code != codeHTTPTestDir || diags[0].At != "n.first" {
 		t.Errorf("診断 = %+v, want n.first の GOHTTP-21 が一つ（m は、基底が GO-4 を返す）", diags)
 	}
-	if _, diags, _ = emitViews(t, t.TempDir(), views); len(diags) != 0 {
-		t.Errorf("go.mod がないとき: 診断 = %+v, want なし", diags)
+	if _, diags, _ = emitViews(t, "", noModule(views)); len(diags) != 0 {
+		t.Errorf("module がないとき: 診断 = %+v, want なし", diags)
 	}
 }

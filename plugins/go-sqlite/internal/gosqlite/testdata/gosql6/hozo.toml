@@ -1,3 +1,6 @@
+[options.go]
+module = "example.com/app"
+
 # plugins/go-sqlite の単体テストの入力（docs/testing.md「単体テスト」）: GOSQL-6（[emit.options.go-sqlite] に、知らないキーがある）。
 [[emit]]
 namespace   = "app"

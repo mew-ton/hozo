@@ -2,6 +2,9 @@
 # 入力 routes が使わない場合: 結果の名前が当たるとき、never を返す op、Given・Request・Then と当たる引数の名前、
 # 基底が、テストのパッケージを作らない出力。
 
+[options.go]
+module = "example.com/app"
+
 # 1: app が使う例外と、wired が呼ぶ op の置き場
 [[emit]]
 namespace   = "other"

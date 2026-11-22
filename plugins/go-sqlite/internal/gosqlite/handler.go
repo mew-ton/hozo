@@ -11,7 +11,6 @@ package gosqlite
 
 import (
 	"fmt"
-	"os"
 
 	"github.com/mew-ton/hozo/plugin"
 )
@@ -24,9 +23,6 @@ const FileName = "db.go"
 
 // Handler は go-sqlite の plugin.Handler。emit と、emit と同じ検査で答える check を実装する。
 type Handler struct {
-	// Getenv は環境変数を引く関数。nil なら os.Getenv。HOZO_PROJECT_ROOT（docs/plugin-protocol.md「起動」）を、型のパッケージの
-	// import パスを求めるルートに使う。空なら作業ディレクトリ（= プロジェクトのルート）。
-	Getenv func(string) string
 }
 
 var _ plugin.Handler = Handler{}
@@ -40,15 +36,7 @@ func (h Handler) Emit(req *plugin.EmitRequest) (*plugin.EmitResponse, error) {
 	if req.Transpiler != TranspilerName {
 		return nil, fmt.Errorf("transpiler %q is not provided by go-sqlite (it provides %q): %w", req.Transpiler, TranspilerName, plugin.ErrUnsupported)
 	}
-	getenv := h.Getenv
-	if getenv == nil {
-		getenv = os.Getenv
-	}
-	root := getenv("HOZO_PROJECT_ROOT")
-	if root == "" {
-		root = "."
-	}
-	return Emit(req, root)
+	return Emit(req)
 }
 
 // Check は、emit と同じ検査をして、emit が errors で返す誤りを、検査の段でも返す（docs/plugin-protocol.md「check」、

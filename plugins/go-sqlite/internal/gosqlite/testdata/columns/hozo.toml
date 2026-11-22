@@ -1,3 +1,6 @@
+[options.go]
+module = "example.com/app"
+
 # plugins/go-sqlite の単体テストの入力（docs/testing.md「単体テスト」）: docs/plugin-go-sqlite.md「しまい方」の表の各行
 # （六つのしまい方。核の型と scalar）、省略可能なフィールドの列（しまい方ごと）、制約（複数の @db.key、@db.unique、@db.ref）。
 [[emit]]

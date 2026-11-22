@@ -1,3 +1,6 @@
+[options.go]
+module = "example.com/app"
+
 # plugins/go-http の単体テストの入力（docs/testing.md「単体テスト」）: 名前空間のパッケージの名前が、生成したコードの局所の名前
 # （ops、mux、w、r、in、req、out、err）や、標準ライブラリのパッケージの名前と同じとき。局所の名前の方の末尾に _ を足す。
 # 標準ライブラリと同じ名前の名前空間のパッケージ（strconv、reflect）と、基底の非公開の名前と同じもの（ops）は、名前空間の方に 2 が付く。

@@ -175,7 +175,7 @@ func TestNone(t *testing.T) {
 	if len(files) != 0 || len(diags) != 0 {
 		t.Fatalf("files=%v 診断=%+v, want どちらも空", sortedPaths(files), diags)
 	}
-	resp, err := Handler{Getenv: func(string) string { return root }}.Emit(request(loadViews(t, "none")[0], TranspilerName))
+	resp, err := Handler{}.Emit(request(loadViews(t, "none")[0], TranspilerName))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -266,14 +266,14 @@ func TestDiagnosticPositions(t *testing.T) {
 	}
 }
 
-// TestNoGoMod: Dir(U, N) の上に go.mod がないとき（基底が GO-1 を返す）、go-valid は、ファイルも診断も返さない。
-// 仕様だけで決まる診断は、go.mod がなくても返す。
-func TestNoGoMod(t *testing.T) {
-	files, diags := emitViews(t, t.TempDir(), loadViews(t, "constraints"))
+// TestNoModule: 基底のオプション module がないとき（基底が GO-8 を返す）、go-valid は、ファイルも診断も返さない。
+// 仕様だけで決まる診断は、module がなくても返す。
+func TestNoModule(t *testing.T) {
+	files, diags := emitViews(t, "", noModule(loadViews(t, "constraints")))
 	if len(files) != 0 || len(diags) != 0 {
-		t.Errorf("files=%v 診断=%+v, want どちらも空（GO-1 は基底が返す）", sortedPaths(files), diags)
+		t.Errorf("files=%v 診断=%+v, want どちらも空（GO-8 は基底が返す）", sortedPaths(files), diags)
 	}
-	_, diags = emitViews(t, t.TempDir(), loadViews(t, "govalid1"))
+	_, diags = emitViews(t, "", noModule(loadViews(t, "govalid1")))
 	if len(diags) == 0 || diags[0].Code != codeValidConstraint {
 		t.Errorf("診断 = %+v, want GOVALID-1", diags)
 	}
@@ -287,24 +287,19 @@ func TestBrokenView(t *testing.T) {
 		"Program がない":          {Version: ir.Version, Viewer: "type", Config: view.Config},
 		"viewer が Program にない": {Version: ir.Version, Viewer: "nowhere", Config: view.Config, Program: view.Program},
 	} {
-		files, diags, err := Emit(request(v, TranspilerName), newRoot(t))
+		files, diags, err := Emit(request(v, TranspilerName))
 		if err == nil || len(files) != 0 || len(diags) != 0 {
 			t.Errorf("%s: files=%d 診断=%+v err=%v, want error だけ", name, len(files), diags, err)
 		}
 	}
 }
 
-// TestHandler は、プラグインの入口（Handler）: HOZO_PROJECT_ROOT をルートにして出力し、診断は応答の errors で返す
+// TestHandler は、プラグインの入口（Handler）: 要求の View から出力し、診断は応答の errors で返す
 // （docs/plugin-protocol.md「emit」）。check と import は持たない。
 func TestHandler(t *testing.T) {
 	view := loadViews(t, "constraints")[0]
 	root := newRoot(t)
-	h := Handler{Getenv: func(key string) string {
-		if key == "HOZO_PROJECT_ROOT" {
-			return root
-		}
-		return ""
-	}}
+	h := Handler{}
 	resp, err := h.Emit(request(view, TranspilerName))
 	if err != nil {
 		t.Fatal(err)

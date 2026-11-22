@@ -91,7 +91,7 @@ func wantSources(t *testing.T, got []string, want ...string) {
 
 func kitOf(t *testing.T, v *ir.View) *TestKit {
 	t.Helper()
-	kit, err := TestKitOf(v, "")
+	kit, err := TestKitOf(v)
 	if err != nil || kit.Blocked != "" {
 		t.Fatalf("TestKitOf: %v, Blocked = %q", err, kit.Blocked)
 	}

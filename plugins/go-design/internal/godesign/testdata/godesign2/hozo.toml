@@ -1,3 +1,6 @@
+[options.go]
+module = "example.com/app"
+
 # plugins/go-design の単体テストの入力（docs/testing.md「単体テスト」）: GODESIGN-2（@business.flow の付いた op が、本体を持たない、
 # または never を返す）。
 [[emit]]

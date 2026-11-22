@@ -1,3 +1,6 @@
+[options.go]
+module = "example.com/app"
+
 # plugins/go-http の単体テストの入力（docs/testing.md「単体テスト」）: GOHTTP-8（同じメソッドとパスの経路が二つある）。
 [[emit]]
 namespace   = "app"

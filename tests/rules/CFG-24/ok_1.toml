@@ -1,0 +1,22 @@
+# プロジェクト全体のオプション: go は、二つの単位が、go-x は、一つ目の単位だけが、transpilers に書いている
+[hozo]
+plugin_dirs = ["plugins"]
+
+[options.go]
+module = "example.com/app"
+
+[options.go-x]
+strict = true
+
+[[emit]]
+namespace   = "a"
+transpilers = ["go", "go-x"]
+out         = "gen/a"
+
+[emit.options.go]
+module = "example.com/other"
+
+[[emit]]
+namespace   = "a.sub"
+transpilers = ["go"]
+out         = "gen/sub"

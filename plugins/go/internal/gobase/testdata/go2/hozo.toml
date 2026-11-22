@@ -3,6 +3,9 @@
 [hozo]
 plugin_dirs = ["plugins"]
 
+[options.go]
+module = "example.com/app"
+
 [[emit]]
 namespace   = "c"
 transpilers = ["go", "go-rate"]

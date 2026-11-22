@@ -159,5 +159,5 @@ func CheckFormat(name, v string) bool                   // "email" / "uri" / "uu
 | GOVALID-7 | error | `[emit.options.go-valid]` に、知らないキーがある。位置なし |
 
 - GOVALID-2 は欠番。「フィールドの既定値が、その型かフィールドの制約に合わない」という規則だったが、フィールドの既定値を言語からなくしたので、確かめるものがない（`docs/decisions.md`「設計書から離れた決定」S24）。値を入れるデコレータ（`@http.default`、`@cli.default`）の値は、それを読む相乗りが、生成するときに制約で確かめる（`docs/plugin-go-http.md`「補う値と制約」）。番号は別の意味に使い回さない（欠番の一覧は `docs/requirements.md`「検査の規則の一覧」）。
-- Dir(U, N) の上に `go.mod` がないとき（同じ単位の基底が GO-1 を返し、何も書き出されない。`docs/plugin-go.md`「診断」）は、ファイルを返さず、GO-1 も重ねて返さない。置き場を求められないので、GOVALID-3 は確かめない。ほかの診断は、そのときも返す。
+- 基底のオプション `module` がないとき（同じ単位の基底が GO-8 を返し、何も書き出されない。`docs/plugin-go.md`「診断」）は、ファイルを返さず、GO-8 も重ねて返さない。置き場を求められないので、GOVALID-3 は確かめない。ほかの診断は、そのときも返す。
 - 生成器の不具合（`View` が欠けている、生成したコードを `go/format` で整形できない）は、診断にせず、異常終了する（`proc.Crashed`。`docs/plugin-protocol.md`「起動」）。

@@ -1,3 +1,6 @@
+[options.go]
+module = "example.com/app"
+
 # go-ratelimit の単体テストの入力: GORATE-2（公開の名前が当たる）。条件ごとに名前空間が一つ。
 [[emit]]
 namespace   = "types"

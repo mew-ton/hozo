@@ -424,6 +424,12 @@
 | 本体のないデコレータの `throws` は、継ぎ目の設定によらず、出どころに数える（種類 `decorator`）。継ぎ目がなければ、Go では、作れない。葉の op が、同じ例外を、節にも書いていれば、`decorator` の出どころだけを数える | 継ぎ目のないデコレータの例外を、出どころが見つからない例外（`unknown`）のままにする | `check.md`「入口ごとの、求めるケース」の「出どころ」 |
 | テストのパッケージのファイルは、別の名前空間の型も、その型の置き場の、入口のパッケージから書く（実装は、前から、この形。文書に、例外として書き足した） | 型のパッケージから書く（「パッケージと import パス」の決まりのまま） | `plugin-go.md`「単体テストの口」の「テストのパッケージ」 |
 | サンプルの、例外を受ける文の例: `shop-server` は、`resendNotices` の配送（`mailer.send`）を囲み、葉 `recordAudit` で記録して、`throw e` で投げ直す（op の関数の型と、テストの口が、変わらない形を選んだ）。`order-app` は、`payment.prepay` を、例外の分類 `PrepayFailure`（`Expected` / `Unexpected`）で、`notice.bestEffort` を、例外の分類 `Delivery`（`Undelivered` / `Other`）で書き直し、`payment.noteFailure` を、なくした | `shop-server` に、新しい葉（送れなかった通知を記録する）を足す。`placeOrder` の配送の失敗を、受けて、注文を成功にする（入口の結果が変わる） | `tests/samples/shop-server/README.md`「例外を受ける文で足したこと」、`tests/samples/order-app/README.md` |
+| プロジェクト全体のオプション（作り直しの段 3a。`decisions.md`「決めたこと」425 が決めていない分）: `hozo.toml` の、いちばん上の `[options.<名前>]`。そのトランスパイラを `transpilers` に書いた、すべての単位に渡り、単位の `[emit.options.<名前>]` に同じキーがあれば、単位のものが勝つ（キーごと。値がテーブルでも、中は混ぜない）。`View.config.options` は、混ぜた後のもの。どの単位の `transpilers` にもない名前は、CFG-24（error。単位が一つもないときも） | オプションは、単位ごとにだけ書く（モジュールの名前を、単位ごとに繰り返す）。Go のためだけのキー（`[go] module`）を、設定に足す。CFG-24 を warning にする | `config.md`「プロジェクト全体のオプション」 |
+| Go のモジュールのルートは、プロジェクトのルート（`hozo.toml` のあるディレクトリ）に決めた: import パスは、`module` に、`Dir(U, N)` をつないだもの。`go.mod` が、プロジェクトのルートより下にあるプロジェクトのための書き方（モジュールのルートのディレクトリを言うオプション）は、足していない | オプション `module_dir` を足す（import パスは、`module` に、そこからの相対パスをつなぐ）。単位ごとに、`module` と、その単位の `out` からの相対を書く | `plugin-go.md`「パッケージと import パス」 |
+| `module` がないときの診断は、新しい GO-8（書かれていない、文字列でない、空）。GO-1（`go.mod` がない）は、欠番にした: 意味が違う（ファイルがない、と、設定がない）ので、言い直さなかった | GO-1 を、言い直して使う | `plugin-go.md`「診断」 |
+| 起動するときに足していた環境変数 `HOZO_PROJECT_ROOT` と `HOZO_PLUGIN_DIR` を、なくした。プラグインは、作業ディレクトリにも、環境変数にも、頼らない。リポジトリのプラグインで、読んでいたのは `HOZO_PROJECT_ROOT`（`go.mod` を探す起点）だけで、`HOZO_PLUGIN_DIR` を読むものは、なかった | 変数は残し、文書で「頼らない」とだけ言う（シェルで書いた、手元のプラグインが、自分の置き場を知るのに使える） | `plugin-protocol.md`「起動」 |
+| カバレッジの要求に、`outputs`（`files` を出した出力の設定 `NamespaceConfig` の並び）を足した。基底 `go` は、ファイルのディレクトリか、その上にある `dir` のうち、いちばん深い出力の `module` で、import パスを作る。そういう出力がないファイルは、測られていないものとする | `files` を、パスと、その出力の設定の組にする。モジュールの名前だけを、要求の項目にする（言語に寄った項目になる） | `plugin-protocol.md`「coverage」、`plugin-go.md`「カバレッジを読む」 |
+| Go の SDK の `TestKitOf` は、`module` のない出力があっても、形（`TestKit`）を返し、その出力の `Layout` を nil にして、`ErrNoModule` を、一緒に返す（相乗りは、基底が GO-8 を返す設定では、何も出さない） | 誤りだけを返す | `packages.md`「`plugin/golang`（公開）」 |
 
 ## 持ち主のない点
 
@@ -484,7 +490,8 @@ GitHub Actions の無料の枠が尽きて、CI が動かない間は、手元�
 | `471842f..266f55c` | プラグインの作り直しの段取り（同 423）と、段 1a: 節 `outer throws`、核の印 `@entry` と `@hint`、`@external` をなくしたこと（同 407、408、420 の印）。DEC-26。DEC-14 と DEC-15 を欠番にしたこと。IR の版 0.19 | 同じ |
 | `266f55c..e2baf21` | 作り直しの段 1b: 例外を受ける文（`try` / `catch (e)` / `catch (e by 分類)`、`throw e`）と、例外の分類（同 419、422）。WIRE-15、WIRE-16、CLS-10、MATCH-10、DEC-27。IR の版 0.20。基底 `go` の出力（`plugin-go.md`「例外を受ける文」）。サンプル `order-app` の `payment.prepay` と `notice.bestEffort`、`shop-server` の `resendNotices` | 同じ |
 | `e2baf21..36f666e` | 作り直しの段 2: 入口ごとの、求めるケースを、本体が求めて、プラグインに渡す（同 409。`check.md`「入口ごとの、求めるケース」）。`View.entries`。IR の版 0.21。相手の入口を、流れの端にする（同 383、408）。境界の出どころ。受ける道のケース（同 419）。`plugin/golang` の `ThrowSources` は、本体の結果を、にせものに当てるだけになった | 同じ |
-| `36f666e` の次のコミット | にせものに、呼び出しごとの結果を言えるようにしたこと（同 424。`runtime` の `ReturnsAt`、`ThrowsAt`） | 同じ |
+| `36f666e..4e38a89` | にせものに、呼び出しごとの結果を言えるようにしたこと（同 424。`runtime` の `ReturnsAt`、`ThrowsAt`） | 同じ |
+| `4e38a89` の次のコミット | 作り直しの段 3a: プラグインが、ファイルも、環境変数も、読まないようにしたこと（同 425）。Go のモジュールの名前を、設定に（プロジェクト全体のオプション `[options.go]` の `module`。CFG-24、GO-8。GO-1 を欠番にしたこと）。カバレッジの要求の `outputs`。`HOZO_PROJECT_ROOT` と `HOZO_PLUGIN_DIR` をなくしたこと | 同じ |
 
 - この例外で、`main` に入れたものは、この表に、足す。
 - 枠が戻ったら、`main` の先頭で、CI を走らせ、緑を確かめて、この見出しを消す。赤なら、原因を直してから、消す。

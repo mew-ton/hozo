@@ -1,6 +1,9 @@
 # plugins/go-valid の単体テストの入力（docs/testing.md「単体テスト」）: GOVALID-3（Validate を持つ別の名前空間の型をフィールドに
 # 持つが、その名前空間の型の置き場の単位が go-valid を並べていない）。
 
+[options.go]
+module = "example.com/app"
+
 # 1: type の型の置き場（基底が go で type を出力する最初の単位）。go-valid を並べていない
 [[emit]]
 namespace   = "type"

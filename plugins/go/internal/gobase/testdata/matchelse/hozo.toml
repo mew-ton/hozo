@@ -1,3 +1,6 @@
+[options.go]
+module = "example.com/app"
+
 # plugins/go の単体テストの入力（docs/testing.md「単体テスト」）: docs/plugin-go.md「match」の、残りのケース（対象 as else）を持つ、型で決まる分類（presence と variant）。
 [[emit]]
 namespace   = "app"
