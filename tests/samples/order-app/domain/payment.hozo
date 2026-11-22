@@ -376,17 +376,13 @@ namespace payment {
 
   // ---- 枠の期限が近い: 上限の額で、先に確定する ----
 
-  /**
-   * error が起きたら、op を終わらせて、then の効果を行う。呼ぶ人のいない op（時計で動く op）が、想定した失敗を、
-   * 返す相手がいないので、状態に残すために使う。どの行に、何を書くかは、デコレータの中身（継ぎ目）が決める:
-   * 仕様の上では、効果は、引数を受け取らない。
-   *
-   * @param error 受ける例外
-   * @param then  代わりに行う効果
-   */
-  @repeatable
-  decorator fn noteFailure(error: any exception, then: any effect):
-    catches error halts then;
+  /** 先の確定の失敗の、分け方。呼ぶ人のいない op（時計で動く op）は、想定した失敗を、返す相手がいないので、状態に残す */
+  classify PrepayFailure of any exception {
+    /** 想定した失敗: 枠が切れていた、相手に届かない。支払いに残して、次に時計が動いたときに、もう一度試す */
+    Expected: any exception as psp.HoldExpired | http.NetworkError | http.ServerError;
+    /** 想定していない失敗: そのまま伝えて、繰り返しを止める */
+    Unexpected: any exception as else;
+  }
 
   /**
    * 枠の期限が近い支払いを、期限の近い順に、一つずつ、上限の額で、先に請求を確定する。誰にも呼ばれずに動く。
@@ -418,13 +414,15 @@ namespace payment {
    * 上限の額で、請求を確定する。想定した失敗（枠が切れていた、相手に届かない）は、支払いに残して、終わる。
    * 次に時計が動いたときに、もう一度、試される
    */
-  @noteFailure(psp.HoldExpired, notePrepayFailure)
-  @noteFailure(http.NetworkError, notePrepayFailure)
-  @noteFailure(http.ServerError, notePrepayFailure)
   fn prepay(payment: Payment on Standing.Held, now: datetime) {
-    val request = limitCaptureOf(payment);
-    psp.capture(request);
-    recordPrepaid(payment, now);
+    try {
+      val request = limitCaptureOf(payment);
+      psp.capture(request);
+      recordPrepaid(payment, now);
+    } catch (e by PrepayFailure) {
+      Expected => notePrepayFailure(payment, now);
+      Unexpected => throw e;
+    }
   }
 
   /** 上限の額（同意した額）で請求を確定する依頼（人が書く）。送料は、まだ決まっていない */

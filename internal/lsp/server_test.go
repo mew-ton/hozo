@@ -1802,3 +1802,77 @@ func TestCoreMarkHover(t *testing.T) {
 	}
 	c.shutdown()
 }
+
+// TestTryHover は、例外を受ける文の中の、ホバーと、定義への移動（docs/lsp.md「定義へジャンプ」「ホバー」）: try と catch のブロックの中の
+// 呼び出しと val、受けた例外の名前（match (e by …) の対象、throw e）、catch (e by C) の分類とケース、例外の分類の見出し。
+func TestTryHover(t *testing.T) {
+	root := t.TempDir()
+	text := `namespace gate {
+  exception Refused;
+  exception Broken;
+  /** 失敗の分け方 */
+  classify Failure of any exception {
+    Soft: any exception as Refused;
+    Hard: any exception as else;
+  }
+  /** 送る */
+  fn send(text: string):
+    throws Refused, Broken;
+  fn note(text: string);
+  fn relay(text: string) {
+    try {
+      val copy = text;
+      send(copy);
+    } catch (err) {
+      note(text);
+      throw err;
+    }
+    try {
+      send(text);
+    } catch (e by Failure) {
+      Soft => note(text);
+      Hard => throw e;
+    }
+  }
+}
+`
+	path := filepath.Join(root, "a.hozo")
+	writeFile(t, path, text)
+	c := startServer(t, Options{})
+	_, byURI := c.initialize(root, protocol.ClientCapabilities{})
+	uri, enc := fileURI(path), encUTF16
+	for _, d := range byURI[uri] {
+		if d.Code != codeNoConfig {
+			t.Fatalf("診断がある: %s %s", d.Code, d.Message)
+		}
+	}
+	for _, tt := range []struct{ what, needle, want string }{
+		{"try のブロックの中の呼び出し", "send(copy)", "fn send(text: string)"},
+		{"try のブロックの中の val", "copy);", "val copy: string = text"},
+		{"catch のブロックの中の呼び出し", "note(text);\n      throw", "fn note(text: string)"},
+		{"throw e の、受けた例外", "err;", "catch (err)"},
+		{"catch (e by C) の分類", "Failure) {", "classify Failure of any exception"},
+		{"分類のケース", "Soft =>", "Soft: any exception as Refused"},
+		{"残りのケース", "Hard =>", "Hard: any exception as else"},
+		{"アームの throw e", "e;\n    }\n  }", "catch (e)"},
+	} {
+		var hov *protocol.Hover
+		c.result(protocol.MethodHover, protocol.TextDocumentPositionParams{TextDocument: textDoc(uri), Position: positionOf(t, enc, text, tt.needle, 0)}, &hov)
+		if hov == nil || !strings.Contains(hov.Contents.Value, tt.want) {
+			t.Errorf("hover(%s) に %q がない: %+v", tt.what, tt.want, hov)
+		}
+	}
+	// 定義へ: throw err の err → catch (err) の名前。catch (e by Failure) の Failure → classify の名前
+	for _, tt := range []struct{ what, from, to string }{
+		{"throw err", "err;", "err) {"},
+		{"分類", "Failure) {", "Failure of any"},
+		{"ケース", "Soft =>", "Soft: any"},
+	} {
+		var loc *protocol.Location
+		c.result(protocol.MethodDefinition, protocol.TextDocumentPositionParams{TextDocument: textDoc(uri), Position: positionOf(t, enc, text, tt.from, 0)}, &loc)
+		if loc == nil || loc.URI != uri || loc.Range.Start != positionOf(t, enc, text, tt.to, 0) {
+			t.Errorf("definition(%s) = %+v（期待は %q の位置）", tt.what, loc, tt.to)
+		}
+	}
+	c.shutdown()
+}

@@ -1,0 +1,25 @@
+// WIRE-15（docs/check.md「例外を受ける」）: try を、disjoint のアームの中に書いた
+namespace a {
+  exception Failed;
+  fn send(): throws Failed;
+  fn note();
+  fn f(xs: string[]) {
+    disjoint {
+      {
+        try {                          // ERROR: WIRE-15
+          send();
+        } catch (e) {
+          note();
+        }
+      }
+      {
+        for (val x of xs) {
+          try {                        // ERROR: WIRE-15
+            send();
+          } catch (e) {
+          }
+        }
+      }
+    }
+  }
+}

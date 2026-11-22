@@ -1,0 +1,27 @@
+// WIRE-16 に当たらない: e は、match (e by 分類) の対象と、throw e に書ける
+namespace a {
+  exception Failed;
+  exception Broken;
+  classify Failure of any exception {
+    Soft: any exception as Failed;
+    Hard: any exception as else;
+  }
+  fn send(): throws Failed, Broken;
+  fn note();
+  fn f() {
+    try {
+      send();
+    } catch (e) {
+      match (e by Failure) {
+        Soft => note();
+        Hard => throw e;
+      }
+    }
+    try {
+      send();
+    } catch (e) {
+      note();
+      throw e;
+    }
+  }
+}

@@ -46,6 +46,10 @@ type binding struct {
 	loops int
 	// irSpan は、IR の val の文の span（後から、型を入れるための鍵）。
 	irSpan ir.Span
+	// caught は、catch が受けた例外の名前（catch (e) の e）か。値ではない: 書けるのは、match (e by 分類) の対象と throw e だけ（WIRE-16）。
+	caught bool
+	// partial は、try か catch の、片方だけが、値を入れた val か（抜けた後、読めず、入れられない。docs/check.md「例外を受ける」）。
+	partial bool
 	// unusable は、デコレータの本体で、まだ使えない引数（any <種類>、型が二つ以上、残りの引数）なら、その引数の型の言い方（DEC-23）。
 	unusable string
 }
@@ -109,8 +113,24 @@ type wiring struct {
 	depth int
 	// arms は、今、中にいる disjoint（外から内へ）。アームごとに、代入の済んだ val を、数え直すため。
 	arms []*disjointFrame
+	// tries は、今、中にいる try の文（外から内へ）。
+	tries []*tryFrame
 	// vals は、IR の val の文の span から、その束縛（後から、型を入れる）。
 	vals map[ir.Span]*binding
+}
+
+// tryFrame は、今、中にいる try の文一つ（docs/check.md「例外を受ける」）。
+type tryFrame struct {
+	// inCatch は、catch のブロックを見ているか（偽なら、try のブロック）。
+	inCatch bool
+	// catchDepth は、catch のブロックの、直の文の深さ（wiring.depth）。
+	catchDepth int
+	// never は、catch のブロックが「返らない」か（最後の文が throw か、「返らない」式の文）。
+	never bool
+	// first は、try のブロックの、最初の文の呼び出し（呼び出しの文でなければ nil）。proceed() を書けるのは、ここだけ（DEC-19）。
+	first *ast.Call
+	// assigned は、今のブロック（try か catch）で、代入が済んだ val。
+	assigned []*binding
 }
 
 // disjointFrame は、今、中にいる disjoint 一つ。
@@ -204,6 +224,7 @@ func (a *analyzer) lowerDecoratorBody(j *wiringJob) {
 
 // proceedCount は、文の並びを通る道ごとの、proceed() の回数の集まり（0、1、2 以上は 2）。例外を投げて終わる道
 // （throw のアーム、すべてのアームが返らない match）は、数えない。done は、その並びが、必ず、返らずに終わるか。
+// try の文は、try のブロックの中の回数で数える（docs/check.md「デコレータの本体」）。
 func proceedCounts(stmts []ir.Statement) (counts map[int]bool, done bool) {
 	counts = map[int]bool{0: true}
 	add := func(next map[int]bool) {
@@ -220,6 +241,12 @@ func proceedCounts(stmts []ir.Statement) (counts map[int]bool, done bool) {
 		counts = out
 	}
 	for _, st := range stmts {
+		if try, isTry := st.(ir.TryStmt); isTry {
+			// try の文は、try のブロックの中の回数で数える（proceed() は、try のブロックの最初の文で、catch のブロックには、ない: DEC-19）
+			sub, _ := proceedCounts(try.Body)
+			add(sub)
+			continue
+		}
 		expr, ok := ir.StatementExpr(st)
 		if !ok {
 			continue
@@ -306,6 +333,9 @@ func (a *analyzer) fillVals(w *wiring, stmts []ir.Statement) {
 			}
 		case ir.ForStmt:
 			a.fillVals(w, s.Body)
+		case ir.TryStmt:
+			a.fillVals(w, s.Body)
+			a.fillVals(w, s.Catch.Body)
 		}
 	}
 }
@@ -363,7 +393,7 @@ func (a *analyzer) lowerStmt(w *wiring, s ast.Stmt, last bool) (ir.Statement, bo
 		return a.lowerCollect(w, s)
 	case *ast.ReturnStmt:
 		if w.depth > 0 {
-			a.errorf("WIRE-13", s.Span, "for のブロックと、disjoint のアームの中に、return は書けない")
+			a.errorf("WIRE-13", s.Span, "for のブロック、disjoint のアーム、try と catch のブロックの中に、return は書けない")
 			a.evalExpr(w, s.Value, nil)
 			return nil, false
 		}
@@ -395,8 +425,142 @@ func (a *analyzer) lowerStmt(w *wiring, s ast.Stmt, last bool) (ir.Statement, bo
 		return a.lowerDisjoint(w, s), true
 	case *ast.ForStmt:
 		return a.lowerFor(w, s)
+	case *ast.TryStmt:
+		return a.lowerTry(w, s), true
+	case *ast.ThrowStmt:
+		// catch のブロックの、最後の文（文法で閉じる）
+		if s.Throw == nil {
+			return nil, false
+		}
+		body, _ := a.lowerThrow(w, s.Throw, nil).(ir.ThrowBody)
+		if n := len(w.tries); n > 0 {
+			w.tries[n-1].never = true
+		}
+		return ir.ThrowStmt{Throw: body, Span: a.irSpan(s.Span)}, true
 	}
 	return nil, false
+}
+
+// lowerTry は例外を受ける文 `try { … } catch (e) { … }`、`try { … } catch (e by 分類) { アーム … }`
+// （docs/check.md「例外を受ける」）。WIRE-15（disjoint のアームの中）。代入の済んだ val は、同「値の入れ物」の表のとおりに数える:
+// catch のブロックは、try の前の集まりから始め、抜けたとき、両方が入れた val（catch が「返らない」なら、try が入れた val）を足す。
+// `catch (e by C) { アーム … }` は、`match (e by C) { アーム … }` の文一つにする（docs/ir.md「配線」の Catch）。
+func (a *analyzer) lowerTry(w *wiring, s *ast.TryStmt) ir.Statement {
+	if len(w.arms) > 0 {
+		a.errorf("WIRE-15", s.Keyword, "try は、disjoint のアームの中には書けない")
+	}
+	f := &tryFrame{}
+	w.tries = append(w.tries, f)
+	w.depth++
+	out := ir.TryStmt{Span: a.irSpan(s.Span)}
+	if s.Body != nil {
+		if len(s.Body.Stmts) > 0 {
+			if cs, ok := s.Body.Stmts[0].(*ast.CallStmt); ok {
+				f.first = cs.Call
+			}
+		}
+		out.Body = a.lowerBlock(w, s.Body.Stmts)
+	}
+	tried := f.assigned
+	f.assigned = nil
+	for _, b := range tried {
+		b.unassigned = true
+	}
+	f.inCatch, f.catchDepth = true, w.depth
+	// 受けた例外の名前は、catch のブロックの中だけで見える: 名前だけの枠を、ブロックの枠の外に、一つ足す
+	w.scope.frames = append(w.scope.frames, map[string]*binding{})
+	e := &binding{name: s.Name.Name, typ: unknownType(), span: s.Name.Span, caught: true, used: true, target: Target{Kind: TargetBinding, Decl: w.job.sym.fqn, Name: s.Name.Name, Span: s.Name.Span}}
+	a.declareVal(w, e, "catch が受けた例外の名前")
+	out.Catch = ir.Catch{Name: s.Name.Name, Span: a.irSpan(s.CatchSpan)}
+	switch {
+	case s.By != nil:
+		m := &ast.Match{Span: s.CatchSpan, Subject: &ast.NameAtom{Span: s.Name.Span, Name: ast.QualifiedName{Span: s.Name.Span, Segments: []ast.Ident{s.Name}}}, Classifier: *s.By, Arms: s.Arms}
+		t, im := a.evalCaughtMatch(w, m, e, false)
+		if hasValue(t) {
+			a.errorf("WIRE-2", s.By.Span, "catch (e by 分類) のアームは値を持つので、書けない（アームの本体は、値を返さない呼び出しか、none か、throw）")
+		}
+		f.never = t.kind == etNever
+		out.Catch.Body = []ir.Statement{ir.MatchStmt{Match: im, Span: a.irSpan(s.CatchSpan)}}
+	case s.Catch != nil:
+		out.Catch.Body = a.lowerBlock(w, s.Catch.Stmts)
+	}
+	out.Catch.Never = f.never
+	w.scope.frames = w.scope.frames[:len(w.scope.frames)-1]
+	w.depth--
+	w.tries = w.tries[:len(w.tries)-1]
+	caught := f.assigned
+	inTry, inCatch := map[*binding]bool{}, map[*binding]bool{}
+	for _, b := range tried {
+		inTry[b] = true
+	}
+	for _, b := range caught {
+		inCatch[b] = true
+	}
+	seen := map[*binding]bool{}
+	for _, b := range append(append([]*binding(nil), tried...), caught...) {
+		if seen[b] {
+			continue
+		}
+		seen[b] = true
+		if inTry[b] && (f.never || inCatch[b]) {
+			w.markAssigned(b)
+		} else {
+			b.unassigned, b.partial = true, true
+		}
+	}
+	return out
+}
+
+// caughtOf は、atom が、見えている、受けた例外の名前（catch (e) の e）なら、その束縛。
+func (a *analyzer) caughtOf(w *wiring, atom ast.Atom) *binding {
+	n, ok := atom.(*ast.NameAtom)
+	if !ok || len(n.Name.Segments) == 0 {
+		return nil
+	}
+	if b, found := w.scope.lookup(n.Name.Segments[0].Name); found && b.caught {
+		return b
+	}
+	return nil
+}
+
+// evalCaughtMatch は、受けた例外の match（`match (e by C)`、`catch (e by C)`。docs/check.md「分類」の「例外の分類」）。
+// MATCH-7: C が、例外の分類でない。MATCH-2 / MATCH-9 は、ほかの match と同じ。漏れ（MATCH-10）は、計算が確かめる。
+// stmt は、match の文として書いたか（偽なら、catch (e by C) の短い書き方）。
+func (a *analyzer) evalCaughtMatch(w *wiring, m *ast.Match, e *binding, stmt bool) (exprType, ir.Match) {
+	out := ir.Match{Span: a.irSpan(m.Span), Subject: ir.CaughtSubject{Name: e.name}}
+	if n, ok := m.Subject.(*ast.NameAtom); ok {
+		if len(n.Name.Segments) > 1 {
+			a.errorf("WIRE-16", n.Span, "受けた例外 %s は、値ではないので、フィールドは読めない", e.name)
+		}
+		if stmt {
+			a.refs = append(a.refs, Ref{Span: n.Name.Segments[0].Span, Target: e.target})
+		}
+	}
+	var class *matchClass
+	if m.Builtin {
+		a.errorf("MATCH-7", m.Classifier.Span, "受けた例外 %s の match に書ける分類は、例外の分類（classify … of any exception）だけ。標準の分類 %s は書けない", e.name, m.Classifier.String())
+	} else if c := a.resolveClassifier(w, m); c != nil {
+		if c.IsExceptionClass() {
+			class = classOf(c)
+			out.Classify = c.Name
+		} else {
+			a.errorf("MATCH-7", m.Classifier.Span, "受けた例外 %s の match に書ける分類は、例外の分類（classify … of any exception）だけ。classify %s は%s", e.name, c.Name, classifyKindName(c))
+		}
+	}
+	var rest []string
+	if class != nil {
+		rest = a.checkArmCases(class, m)
+	}
+	var arms []armResult
+	for _, arm := range m.Arms {
+		if arm == nil {
+			continue
+		}
+		t, ia := a.evalArm(w, arm, class, nil, rest)
+		arms = append(arms, armResult{typ: t, span: arm.Span})
+		out.Arms = append(out.Arms, ia)
+	}
+	return a.matchType(arms, m, nil), out
 }
 
 // hasValue は式に値があるか（「値がない」「返らない」と、解決できなかった式を除く）。
@@ -410,8 +574,17 @@ func (a *analyzer) checkWIRE9(w *wiring, t exprType, span source.Span, last bool
 	if t.kind != etNever {
 		return
 	}
+	if n := len(w.tries); n > 0 && w.tries[n-1].inCatch && w.depth == w.tries[n-1].catchDepth {
+		// catch のブロックの、直の文: 最後の文なら、書ける（ブロックが「返らない」。docs/check.md「例外を受ける」）
+		if last {
+			w.tries[n-1].never = true
+		} else {
+			a.errorf("WIRE-9", span, "この文は決して返らないので、catch のブロックでは、最後にだけ書ける（下の行が評価されない）")
+		}
+		return
+	}
 	if w.depth > 0 {
-		a.errorf("WIRE-9", span, "この文は決して返らないので、for のブロックと、disjoint のアームの中には書けない")
+		a.errorf("WIRE-9", span, "この文は決して返らないので、for のブロック、disjoint のアーム、try のブロックの中には書けない")
 	} else if !last {
 		a.errorf("WIRE-9", span, "この文は決して返らないので、本体の最後にだけ書ける（下の行が評価されない）")
 	}
@@ -426,13 +599,15 @@ func (a *analyzer) declareVal(w *wiring, b *binding, what string) bool {
 			kind = "引数"
 		case prev.isLoopVar:
 			kind = "for の変数"
+		case prev.caught:
+			kind = "受けた例外"
 		}
 		a.errorf("WIRE-4", b.span, "%s は既に%sの名前（見えている名前と同じ名前は、%sに使えない）", b.name, kind, what).Related = []diag.Related{related(prev.span, "最初の定義")}
 		return false
 	}
 	b.loops = len(w.loops)
 	w.scope.frames[len(w.scope.frames)-1][b.name] = b
-	if !b.isLoopVar {
+	if !b.isLoopVar && !b.caught {
 		w.scope.order = append(w.scope.order, b)
 	}
 	return true
@@ -440,8 +615,11 @@ func (a *analyzer) declareVal(w *wiring, b *binding, what string) bool {
 
 // markAssigned は、val の代入が済んだことにする。disjoint のアームの中なら、そのアームの分として覚える。
 func (w *wiring) markAssigned(b *binding) {
-	b.unassigned = false
+	b.unassigned, b.partial = false, false
 	for _, f := range w.arms {
+		f.assigned = append(f.assigned, b)
+	}
+	for _, f := range w.tries {
 		f.assigned = append(f.assigned, b)
 	}
 }
@@ -524,6 +702,10 @@ func (a *analyzer) lowerAssign(w *wiring, s *ast.AssignStmt) (ir.Statement, bool
 		bad = "引数には、値を入れられない"
 	case b.isLoopVar:
 		bad = "for の変数には、値を入れられない"
+	case b.caught:
+		bad = "受けた例外には、値を入れられない"
+	case b.partial:
+		bad = "try か catch の、片方だけが、値を入れた val には、もう、値を入れられない"
 	case !b.empty:
 		bad = "値と一緒に宣言した val には、もう、値を入れられない"
 	case !b.unassigned:
@@ -807,8 +989,20 @@ func (a *analyzer) evalCall(w *wiring, c *ast.Call, arm *armContext) (exprType, 
 			if len(c.Args) > 0 {
 				a.errorf("DEC-19", c.Args[0].NodeSpan(), "proceed() に、引数は書かない。包んだ op は、呼ばれたときの引数のまま、動く")
 			}
-			if w.depth > 0 {
+			switch {
+			case len(w.loops) > 0 || len(w.arms) > 0:
 				a.errorf("DEC-19", c.Span, "proceed() は、for と disjoint の中には書けない。書けるのは、本体のいちばん外の文と、その match のアームの本体")
+			default:
+				for _, f := range w.tries {
+					if f.inCatch {
+						a.errorf("DEC-19", c.Span, "proceed() は、catch のブロックには書けない（受ける道が、包んだ op を、もう一度呼ぶことになる）")
+						break
+					}
+					if f.first != c {
+						a.errorf("DEC-19", c.Span, "proceed() を、try のブロックに書くなら、最初の文（try { proceed(); … } catch (e) { … }）")
+						break
+					}
+				}
 			}
 			return noValue(), call, true
 		}
@@ -1007,6 +1201,11 @@ func (a *analyzer) evalAtomKey(w *wiring, at ast.Atom) (exprType, ir.Atom, strin
 	switch at := at.(type) {
 	case *ast.NameAtom:
 		span := a.irSpan(at.Span)
+		if e := a.caughtOf(w, at); e != nil {
+			a.errorf("WIRE-16", at.Span, "受けた例外 %s は、値ではない。書けるのは、match (%s by 分類) の対象と、throw %s だけ", e.name, e.name, e.name)
+			a.refs = append(a.refs, Ref{Span: at.Name.Segments[0].Span, Target: e.target})
+			return unknownType(), ir.NameAtom{Path: segmentsOf(at.Name), Span: span}, ""
+		}
 		r, ok := a.resolve(at.Name, w.vsc, acValue|acState)
 		if !ok {
 			return unknownType(), ir.NameAtom{Path: segmentsOf(at.Name), Span: span}, ""
@@ -1102,6 +1301,11 @@ func standardClass(name string) *matchClass {
 // アームの中の対象の型は docs/types.md「アームの中の対象の型」、アームの型の集め方は同「match の型」。
 // ret は match が `return` の式なら nil でない。
 func (a *analyzer) evalMatch(w *wiring, m *ast.Match, ret *returnContext) (exprType, ir.Match) {
+	if m.Subject != nil {
+		if e := a.caughtOf(w, m.Subject); e != nil {
+			return a.evalCaughtMatch(w, m, e, true)
+		}
+	}
 	out := ir.Match{Span: a.irSpan(m.Span)}
 	var class *matchClass
 	var value *matchValue
@@ -1146,6 +1350,13 @@ type matchValue struct {
 func (a *analyzer) matchSubject(w *wiring, m *ast.Match, c *ir.Classify) (ir.MatchSubject, *matchValue) {
 	if c != nil && c.IsSubjectless() {
 		a.errorf("MATCH-7", m.Classifier.Span, "classify %s は、対象のない分類（of never）なので、match の by には書けない（当たる値がない）", c.Name)
+		if m.Subject != nil {
+			a.evalAtom(w, m.Subject)
+		}
+		return nil, nil
+	}
+	if c != nil && c.IsExceptionClass() {
+		a.errorf("MATCH-7", m.Classifier.Span, "classify %s は、例外の分類（of any exception）なので、受けた例外（catch (e) の e）の match にだけ書ける", c.Name)
 		if m.Subject != nil {
 			a.evalAtom(w, m.Subject)
 		}
@@ -1375,6 +1586,18 @@ func (a *analyzer) evalArm(w *wiring, arm *ast.MatchArm, class *matchClass, valu
 // 確かめる（docs/types.md「呼び出しの引数」）。
 func (a *analyzer) lowerThrow(w *wiring, t *ast.Throw, arm *armContext) ir.ArmBody {
 	body := ir.ThrowBody{Span: a.irSpan(t.Span)}
+	if len(t.Exception.Segments) == 1 {
+		// throw e: 見えている、受けた例外の名前が、例外の宣言より先（docs/resolve.md「位置ごとに受け付ける種類」）
+		if e, found := w.scope.lookup(t.Exception.Segments[0].Name); found && e.caught {
+			a.refs = append(a.refs, Ref{Span: t.Exception.Segments[0].Span, Target: e.target})
+			if len(t.Args) > 0 {
+				a.errorf("WIRE-16", t.Exception.Span, "throw %s に、引数は書けない（受けた例外を、そのまま投げ直す）", e.name)
+				a.evalArgs(w, t.Args)
+			}
+			body.Caught = e.name
+			return body
+		}
+	}
 	args := a.evalArgs(w, t.Args)
 	r, ok := a.resolve(t.Exception, &scope{ns: w.sc.ns}, acException)
 	if !ok {

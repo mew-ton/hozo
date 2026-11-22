@@ -265,6 +265,7 @@ type pageStore struct {
 	orders   []pkgtype.Order
 	noUser   bool
 	failSend pkgtype.OrderId // この注文の通知は、送れない
+	sendErr  error           // 送れないときに返す失敗。nil なら、仕様の例外 NotificationFailed
 	calls    []string
 	recorded []pkgtype.Notification
 }
@@ -304,6 +305,9 @@ func (p *pageStore) RecordNotice(_ context.Context, notification pkgtype.Notific
 func (p *pageStore) Send(_ context.Context, notice pkgtype.Notification) error {
 	p.calls = append(p.calls, "mailer.send")
 	if p.failSend != "" && strings.Contains(notice.Message, string(p.failSend)) {
+		if p.sendErr != nil {
+			return p.sendErr
+		}
 		return pkgtype.NotificationFailed{}
 	}
 	return nil
@@ -416,6 +420,55 @@ func TestResendNoticesStopsAtFailure(t *testing.T) {
 	want := []string{"store.findSession", "store.listOrders", "mailer.send", "store.recordNotice", "mailer.send"}
 	if !slices.Equal(store.calls, want) {
 		t.Errorf("呼ばれた順が %v（期待は %v）", store.calls, want)
+	}
+}
+
+// auditLeaves は、葉 recordAudit の呼び出しを数える server.Leaves。ほかの葉は、本物のまま。
+type auditLeaves struct {
+	server.Leaves
+	audits int
+}
+
+func (l *auditLeaves) RecordAudit(context.Context) error {
+	l.audits++
+	return nil
+}
+
+// TestResendNoticesCatch は、配線 resendNotices の、例外を受ける文（docs/check.md「例外を受ける」。
+// try { mailer.send(notice); } catch (e) { recordAudit(); throw e; }）:
+//
+//   - 配送が、仕様の例外（NotificationFailed）で失敗したら、catch のブロックが、葉 recordAudit を、一度呼んでから、
+//     受けた例外を、そのまま投げ直す（包み直さない）。
+//   - 仕様にない失敗は、受けない: recordAudit を呼ばずに、その失敗が、そのまま返る。
+//   - 配送が、失敗しなければ、catch のブロックは、動かない。
+func TestResendNoticesCatch(t *testing.T) {
+	t.Parallel()
+	broken := errors.New("SMTP の接続が切れた")
+	for _, tc := range []struct {
+		name     string
+		failSend pkgtype.OrderId
+		sendErr  error
+		want     error
+		audits   int
+	}{
+		{"仕様の例外は、受けて、記録して、投げ直す", "order-b", nil, pkgtype.NotificationFailed{}, 1},
+		{"仕様にない失敗は、受けない", "order-b", broken, broken, 0},
+		{"失敗しなければ、catch は動かない", "", nil, nil, 0},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			f := &handlertest.Fixture{}
+			leaves := &auditLeaves{Leaves: f.Leaves()}
+			store := &pageStore{orders: threeOrders(), failSend: tc.failSend, sendErr: tc.sendErr}
+			ops := server.New(leaves, store, store, nil)
+			token := pkgtype.Token("token-1")
+			_, err := ops.ResendNotices(context.Background(), server.AuthInput{Token: &token})
+			if err != tc.want {
+				t.Errorf("ResendNotices の失敗 = %v（期待は %v。受けた例外は、そのまま返る）", err, tc.want)
+			}
+			if leaves.audits != tc.audits {
+				t.Errorf("recordAudit の呼び出し = %d 回（期待は %d 回）", leaves.audits, tc.audits)
+			}
+		})
 	}
 }
 

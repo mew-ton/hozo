@@ -513,7 +513,10 @@ type ClassifyDecl struct {
 	// Never は、対象のない分類（"of never"）か。NeverSpan は、その語の位置。
 	Never     bool
 	NeverSpan source.Span
-	Cases     []*ClassifyCase
+	// Exception は、例外の分類（"of any exception"）か。ExceptionSpan は、その二語の位置。
+	Exception     bool
+	ExceptionSpan source.Span
+	Cases         []*ClassifyCase
 }
 
 // NodeSpan は Node の実装。
@@ -547,6 +550,10 @@ type CaseTyping struct {
 	// None は、as の後ろが型ではなく none（ない側のケース。docs/check.md「ない側のケース」）。NoneSpan は、その none の位置。
 	None     bool
 	NoneSpan source.Span
+	// AnyException は、例外の分類のケース（"any exception as …"。docs/check.md「例外の分類」）か。そのとき Subject と Type は nil で、
+	// Exceptions が、as の後ろに "|" で並べた例外（Else なら空）。
+	AnyException bool
+	Exceptions   []QualifiedName
 }
 
 // NodeSpan は Node の実装。
@@ -996,7 +1003,8 @@ type Block struct {
 // NodeSpan は Node の実装。
 func (n *Block) NodeSpan() source.Span { return n.Span }
 
-// Stmt は文。*ValStmt、*AssignStmt、*CollectStmt、*ReturnStmt、*CallStmt、*MatchStmt、*DisjointStmt、*ForStmt が実装する。
+// Stmt は文。*ValStmt、*AssignStmt、*CollectStmt、*ReturnStmt、*CallStmt、*MatchStmt、*DisjointStmt、*ForStmt、*TryStmt、
+// *ThrowStmt が実装する。
 type Stmt interface {
 	Node
 	stmtNode()
@@ -1076,6 +1084,38 @@ type ForStmt struct {
 // NodeSpan は Node の実装。
 func (n *ForStmt) NodeSpan() source.Span { return n.Span }
 func (n *ForStmt) stmtNode()             {}
+
+// TryStmt は例外を受ける文 "try { … } catch (e) { … }"、"try { … } catch (e by 分類) { アーム … }"
+// （docs/grammar.md「配線」の Try）。
+type TryStmt struct {
+	Span source.Span
+	// Keyword は try の語の位置（診断の位置）。
+	Keyword source.Span
+	Body    *Block
+	// Name は、受けた例外の名前（catch (e) の e）。
+	Name Ident
+	// By は、catch (e by 分類) の分類。書いていなければ nil。書いていれば、Arms が、波括弧の中のアームで、Catch は nil。
+	By   *QualifiedName
+	Arms []*MatchArm
+	// Catch は、catch のブロック（by を書かないとき）。最後の文は *ThrowStmt でありうる。
+	Catch *Block
+	// CatchSpan は、catch の語から、閉じ括弧までの位置。
+	CatchSpan source.Span
+}
+
+// NodeSpan は Node の実装。
+func (n *TryStmt) NodeSpan() source.Span { return n.Span }
+func (n *TryStmt) stmtNode()             {}
+
+// ThrowStmt は、catch のブロックの最後の文の "throw E;"、"throw E(値, …);"、"throw e;"。
+type ThrowStmt struct {
+	Span  source.Span
+	Throw *Throw
+}
+
+// NodeSpan は Node の実装。
+func (n *ThrowStmt) NodeSpan() source.Span { return n.Span }
+func (n *ThrowStmt) stmtNode()             {}
 
 // ReturnStmt は "return Expr;"。
 type ReturnStmt struct {

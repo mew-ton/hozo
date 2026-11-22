@@ -423,7 +423,42 @@ type StatesSubject struct {
 	States []string `json:"states"`
 }
 
+// ExceptionSubject は例外の分類の対象（docs/ir.md「classify」の subject kind "exception"）: catch が受けた例外。
+type ExceptionSubject struct{}
+
+// Kind は "exception"。
+func (ExceptionSubject) Kind() string { return "exception" }
+
+func (ExceptionSubject) isClassifySubject() {}
+
+// MarshalJSON は kind だけを書く。
+func (ExceptionSubject) MarshalJSON() ([]byte, error) { return []byte(`{"kind":"exception"}`), nil }
+
+// IsExceptionClass は、例外の分類（`classify C of any exception`）か。
+func (c *Classify) IsExceptionClass() bool {
+	_, ok := c.Subject.(ExceptionSubject)
+	return ok
+}
+
+// CaseOfException は、例外の分類 c で、例外 x（FQN）が当たるケースの名前: x を並べたケース。なければ、残りのケース
+// （`any exception as else`）。それもなければ ok が false。
+func (c *Classify) CaseOfException(x string) (name string, ok bool) {
+	rest := ""
+	for _, cs := range c.Cases {
+		for _, e := range cs.Exceptions {
+			if e == x {
+				return cs.Name, true
+			}
+		}
+		if cs.Rest {
+			rest = cs.Name
+		}
+	}
+	return rest, rest != ""
+}
+
 var (
+	_ ClassifySubject = ExceptionSubject{}
 	_ ClassifySubject = TypeSubject{}
 	_ ClassifySubject = OpSubject{}
 	_ ClassifySubject = StatesSubject{}
@@ -471,9 +506,10 @@ func (s *TypeSubject) UnmarshalJSON(data []byte) error { return unmarshalStruct(
 func (s *StatesSubject) UnmarshalJSON(data []byte) error { return unmarshalStruct(data, s) }
 
 var classifySubjectTable = map[string]func([]byte) (ClassifySubject, error){
-	"type":   asValue[ClassifySubject, TypeSubject],
-	"op":     asValue[ClassifySubject, OpSubject],
-	"states": asValue[ClassifySubject, StatesSubject],
+	"type":      asValue[ClassifySubject, TypeSubject],
+	"op":        asValue[ClassifySubject, OpSubject],
+	"states":    asValue[ClassifySubject, StatesSubject],
+	"exception": asValue[ClassifySubject, ExceptionSubject],
 }
 
 // UnmarshalClassifySubject は kind で分けて ClassifySubject を読む（docs/ir.md「JSON」）。
@@ -532,8 +568,12 @@ type ClassifyCase struct {
 	// Decorators は、ケースの前に書いたデコレータ（書かれた順）。なければ空（JSON では []）。
 	Decorators []Application `json:"decorators"`
 	// As は `対象 as T` と `対象 as else` の並び（書かれた順）。なければ空（JSON では []）。
-	As   []CaseTyping `json:"as"`
-	Span Span         `json:"span"`
+	As []CaseTyping `json:"as"`
+	// Exceptions は、例外の分類のケースに当たる例外の FQN（書かれた順。例外のユニオンは、展開済み）。ほかの分類では持たない。
+	Exceptions []string `json:"exceptions,omitempty"`
+	// Rest は、例外の分類の、残りのケース（`any exception as else`）か。
+	Rest bool `json:"rest,omitempty"`
+	Span Span `json:"span"`
 }
 
 // IsElse は、残りのケース（`対象 as else`。docs/check.md「残りのケース」）か。

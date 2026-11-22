@@ -1,0 +1,34 @@
+// WIRE-15 に当たらない: try は、本体のいちばん外、for のブロック、try と catch のブロックに書ける
+namespace a {
+  exception Failed;
+  exception Broken;
+  fn send(): throws Failed;
+  fn resend(): throws Broken;
+  fn note();
+  fn f(xs: string[]) {
+    try {
+      send();
+    } catch (e) {
+      note();
+    }
+    for (val x of xs) {
+      try {
+        send();
+      } catch (e) {
+        try {
+          resend();
+        } catch (inner) {
+          note();
+        }
+      }
+    }
+    try {
+      try {
+        send();
+      } catch (e) {
+        throw e;
+      }
+    } catch (outer) {
+    }
+  }
+}

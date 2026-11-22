@@ -1,0 +1,15 @@
+// WIRE-13: try と catch のブロックの中の return
+namespace a {
+  exception Failed;
+  model M { id: string; }
+  fn one(m: M): M
+    throws Failed;
+  fn f(m: M): M {
+    try {
+      return one(m);                   // ERROR: WIRE-13
+    } catch (e) {
+      return m;                        // ERROR: WIRE-13
+    }
+    return m;
+  }
+}

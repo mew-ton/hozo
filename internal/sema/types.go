@@ -218,6 +218,11 @@ func (a *analyzer) lowerOnType(t *ast.OnType, sc *scope) (ir.Type, bool) {
 			ok = false
 			continue
 		}
+		if d, isClassify := r.sym.node.(*ast.ClassifyDecl); isClassify && d.Exception {
+			a.errorf("RES-4", qn.Span, "classify %s は、例外の分類（of any exception）なので、型には書けない（受けた例外は、値ではない）", r.sym.fqn)
+			ok = false
+			continue
+		}
 		switch {
 		case classify == nil:
 			classify = r.sym

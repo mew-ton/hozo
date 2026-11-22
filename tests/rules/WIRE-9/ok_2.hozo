@@ -1,0 +1,27 @@
+// WIRE-9 に当たらない: catch のブロックの最後の文は、「返らない」文でもよい
+namespace a {
+  exception Failed;
+  exception Broken;
+  classify Failure of any exception {
+    Soft: any exception as Failed;
+    Rest: any exception as else;
+  }
+  fn send(): throws Failed, Broken;
+  fn fail(): never
+    throws Broken;
+  fn note();
+  fn f() {
+    try {
+      send();
+    } catch (e) {
+      note();
+      fail();
+    }
+    try {
+      send();
+    } catch (e by Failure) {
+      Soft => throw Broken;
+      Rest => throw e;
+    }
+  }
+}

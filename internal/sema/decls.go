@@ -801,9 +801,13 @@ func operationOf(op ast.StateOp) ir.Operation {
 func (a *analyzer) lowerClassify(s *symbol, d *ast.ClassifyDecl, sc *scope) ir.Decl {
 	c := &ir.Classify{DeclBase: a.base(s, d.Doc, d.Span, docContext{})}
 	a.addSite(d.Decorators, siteClassify, sc, &c.DeclBase.Decorators)
+	excSeen := map[string]string{}
 	if d.Never {
 		// 対象のない分類（docs/check.md「分類」の「対象のない分類」）: 値の分類で、対象の型が never
 		c.Subject = ir.TypeSubject{Type: ir.Never()}
+	} else if d.Exception {
+		// 例外の分類（同「例外の分類」）
+		c.Subject = ir.ExceptionSubject{}
 	} else {
 		c.Subject = a.lowerClassifySubject(s, d.Of, sc)
 	}
@@ -828,6 +832,8 @@ func (a *analyzer) lowerClassify(s *symbol, d *ast.ClassifyDecl, sc *scope) ir.D
 			if len(cs.As) > 0 && cs.As[0] != nil {
 				a.errorf("CLS-9", cs.As[0].Span, "classify %s は、対象のない分類（of never）なので、ケース %s に as は書けない（ケースは、名前だけ）", s.fqn, cs.Name.Name)
 			}
+		} else if d.Exception {
+			a.lowerExceptionCase(s, cs, &cc, sc, excSeen, &rest)
 		} else {
 			cc.As = a.lowerCaseTypings(s, c, cs, sc, &rest)
 		}
@@ -839,6 +845,8 @@ func (a *analyzer) lowerClassify(s *symbol, d *ast.ClassifyDecl, sc *scope) ir.D
 	}
 	if d.Never {
 		c.DecidedBy = ir.DecidedByNone
+	} else if d.Exception {
+		c.DecidedBy = ir.DecidedByType
 	} else {
 		a.lowerNoneCase(s, c, &rest)
 		a.lowerElseCase(s, c, &rest)
@@ -851,6 +859,46 @@ func (a *analyzer) lowerClassify(s *symbol, d *ast.ClassifyDecl, sc *scope) ir.D
 		}
 	}
 	return c
+}
+
+// lowerExceptionCase は、例外の分類のケース `K: any exception as E1 | E2;`、`R: any exception as else;`
+// （docs/check.md「分類」の「例外の分類」）。CLS-10: any exception as … を、ちょうど一つ持たない。同じ例外が、二つのケースにある。
+// CLS-1: 残りのケースが、もうある。例外のユニオンは、要素に展開する。
+func (a *analyzer) lowerExceptionCase(s *symbol, cs *ast.ClassifyCase, cc *ir.ClassifyCase, sc *scope, seen map[string]string, rest *restCases) {
+	var typings []*ast.CaseTyping
+	for _, ct := range cs.As {
+		if ct != nil {
+			typings = append(typings, ct)
+		}
+	}
+	if len(typings) != 1 || !typings[0].AnyException {
+		a.errorf("CLS-10", cs.Name.Span, "classify %s は、例外の分類（of any exception）なので、ケース %s は、any exception as … を、ちょうど一つ持つ（%s: any exception as 例外 | 例外; か、%s: any exception as else;）", s.fqn, cs.Name.Name, cs.Name.Name, cs.Name.Name)
+		return
+	}
+	t := typings[0]
+	if t.Else {
+		if rest.said {
+			a.errorf("CLS-1", t.ElseSpan, "classify %s に、残りのケース（as else）が二つ以上ある（残りは一つ。docs/check.md「残りのケース」）", s.fqn)
+			return
+		}
+		rest.said = true
+		cc.Rest = true
+		return
+	}
+	for _, n := range t.Exceptions {
+		r, ok := a.resolve(n, sc, acThrowsPos)
+		if !ok || r.kind == rDecoParam {
+			continue
+		}
+		for _, x := range a.expandSet(r, kindException, n.Span) {
+			if prev, dup := seen[x]; dup {
+				a.errorf("CLS-10", n.Span, "classify %s のケース %s: 例外 %s は、もう、ケース %s にある（同じ例外は、二つのケースに書けない）", s.fqn, cs.Name.Name, x, prev)
+				continue
+			}
+			seen[x] = cs.Name.Name
+			cc.Exceptions = append(cc.Exceptions, x)
+		}
+	}
 }
 
 // restCases は、一つの classify の中の、残りのケース（`対象 as else`）の覚え書き（docs/check.md「残りのケース」）。
@@ -1036,6 +1084,8 @@ func classifyKindName(c *ir.Classify) string {
 		return "op の分類"
 	case ir.StatesSubject:
 		return "状態の分類"
+	case ir.ExceptionSubject:
+		return "例外の分類"
 	}
 	return "値の分類"
 }
@@ -1050,6 +1100,11 @@ func (a *analyzer) lowerCaseTypings(s *symbol, c *ir.Classify, cs *ast.ClassifyC
 	seen := map[string]bool{}
 	for _, ct := range cs.As {
 		if ct == nil {
+			continue
+		}
+		if ct.AnyException {
+			a.errorf("CLS-10", ct.Span, "classify %s は、例外の分類ではないので、ケース %s に any exception as … は書けない（例外の分類は classify … of any exception）", s.fqn, cs.Name.Name)
+			rest.broken = true
 			continue
 		}
 		if ct.Else || ct.None {

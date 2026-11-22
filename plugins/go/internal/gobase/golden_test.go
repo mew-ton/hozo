@@ -32,6 +32,7 @@ var goldenFixtures = []struct {
 	{name: "matchclosed", covers: "「match」の、二つに分ける形の「分類の誤りの枝」（残りのケースを書かない presence の分類）と、else のアーム（受けるケースを名前で並べたアームと同じコード）", behavior: true},
 	{name: "rowstate", covers: "「effect」「状態の単位」「コメント」の、行の遷移を持つ効果（メソッドの形は変わらず、コメントに行の遷移の表示。行の引数を絞り込んだ効果は「効果の入口の確かめ」）と、「分類」の、ない側のケース（述語を持たない。判定関数が、値がないことで決める）、「match」の、ない側のケースを as none で書いた presence の分類", behavior: true},
 	{name: "throws", covers: "「exception」（引数ごとにフィールド一つ）と、「match」のアームの本体の throw E(<値>, …)、例外を投げる効果（「状態の単位」と、単位のメソッドのコメントの throws）", behavior: true},
+	{name: "try", covers: "「例外を受ける文」の各行（try のブロックの関数、catch (e)、throw e、throw 例外(値)、空の catch、catch (e by 分類) の型の switch と default、try と catch が入れる val、for の中の try、入れ子、本体のあるデコレータの try { proceed(); }）", behavior: true},
 	{name: "seams", covers: "「継ぎ目」の各行、「内側のフォルダと入口」", behavior: true},
 	{name: "wraps", covers: "「本体のあるデコレータ」の各行（外側のメソッド、proceed() の式、値を返す op の result、値の引数、別の名前空間の op と分類の述語、継ぎ目との入れ子、proceed() のアームを持つ match の後ろの文、never を返す op）と、「デコレータのテストの口」の、関係ごとの確かめと、「受けるケース」（名前空間 desk: ignores、recovers、halts、引数で渡した例外、残りの引数、ユニオン、同じデコレータを二度、当たる名前、受けた例外が throws にもあるもの、op の例外にない例外）", behavior: true},
 	{name: "typespkg", covers: "「型のパッケージ」（関数を持つ名前空間の型を、types/ に置く。定義のパッケージの再公開。別の名前空間は、型のパッケージを import する。型だけの名前空間は、分けない）と、「パッケージと import パス」（互いの型を使う二つの名前空間が、輪にならない）", behavior: true},

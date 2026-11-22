@@ -1,0 +1,34 @@
+// SYNTAX に当たらない: try / catch (e) / catch (e by 分類)、catch のブロックの最後の throw、例外の分類
+namespace a {
+  exception Failed;
+  exception Broken(code: int);
+  classify Failure of any exception {
+    Soft: any exception as Failed;
+    Rest: any exception as else;
+  }
+  fn send(): throws Failed, Broken;
+  fn note();
+  fn f() {
+    try {
+      send();
+    } catch (e) {
+      note();
+      throw e;
+    }
+    try {
+      send();
+    } catch (e) {
+      throw Broken(1);
+    };
+    try {
+      send();
+    } catch (e by Failure) {
+      Soft => note();
+      else => throw e;
+    }
+    try {
+      send();
+    } catch (e) {
+    }
+  }
+}

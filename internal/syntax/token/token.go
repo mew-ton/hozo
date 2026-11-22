@@ -77,6 +77,8 @@ const (
 	Else
 	None
 	Throw
+	Try
+	Catch
 
 	// 核の型と形。
 	StringType
@@ -169,6 +171,8 @@ var Keywords = map[string]Kind{
 	"else":     Else,
 	"none":     None,
 	"throw":    Throw,
+	"try":      Try,
+	"catch":    Catch,
 
 	"string":   StringType,
 	"boolean":  BooleanType,

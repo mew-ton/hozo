@@ -1,0 +1,151 @@
+// docs/plugin-go.md「例外を受ける文」の各行を、一か所ずつ使う。各 op の上のコメントが、その op が確かめる行。
+// op はどれも export（出力は一つのパッケージ）。
+
+/** 例外を受ける配線 */
+namespace app {
+  /** 断られた */
+  exception Refused;
+  /** 届かなかった */
+  exception Lost(code: int);
+  /** 壊れた */
+  exception Broken;
+
+  /** 失敗の分け方（残りのケースがある） */
+  classify Failure of any exception {
+    Soft: any exception as Refused | Lost;
+    Hard: any exception as else;
+  }
+  /** 失敗の分け方（残りのケースがない） */
+  classify Closed of any exception {
+    Soft: any exception as Refused;
+    Lossy: any exception as Lost;
+  }
+
+  export fn send(text: string):
+    throws Refused, Lost, Broken;
+  export fn soft(text: string):
+    throws Refused, Lost;
+  export fn load(id: string): string
+    throws Refused;
+  export fn fallback(id: string): string;
+  export fn note(text: string);
+
+  // try のブロックは、その場で呼ぶ関数。catch (e) は、仕様の例外だけを受ける。throw e は、受けた失敗を、そのまま返す
+  export fn relay(text: string) {
+    try {
+      send(text);
+    } catch (e) {
+      note("failed");
+      throw e;
+    }
+  }
+
+  // 空の catch のブロック: 受けて、何もしない
+  export fn quiet(text: string) {
+    try {
+      send(text);
+    } catch (e) {
+    }
+  }
+
+  // catch のブロックの throw 例外(値): 別の例外に替える
+  export fn replace(text: string) {
+    try {
+      send(text);
+    } catch (e) {
+      throw Lost(7);
+    }
+  }
+
+  // catch (e by 分類): 型の switch。残りのケースを受けるアームは default。アームの本体の throw e
+  export fn sorted(text: string) {
+    try {
+      send(text);
+    } catch (e by Failure) {
+      Soft => note("soft");
+      Hard => throw e;
+    }
+  }
+
+  // 残りのケースがない分類: default は、受けた失敗を、そのまま返す。none のアームと、else のアーム
+  export fn closed(text: string) {
+    try {
+      soft(text);
+    } catch (e by Closed) {
+      Soft => none;
+      else => note("lost");
+    }
+  }
+
+  // try が入れ、catch も入れた val: 外の変数に、関数の中から入れる
+  export fn either(id: string): string {
+    val x;
+    try {
+      x = load(id);
+    } catch (e) {
+      x = fallback(id);
+    }
+    return x;
+  }
+
+  // for の中の try と、集める文。catch (e) のブロックの中の、match (e by 分類) の文
+  export fn each(ids: string[]): string[] {
+    val got: string[];
+    for (val id of ids) {
+      try {
+        val one = load(id);
+        got collect one;
+      } catch (e) {
+        match (e by Closed) {
+          Soft => note(id);
+          Lossy => throw e;
+        }
+      }
+    }
+    return got;
+  }
+
+  // 入れ子: 内側が投げ直したものを、外側が受ける。受けた失敗の変数は caught、caught_
+  export fn nested(text: string) {
+    try {
+      try {
+        send(text);
+      } catch (inner) {
+        note("inner");
+        throw inner;
+      }
+    } catch (outer) {
+      note("outer");
+    }
+  }
+
+  // 本体のあるデコレータの try { proceed(); … }: 値を返す op では、result を、try の前に置き、try の中で入れる
+  decorator fn noted() {
+    try {
+      proceed();
+      note("done");
+    } catch (e) {
+      note("failed");
+      throw e;
+    }
+  }
+  // 本体のあるデコレータの catch (e by 分類): 値を返さない op にだけ付く（DEC-27）
+  decorator fn bestEffort() {
+    try {
+      proceed();
+    } catch (e by Failure) {
+      Soft => none;
+      Hard => throw e;
+    }
+  }
+
+  @noted
+  export fn fetch(id: string): string {
+    return load(id);
+  }
+
+  @bestEffort
+  export fn push(text: string) {
+    send(text);
+  }
+}

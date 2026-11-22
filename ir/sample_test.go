@@ -270,6 +270,16 @@ func sampleProgram() *Program {
 						Absent:    "Gone",
 					},
 					&Classify{
+						// 例外の分類（docs/check.md「例外の分類」）
+						DeclBase: DeclBase{Name: "server.Failure", Span: span(f, 36, 1, 36, 80)},
+						Subject:  ExceptionSubject{},
+						Cases: []ClassifyCase{
+							{Name: "Soft", Exceptions: []string{"server.Unauthorized"}, Span: span(f, 36, 40, 36, 60)},
+							{Name: "Hard", Rest: true, Span: span(f, 36, 61, 36, 78)},
+						},
+						DecidedBy: DecidedByType,
+					},
+					&Classify{
 						DeclBase: DeclBase{Name: "server.IsAdmin", Span: span(f, 35, 1, 35, 51)},
 						Subject:  TypeSubject{Type: Ref("server.User")},
 						Cases: []ClassifyCase{
@@ -595,6 +605,28 @@ func sampleProgram() *Program {
 								}},
 								Disjoint: true,
 								Span:     span(f, 75, 3, 77, 4),
+							},
+							// 例外を受ける文（docs/check.md「例外を受ける」）: 受けた例外の match と、catch のブロックの最後の throw
+							TryStmt{
+								Body: []Statement{CallStmt{Call: Call{Callee: OpCallee{Op: "server.audit"}, Span: span(f, 79, 5, 79, 12)}, Span: span(f, 79, 5, 79, 13)}},
+								Catch: Catch{
+									Name: "e",
+									Body: []Statement{
+										MatchStmt{Match: Match{
+											Subject:  CaughtSubject{Name: "e"},
+											Classify: "server.Failure",
+											Arms: []MatchArm{
+												{Cases: []string{"Soft"}, Body: NoneBody{}, Span: span(f, 81, 7, 81, 20)},
+												{Cases: []string{"Hard"}, Body: ThrowBody{Caught: "e", Span: span(f, 82, 15, 82, 22)}, Span: span(f, 82, 7, 82, 23)},
+											},
+											Span: span(f, 80, 14, 83, 6),
+										}, Span: span(f, 80, 5, 83, 6)},
+										ThrowStmt{Throw: ThrowBody{Exception: "server.Unauthorized", Span: span(f, 84, 5, 84, 23)}, Span: span(f, 84, 5, 84, 24)},
+									},
+									Never: true,
+									Span:  span(f, 80, 5, 85, 4),
+								},
+								Span: span(f, 78, 3, 85, 4),
 							},
 						}},
 						Signature: Signature{},

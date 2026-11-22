@@ -161,6 +161,58 @@ type sourceWalker struct {
 	found  []ThrowSource
 	index  map[string]int
 	stack  map[string]bool
+	// capture は、try のブロックを辿っている間の、出どころの受け皿。nil でなければ、add は、found ではなく、ここに足す
+	// （try のブロックの中の出どころは、catch が受けるので、そのままでは、数えない）。
+	capture *[]heldSource
+	// catches は、今、中にいる catch のブロック（外から内へ）: その try のブロックの中の出どころを持つ。
+	catches []caughtSources
+}
+
+// heldSource は、try のブロックの中で見つけて、取っておいた出どころ（add の引数のまま）。
+type heldSource struct {
+	fr  *sourceFrame
+	s   ThrowSource
+	c   sourceCond
+	own []FakeStep
+}
+
+// caughtSources は、catch のブロック一つ: その配線（fr）の、受けた例外の名前（name）と、try のブロックの中の出どころ。
+type caughtSources struct {
+	fr      *sourceFrame
+	name    string
+	sources []heldSource
+}
+
+// rethrow は、`throw e`（受けた例外 name を、そのまま投げ直す）の出どころ: try のブロックの中の出どころを、そのまま、出どころにする
+// （docs/ide-chain.md「Hozo が作る、例外のケース」の「例外を受ける文」）。keep が nil でなければ、keep が真の例外だけ。
+// why が空でなければ、その理由で、作れない。
+func (w *sourceWalker) rethrow(fr *sourceFrame, name string, keep func(exception string) bool, why string) {
+	for i := len(w.catches) - 1; i >= 0; i-- {
+		if w.catches[i].fr != fr || w.catches[i].name != name {
+			continue
+		}
+		for _, h := range w.catches[i].sources {
+			if keep != nil && !keep(h.s.Exception) {
+				continue
+			}
+			c := h.c
+			if why != "" {
+				c = c.with(nil, why)
+			}
+			w.add(h.fr, h.s, c, h.own)
+		}
+		return
+	}
+}
+
+// thrown は、catch のブロックの `throw 例外`（文か、受けた例外の match のアームの本体）の出どころ。
+// 名前は `<配線の op の FQN>.catch`（デコレータの本体なら `<op の FQN>@<デコレータの FQN>.catch`）。
+func (w *sourceWalker) thrown(fr *sourceFrame, body *ir.ThrowBody, c sourceCond) {
+	label, id := fr.op.Name, MethodName(fr.op.Name)
+	if fr.deco != nil {
+		label, id = fr.op.Name+"@"+fr.deco.Name, SeamMethod(fr.op.Name, fr.deco.Name)
+	}
+	w.add(fr, ThrowSource{Exception: body.Exception, Kind: SourceArm, Label: label + ".catch", Ident: id + "Catch"}, c, nil)
 }
 
 func (w *sourceWalker) path(fr *sourceFrame, names ...string) []string {
@@ -169,6 +221,10 @@ func (w *sourceWalker) path(fr *sourceFrame, names ...string) []string {
 
 // add は、出どころを足す。入口まで伝わらない例外（途中の op の signature にないもの）は、足さない。
 func (w *sourceWalker) add(fr *sourceFrame, s ThrowSource, c sourceCond, own []FakeStep) {
+	if w.capture != nil {
+		*w.capture = append(*w.capture, heldSource{fr: fr, s: s, c: c, own: own})
+		return
+	}
 	if !contains(w.root.Signature.Exceptions, s.Exception) {
 		return
 	}
@@ -345,6 +401,22 @@ func (w *sourceWalker) stmts(fr *sourceFrame, list []ir.Statement, c sourceCond)
 			for _, arm := range s.Arms {
 				w.stmts(fr, arm.Statements, c)
 			}
+		case ir.TryStmt:
+			// try のブロックの中の出どころは、取っておく。catch のブロックの throw e が、そのまま、出どころにする
+			var held []heldSource
+			saved := w.capture
+			w.capture = &held
+			w.stmts(fr, s.Body, c)
+			w.capture = saved
+			w.catches = append(w.catches, caughtSources{fr: fr, name: s.Catch.Name, sources: held})
+			w.stmts(fr, s.Catch.Body, c.with(nil, "例外を受けた後の道（catch のブロック）にある"))
+			w.catches = w.catches[:len(w.catches)-1]
+		case ir.ThrowStmt:
+			if s.Throw.Caught != "" {
+				w.rethrow(fr, s.Throw.Caught, nil, "")
+			} else {
+				w.thrown(fr, &s.Throw, c)
+			}
 		default:
 			if e, ok := ir.StatementExpr(st); ok {
 				switch x := e.(type) {
@@ -395,6 +467,30 @@ func (w *sourceWalker) unitOf(kit *TestKit, fqn string) (KitParam, bool) {
 }
 
 func (w *sourceWalker) match(fr *sourceFrame, m *ir.Match, c sourceCond) {
+	if cs, caught := m.Subject.(ir.CaughtSubject); caught {
+		// 受けた例外の match: アームの throw e は、そのアームが受けるケースの例外だけを、投げ直す
+		cl, _ := w.p.Lookup(m.Classify).(*ir.Classify)
+		for i := range m.Arms {
+			arm := &m.Arms[i]
+			switch body := arm.Body.(type) {
+			case ir.ThrowBody:
+				switch {
+				case body.Caught == cs.Name && cl != nil:
+					w.rethrow(fr, body.Caught, func(x string) bool {
+						name, ok := cl.CaseOfException(x)
+						return ok && contains(arm.Cases, name)
+					}, "")
+				case body.Caught != "":
+					w.rethrow(fr, body.Caught, nil, "")
+				default:
+					w.thrown(fr, &body, c)
+				}
+			case ir.CallExpr:
+				w.call(fr, &body.Call, c)
+			}
+		}
+		return
+	}
 	nonThrow := 0
 	for _, arm := range m.Arms {
 		if _, throws := arm.Body.(ir.ThrowBody); !throws {
@@ -405,6 +501,11 @@ func (w *sourceWalker) match(fr *sourceFrame, m *ir.Match, c sourceCond) {
 		arm := &m.Arms[i]
 		switch body := arm.Body.(type) {
 		case ir.ThrowBody:
+			if body.Caught != "" {
+				// catch のブロックの中の、ほかの match のアームの throw e: そのアームに入る用意は、作らない
+				w.rethrow(fr, body.Caught, nil, "例外を受けた後の道の、match のアームにある")
+				continue
+			}
 			steps, why := w.enter(fr, m, arm)
 			var ident string
 			for _, k := range arm.Cases {

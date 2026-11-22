@@ -1,0 +1,30 @@
+// MATCH-10（docs/check.md「分類」の「例外の分類」）: try のブロックが投げうる例外に、分類のどのケースにも当たらないものがある
+namespace a {
+  exception Failed;
+  exception Broken;
+  exception Lost;
+  classify Failure of any exception {
+    Soft: any exception as Failed;
+    Hard: any exception as Broken;
+  }
+  fn send(): throws Failed, Broken, Lost;
+  fn note();
+  fn f() {
+    try {
+      send();
+    } catch (e by Failure) {           // ERROR: MATCH-10
+      Soft => note();
+      Hard => throw e;
+    }
+  }
+  fn g() {
+    try {
+      send();
+    } catch (e) {
+      match (e by Failure) {           // ERROR: MATCH-10
+        Soft => note();
+        Hard => throw e;
+      }
+    }
+  }
+}

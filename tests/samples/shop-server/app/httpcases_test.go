@@ -335,6 +335,7 @@ func (resendNoticesCases) UnauthorizedAuthenticateAbsent() servertest.ResendNoti
 }
 
 // NotificationFailedSend: 配送（mailer.send）は、繰り返しの中にあるので、人が書く: 注文が、一件はあって、配送が、失敗する。
+// 配送は、try のブロックの中にあり、catch のブロックが、受けて、投げ直す（throw e）ので、出どころは、mailer.send のまま。
 func (resendNoticesCases) NotificationFailedSend() servertest.ResendNoticesHTTPCase {
 	return servertest.ResendNoticesHTTPCase{
 		In: server.AuthInput{Token: sessionToken()},
@@ -349,6 +350,10 @@ func (resendNoticesCases) NotificationFailedSend() servertest.ResendNoticesHTTPC
 			}
 			if n := len(f.Store.Notifications.NotifyUser.Calls); n != 0 {
 				t.Errorf("notifyUser の呼び出し = %d 回（期待は、なし: 送れた分は、ない）", n)
+			}
+			// catch のブロック（本物を通す）が、受けた失敗を、葉 recordAudit で、一度、記録する
+			if n := len(f.Leaves.RecordAudit.Calls); n != 1 {
+				t.Errorf("recordAudit の呼び出し = %d 回（期待は、一度: 受けて、記録して、投げ直す）", n)
 			}
 		},
 	}

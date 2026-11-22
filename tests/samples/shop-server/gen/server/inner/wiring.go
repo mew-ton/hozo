@@ -4,8 +4,10 @@ package inner
 
 import (
 	"context"
+	"errors"
 
 	pkgtype "example.com/shop-server/gen/type"
+	"github.com/mew-ton/hozo/runtime"
 )
 
 // loginBody は op server.login の中身（配線の本体）。外側の Login が、継ぎ目を通して呼ぶ。
@@ -230,7 +232,7 @@ func (o *ops) PlaceOrder(ctx context.Context, in PlaceOrderInput) (pkgtype.Order
 	return order, nil
 }
 
-// ResendNotices は自分の注文の通知を、もう一度、送る。一つ失敗したら、そこで止まり、送れた分の記録は、残る
+// ResendNotices は自分の注文の通知を、もう一度、送る。一つ失敗したら、失敗したことを記録して（recordAudit）、そこで止まり、送れた分の記録は、残る
 //
 // Throws: type.Unauthorized, type.NotificationFailed
 // Reads: store.sessions, store.orders
@@ -250,8 +252,22 @@ func (o *ops) ResendNotices(ctx context.Context, in AuthInput) ([]pkgtype.Notifi
 		if err != nil {
 			return nil, err
 		}
-		if err := o.mailer.Send(ctx, notice); err != nil {
-			return nil, err
+		// try
+		if caught := func(ctx context.Context) error {
+			if err := o.mailer.Send(ctx, notice); err != nil {
+				return err
+			}
+			return nil
+		}(ctx); caught != nil {
+			// catch (e)
+			var e runtime.Exception
+			if !errors.As(caught, &e) {
+				return nil, caught
+			}
+			if err := o.RecordAudit(ctx); err != nil {
+				return nil, err
+			}
+			return nil, caught
 		}
 		if err := o.store.RecordNotice(ctx, notice); err != nil {
 			return nil, err

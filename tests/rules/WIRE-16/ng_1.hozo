@@ -1,0 +1,24 @@
+// WIRE-16（docs/check.md「例外を受ける」）: 受けた例外の名前 e を、書けない所に書いた
+namespace a {
+  exception Failed;
+  exception Other(code: int);
+  model M { id: string; }
+  classify Kind of M { A; B; }
+  fn send(): throws Failed;
+  fn use(m: M);
+  fn make(): M;
+  fn f(m: M) {
+    try {
+      send();
+    } catch (e) {
+      use(e);                          // ERROR: WIRE-16
+      val x = e;                       // ERROR: WIRE-16
+      use(x);
+    }
+    try {
+      send();
+    } catch (e) {
+      throw e(1);                      // ERROR: WIRE-16
+    }
+  }
+}

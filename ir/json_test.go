@@ -184,6 +184,15 @@ func TestRoundTripExprsAndStatements(t *testing.T) {
 		`{"kind":"disjoint","arms":[{"block":true,"statements":[{"kind":"call","call":`+callJSON+`,`+spJSON+`}],`+spJSON+`},{"block":false,"statements":[{"kind":"call","call":`+callJSON+`,`+spJSON+`}],`+spJSON+`}],`+spJSON+`}`)
 	unionRoundTrip(t, Statement(ForStmt{Var: "x", VarType: String(), Of: NameAtom{Path: []string{"xs"}, Span: sp()}, Body: []Statement{CallStmt{Call: call, Span: sp()}}, Disjoint: true, Span: sp()}), UnmarshalStatement,
 		`{"kind":"for","var":"x","varType":{"kind":"core","name":"string"},"of":{"kind":"name","path":["xs"],`+spJSON+`},"body":[{"kind":"call","call":`+callJSON+`,`+spJSON+`}],"disjoint":true,`+spJSON+`}`)
+	// 例外を受ける文と、catch のブロックの最後の throw（docs/ir.md「配線」の Catch、Throw）
+	unionRoundTrip(t, Statement(TryStmt{Body: []Statement{CallStmt{Call: call, Span: sp()}},
+		Catch: Catch{Name: "e", Body: []Statement{ThrowStmt{Throw: ThrowBody{Caught: "e", Span: sp()}, Span: sp()}}, Never: true, Span: sp()}, Span: sp()}), UnmarshalStatement,
+		`{"kind":"try","body":[{"kind":"call","call":`+callJSON+`,`+spJSON+`}],"catch":{"name":"e","body":[{"kind":"throw","throw":{"kind":"throw","exception":"","args":[],"caught":"e",`+spJSON+`},`+spJSON+`}],"never":true,`+spJSON+`},`+spJSON+`}`)
+	unionRoundTrip(t, Statement(TryStmt{Catch: Catch{Name: "e", Span: sp()}, Span: sp()}), UnmarshalStatement,
+		`{"kind":"try","body":[],"catch":{"name":"e","body":[],"never":false,`+spJSON+`},`+spJSON+`}`)
+	unionRoundTrip(t, Statement(ThrowStmt{Throw: ThrowBody{Exception: "shop.Sold", Span: sp()}, Span: sp()}), UnmarshalStatement,
+		`{"kind":"throw","throw":{"kind":"throw","exception":"shop.Sold","args":[],`+spJSON+`},`+spJSON+`}`)
+	unionRoundTrip(t, MatchSubject(CaughtSubject{Name: "e"}), UnmarshalMatchSubject, `{"kind":"caught","name":"e"}`)
 	unionRoundTrip(t, Statement(ReturnStmt{Expr: CallExpr{Call: call}, Span: sp()}), UnmarshalStatement,
 		`{"kind":"return","expr":{"kind":"call","call":`+callJSON+`},`+spJSON+`}`)
 	unionRoundTrip(t, Statement(CallStmt{Call: call, Span: sp()}), UnmarshalStatement, `{"kind":"call","call":`+callJSON+`,`+spJSON+`}`)
@@ -315,6 +324,7 @@ func TestRoundTripClassifySubjects(t *testing.T) {
 	unionRoundTrip(t, ClassifySubject(StatesSubject{States: []string{"shop.carts", "shop.orders"}}), UnmarshalClassifySubject,
 		`{"kind":"states","states":["shop.carts","shop.orders"]}`)
 	unionRoundTrip(t, ClassifySubject(StatesSubject{}), UnmarshalClassifySubject, `{"kind":"states","states":[]}`)
+	unionRoundTrip(t, ClassifySubject(ExceptionSubject{}), UnmarshalClassifySubject, `{"kind":"exception"}`)
 	unionRoundTrip(t, ClassifySubject(OpSubject{Op: "store.findUser", Type: Optional(Ref("type.User"))}), UnmarshalClassifySubject,
 		`{"kind":"op","op":"store.findUser","type":{"kind":"optional","of":{"kind":"ref","target":"type.User"}}}`)
 	oc := &Classify{Subject: OpSubject{Op: "store.findUser", Type: Optional(Ref("type.User"))}, Cases: []ClassifyCase{{Name: "Registered"}}}
@@ -530,7 +540,7 @@ func TestEmptyProgramJSON(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := `{"version":"0.19","namespaces":[],"binds":[]}`
+	want := `{"version":"0.20","namespaces":[],"binds":[]}`
 	if string(b) != want {
 		t.Errorf("want %s\ngot  %s", want, b)
 	}
@@ -538,7 +548,7 @@ func TestEmptyProgramJSON(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want = `{"version":"0.19","viewer":"","config":{"index":0,"language":"","base":"","out":"","dir":"","transpilers":[],"options":{},"seams":{}},"files":[],"namespaces":{},"program":{"version":"0.19","namespaces":[],"binds":[]},"ops":{}}`
+	want = `{"version":"0.20","viewer":"","config":{"index":0,"language":"","base":"","out":"","dir":"","transpilers":[],"options":{},"seams":{}},"files":[],"namespaces":{},"program":{"version":"0.20","namespaces":[],"binds":[]},"ops":{}}`
 	if string(b) != want {
 		t.Errorf("want %s\ngot  %s", want, b)
 	}
@@ -734,6 +744,7 @@ func TestKinds(t *testing.T) {
 		"throw": ThrowBody{},
 		"type":  TypeParam{}, "any": AnyParam{},
 		"val": ValStmt{}, "assign": AssignStmt{}, "collect": CollectStmt{}, "disjoint": DisjointStmt{}, "for": ForStmt{}, "return": ReturnStmt{},
+		"try": TryStmt{}, "caught": CaughtSubject{},
 		"atom": AtomExpr{},
 		"name": NameAtom{}, "literal": LiteralAtom{}, "none": NoneAtom{},
 		"string": StringLiteral{}, "int": IntLiteral{}, "float": FloatLiteral{}, "boolean": BooleanLiteral{}, "duration": DurationLiteral{},

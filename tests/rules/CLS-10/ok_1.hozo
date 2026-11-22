@@ -1,0 +1,15 @@
+// CLS-10 に当たらない: どのケースも any exception as … を一つ持ち、同じ例外が、二つのケースにない。例外のユニオンは、展開する
+namespace a {
+  exception Failed;
+  exception Broken;
+  exception Lost;
+  union Transport { Broken; Lost; }
+  classify Failure of any exception {
+    Soft: any exception as Failed;
+    Hard: any exception as Transport;
+    Rest: any exception as else;
+  }
+  classify Closed of any exception {
+    Soft: any exception as Failed | Broken;
+  }
+}

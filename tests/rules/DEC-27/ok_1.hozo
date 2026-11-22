@@ -1,0 +1,27 @@
+// DEC-27 に当たらない: 値を返さない op には、付けられる。catch のブロックが「返らない」なら、値を返す op にも、付けられる
+namespace a {
+  exception Failed;
+  model M { id: string; }
+  fn note();
+  decorator fn quiet() {
+    try {
+      proceed();
+    } catch (e) {
+      note();
+    }
+  }
+  decorator fn noted() {
+    try {
+      proceed();
+    } catch (e) {
+      note();
+      throw e;
+    }
+  }
+  @quiet
+  fn send():
+    throws Failed;
+  @noted
+  fn load(): M
+    throws Failed;
+}

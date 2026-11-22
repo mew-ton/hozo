@@ -199,6 +199,13 @@ func (r *renderer) hover(t sema.Target) (string, bool) {
 					line += ": " + r.typ(c.VarType)
 				}
 				code(r.head(op), line+" of …)")
+			case ir.TryStmt:
+				// catch が受けた例外の名前（docs/lsp.md「定義へジャンプ」）
+				if c.Catch.Name != t.Name {
+					return
+				}
+				found = true
+				code(r.head(op), "  catch ("+c.Catch.Name+")")
 			}
 		})
 		if found {
@@ -575,6 +582,17 @@ func (r *renderer) typ(t ir.Type) string {
 // `Unregistered: findUser as else`（docs/lsp.md「ホバー」）。as の前は、値の分類なら対象の型、op の分類ならその op、
 // 状態の分類ならその状態。
 func (r *renderer) caseLine(c *ir.Classify, cs ir.ClassifyCase) string {
+	if c.IsExceptionClass() {
+		// 例外の分類のケース: `K: any exception as E1 | E2`、`R: any exception as else`
+		if cs.Rest {
+			return cs.Name + ": any exception as else"
+		}
+		names := make([]string, len(cs.Exceptions))
+		for i, x := range cs.Exceptions {
+			names[i] = r.rel(x)
+		}
+		return cs.Name + ": any exception as " + strings.Join(names, " | ")
+	}
 	if len(cs.As) == 0 {
 		return cs.Name
 	}
@@ -668,6 +686,8 @@ func caseSet(c ir.CaseSet) string {
 // `classify Registration of findUser`、`classify Checkout of carts, orders`）。対象が決まっていなければ "?"。
 func (r *renderer) classifySubject(s ir.ClassifySubject) string {
 	switch s := s.(type) {
+	case ir.ExceptionSubject:
+		return "any exception"
 	case ir.TypeSubject:
 		return r.typ(s.Type)
 	case ir.OpSubject:
@@ -692,6 +712,8 @@ func (r *renderer) matchHead(m ir.Match) string {
 		return "match (" + r.atom(s.Atom) + " by " + r.rel(m.Classify) + ")"
 	case ir.ClassifyOwnedSubject:
 		return "match (by " + r.rel(m.Classify) + ")"
+	case ir.CaughtSubject:
+		return "match (" + s.Name + " by " + r.rel(m.Classify) + ")"
 	}
 	return "match (by " + r.rel(m.Classify) + ")"
 }

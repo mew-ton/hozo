@@ -355,6 +355,12 @@ test('修飾（export、override）と、reads / as / throw / never', () => {
   assertScope(th, 'Unknown', 'type.InvalidCredentials', 'entity.name.type.hozo');
   assertScope(th, 'Unknown', '=>', 'keyword.operator.arrow.hozo');
   // else のアーム: アームの頭の else は予約語（docs/grammar.md「配線」の ElseArm）。本体は、ほかのアームと同じ
+  // 例外を受ける文（docs/grammar.md「配線」の Try）: try と catch は、文の頭の予約語。catch (e by 分類) の by も
+  const tr = tokensOf('    try {');
+  assertScope(tr, 'try {', 'try', 'keyword.control.hozo');
+  const ca = tokensOf('    } catch (e by payment.PrepayFailure) {');
+  assertScope(ca, 'catch (e by', 'catch', 'keyword.control.hozo');
+  assertScope(ca, 'catch (e by', 'by', 'keyword.control.hozo');
   const el = tokensOf('      else    => throw type.InvalidCredentials;');
   assertScope(el, 'else', 'else', 'keyword.control.hozo');
   assertScope(el, 'else', 'throw', 'keyword.control.hozo');

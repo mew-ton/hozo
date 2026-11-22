@@ -1,0 +1,15 @@
+{
+  "tests": [
+    {"name": "app.send/OK", "file": "gen/app/apptest/leaves.go", "lines": [106, 113]},
+    {"name": "app.send/Refused", "file": "gen/app/apptest/leaves.go", "lines": [116, 124]},
+    {"name": "app.send/Lost", "file": "gen/app/apptest/leaves.go", "lines": [127, 135]},
+    {"name": "app.send/Broken", "file": "gen/app/apptest/leaves.go", "lines": [138, 146]},
+    {"name": "app.soft/OK", "file": "gen/app/apptest/leaves.go", "lines": [152, 159]},
+    {"name": "app.soft/Refused", "file": "gen/app/apptest/leaves.go", "lines": [162, 170]},
+    {"name": "app.soft/Lost", "file": "gen/app/apptest/leaves.go", "lines": [173, 181]},
+    {"name": "app.load/OK", "file": "gen/app/apptest/leaves.go", "lines": [187, 194]},
+    {"name": "app.load/Refused", "file": "gen/app/apptest/leaves.go", "lines": [197, 205]},
+    {"name": "app.fallback/OK", "file": "gen/app/apptest/leaves.go", "lines": [211, 218]},
+    {"name": "app.note/OK", "file": "gen/app/apptest/leaves.go", "lines": [224, 231]}
+  ]
+}

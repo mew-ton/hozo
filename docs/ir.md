@@ -21,7 +21,7 @@ TypeScript 風の記法で書く。`?` は省略可（JSON での扱いは「JSO
 
 ```ts
 interface Program {
-  version: "0.19";                 // この文書の版。Program か View の構造が変わったら上げる（「版」）
+  version: "0.20";                 // この文書の版。Program か View の構造が変わったら上げる（「版」）
   namespaces: Namespace[];        // グローバルは name "" の Namespace として先頭に置く
   binds: Bind[];
 }
@@ -187,11 +187,14 @@ interface Classify extends DeclBase {
   kind: "classify";
   subject: { kind: "type"; type: Type }             // 値の分類。対象のない分類（`of never`）は、type が never
          | { kind: "op"; op: string; type: Type }   // op の分類。op は FQN、type はその op の returns（対象の型）
-         | { kind: "states"; states: string[] };    // 状態の分類。基底の状態の FQN（書かれた順）
-  cases: { name: string; description?: Doc; decorators: Application[]; as: CaseTyping[]; span: Span }[];
+         | { kind: "states"; states: string[] }     // 状態の分類。基底の状態の FQN（書かれた順）
+         | { kind: "exception" };                   // 例外の分類（`of any exception`。docs/check.md「例外の分類」）。対象は、catch が受けた例外
+  cases: { name: string; description?: Doc; decorators: Application[]; as: CaseTyping[]; exceptions?: string[]; rest?: boolean; span: Span }[];
                                   // 宣言したケースのすべて（docs/check.md「閉じた分類」）。宣言順。as は書かれた順（なければ []）。
                                   // decorators は、ケースの前に書いたデコレータ（書かれた順。なければ []）。付けられるのは、
                                   // Decorator.caseTargets に、そのケースを含む CaseKind を持つデコレータ（DEC-1）
+                                  // exceptions と rest は、例外の分類のケースだけが持つ（as は []）: exceptions は、そのケースに当たる例外の
+                                  // FQN（書かれた順。例外のユニオンは、展開済み）。rest は、`any exception as else` と書いたケースで true
   decidedBy: "type" | "predicate" | "none";   // ケースが何で決まるか（docs/check.md「ケースの判定」）。type なら述語を持たない。
                                   // none は、対象のない分類: 判定するものがなく、述語も持たない（docs/check.md「対象のない分類」）
   absent?: string;                // ない側のケース（docs/check.md「ない側のケース」）の名前。なければ持たない。
@@ -328,9 +331,26 @@ type Statement =
   | { kind: "call"; call: Call; span: Span }
   | { kind: "match"; match: Match; span: Span }
   | { kind: "disjoint"; arms: Arm[]; span: Span }                 // 互いに触れないアームの並び（docs/check.md「disjoint」）。書かれた順。二つ以上
-  | { kind: "for"; var: string; varType: Type; of: Atom; body: Statement[]; disjoint: boolean; span: Span };
+  | { kind: "for"; var: string; varType: Type; of: Atom; body: Statement[]; disjoint: boolean; span: Span }
                                   // 繰り返し（docs/check.md「繰り返し」）。var は変数の名前、varType はその型（並びの要素の型）、of は並び。
                                   // disjoint は、前に `disjoint` を書いたか（回どうしが、互いに触れない）
+  | { kind: "try"; body: Statement[]; catch: Catch; span: Span }  // 例外を受ける文（docs/check.md「例外を受ける」）。body は try のブロック
+  | { kind: "throw"; throw: Throw; span: Span };                  // catch のブロックの、最後の文の `throw`
+
+interface Catch {
+  name: string;                   // 受けた例外の名前（`catch (e)` の e）
+  body: Statement[];              // catch のブロック。`catch (e by C) { アーム … }` は、`match (e by C) { アーム … }` の文一つにして入れる
+  never: boolean;                 // ブロックが「返らない」か（最後の文が throw か、「返らない」式の文。docs/check.md「例外を受ける」）
+  span: Span;
+}
+
+interface Throw {                 // `throw E`、`throw E(値, …)`、`throw e`。アームの本体（MatchArm.body）と、同じ形
+  kind: "throw";
+  exception: string;              // 例外の FQN。`throw e`（受けた例外を、そのまま投げ直す）なら ""
+  args: { param: string; value: Atom }[];   // 位置で書いた値を、例外の params の名前に対応付けたもの（なければ []）
+  caught?: string;                // `throw e` のとき、受けた例外の名前（Catch.name）。ほかは、持たない
+  span: Span;
+}
 
 interface Arm {                   // disjoint のアーム。ブロックでも、文の一つでも、文の並びにする（文の一つなら、要素が一つ）
   block: boolean;                 // ブロック `{ … }` で書いたか（中の文が一つでも true。出力の形に効く: docs/plugin-go.md「文」）
@@ -370,7 +390,9 @@ type Atom =
 interface Match {
   subject: { kind: "value"; atom: Atom }            // 値を対象にした match（値の分類、op の分類、標準の分類）。
                                                     // 状態を名前で書いた対象（match token by nullable）は、atom が state
-         | { kind: "classify" };                    // 状態の分類での match（対象は classify が持つ）
+         | { kind: "classify" }                     // 状態の分類での match（対象は classify が持つ）
+         | { kind: "caught"; name: string };        // 受けた例外の match（`match (e by C)`、`catch (e by C)`）。name は Catch.name。
+                                                    // classify は、例外の分類。どのアームも、narrowed は []
   classify: string;               // FQN。標準の分類なら "list" か "nullable"
   arms: MatchArm[];
   span: Span;
@@ -383,9 +405,7 @@ interface MatchArm {
   body: { kind: "call"; call: Call }
       | { kind: "atom"; atom: Atom }                // 値（docs/grammar.md「配線」の ArmBody の Atom）。none はここに入れず、下の none にする
       | { kind: "none" }
-      | { kind: "throw"; exception: string; args: { param: string; value: Atom }[]; span: Span };
-                                                    // `throw E`、`throw E(値, …)`。exception は FQN。args は、位置で書いた値を
-                                                    // 例外の params の名前に対応付けたもの（なければ []）
+      | Throw;                                      // `throw E`、`throw E(値, …)`、`throw e`（上の Throw）
   narrowed: Narrowing[];          // このアームの中で、外と型が違う対象（docs/types.md「アームの中の対象の型」）。なければ []
   span: Span;
 }
@@ -499,7 +519,7 @@ interface Bind {
 
 ```ts
 interface View {
-  version: "0.19";
+  version: "0.20";
   viewer: string;                 // 見る側の名前空間の FQN
   config: NamespaceConfig;        // この View の単位での viewer の設定
   files: string[];                // この View の単位の in に合ったユーザーのファイルと、読み込んだすべての語彙のファイル
@@ -557,10 +577,11 @@ interface ViewedSignature extends Signature {   // Signature は Sig(O, viewer)
 
 ## 版
 
-`Program.version` と `View.version` は同じ値で、どちらかの構造か、プラグインとのやり取りの形（`docs/plugin-protocol.md`「要求と応答」）が変わったら上げる。IR が決めている名前のうち、プラグインが、その値で出力を分けるもの（核の型の名前、標準の分類のケースの名前）が変わったときも、上げる。今の版は `"0.19"`。構造もやり取りの形も同じで、値の意味だけが変わる決定では、上げない: 配線の op の `Op.carried` が空でないことがあり、その `Signature` が運ばれたものを含むこと（`docs/decisions.md`「決めたこと」149）は、0.6 の中にある。
+`Program.version` と `View.version` は同じ値で、どちらかの構造か、プラグインとのやり取りの形（`docs/plugin-protocol.md`「要求と応答」）が変わったら上げる。IR が決めている名前のうち、プラグインが、その値で出力を分けるもの（核の型の名前、標準の分類のケースの名前）が変わったときも、上げる。今の版は `"0.20"`。構造もやり取りの形も同じで、値の意味だけが変わる決定では、上げない: 配線の op の `Op.carried` が空でないことがあり、その `Signature` が運ばれたものを含むこと（`docs/decisions.md`「決めたこと」149）は、0.6 の中にある。
 
 | 版 | 変わったこと |
 |---|---|
+| 0.20 | 配線の文（`Statement`）に `try`（`Catch`）と `throw` を足した。`Match.subject` に `caught`。アームの本体の `throw` に `caught`（`throw e`）。`Classify.subject` に `exception`、`Classify.cases[]` に `exceptions` と `rest`（例外の分類）（`docs/check.md`「例外を受ける」「例外の分類」。`docs/decisions.md`「決めたこと」419、422）。`View` とやり取りの形は 0.19 のまま |
 | 0.19 | `Decorator.external` をなくし、`Decorator.outerThrows`（節 `outer throws`）と、`Decorator.entry`、`Decorator.hint`（核の印 `@entry`、`@hint`）を足した（`docs/grammar.md`「decorator の宣言」。`docs/decisions.md`「決めたこと」407、408、420） |
 | 0.18 | `Decorator.fn` と `Decorator.body` を足した（関数に付けるデコレータ `decorator fn` と、その本体。`docs/grammar.md`「decorator の宣言」「デコレータの本体」、`docs/decisions.md`「決めたこと」392〜394）。`Callee` に `proceed` を足した（デコレータの本体の `proceed()`）。`View` とやり取りの形は 0.17 と同じ |
 | 0.17 | やり取りに、direction `coverage` を足した（`docs/plugin-protocol.md`「coverage」、`docs/decisions.md`「決めたこと」380）。マニフェストの `[coverage]`。`emit` の応答の `files` のうち、名前が `hozo-tests.<トランスパイラの名前>.json` のものを、テストの対応表として読み、形を確かめる（同「テストの対応表」、PLG-4）。`Program` と `View` の構造、`emit` / `check` / `import` の要求と応答の形は、0.16 と同じ |

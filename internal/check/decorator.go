@@ -21,6 +21,34 @@ func checkDecorators(ix *index, c *computer, r *reporter) {
 		checkDec4(ix, o, r)
 		checkDec24(ix, o, ix.opsNS[i], r)
 		checkDec25(ix, o, r)
+		checkDec27(ix, o, r)
+	}
+}
+
+// checkDec27 は DEC-27（docs/check.md「デコレータの本体」）: proceed() を try のブロックに持ち、catch のブロックが「返らない」でない
+// デコレータを、returns が null でない op に付けた（DEC-4 と同じ理由: 受けた後に、返す値がない）。位置は、適用。
+func checkDec27(ix *index, o *ir.Op, r *reporter) {
+	if o.Returns == nil {
+		return
+	}
+	for ai := range o.Decorators {
+		app := &o.Decorators[ai]
+		d, _ := ix.decorator(app.Decorator)
+		if d == nil || d.Body == nil {
+			continue
+		}
+		reported := false
+		ir.WalkStatements(d.Body.Statements, func(st ir.Statement) {
+			try, ok := st.(ir.TryStmt)
+			if !ok || reported || try.Catch.Never || len(try.Body) == 0 {
+				return
+			}
+			if cs, isCall := try.Body[0].(ir.CallStmt); isCall && cs.Call.IsProceed() {
+				reported = true
+				r.report(diag.Error, "DEC-27", app.Span, sprintf("デコレータ %s の本体は、proceed() の例外を受けて、投げずに終わる道を持つので、値を返す op %s には付けられない（受けた後に、返す値がない）", d.Name, o.Name),
+					[]related{{span: try.Catch.Span, msg: "投げずに終わりうる catch"}}, nil)
+			}
+		})
 	}
 }
 

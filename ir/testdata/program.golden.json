@@ -1,5 +1,5 @@
 {
-  "version": "0.19",
+  "version": "0.20",
   "namespaces": [
     {
       "name": "",
@@ -1414,6 +1414,64 @@
           ],
           "decidedBy": "predicate",
           "absent": "Gone"
+        },
+        {
+          "kind": "classify",
+          "name": "server.Failure",
+          "decorators": [],
+          "span": {
+            "file": "server.hozo",
+            "start": {
+              "line": 36,
+              "col": 1
+            },
+            "end": {
+              "line": 36,
+              "col": 80
+            }
+          },
+          "subject": {
+            "kind": "exception"
+          },
+          "cases": [
+            {
+              "name": "Soft",
+              "decorators": [],
+              "as": [],
+              "exceptions": [
+                "server.Unauthorized"
+              ],
+              "span": {
+                "file": "server.hozo",
+                "start": {
+                  "line": 36,
+                  "col": 40
+                },
+                "end": {
+                  "line": 36,
+                  "col": 60
+                }
+              }
+            },
+            {
+              "name": "Hard",
+              "decorators": [],
+              "as": [],
+              "rest": true,
+              "span": {
+                "file": "server.hozo",
+                "start": {
+                  "line": 36,
+                  "col": 61
+                },
+                "end": {
+                  "line": 36,
+                  "col": 78
+                }
+              }
+            }
+          ],
+          "decidedBy": "type"
         },
         {
           "kind": "classify",
@@ -3565,6 +3623,192 @@
                   },
                   "end": {
                     "line": 77,
+                    "col": 4
+                  }
+                }
+              },
+              {
+                "kind": "try",
+                "body": [
+                  {
+                    "kind": "call",
+                    "call": {
+                      "callee": {
+                        "kind": "op",
+                        "op": "server.audit"
+                      },
+                      "args": [],
+                      "bound": [],
+                      "span": {
+                        "file": "server.hozo",
+                        "start": {
+                          "line": 79,
+                          "col": 5
+                        },
+                        "end": {
+                          "line": 79,
+                          "col": 12
+                        }
+                      }
+                    },
+                    "span": {
+                      "file": "server.hozo",
+                      "start": {
+                        "line": 79,
+                        "col": 5
+                      },
+                      "end": {
+                        "line": 79,
+                        "col": 13
+                      }
+                    }
+                  }
+                ],
+                "catch": {
+                  "name": "e",
+                  "body": [
+                    {
+                      "kind": "match",
+                      "match": {
+                        "subject": {
+                          "kind": "caught",
+                          "name": "e"
+                        },
+                        "classify": "server.Failure",
+                        "arms": [
+                          {
+                            "cases": [
+                              "Soft"
+                            ],
+                            "else": false,
+                            "body": {
+                              "kind": "none"
+                            },
+                            "narrowed": [],
+                            "span": {
+                              "file": "server.hozo",
+                              "start": {
+                                "line": 81,
+                                "col": 7
+                              },
+                              "end": {
+                                "line": 81,
+                                "col": 20
+                              }
+                            }
+                          },
+                          {
+                            "cases": [
+                              "Hard"
+                            ],
+                            "else": false,
+                            "body": {
+                              "kind": "throw",
+                              "exception": "",
+                              "args": [],
+                              "caught": "e",
+                              "span": {
+                                "file": "server.hozo",
+                                "start": {
+                                  "line": 82,
+                                  "col": 15
+                                },
+                                "end": {
+                                  "line": 82,
+                                  "col": 22
+                                }
+                              }
+                            },
+                            "narrowed": [],
+                            "span": {
+                              "file": "server.hozo",
+                              "start": {
+                                "line": 82,
+                                "col": 7
+                              },
+                              "end": {
+                                "line": 82,
+                                "col": 23
+                              }
+                            }
+                          }
+                        ],
+                        "span": {
+                          "file": "server.hozo",
+                          "start": {
+                            "line": 80,
+                            "col": 14
+                          },
+                          "end": {
+                            "line": 83,
+                            "col": 6
+                          }
+                        }
+                      },
+                      "span": {
+                        "file": "server.hozo",
+                        "start": {
+                          "line": 80,
+                          "col": 5
+                        },
+                        "end": {
+                          "line": 83,
+                          "col": 6
+                        }
+                      }
+                    },
+                    {
+                      "kind": "throw",
+                      "throw": {
+                        "kind": "throw",
+                        "exception": "server.Unauthorized",
+                        "args": [],
+                        "span": {
+                          "file": "server.hozo",
+                          "start": {
+                            "line": 84,
+                            "col": 5
+                          },
+                          "end": {
+                            "line": 84,
+                            "col": 23
+                          }
+                        }
+                      },
+                      "span": {
+                        "file": "server.hozo",
+                        "start": {
+                          "line": 84,
+                          "col": 5
+                        },
+                        "end": {
+                          "line": 84,
+                          "col": 24
+                        }
+                      }
+                    }
+                  ],
+                  "never": true,
+                  "span": {
+                    "file": "server.hozo",
+                    "start": {
+                      "line": 80,
+                      "col": 5
+                    },
+                    "end": {
+                      "line": 85,
+                      "col": 4
+                    }
+                  }
+                },
+                "span": {
+                  "file": "server.hozo",
+                  "start": {
+                    "line": 78,
+                    "col": 3
+                  },
+                  "end": {
+                    "line": 85,
                     "col": 4
                   }
                 }

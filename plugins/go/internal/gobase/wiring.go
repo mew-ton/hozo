@@ -1,6 +1,7 @@
 package gobase
 
 import (
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -101,6 +102,17 @@ func wrapStatements(stmts []ir.Statement, o *ir.Op) []ir.Statement {
 		case ir.MatchStmt:
 			if proceeds(x.Match) {
 				expr, span = ir.MatchExpr{Match: x.Match}, x.Span
+			}
+		case ir.TryStmt:
+			// try { proceed(); … }: 結果の val を、try の前に、空で宣言し、try のブロックの中で入れる（docs/plugin-go.md「例外を受ける文」）
+			if len(x.Body) > 0 {
+				if cs, isCall := x.Body[0].(ir.CallStmt); isCall && cs.Call.IsProceed() {
+					body := append([]ir.Statement{ir.AssignStmt{Name: name, Expr: ir.CallExpr{Call: cs.Call}, Span: cs.Span}}, x.Body[1:]...)
+					x.Body = body
+					out = append(out, ir.ValStmt{Name: name, Type: o.Returns, Span: x.Span}, x)
+					held = true
+					continue
+				}
 			}
 		}
 		switch {
@@ -222,6 +234,24 @@ type bodyGen struct {
 	terminated bool
 	// proceed は、本体のあるデコレータの外側を書いているときの、proceed() の式（内側の層の呼び出し）。配線の本体では空。
 	proceed string
+	// catches は、今、中にいる catch のブロック（外から内へ）。
+	catches []catchVar
+}
+
+// catchVar は、catch のブロック一つ（docs/plugin-go.md「例外を受ける文」）: 仕様の、受けた例外の名前（name）と、
+// 受けた失敗の変数（err。error）、仕様の例外として取り出した変数（exc。runtime.Exception）。
+type catchVar struct {
+	name, err, exc string
+}
+
+// catchOf は、受けた例外 name の catch のブロック（いちばん内側）。
+func (b *bodyGen) catchOf(name string) (catchVar, bool) {
+	for i := len(b.catches) - 1; i >= 0; i-- {
+		if b.catches[i].name == name {
+			return b.catches[i], true
+		}
+	}
+	return catchVar{}, false
 }
 
 func newBody(e *emitter, f *fileGen, os golang.OpShape) *bodyGen {
@@ -247,6 +277,8 @@ func newBodyOf(e *emitter, f *fileGen, os golang.OpShape, o *ir.Op) *bodyGen {
 			b.taken[golang.LocalName(c.Name, e.reserved)] = true
 		case ir.ForStmt:
 			b.taken[golang.LocalName(c.Var, e.reserved)] = true
+		case ir.TryStmt:
+			b.taken[golang.LocalName(c.Catch.Name, e.reserved)] = true
 		}
 	})
 	return b
@@ -1080,6 +1112,15 @@ func (b *bodyGen) call(c *ir.Call) callInfo {
 // 例外の構造体のリテラル。フィールドは例外の引数（Exception.params の順）で、いつもすべて書く。値は、引数の型を当てはめる型にして
 // 「値」の規則で書く。渡されていない省略可能な引数は nil。
 func (b *bodyGen) throwValue(t *ir.ThrowBody) string {
+	if t.Caught != "" {
+		// throw e: 受けた失敗を、包み直さずに返す
+		cv, ok := b.catchOf(t.Caught)
+		if !ok {
+			b.e.errorf(codeInternal, b.op.Name, "op %s の配線の throw %s が、catch のブロックの外にある（検査を通った IR には来ないはずの形）", b.op.Name, t.Caught)
+			return "nil"
+		}
+		return cv.err
+	}
 	typ := b.f.goType(ir.Ref(t.Exception))
 	x, ok := b.e.lookup(t.Exception).(*ir.Exception)
 	if !ok {
@@ -1167,6 +1208,14 @@ func usesName(stmts []ir.Statement, name string) bool {
 		}
 		if f, ok := s.(ir.ForStmt); ok {
 			used = inAtom(f.Of)
+			return
+		}
+		if t, ok := s.(ir.ThrowStmt); ok {
+			for _, a := range t.Throw.Args {
+				if inAtom(a.Value) {
+					used = true
+				}
+			}
 			return
 		}
 		if x, ok := ir.StatementExpr(s); ok {
@@ -1346,6 +1395,15 @@ func (b *bodyGen) stmt(s ir.Statement, rest []ir.Statement) {
 		b.pop()
 		b.depth--
 		b.line("}")
+	case ir.TryStmt:
+		b.tryStmt(x)
+	case ir.ThrowStmt:
+		var states []string
+		for i := range x.Throw.Args {
+			statesOfAtom(x.Throw.Args[i].Value, &states)
+		}
+		b.read(states, nil)
+		b.returnErr(b.throwValue(&x.Throw))
 	case ir.ForStmt:
 		var states []string
 		statesOfAtom(x.Of, &states)
@@ -1370,6 +1428,94 @@ func (b *bodyGen) stmt(s ir.Statement, rest []ir.Statement) {
 		b.depth--
 		b.line("}")
 	}
+}
+
+// tryStmt は、例外を受ける文（docs/plugin-go.md「例外を受ける文」）: try のブロックを、その場で呼ぶ関数にして、その失敗を、
+// catch のブロックで受ける。受けるのは、仕様の例外（runtime.Exception）だけで、そうでない失敗は、そのまま返す。
+func (b *bodyGen) tryStmt(x ir.TryStmt) {
+	caught := b.fresh("caught")
+	b.line("// try")
+	// 関数は、基底が出すほかの関数と同じに、ctx を取り、error を返す（docs/plugin-go.md「op の形」）
+	b.line("if " + caught + " := func(ctx " + b.f.im.Add("context", "context") + ".Context) error {")
+	b.depth++
+	b.push()
+	ret := b.ret
+	b.ret = nil // 関数の戻り値は error だけ: 失敗の扱いは return err
+	b.block(x.Body)
+	if !b.terminated {
+		b.line("return nil")
+	}
+	b.ret = ret
+	b.pop()
+	b.depth--
+	b.line("}(ctx); " + caught + " != nil {")
+	b.depth++
+	b.push()
+	// 受けた例外の名前は、val と同じに、先に押さえてある（newBodyOf）。見えている名前と当たらない（WIRE-4）
+	exc := golang.LocalName(x.Catch.Name, b.e.reserved)
+	b.line("// catch (" + x.Catch.Name + ")")
+	b.line("var " + exc + " " + b.f.im.Add(runtimePath, "runtime") + ".Exception")
+	b.line("if !" + b.f.im.Add("errors", "errors") + ".As(" + caught + ", &" + exc + ") {")
+	b.depth++
+	b.returnErr(caught)
+	b.depth--
+	b.line("}")
+	b.catches = append(b.catches, catchVar{name: x.Catch.Name, err: caught, exc: exc})
+	b.block(x.Catch.Body)
+	b.catches = b.catches[:len(b.catches)-1]
+	b.pop()
+	b.depth--
+	b.line("}")
+}
+
+// caughtSwitch は、受けた例外の match（docs/plugin-go.md「例外を受ける文」）: 型の switch。アームごとに case 一つで、そのアームが
+// 受けるケースの例外の型を、分類の宣言の順に並べる。残りのケースを受けるアームは default。残りのケースがない分類では、
+// default は、受けた失敗を、そのまま返す。mode、x、t は、アームの本体の使われ方（matchSwitch と同じ）。
+func (b *bodyGen) caughtSwitch(m *ir.Match, cs ir.CaughtSubject, mode matchMode, x string, t ir.Type) {
+	cv, ok := b.catchOf(cs.Name)
+	c, isClassify := b.e.lookup(m.Classify).(*ir.Classify)
+	if !ok || !isClassify {
+		b.e.errorf(codeInternal, b.op.Name, "op %s の配線の、受けた例外 %s の match が、catch のブロックの外にあるか、分類 %s が Program にない（検査を通った IR には来ないはずの形）", b.op.Name, cs.Name, m.Classify)
+		return
+	}
+	b.line("switch " + cv.exc + ".(type) {")
+	hasDefault := false
+	for i := range m.Arms {
+		a := &m.Arms[i]
+		var types []string
+		rest := false
+		for _, k := range c.Cases {
+			if !slices.Contains(a.Cases, k.Name) {
+				continue
+			}
+			rest = rest || k.Rest
+			for _, exc := range k.Exceptions {
+				types = append(types, b.f.goType(ir.Ref(exc)))
+			}
+		}
+		switch {
+		case rest:
+			hasDefault = true
+			b.line("default: // " + armCasesText(a))
+		case len(types) == 0:
+			continue
+		default:
+			b.line("case " + strings.Join(types, ", ") + ": // " + armCasesText(a))
+		}
+		b.depth++
+		b.push()
+		b.read(armStates(a), nil)
+		b.armBody(nil, a, mode, x, t)
+		b.pop()
+		b.depth--
+	}
+	if !hasDefault {
+		b.line("default:")
+		b.depth++
+		b.returnErr(cv.err)
+		b.depth--
+	}
+	b.line("}")
 }
 
 // block は、ブロック一つの文の並びを書く。
@@ -1879,6 +2025,37 @@ func (b *bodyGen) errorBranch(classify string) string {
 // mode が modeConst（val x = match）なら、分ける前に `var x <型>` を置く。modeAssign（x = match）なら、置かない
 // （空の宣言の所に、もう、ある）。typ は、val の型（書いた型か、解決した型）。nil なら、match の型。
 func (b *bodyGen) match(m *ir.Match, mode matchMode, bindName string, typ ir.Type, rest []ir.Statement) {
+	if cs, caught := m.Subject.(ir.CaughtSubject); caught {
+		// 受けた例外の match（docs/plugin-go.md「例外を受ける文」）
+		x := ""
+		if mode == modeConst || mode == modeAssign {
+			if typ == nil {
+				b.e.errorf(codeInternal, b.op.Name, "op %s の配線の `val %s = match` の型が決まらない（検査を通った IR には来ないはずの形）", b.op.Name, bindName)
+				return
+			}
+			if mode == modeAssign {
+				l, _ := b.lookupVar(bindName)
+				x = l.expr
+			} else {
+				x = golang.LocalName(bindName, b.e.reserved)
+				b.taken[x] = true
+			}
+		}
+		b.line("// match (" + cs.Name + " by " + m.Classify + ")")
+		inner := mode
+		if mode == modeConst {
+			b.line("var " + x + " " + b.f.goType(typ))
+		}
+		if mode == modeAssign {
+			inner = modeConst
+		}
+		b.caughtSwitch(m, cs, inner, x, typ)
+		if mode == modeConst {
+			b.scopes[len(b.scopes)-1].vars[bindName] = local{expr: x, typ: typ}
+			b.markUnused(x, bindName, rest)
+		}
+		return
+	}
 	p := b.plan(m)
 	if p == nil {
 		return
@@ -1932,6 +2109,16 @@ func (b *bodyGen) matchHead(m *ir.Match) {
 
 // matchInto は、match の値を、新しい変数 v（型 typ。nil なら match の型）に受ける: `val v = match` と同じ形。
 func (b *bodyGen) matchInto(m *ir.Match, v string, typ ir.Type) {
+	if cs, caught := m.Subject.(ir.CaughtSubject); caught {
+		if typ == nil {
+			b.e.errorf(codeInternal, b.op.Name, "op %s の配線の、集める match の型が決まらない（検査を通った IR には来ないはずの形）", b.op.Name)
+			return
+		}
+		b.line("// match (" + cs.Name + " by " + m.Classify + ")")
+		b.line("var " + v + " " + b.f.goType(typ))
+		b.caughtSwitch(m, cs, modeConst, v, typ)
+		return
+	}
 	p := b.plan(m)
 	if p == nil {
 		return

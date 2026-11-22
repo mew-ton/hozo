@@ -1,0 +1,11 @@
+// STATE-7（docs/check.md「分類」の「例外の分類」）: 例外の分類のケースを、行の遷移に書いた
+namespace a {
+  exception Failed;
+  model M { id: string; }
+  state rows: list<M>;
+  classify Failure of any exception {
+    Soft: any exception as Failed;
+    Rest: any exception as else;
+  }
+  effect fn mark(m: M): effects rows.put as Failure.Soft;   // ERROR: STATE-7
+}

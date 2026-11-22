@@ -166,6 +166,14 @@ func (s *server) declIndex(id source.FileID) []declEntry {
 								if c.Body != nil {
 									stmts(c.Body.Stmts)
 								}
+							case *ast.TryStmt:
+								if c.Body != nil {
+									stmts(c.Body.Stmts)
+								}
+								add(c.Name.Span, sema.Target{Kind: sema.TargetBinding, Decl: fqn, Name: c.Name.Name})
+								if c.Catch != nil {
+									stmts(c.Catch.Stmts)
+								}
 							}
 						}
 					}

@@ -1,0 +1,34 @@
+// MATCH-10 に当たらない: 投げうる例外の、どれもが、どれかのケースに当たる。残りのケースがあれば、いつも満たす。
+// 当たる例外のないケース（Hard）は、診断しない
+namespace a {
+  exception Failed;
+  exception Broken;
+  exception Lost;
+  classify Failure of any exception {
+    Soft: any exception as Failed;
+    Hard: any exception as Broken;
+  }
+  classify Open of any exception {
+    Soft: any exception as Failed;
+    Rest: any exception as else;
+  }
+  fn send(): throws Failed, Broken, Lost;
+  fn soft(): throws Failed;
+  fn note();
+  fn f() {
+    try {
+      soft();
+    } catch (e by Failure) {
+      Soft => note();
+      Hard => throw e;
+    }
+  }
+  fn g() {
+    try {
+      send();
+    } catch (e by Open) {
+      Soft => note();
+      Rest => throw e;
+    }
+  }
+}

@@ -192,7 +192,8 @@ namespace server {
   /** 通知の文面を作る（人が書く） */
   fn composeNotice(order: type.Order): type.Notification;
 
-  /** 自分の注文の通知を、もう一度、送る。一つ失敗したら、そこで止まり、送れた分の記録は、残る */
+  // 例外を受ける文の例（docs/check.md「例外を受ける」）: 受けて、記録して、そのまま投げ直す
+  /** 自分の注文の通知を、もう一度、送る。一つ失敗したら、失敗したことを記録して（recordAudit）、そこで止まり、送れた分の記録は、残る */
   @http.post("/orders/notices")
   export fn resendNotices(in: AuthInput): type.Notification[] {
     val session = authenticate(in.token);
@@ -200,7 +201,12 @@ namespace server {
     val sent: type.Notification[];
     for (val order of orders) {
       val notice = composeNotice(order);
-      mailer.send(notice);
+      try {
+        mailer.send(notice);
+      } catch (e) {
+        recordAudit();
+        throw e;
+      }
       store.recordNotice(notice);
       sent collect notice;
     }

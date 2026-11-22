@@ -13,7 +13,7 @@ Go の**基底**のトランスパイラ `go`（`docs/config.md`「基底と相�
 ```toml
 name     = "go"
 command  = ["go", "run", "github.com/mew-ton/hozo/plugins/go"]
-protocol = "0.19"
+protocol = "0.20"
 
 [[transpiler]]
 name     = "go"
@@ -608,6 +608,7 @@ if <x> != nil {
 | `for (val v of 並び) { … }` | `for _, v := range <並び> { … }`。ブロックが `v` を読んでいなければ `for range <並び> { … }`。並びは「値」の規則で書く（状態なら、先に読む: 「状態の参照」）。ブロックの中の文は、この表を、そのまま当てる |
 | `disjoint { アーム … }` | `// disjoint` の一行と、Go のブロック `{ … }`。中に、アームを、書いた順に並べる。ブロックのアーム（`Arm.block` が `true`。中の文が一つでも）は、Go のブロック `{ … }`。文の一つのアームは、その文を、そのまま（この表を当てる） |
 | `disjoint for (…) { … }` | `// disjoint` の一行と、上の `for` |
+| `try { … } catch (e) { … }`、`catch` のブロックの `throw` | 下の「例外を受ける文」 |
 | 「返らない」呼び出し（`never` を返す op）の文と `return` | `return <零値>, <呼び出し>`（戻り値がなければ `return <呼び出し>`） |
 | 本体の終わり（戻り値のない配線） | 最後に `return nil`。最後の文が「返らない」なら足さない |
 
@@ -642,6 +643,64 @@ if <x> != nil {
 		summaries = append(summaries, v0)
 	}
 ```
+
+### 例外を受ける文
+
+`try { … } catch (e) { … }`（`docs/check.md`「例外を受ける」）は、`try` のブロックを、その場で呼ぶ関数にして、その失敗を、`catch` のブロックで受ける。
+
+仕様:
+
+```
+try {
+  mailer.send(notice);
+} catch (e) {
+  recordAudit();
+  throw e;
+}
+```
+
+出力:
+
+```go
+		// try
+		if caught := func(ctx context.Context) error {
+			if err := o.mailer.Send(ctx, notice); err != nil {
+				return err
+			}
+			return nil
+		}(ctx); caught != nil {
+			// catch (e)
+			var e runtime.Exception
+			if !errors.As(caught, &e) {
+				return nil, caught
+			}
+			if err := o.RecordAudit(ctx); err != nil {
+				return nil, err
+			}
+			return nil, caught
+		}
+```
+
+- **`try` のブロック**は、`func(ctx context.Context) error { … }(ctx)`: 基底が出すほかの関数と同じに、`ctx` を取り、`error` を返す（「op の形」）。中の文は、「文」の表のまま。違いは、失敗の扱いが、`return err`（関数の戻り値は `error` だけ）になることと、最後に `return nil` を置くこと。外の `val` に値を入れる文は、外の変数に、そのまま入れる（関数は、外の変数を、捕まえる）。
+- **受けた失敗の変数**は `caught`（メソッドの中の名前と当たれば、「名前」の規則で、末尾に `_`）。
+- **受けるのは、仕様の例外だけ**: `var e runtime.Exception` と `errors.As(caught, &e)`（「runtime パッケージ」の `Exception`）。当たらなければ（仕様にない失敗）、`return <零値>, caught` で、そのまま返す。変数の名前は、仕様の `e` を、「名前」の規則で直したもの。
+- **`catch` のブロックの文**は、「文」の表のまま。`throw e` は `return <零値>, caught`（受けた失敗を、包み直さずに返す）。`throw 例外` の文は `return <零値>, <例外の値>`（「match」の `throw` と同じ値）。
+- **受けた例外の `match (e by C)`**（`catch (e by C) { … }` も、同じ IR）は、`// match (e by <分類>)` の一行と、型の `switch`。アームは、書いた順で、アームごとに、`case` 一つ: そのアームが受けるケースの例外（`Classify.cases[].exceptions`）の型を、分類の宣言の順に並べ、後ろに、ケースの名前のコメントを付ける。残りのケース（`rest`）を受けるアームは `default`。残りのケースがない分類では、`default` は `return <零値>, caught`（どのケースにも当たらない、仕様の例外は、MATCH-10 を通った仕様では、実装が、仕様にない例外を返したときにしか、来ない。そのまま返す）。アームの本体は、「match」の、文の `match` のアームと同じ（呼び出しは、失敗の扱いつき。`none` は、何も書かない）。
+
+  ```go
+  			// match (e by payment.Failure)
+  			switch e.(type) {
+  			case psp.Declined, psp.Expired: // Refused
+  				if err := o.NoteRefused(ctx, payment); err != nil {
+  					return err
+  				}
+  			default: // Unknown
+  				return caught
+  			}
+  ```
+
+- **本体のあるデコレータ**（「本体のあるデコレータ」）の `try { proceed(); … }` で、op が値を返すとき: `var result <型>` を、`try` の前に置き、`try` のブロックの中で `result, err = <内側の呼び出し>` と入れ、本体の最後に `return result, nil`。
+- import は、`errors` と、runtime パッケージ。
 
 ### 状態の参照
 

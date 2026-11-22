@@ -1,0 +1,29 @@
+// MATCH-7（docs/check.md「分類」の「例外の分類」）: 例外の分類を、受けた例外でない対象に書いた。受けた例外を対象にして、
+// 例外の分類でないものを書いた
+namespace a {
+  exception Failed;
+  model M { id: string; }
+  classify Kind of M { A; B; }
+  classify Failure of any exception {
+    Soft: any exception as Failed;
+    Rest: any exception as else;
+  }
+  fn send(): throws Failed;
+  fn note();
+  fn f(m: M) {
+    match (m by Failure) {             // ERROR: MATCH-7
+      Soft => note();
+      Rest => note();
+    }
+    match (by Failure) {               // ERROR: MATCH-7
+      Soft => note();
+      Rest => note();
+    }
+    try {
+      send();
+    } catch (e by Kind) {              // ERROR: MATCH-7
+      A => note();
+      B => note();
+    }
+  }
+}

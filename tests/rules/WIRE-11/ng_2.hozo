@@ -1,0 +1,18 @@
+// WIRE-11: try か catch の、片方だけが入れた val には、抜けた後、入れられない
+namespace a {
+  exception Failed;
+  model M { id: string; }
+  fn load(): M
+    throws Failed;
+  fn fallback(): M;
+  fn note();
+  fn f() {
+    val x;                             // WARN: WIRE-8
+    try {
+      x = load();
+    } catch (e) {
+      note();
+    }
+    x = fallback();                    // ERROR: WIRE-11
+  }
+}

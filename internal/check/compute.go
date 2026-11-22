@@ -3,6 +3,7 @@ package check
 import (
 	"strings"
 
+	"github.com/mew-ton/hozo/internal/diag"
 	"github.com/mew-ton/hozo/ir"
 )
 
@@ -166,6 +167,11 @@ type callRef struct {
 	call  ir.Call // 呼び出し（写し）
 	throw string  // アームの本体の throw の例外。呼び出しなら空
 	stmt  ir.Span // 行の位置
+	// rethrow は、`throw e`（受けた例外を、そのまま投げ直す）の e。そのとき throw は空で、call は Callee が nil。
+	// 受けた例外の match のアームの本体なら、classify が、その分類、cases が、そのアームが受けるケース（投げ直すのは、当たる例外だけ）。
+	rethrow  string
+	classify string
+	cases    []string
 }
 
 // row は配線の本体の一行。
@@ -176,42 +182,103 @@ type row struct {
 	loops []int
 	// armBodies は match のアームごとの本体（アームの順）。呼び出しを持たないアーム（値、none）も含む。
 	armBodies []ir.ArmBody
+	// regions は、この文を囲んでいる、例外を受ける文のブロック（外から内へ）。
+	regions []region
+	// caught は、受けた例外の match（`match (e by C)`）の行なら、その e。classify は、その分類、span は、その match。
+	caught   string
+	classify string
+	span     ir.Span
+}
+
+// catcher は、この行の例外を受ける、例外を受ける文の番号: 囲んでいるブロックの、いちばん内側の、try のブロック。なければ -1。
+func (r row) catcher() int {
+	for k := len(r.regions) - 1; k >= 0; k-- {
+		if !r.regions[k].catch {
+			return r.regions[k].try
+		}
+	}
+	return -1
+}
+
+// tryOf は、この行から見える、受けた例外 name の、例外を受ける文の番号（囲んでいる catch のブロックの、いちばん内側）。なければ -1。
+func (r row) tryOf(name string, tries []tryInfo) int {
+	for k := len(r.regions) - 1; k >= 0; k-- {
+		if r.regions[k].catch && tries[r.regions[k].try].name == name {
+			return r.regions[k].try
+		}
+	}
+	return -1
 }
 
 // rowsOf は配線の本体を、式を持つ文ごとの呼び出しに分ける（docs/check.md「手順 0」の「文 i の呼び出し」）。
 // 並びは、文を辿る順（walkStmts）。空の val、disjoint、for は、行にならない（中の文が、行になる）。
 func rowsOf(w *ir.Wiring) []row {
+	rows, _ := rowsAndTries(w)
+	return rows
+}
+
+// throwRef は、throw（アームの本体か、catch のブロックの最後の文）を、呼び出しとして数えたもの。例外を持たない throw
+// （解決できなかったもの）は ok が false。
+func throwRef(i, arm int, body ir.ThrowBody, stmt ir.Span) (callRef, bool) {
+	cr := callRef{row: i, arm: arm, call: ir.Call{Args: body.Args, Span: body.Span}, stmt: stmt}
+	switch {
+	case body.Caught != "":
+		cr.rethrow = body.Caught
+	case body.Exception != "":
+		cr.throw = body.Exception
+	default:
+		return cr, false
+	}
+	return cr, true
+}
+
+// rowsAndTries は、rowsOf に、辿った、例外を受ける文を足したもの。catch のブロックの最後の throw の文も、行になる。
+func rowsAndTries(w *ir.Wiring) ([]row, []tryInfo) {
 	if w == nil {
-		return nil
+		return nil, nil
 	}
 	rows := make([]row, 0, len(w.Statements))
-	walkStmts(w.Statements, func(st ir.Statement, loops []int) {
+	tries := walkAll(w.Statements, func(st ir.Statement, loops []int, regions []region) {
+		if ts, isThrow := st.(ir.ThrowStmt); isThrow {
+			r := row{loops: loops, regions: regions}
+			if cr, ok := throwRef(len(rows), -1, ts.Throw, ts.Span); ok {
+				r.calls = append(r.calls, cr)
+			}
+			rows = append(rows, r)
+			return
+		}
 		expr, span, ok := stmtExpr(st)
 		if !ok {
 			return
 		}
 		i := len(rows)
-		r := row{loops: loops}
+		r := row{loops: loops, regions: regions}
 		switch e := expr.(type) {
 		case ir.CallExpr:
 			r.calls = append(r.calls, callRef{row: i, arm: -1, call: e.Call, stmt: span})
 		case ir.MatchExpr:
 			r.isMatch = true
+			if cs, isCaught := e.Match.Subject.(ir.CaughtSubject); isCaught {
+				r.caught, r.classify, r.span = cs.Name, e.Match.Classify, e.Match.Span
+			}
 			for j, arm := range e.Match.Arms {
 				r.armBodies = append(r.armBodies, arm.Body)
 				switch body := arm.Body.(type) {
 				case ir.CallExpr:
 					r.calls = append(r.calls, callRef{row: i, arm: j, call: body.Call, stmt: span})
 				case ir.ThrowBody:
-					if body.Exception != "" {
-						r.calls = append(r.calls, callRef{row: i, arm: j, call: ir.Call{Args: body.Args, Span: body.Span}, throw: body.Exception, stmt: span})
+					if cr, ok := throwRef(i, j, body, span); ok {
+						if cr.rethrow != "" && r.caught == cr.rethrow {
+							cr.classify, cr.cases = r.classify, arm.Cases
+						}
+						r.calls = append(r.calls, cr)
 					}
 				}
 			}
 		}
 		rows = append(rows, r)
 	})
-	return rows
+	return rows, tries
 }
 
 // mapCalls は配線のすべての呼び出しに fn を適用し、変更を本体に書き戻す（Call.Bound を埋めるため）。
@@ -258,6 +325,18 @@ type bodyInfo struct {
 	sigs    [][]*sigState         // rows と同じ並びの Sc
 	thrown  []string              // ∪ Sc.exceptions（出現順）
 	sources map[string][]exSource // 例外 → 出どころ
+	// tries は、本体の、例外を受ける文。caught は、その文ごとの、受ける例外の集まり（docs/check.md「Sig(O, v)」の「例外を受ける文」）。
+	tries  []tryInfo
+	caught [][]string
+	// unclassified は、受けた例外の match で、分類のどのケースにも当たらない例外があったもの（MATCH-10）。
+	unclassified []unclassified
+}
+
+// unclassified は、MATCH-10 の一件: 受けた例外の match（span）と、その分類、当たらない例外。
+type unclassified struct {
+	span       ir.Span
+	classify   string
+	exceptions []string
 }
 
 // computer は Sig(O, v) をメモしながら計算する。診断は v = ns(O) の計算のときにだけ出す。
@@ -430,8 +509,35 @@ func (c *computer) leafStep0(o *ir.Op, s *sigState) {
 
 // wiringStep0 は手順 0（配線の op）。本体の行を順に見て E / F / rel / succ を計算し、その後ろに、運ばれた効果を足す
 // （addCarried）。
+// inCases は、例外 x が、例外の分類 classify で当たるケースが、cases にあるか。
+func (c *computer) inCases(classify string, cases []string, x string) bool {
+	cl, ok := c.ix.decls[classify].(*ir.Classify)
+	if !ok {
+		return false
+	}
+	name, hit := cl.CaseOfException(x)
+	return hit && contains(cases, name)
+}
+
+// reportUnclassified は MATCH-10（docs/check.md「分類」の「例外の分類」）: 受けた例外の match で、try のブロックが投げうる例外に、
+// 分類のどのケースにも当たらないものがある。app が nil でなければ、デコレータの本体の try で、位置は、その適用。
+func (c *computer) reportUnclassified(info *bodyInfo, o *ir.Op, app *ir.Application) {
+	for _, u := range info.unclassified {
+		data := map[string]any{"unclassified": u.exceptions}
+		if app != nil {
+			c.r.report(diag.Error, "MATCH-10", app.Span, sprintf("@%s の本体の、受けた例外の match で、op %s が投げうる例外 %s が、classify %s のどのケースにも当たらない", shortName(app.Decorator), o.Name, joinNames(u.exceptions), u.classify),
+				[]related{{span: u.span, msg: "受けた例外の match"}}, data)
+			continue
+		}
+		c.r.report(diag.Error, "MATCH-10", u.span, sprintf("try のブロックが投げうる例外 %s が、classify %s のどのケースにも当たらない（ケースに足すか、残りのケース any exception as else を足す）", joinNames(u.exceptions), u.classify), nil, data)
+	}
+}
+
 func (c *computer) wiringStep0(o *ir.Op, ns string, s *sigState, emit bool) {
 	info := c.blockStep(o.Body, ns, s, declared(o), o.Throws)
+	if emit {
+		c.reportUnclassified(info, o, nil)
+	}
 	c.addWritten(o, s)
 	c.addCarried(o, s)
 	c.bodies[o.Name] = info
@@ -444,11 +550,50 @@ func (c *computer) wiringStep0(o *ir.Op, ns string, s *sigState, emit bool) {
 // s に入れる。written は、節に書いた例外（Declared）、throws は、その節（出どころのない例外の rel を決める）。
 // デコレータの本体では、proceed() の Sc が、c.proceed（包んだ op の、そこまでの Sig）。
 func (c *computer) blockStep(body *ir.Wiring, ns string, s *sigState, written []string, throws []ir.ThrowsClause) *bodyInfo {
-	info := &bodyInfo{rows: rowsOf(body), sources: map[string][]exSource{}}
+	info := &bodyInfo{sources: map[string][]exSource{}}
+	info.rows, info.tries = rowsAndTries(body)
+	info.caught = make([][]string, len(info.tries))
 	info.sigs = make([][]*sigState, len(info.rows))
+	// 行の順に、Sc を決める。try のブロックの中の例外は、その文が受ける（受ける例外の集まり）。throw e の Sc は、受けた例外
+	// （受けた例外の match のアームなら、そのアームが受けるケースに当たるものだけ）。try のブロックの行は、catch のブロックの行より
+	// 先に来るので、throw e を見るときには、集まりは、もう、決まっている。
 	for i, r := range info.rows {
 		for _, cr := range r.calls {
-			info.sigs[i] = append(info.sigs[i], c.callSig(cr, ns))
+			var sc *sigState
+			if cr.rethrow != "" {
+				sc = newSigState()
+				if t := r.tryOf(cr.rethrow, info.tries); t >= 0 {
+					for _, x := range info.caught[t] {
+						if cr.classify == "" || c.inCases(cr.classify, cr.cases, x) {
+							sc.addE(x)
+						}
+					}
+				}
+			} else {
+				sc = c.callSig(cr, ns)
+			}
+			info.sigs[i] = append(info.sigs[i], sc)
+			if t := r.catcher(); t >= 0 && sc != nil {
+				for _, x := range sc.E {
+					info.caught[t] = appendUnique(info.caught[t], x)
+				}
+			}
+		}
+		if r.caught != "" {
+			// 受けた例外の match の漏れ（MATCH-10）
+			if cl, ok := c.ix.decls[r.classify].(*ir.Classify); ok && cl.IsExceptionClass() {
+				if t := r.tryOf(r.caught, info.tries); t >= 0 {
+					var missing []string
+					for _, x := range info.caught[t] {
+						if _, hit := cl.CaseOfException(x); !hit {
+							missing = append(missing, x)
+						}
+					}
+					if len(missing) > 0 {
+						info.unclassified = append(info.unclassified, unclassified{span: r.span, classify: r.classify, exceptions: missing})
+					}
+				}
+			}
 		}
 	}
 	// F: 各 Sc.effects を行の順、アームの順に連結し、重複を最初の出現に寄せる
@@ -464,6 +609,9 @@ func (c *computer) blockStep(body *ir.Wiring, ns string, s *sigState, written []
 	}
 	// E: 各 Sc.exceptions の和に Declared(O) を足す。出どころを集める
 	for i, r := range info.rows {
+		if r.catcher() >= 0 {
+			continue // try のブロックの中: 出どころにならない
+		}
 		for j, sc := range info.sigs[i] {
 			if sc == nil {
 				continue
@@ -491,9 +639,43 @@ func (c *computer) blockStep(body *ir.Wiring, ns string, s *sigState, written []
 	// 1: e を持つ呼び出しが、文 j < i にあり、それを囲む for が、どれも、文 i も囲んでいる → kept（必ず、先に動いている）
 	// 3: e を持つ呼び出しが、文 j < i にあり、それを囲む for に、文 i を囲まないものがある → unknown（0 回かもしれない）
 	// 4: e を持つ呼び出しと、文 i を、ともに囲む for がある → unknown（前の回で、起きたかもしれない）
+	// tryRel は、文 j の呼び出しを、文 i から見たときの、例外を受ける文による扱い（同「例外を受ける文」の表）:
+	// ranSurely（囲まれていないのと同じ）、ranMaybe（3 と同じ）、ranNever（ないものとする）。
+	const (
+		ranSurely = iota
+		ranMaybe
+		ranNever
+	)
+	tryRel := func(j, i int) int {
+		res := ranSurely
+		for _, rg := range info.rows[j].regions {
+			same, sameTry := false, false
+			for _, ri := range info.rows[i].regions {
+				if ri == rg {
+					same = true
+				}
+				if ri.try == rg.try {
+					sameTry = true
+				}
+			}
+			switch {
+			case same:
+				// 同じ文の、同じブロック
+			case sameTry:
+				res = ranMaybe // try のブロックと、catch のブロック
+			case info.tries[rg.try].never && rg.catch:
+				return ranNever // catch が動けば、文 i には、来ない
+			case info.tries[rg.try].never:
+				// try のブロックは、終わりまで動いている
+			default:
+				res = ranMaybe
+			}
+		}
+		return res
+	}
 	before := func(e ir.EffectRef, i int) bool {
 		for j := 0; j < i; j++ {
-			if rowHas(e, j) && subset(info.rows[j].loops, info.rows[i].loops) {
+			if rowHas(e, j) && subset(info.rows[j].loops, info.rows[i].loops) && tryRel(j, i) == ranSurely {
 				return true
 			}
 		}
@@ -504,7 +686,11 @@ func (c *computer) blockStep(body *ir.Wiring, ns string, s *sigState, written []
 			if !rowHas(e, j) {
 				continue
 			}
-			if j < i && !subset(info.rows[j].loops, info.rows[i].loops) {
+			tr := tryRel(j, i)
+			if tr == ranNever {
+				continue
+			}
+			if j < i && (tr == ranMaybe || !subset(info.rows[j].loops, info.rows[i].loops)) {
 				return true
 			}
 			if shares(info.rows[j].loops, info.rows[i].loops) {
@@ -551,11 +737,30 @@ func (c *computer) blockStep(body *ir.Wiring, ns string, s *sigState, written []
 		partial := false
 		for i, r := range info.rows {
 			inArms := 0
+			// 例外を受ける文の中の呼び出し: 「返らない」catch のブロックの中なら prevented（成功したなら、動いていない）。
+			// 「返らない」でない catch を持つ文の、try か catch のブロックの中なら unknown
+			inFailing, inUnsure := false, false
+			for _, rg := range r.regions {
+				switch {
+				case rg.catch && info.tries[rg.try].never:
+					inFailing = true
+				case !info.tries[rg.try].never:
+					inUnsure = true
+				}
+			}
 			for j, sc := range info.sigs[i] {
 				if sc == nil || !sc.hasF(e) || c.neverReturns(r.calls[j]) {
 					continue
 				}
 				inArms++
+				if inFailing {
+					prevented++
+					continue
+				}
+				if inUnsure {
+					other++
+					continue
+				}
 				if len(r.loops) > 0 {
 					// for の中の呼び出しは、0 回かもしれない
 					other++
@@ -747,8 +952,11 @@ func (c *computer) decoratorSteps(o *ir.Op, ns, viewer string, s *sigState, emit
 					written = append(written, subst(raw)...)
 				}
 			}
-			c.blockStep(d.Body, ns, s, written, d.Throws)
+			info := c.blockStep(d.Body, ns, s, written, d.Throws)
 			c.proceed = outer
+			if emit {
+				c.reportUnclassified(info, o, app)
+			}
 			if viewer != ns {
 				applyThrows(d.OuterThrows) // DEC-10
 			}
@@ -904,7 +1112,7 @@ func (c *computer) fillBound() {
 // neverReturns は呼び出し（か throw）が「返らない」か: アームの本体の throw と、never を返す op の呼び出し
 // （docs/types.md「式の型」）。
 func (c *computer) neverReturns(cr callRef) bool {
-	if cr.throw != "" {
+	if cr.throw != "" || cr.rethrow != "" {
 		return true
 	}
 	callee := c.ix.op(cr.call.CalledOp())
@@ -1028,6 +1236,13 @@ func (c *computer) stmtReads(stmts []ir.Statement) []string {
 		if f, ok := st.(ir.ForStmt); ok {
 			// for の頭の並びが参照する状態
 			add(atomStates(f.Of)...)
+			return
+		}
+		if t, ok := st.(ir.ThrowStmt); ok {
+			// catch のブロックの最後の throw の引数の Atom が参照する状態
+			for _, a := range t.Throw.Args {
+				add(atomStates(a.Value)...)
+			}
 			return
 		}
 		if e, _, ok := stmtExpr(st); ok {

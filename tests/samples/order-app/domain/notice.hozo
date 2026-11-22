@@ -3,9 +3,23 @@
 
 /** 知らせ。客に、何が起きたかを伝える */
 namespace notice {
-  /** 送れなかったことを、呼び出し元に伝えない（値を返さない op にだけ付く） */
-  decorator fn bestEffort():
-    catches mailer.Undelivered ignores;
+  /** 知らせを送るときの失敗の、分け方 */
+  classify Delivery of any exception {
+    /** 送れなかった */
+    Undelivered: any exception as mailer.Undelivered;
+    /** そのほかの失敗 */
+    Other: any exception as else;
+  }
+
+  /** 送れなかったことを、呼び出し元に伝えない（値を返さない op にだけ付く）。そのほかの失敗は、そのまま伝える */
+  decorator fn bestEffort() {
+    try {
+      proceed();
+    } catch (e by Delivery) {
+      Undelivered => none;
+      Other => throw e;
+    }
+  }
 
   /** 注文を受け付けた。見るための鍵、ダウンロード、送料の見積もりと上限と「梱包の後に決まる」こと、納期を伝える */
   @bestEffort

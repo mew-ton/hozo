@@ -46,7 +46,7 @@ DecoratorRef  = [ QualifiedName "." ] DecoratorName ;
 | 宣言の頭 | `namespace` `model` `scalar` `union` `state` `fn` `op` `exception` `effect` `read` `classify` `decorator` `bind` |
 | 修飾 | `export` `override` |
 | 節の頭 | `extends` `of` `on` `to` `by` `for` `as` `effects` `reads` `throws` `prevents` `keeps` `catches` `recovers` `halts` `ignores` `any` `case` |
-| 文の頭と値 | `val` `return` `match` `disjoint` `collect` `default` `else` `none` `throw` |
+| 文の頭と値 | `val` `return` `match` `disjoint` `collect` `default` `else` `none` `throw` `try` `catch` |
 | 核の型と形 | `string` `boolean` `int` `float` `datetime` `date` `time` `duration` `void` `never` `list` `nullable` `single` |
 | リテラル | `true` `false` |
 
@@ -284,11 +284,12 @@ RowCase       = QualifiedName ;                             (* 分類の名前 "
 ```
 ClassifyDecl    = "classify" Ident "of" ClassifySubject "{" { ClassifyCase } "}" ;
 ClassifyCase    = [ DocComment ] { Decorator } Ident [ ":" CaseTyping { "," CaseTyping } ] ";" ;
-CaseTyping      = Type "as" ( Type | "else" | "none" ) ;
-ClassifySubject = "never" | Type { "," Type } ;
+CaseTyping      = Type "as" ( Type | "else" | "none" )
+                | "any" "exception" "as" ( ExcRef { "|" ExcRef } | "else" ) ;   (* 例外の分類のケース。ExcRef は「decorator の宣言」 *)
+ClassifySubject = "never" | "any" "exception" | Type { "," Type } ;
 ```
 
-対象は、`never` か、三つの種類のどれか。三つの種類は、名前の解決で決まる（`docs/resolve.md`「位置ごとに受け付ける種類」）。合わない並びはエラー（検査 CLS-3）。
+対象は、`never` か、`any exception` か、三つの種類のどれか。三つの種類は、名前の解決で決まる（`docs/resolve.md`「位置ごとに受け付ける種類」）。合わない並びはエラー（検査 CLS-3）。
 
 | 対象 | 例 | 分類の種類 |
 |---|---|---|
@@ -296,12 +297,14 @@ ClassifySubject = "never" | Type { "," Type } ;
 | 一つで、op を指す | `classify Registration of findUser { ... }` | op の分類（その op が返した値の分類） |
 | すべてが今の名前空間の状態の名前 | `classify Checkout of carts, orders { ... }` | 状態の分類 |
 | `never` | `classify Actor of never { Customer; Staff; }` | 対象のない分類（当たる値がない。`docs/check.md`「分類」の「対象のない分類」） |
+| `any exception` | `classify Failure of any exception { Refused: any exception as psp.Declined \| psp.Expired; Other: any exception as else; }` | 例外の分類（受けた例外を、型で分ける。同「例外の分類」） |
 
 - ケースは、どれも名前を持つ（`classify Role of Member { Admin; Regular; }`）。宣言したケースが、その分類のすべて（`docs/check.md`「閉じた分類」）。
 - `CaseTyping` は、そのケースのときに対象が何の型になるかを書く（`Registered: findUser as type.User;`）。`as` の前は対象の一つで、宣言の `of` の後ろと同じに書く（値の分類なら同じ型、op の分類ならその op、状態の分類なら対象の状態の一つ）。`as` の後ろはそのケースでの型。意味と、書ける型は `docs/check.md`「分類」と `docs/types.md`「絞り込み」。
 - `as` の後ろの `else` は、型の代わりに「残り」を言う（`Unregistered: findUser as else;`）: 対象が、ほかのケースが `as` に書いた型のどれにも当たらないとき。`else` は予約語で、書けるのは、この位置と、`match` の最後のアームの頭（「配線」の `ElseArm`）と、行の遷移の矢印の後ろ（「exception / effect / read」の `RowClause`）だけ。書ける分類と意味は `docs/check.md`「分類」の「残りのケース」。
 - `as` の後ろの `none` は、型の代わりに「値がない」を言う（`Absent: Order? as none;`）: 対象に値がないとき。`none` は、配線の値（「配線」の `Atom`）と同じ予約語。書ける分類と意味は `docs/check.md`「分類」の「ない側のケース」。
 - 状態の分類は、一つのケースに複数の対象の型を `,` で並べられる（`Ready: token as Token, profile as Profile;`）。
+- 例外の分類のケースは、`any exception as` の後ろに、そのケースに当たる例外を、`|` で並べる（`Refused: any exception as psp.Declined | psp.Expired;`）。例外のユニオンの名前も書け、その要素に展開する。残りを言うケースは `any exception as else;`。`as none` は、書けない（構文エラー: 受けた例外に、「値がない」は、ない）。ケースごとに、`as` は一つで、省けない（`docs/check.md`「分類」の「例外の分類」）。
 - 対象のない分類は、`of` を省かず、`of never` と書く。ケースは、名前だけ（`CaseTyping` を書けば CLS-9）。その分類は、名前を並べるだけで、型にも、`match` にも、効果の遷移にも、書けない（書けない所と診断は `docs/check.md`「分類」の「対象のない分類」）。
 - ケースの前に、デコレータを書ける（`@actor.human Customer;`）。順は、`DocComment` → デコレータ → ケースの名前。どの種類の分類のケースにも書け、付けられるデコレータは、宣言の `for` が、分類のケース（「decorator の宣言」の `CaseKind`）を並べたもの（検査 DEC-1）。
 - なくした書き方は、新しい書き方をメッセージで示して SYNTAX にする: ケースの位置の `default;`（名前のないケース。ケースには名前を付ける。値がない側や、union の残りのアームなら、残りのケース `<名前>: <対象> as else;`）、宣言の頭の `condition C of T;`（両側に名前を付けた `classify C of T { <成り立つ側>; <成り立たない側>; }` と書く）。
@@ -401,7 +404,7 @@ decorator fn audited() {
 
 - **`proceed()` は、包んだ op の中身を呼ぶ。** 二つ以上のデコレータを重ねた op では、外側の `proceed()` は、内側のデコレータごと、先へ進める。
 - **`proceed` は、文脈キーワード**: 予約語ではなく、デコレータの本体の中の、修飾のない呼び出し `proceed(…)` だけが、この意味になる。本体の外では、ふつうの名前。
-- **書ける位置は、二つだけ**: 文（`proceed();`）と、`match` のアームの本体（`Allowed => proceed();`）。引数は、書かない。値は、ない: `val` に入れる、`return` する、呼び出しの引数にする、は、書けない（`docs/check.md`「デコレータ」の DEC-19）。`for` と `disjoint` の中にも、書けない（同）。
+- **書ける位置は、二つだけ**: 文（`proceed();`）と、`match` のアームの本体（`Allowed => proceed();`）。引数は、書かない。値は、ない: `val` に入れる、`return` する、呼び出しの引数にする、は、書けない（`docs/check.md`「デコレータ」の DEC-19）。`for` と `disjoint` の中にも、書けない（同）。 `try` のブロックに書くなら、最初の文（`try { proceed(); } catch (e) { noteFailure(); throw e; }`）。`catch` のブロックには、書けない（同）。
 - **本体に、`return` は、書けない**（同 DEC-21）。op の結果は、そのまま、呼び元に返る。
 - **どの道も、`proceed()` を、ちょうど一度呼ぶか、例外を投げる**（同 DEC-20）。
 - **本体の中の名前は、デコレータを宣言した名前空間で、解決する**（`docs/resolve.md`「スコープ」）。引数のうち、値の型のもの（`max: int`）は、本体の中で、値として読める。`any <種類>` の引数は、本体では、まだ、使えない（同 DEC-23）。
@@ -479,7 +482,8 @@ Stmt  = ValDecl | Assign | Collect
       | Call End
       | Match End
       | Disjoint End
-      | [ "disjoint" ] For End ;
+      | [ "disjoint" ] For End
+      | Try End ;
 
 ValDecl = "val" ValName { "," ValName } End          (* 空で宣言する。名前を並べられる *)
         | "val" Ident [ ":" Type ] "=" Expr End ;    (* 値と一緒に宣言する *)
@@ -498,15 +502,19 @@ Match    = "match" "(" [ Atom ] "by" ( QualifiedName | "list" | "nullable" ) ")"
 MatchArm = Ident { "," Ident } "=>" ArmBody ";" ;
 ElseArm  = "else" "=>" ArmBody ";" ;
 ArmBody  = Call | Atom | Throw ;
-Throw    = "throw" QualifiedName [ "(" Atom { "," Atom } ")" ] ;
+Throw    = "throw" QualifiedName [ "(" Atom { "," Atom } ")" ] ;   (* 例外の名前か、catch が受けた例外の名前（throw e） *)
 
 Disjoint = "disjoint" "{" Arm Arm { Arm } "}" ;      (* アームは二つ以上 *)
 Arm      = Block End | ArmStmt ;
 ArmStmt  = Assign | Collect | Call End | Match End | Disjoint End | [ "disjoint" ] For End ;
 For      = "for" "(" "val" Ident "of" Atom ")" Block ;
+
+Try        = "try" Block "catch" "(" Ident [ "by" QualifiedName ] ")" ( CatchBlock | CatchArms ) ;
+CatchBlock = "{" { Stmt } [ Throw ";" ] "}" ;                 (* by を書かないとき。最後にだけ、throw の文を書ける *)
+CatchArms  = "{" MatchArm { MatchArm } [ ElseArm ] "}" ;      (* by を書いたとき。match のアームを、そのまま並べる *)
 ```
 
-文は七つ。意味の持ち主は、右の列。
+文は八つ。意味の持ち主は、右の列。
 
 | 文 | 例 | 意味の持ち主 |
 |---|---|---|
@@ -517,11 +525,15 @@ For      = "for" "(" "val" Ident "of" Atom ")" Block ;
 | 呼び出しの文、`match` の文 | `createOrder(order);`、`match (offer by nullable) { … }` | 同上 |
 | 互いに触れないアームの並び（`Disjoint`） | `disjoint { a = f(x); b = g(x); }` | `docs/check.md`「disjoint」 |
 | 繰り返し（`For`）。前に `disjoint` を書ける | `for (val line of order.lines) { … }`、`disjoint for (val order of orders) { … }` | `docs/check.md`「繰り返し」「disjoint」 |
+| 例外を受ける（`Try`） | `try { send(notice); } catch (e) { note(notice); throw e; }`、`try { … } catch (e by Failure) { Refused => …; Other => throw e; }` | `docs/check.md`「例外を受ける」 |
 
 - **`val` は、値が一度だけ入る入れ物の宣言。** 値と一緒に宣言する（`val x = 式;`）か、空で宣言して（`val x;`）、後で、一度だけ、値を入れる（`x = 式;`）。空の宣言は、名前を `,` で並べられる（`val user, latest, orders;`）。値と一緒の宣言は、一つの文に、一つ（`val a = f(), b = g();` は、構文エラー）。型は、どの形でも、名前ごとに、書いてもよい（`val held: Held;`、`val held: Held, credit;`、`val x: T = f();`）。書かなければ、入れる式の型から導く（`docs/types.md`「式の型」）。
 - **`;` は、文の終わりを、明示する印**（`End`）。文の最後の字句が `}` なら、省ける（書いても、同じ意味）。そうでなければ、要る。`}` で終わるのは、`match`、`disjoint`、`for`、レコードリテラルで終わる文（`return { id, name }`）。`;` は、前の文の一部で、「何もしない文」は、ない（`;;` は、構文エラー）。改行に、意味はない。`MatchArm` と `ElseArm` の `;` は、文の終わりではなく、アームの終わりで、省けない。
 - **`disjoint` は、互いに触れないアームを、二つ以上、並べる。** アームは、ブロック（`{ … }`）か、文の一つ（`ArmStmt`: 値を入れる、集める、呼び出し、`match`、`disjoint`、`for`）。文の一つのアームに、`val` の宣言と、`return` は、書けない（宣言は、ブロックのアームの中に書く）。アームが一つだけの `disjoint` は、構文エラー。`disjoint` は、式ではない（`val x = disjoint { … }` は、書けない）: 値は、外で宣言した `val` に、アームの中で入れて、渡す。
 - **`for` は、並びの要素の一つずつに、ブロックを行う。** 頭は、`(val 名前 of 並び)` の形だけ。並びは `Atom`（呼び出しは、先に `val` に受ける）。数を増やしながら回す形（`for (初め; 条件; 増やし方)`）は、ない。前に `disjoint` を書くと、回どうしが、互いに触れない繰り返し（`disjoint for (…) { … }`）。
+- **`try { … } catch (e) { … }` は、`try` のブロックが投げた、仕様の例外を、`catch` のブロックで受ける**（`docs/decisions.md`「決めたこと」419、422）。`e` は、受けた例外の名前で、書けるのは、`match (e by 分類)` の対象と、`throw e`（受けた例外を、そのまま投げ直す）だけ。`catch` のブロックは、ふつうのブロックで、最後の文にだけ、`throw` の文（`throw e;`、`throw 例外;`、`throw 例外(値, …);`）を書ける。空のブロック（`catch (e) { }`）は、受けて、何もしない。
+- **`catch (e by 分類) { ケース => 本体; … }` は、`catch (e) { match (e by 分類) { ケース => 本体; … } }` の、短い書き方。** 意味は、同じ。`by` の後ろは、例外の分類（「classify」）。波括弧の中は、`match` のアーム（`MatchArm`、`ElseArm`）で、文は書けない。
+- `try` は、op の本体のいちばん外、`for` のブロック、ほかの `try` と `catch` のブロックに、書ける。`disjoint` のアームの中には、書けない（`docs/check.md`「例外を受ける」の WIRE-15）。`disjoint` の、文の一つのアーム（`ArmStmt`）にも、ない（文法で閉じる）。`finally` に当たる節は、ない。
 - `for` と `disjoint` は、互いの中に、どの深さにも、書ける。`match` のアームの本体は、ブロックを持たない（`ArmBody`）ので、`match` のアームの中に、`for` と `disjoint` は、書けない。
 - `return` は、`Block` のどこにでも、構文としては書けるが、書いてよいのは、op の本体の、いちばん外だけ（`for` のブロックと、`disjoint` のアームの中の `return` は WIRE-13。`docs/check.md`「繰り返し」「disjoint」）。
 - 文の頭が `Ident` のときは、次の字句で分かれる: `=` なら `Assign`、`collect` なら `Collect`、ほか（`.` か `(`）なら `Call`。`disjoint` のアームの頭が `{` なら、ブロック（レコードリテラルは、文の頭に来ない）。
@@ -561,7 +573,7 @@ For      = "for" "(" "val" Ident "of" Atom ")" Block ;
   | `Throw` | `Absent => throw type.Unauthorized;`、`Exceeded => throw rate.LimitExceeded(wait);` | その例外を投げる。引数は、例外の宣言の引数に、位置で渡す値。引数のない例外には括弧を書かない（`throw X()` は構文エラー）。書ける例外と引数の規則は `docs/check.md`「throw」 |
 
 - `Path` の直後が `(` なら `Call`、そうでなければ `Atom`。
-- `throw` はアームの本体にだけ書ける。文（`Stmt`）や `return` の式には書けない。
+- `throw` を書けるのは、アームの本体と、`catch` のブロックの最後の文（`CatchBlock`）だけ。ほかの文の位置や、`return` の式には書けない。`throw e` の `e` は、囲んでいる `catch` が受けた例外の名前（引数は、書けない）。
 - `match` の頭は、全体を、丸括弧で囲む（`for` と同じ並び: キーワード、丸括弧に入った頭、ブロック）。`val warranty = match (…) { … }` の、`}` の後ろの `;` は、省ける（`End`）。
 
 ## ドキュメンテーションコメント
@@ -627,7 +639,7 @@ DocComment の中身 = { 本文の行 } { タグの行 } ;
 | 行の遷移のケースは、分類の名前から書く（`Stage.Accepted`）。ケースの名前だけの形（`as Accepted`）にしない | 絞り込んだ型の `Order on Stage.Accepted` と同じ綴りにする。行の型には分類がいくつもありうるので、ケースの名前だけでは、どの分類の話かが読めない |
 | 行の遷移で、後のケースを約束しないことは、`as else` と書く。`any` は、書かない | 後ろは、受け取るものではなく、決まっていない残りなので、残りを言う語（`as else`、`else => …`）にする。`any` を書けると、「どのケースにもなる」と読める。前が「どのケースでも」は、行の引数を絞り込まないことで言う |
 | ケースの `as none` は、「値がない」を言う（`docs/decisions.md`「決めたこと」165） | 「値がない」を言う語は、配線の値の `none` で、もうある。`null` を足さない。`as else`（残り）は、残りがたまたま「値がない」ときにも書けるが、「ない」ことを名指しする語ではない |
-| `throw` はアームの本体にだけ書ける | 「この場合は失敗」を書くためのもの。本体のどこにでも書ける文にすると、下の行が評価されない配線を書ける |
+| `throw` を書けるのは、アームの本体と、`catch` のブロックの最後だけ | 「この場合は失敗」を書くためのもの。本体のどこにでも書ける文にすると、下の行が評価されない配線を書ける |
 | `throw` は、例外の引数に値を渡せる（`throw E(a, b)`）。値は `Atom` | 値を運ぶ例外も、配線から投げられるようにする（以前は、値を運ぶ例外を投げられるのは葉の op だけだった）。引数は呼び出しと同じ形（位置で渡す `Atom`）にして、書ける値を位置ごとに分けない |
 | アームの本体の値は `Atom` のすべて（名前、リテラル、`none`、レコードリテラル） | 呼び出しの引数と同じ集合にして、位置ごとに書ける値を分けない |
 | `match` の分類の名前は修飾できる | 分類はどの名前空間からも使える（`docs/decisions.md`「設計書から離れた決定」S18） |
@@ -651,3 +663,4 @@ DocComment の中身 = { 本文の行 } { タグの行 } ;
 | 引数の種類には `any` を書き（`error: any exception`）、付ける先には書かない（`for effect`）（同 357） | `any <種類>` は、種類から、型を作る。`for` の後ろは種類、`:` の後ろは型。引数の種類から `any` を取ると、種類の語が、そのまま型として扱われる |
 | キーが決まっていない構造は、model の本体のインデックスで書く（`model Attrs { [name: string]: string[]; }`）。`Record<K, V>` と、予約語 `Record` は、なくした（同 360） | 構造を持つ型は、どれも、名前を付けて宣言する（union と同じ）。「何を、何で引くのか」に、名前と、説明と、キーの名前が付く。大文字で始まる、言語の語が、なくなる |
 | 関数に付けるデコレータは、`decorator fn` と書き、後ろの形を、関数の宣言にそろえる。本体を書ける。包んだ op の中身は、`proceed()` で呼ぶ。op だけに付けるデコレータの、`for` の形と、`for` を省いた形は、なくした（同 392〜394） | デコレータも、op を受け取って、同じ結果を返す、関数。中身が仕様にあるか、ないかで、葉の op と配線の op と同じに、分かれる。`for op` と、`fn` で、同じことを、二通りに言わない |
+| 例外を受ける文は `try { … } catch (e) { … }`。分類して受けるなら `catch (e by 分類) { ケース => 本体; }`。例外の分類は `classify C of any exception { K: any exception as E1 \| E2; }`。`try` と `catch` は、予約語（同 419、422） | 文の頭の語は、どれも予約語（`val`、`match`、`for`）。`catch` のブロックの最後にだけ `throw` の文を書けるのは、「受けて、記録して、投げ直す」を、`match` なしで書くため。途中の `throw` は、下の文が評価されないので、文法で閉じる |

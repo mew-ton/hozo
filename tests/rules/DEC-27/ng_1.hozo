@@ -1,0 +1,20 @@
+// DEC-27（docs/check.md「デコレータの本体」）: proceed() を try のブロックに持ち、catch のブロックが「返らない」でない
+// デコレータを、値を返す op（と、never を返す op）に付けた
+namespace a {
+  exception Failed;
+  model M { id: string; }
+  fn note();
+  decorator fn quiet() {
+    try {
+      proceed();
+    } catch (e) {
+      note();
+    }
+  }
+  @quiet                                 // ERROR: DEC-27
+  fn load(): M
+    throws Failed;
+  @quiet                                 // ERROR: DEC-27
+  fn fail(): never
+    throws Failed;
+}

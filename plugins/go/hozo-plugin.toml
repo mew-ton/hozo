@@ -1,6 +1,6 @@
 name     = "go"
 command  = ["go", "run", "github.com/mew-ton/hozo/plugins/go"]
-protocol = "0.19"
+protocol = "0.20"
 
 [[transpiler]]
 name     = "go"

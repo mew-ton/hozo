@@ -1066,6 +1066,10 @@ func (p *parser) parseClassify(start source.Offset, doc *ast.DocComment, decorat
 		if p.at(token.Comma) {
 			p.fail(p.tok().Span, "never は、ほかの対象と並べられない（対象のない分類は of never だけ。docs/grammar.md「classify」）")
 		}
+	} else if p.at(token.Any) && p.peek(1).Kind == token.Exception {
+		start := p.advance().Span.Start
+		p.advance()
+		c.Exception, c.ExceptionSpan = true, p.spanFrom(start)
 	} else {
 		c.Of = p.parseClassifySubject()
 	}
@@ -1113,6 +1117,26 @@ func (p *parser) parseClassifyCase() *ast.ClassifyCase {
 // as の後ろの else は、型の代わりに「残り」を言い（docs/check.md「残りのケース」）、none は「値がない」を言う（同「ない側のケース」）。
 func (p *parser) parseCaseTyping() *ast.CaseTyping {
 	start := p.tok().Span.Start
+	if p.at(token.Any) && p.peek(1).Kind == token.Exception {
+		// 例外の分類のケース: "any" "exception" "as" ( ExcRef { "|" ExcRef } | "else" )
+		p.advance()
+		p.advance()
+		t := &ast.CaseTyping{AnyException: true}
+		p.expect(token.As)
+		switch {
+		case p.at(token.Else):
+			t.Else, t.ElseSpan = true, p.advance().Span
+		case p.at(token.None):
+			p.fail(p.tok().Span, "例外の分類のケースに、as none は書けない（受けた例外に、「値がない」は、ない。docs/grammar.md「classify」）")
+		default:
+			t.Exceptions = append(t.Exceptions, p.parseQualifiedName())
+			for p.got(token.Pipe) {
+				t.Exceptions = append(t.Exceptions, p.parseQualifiedName())
+			}
+		}
+		t.Span = p.spanFrom(start)
+		return t
+	}
 	t := &ast.CaseTyping{Subject: p.parseType()}
 	p.expect(token.As)
 	switch {
@@ -1856,6 +1880,13 @@ func (p *parser) parseStmt(arm bool) []ast.Stmt {
 		return []ast.Stmt{p.parseDisjoint()}
 	case token.For:
 		return []ast.Stmt{p.parseFor()}
+	case token.Try:
+		if arm {
+			p.fail(p.tok().Span, "disjoint のアームに、try は書けない（docs/grammar.md「配線」）")
+		}
+		return []ast.Stmt{p.parseTry()}
+	case token.Catch:
+		p.fail(p.tok().Span, "catch は、try のブロックの直後にだけ書ける（try { … } catch (e) { … }。docs/grammar.md「配線」）")
 	case token.Ident, token.QualifiedName:
 		if p.at(token.Ident) {
 			switch {
@@ -1884,14 +1915,14 @@ func (p *parser) parseStmt(arm bool) []ast.Stmt {
 	case token.DocComment:
 		p.fail(p.tok().Span, "付く先のないドキュメンテーションコメント（docs/grammar.md「決めたこと」）")
 	case token.Throw:
-		p.fail(p.tok().Span, "throw は match のアームの本体にだけ書ける（docs/grammar.md「配線」）")
+		p.fail(p.tok().Span, "throw を書けるのは、match のアームの本体と、catch のブロックの最後の文だけ（docs/grammar.md「配線」）")
 	case token.Semicolon:
 		p.fail(p.tok().Span, "「何もしない文」は、ない。; は、文の終わりに、一つだけ書く（docs/grammar.md「配線」）")
 	}
 	if arm {
 		p.failExpected("disjoint のアーム（ブロック { … } か、文の一つ: 値を入れる / 集める / 呼び出し / match / disjoint / for）")
 	}
-	p.failExpected("文（val / 値を入れる / 集める / return / 呼び出し / match / disjoint / for）")
+	p.failExpected("文（val / 値を入れる / 集める / return / 呼び出し / match / disjoint / for / try）")
 	return nil
 }
 
@@ -1996,7 +2027,7 @@ func (p *parser) parseExpr() ast.Expr {
 		return p.parseCall()
 	}
 	if p.at(token.Throw) {
-		p.fail(p.tok().Span, "throw は match のアームの本体にだけ書ける（docs/grammar.md「配線」）")
+		p.fail(p.tok().Span, "throw を書けるのは、match のアームの本体と、catch のブロックの最後の文だけ（docs/grammar.md「配線」）")
 	}
 	return p.parseAtom()
 }
@@ -2137,6 +2168,91 @@ func (p *parser) armHeadEnd(a *ast.MatchArm) source.Offset {
 	return a.Span.End
 }
 
+// parseThrow は Throw = "throw" QualifiedName [ "(" Atom { "," Atom } ")" ] を読む。
+func (p *parser) parseThrow() *ast.Throw {
+	tstart := p.expect(token.Throw).Span.Start
+	t := &ast.Throw{Exception: p.parseQualifiedName()}
+	if p.at(token.LParen) {
+		open := p.tok().Span
+		t.Args = p.parseCallArgs()
+		if len(t.Args) == 0 {
+			p.errorAt(source.Span{File: open.File, Start: open.Start, End: p.prevEnd()}, fmt.Sprintf("引数のない例外は括弧を書かない（throw %s と書く。docs/grammar.md「配線」）", t.Exception.String()))
+		}
+	}
+	t.Span = p.spanFrom(tstart)
+	return t
+}
+
+// parseTry は Try を読む（docs/grammar.md「配線」）。
+//
+//	Try        = "try" Block "catch" "(" Ident [ "by" QualifiedName ] ")" ( CatchBlock | CatchArms ) ;
+//	CatchBlock = "{" { Stmt } [ Throw ";" ] "}" ;
+//	CatchArms  = "{" MatchArm { MatchArm } [ ElseArm ] "}" ;
+func (p *parser) parseTry() ast.Stmt {
+	kw := p.expect(token.Try)
+	s := &ast.TryStmt{Keyword: kw.Span}
+	s.Body = p.parseBlock()
+	if !p.at(token.Catch) {
+		p.failExpected("catch（try のブロックの後ろには、catch (e) { … } が要る。docs/grammar.md「配線」）")
+	}
+	cstart := p.advance().Span.Start
+	p.expect(token.LParen)
+	s.Name = p.parseIdent()
+	if p.got(token.By) {
+		if p.at(token.List) || p.at(token.Nullable) {
+			p.fail(p.tok().Span, "catch (e by …) の分類は、例外の分類（classify … of any exception）。標準の分類は書けない（docs/grammar.md「配線」）")
+		}
+		name := p.parseQualifiedName()
+		s.By = &name
+	}
+	p.expect(token.RParen)
+	if s.By != nil {
+		p.expect(token.LBrace)
+		sawElse := false
+		p.parseMembers(func() {
+			arm := p.parseMatchArm()
+			switch {
+			case sawElse:
+				head := source.Span{File: arm.Span.File, Start: arm.Span.Start, End: p.armHeadEnd(arm)}
+				p.errorAt(head, "else のアームの後ろに、アームは書けない（else は、最後に一つだけ。docs/grammar.md「配線」）")
+				return
+			case arm.Else && len(s.Arms) == 0:
+				p.errorAt(arm.ElseSpan, "else のアームは、ケースを名前で並べたアームの後ろに書く（else は「ほかのケースのすべて」。docs/grammar.md「配線」）")
+			}
+			sawElse = sawElse || arm.Else
+			s.Arms = append(s.Arms, arm)
+		})
+		closing := p.expect(token.RBrace)
+		if len(s.Arms) == 0 {
+			p.errorAt(closing.Span, "catch (e by 分類) にはアームが一つ以上要る（docs/grammar.md「配線」）")
+		}
+	} else {
+		bstart := p.expect(token.LBrace).Span.Start
+		b := &ast.Block{Stmts: []ast.Stmt{}}
+		p.parseMembers(func() {
+			if p.at(token.Throw) {
+				tstart := p.tok().Span.Start
+				t := &ast.ThrowStmt{Throw: p.parseThrow()}
+				p.expect(token.Semicolon)
+				t.Span = p.spanFrom(tstart)
+				if !p.at(token.RBrace) {
+					p.fail(t.Span, "throw の文は、catch のブロックの最後にだけ書ける（下の文が、評価されない。docs/grammar.md「配線」）")
+				}
+				b.Stmts = append(b.Stmts, t)
+				return
+			}
+			b.Stmts = append(b.Stmts, p.parseStmt(false)...)
+		})
+		p.expect(token.RBrace)
+		b.Span = p.spanFrom(bstart)
+		s.Catch = b
+	}
+	s.CatchSpan = p.spanFrom(cstart)
+	p.end()
+	s.Span = p.spanFrom(kw.Span.Start)
+	return s
+}
+
 // parseMatchArm は MatchArm と ElseArm を読む。
 //
 //	MatchArm = Ident { "," Ident } "=>" ArmBody ";" ;
@@ -2161,17 +2277,7 @@ func (p *parser) parseMatchArm() *ast.MatchArm {
 	p.expect(token.Arrow)
 	switch {
 	case p.at(token.Throw):
-		tstart := p.advance().Span.Start
-		t := &ast.Throw{Exception: p.parseQualifiedName()}
-		if p.at(token.LParen) {
-			open := p.tok().Span
-			t.Args = p.parseCallArgs()
-			if len(t.Args) == 0 {
-				p.errorAt(source.Span{File: open.File, Start: open.Start, End: p.prevEnd()}, fmt.Sprintf("引数のない例外は括弧を書かない（throw %s と書く。docs/grammar.md「配線」）", t.Exception.String()))
-			}
-		}
-		t.Span = p.spanFrom(tstart)
-		a.Body = t
+		a.Body = p.parseThrow()
 	case p.atName() && p.peek(1).Kind == token.LParen:
 		a.Body = p.parseCall()
 	case p.atName(), p.tok().Kind.IsLiteral(), p.at(token.None), p.at(token.LBrace):

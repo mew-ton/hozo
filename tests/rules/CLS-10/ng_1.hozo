@@ -1,0 +1,22 @@
+// CLS-10（docs/check.md「分類」の「例外の分類」）: 例外の分類のケースの書き方が、合わない
+namespace a {
+  exception Failed;
+  exception Broken;
+  model M { id: string; }
+  classify NoTyping of any exception {
+    Soft;                                                    // ERROR: CLS-10
+    Hard: any exception as else;
+  }
+  classify Twice of any exception {
+    Soft: any exception as Failed, any exception as Broken;  // ERROR: CLS-10
+    Hard: any exception as else;
+  }
+  classify Same of any exception {
+    Soft: any exception as Failed | Broken;
+    Hard: any exception as Failed;                           // ERROR: CLS-10
+  }
+  classify Value of M {
+    A: any exception as Failed;                              // ERROR: CLS-10
+    B;
+  }
+}

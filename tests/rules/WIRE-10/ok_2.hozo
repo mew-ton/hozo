@@ -1,0 +1,26 @@
+// WIRE-10 に当たらない: try が入れ、catch も入れた val と、catch のブロックが「返らない」ときに try が入れた val は、読める
+namespace a {
+  exception Failed;
+  model M { id: string; }
+  fn load(): M
+    throws Failed;
+  fn fallback(): M;
+  fn use(m: M);
+  fn note();
+  fn f() {
+    val x, y;
+    try {
+      x = load();
+    } catch (e) {
+      x = fallback();
+    }
+    use(x);
+    try {
+      y = load();
+    } catch (e) {
+      note();
+      throw e;
+    }
+    use(y);
+  }
+}

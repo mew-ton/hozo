@@ -6,24 +6,50 @@ import "github.com/mew-ton/hozo/ir"
 // 書いた順で、中のブロックにも入る。for は、文そのものの後に、ブロックの文を上から。disjoint は、文そのものの後に、
 // アームを書いた順に、アームの中の文を上から。loops は、その文を囲んでいる for の番号（外から内へ。本体の中で一意）。
 func walkStmts(stmts []ir.Statement, fn func(st ir.Statement, loops []int)) {
+	walkAll(stmts, func(st ir.Statement, loops []int, _ []region) { fn(st, loops) })
+}
+
+// region は、文を囲んでいる、例外を受ける文のブロック一つ（docs/check.md「Sig(O, v)」の「例外を受ける文」）:
+// try は、その文の番号（本体の中で一意。tryInfo の添字）、catch は、catch のブロックか（偽なら、try のブロック）。
+type region struct {
+	try   int
+	catch bool
+}
+
+// tryInfo は、例外を受ける文一つ: 受けた例外の名前と、catch のブロックが「返らない」か（Catch.never）。
+type tryInfo struct {
+	name  string
+	never bool
+}
+
+// walkAll は、walkStmts に、文を囲んでいる、例外を受ける文のブロック（外から内へ）を足したもの。try は、文そのものの後に、
+// try のブロックの文、catch のブロックの文の順に辿る。戻り値は、辿った、例外を受ける文（番号の順）。
+func walkAll(stmts []ir.Statement, fn func(st ir.Statement, loops []int, regions []region)) []tryInfo {
 	next := 0
-	var walk func(stmts []ir.Statement, loops []int)
-	walk = func(stmts []ir.Statement, loops []int) {
+	var tries []tryInfo
+	var walk func(stmts []ir.Statement, loops []int, regions []region)
+	walk = func(stmts []ir.Statement, loops []int, regions []region) {
 		for _, st := range stmts {
-			fn(st, loops)
+			fn(st, loops, regions)
 			switch s := st.(type) {
 			case ir.DisjointStmt:
 				for _, arm := range s.Arms {
-					walk(arm.Statements, loops)
+					walk(arm.Statements, loops, regions)
 				}
 			case ir.ForStmt:
 				next++
 				inner := append(append([]int(nil), loops...), next)
-				walk(s.Body, inner)
+				walk(s.Body, inner, regions)
+			case ir.TryStmt:
+				id := len(tries)
+				tries = append(tries, tryInfo{name: s.Catch.Name, never: s.Catch.Never})
+				walk(s.Body, loops, append(append([]region(nil), regions...), region{try: id}))
+				walk(s.Catch.Body, loops, append(append([]region(nil), regions...), region{try: id, catch: true}))
 			}
 		}
 	}
-	walk(stmts, nil)
+	walk(stmts, nil, nil)
+	return tries
 }
 
 // mapStmts は、配線の文を、辿る順に、fn の結果で置き換える（中のブロックの文も、その場で置き換える）。
@@ -37,6 +63,9 @@ func mapStmts(stmts []ir.Statement, fn func(st ir.Statement) ir.Statement) {
 			}
 		case ir.ForStmt:
 			mapStmts(s.Body, fn)
+		case ir.TryStmt:
+			mapStmts(s.Body, fn)
+			mapStmts(s.Catch.Body, fn)
 		default:
 			stmts[i] = fn(st)
 		}

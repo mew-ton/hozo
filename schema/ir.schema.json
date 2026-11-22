@@ -537,6 +537,34 @@
       ],
       "type": "object"
     },
+    "Catch": {
+      "additionalProperties": false,
+      "description": "catch のブロック（docs/ir.md「配線」の Catch）。never は、ブロックが「返らない」か。",
+      "properties": {
+        "body": {
+          "items": {
+            "$ref": "#/$defs/Statement"
+          },
+          "type": "array"
+        },
+        "name": {
+          "type": "string"
+        },
+        "never": {
+          "type": "boolean"
+        },
+        "span": {
+          "$ref": "#/$defs/Span"
+        }
+      },
+      "required": [
+        "name",
+        "body",
+        "never",
+        "span"
+      ],
+      "type": "object"
+    },
     "CatchMode": {
       "enum": [
         "recovers",
@@ -565,6 +593,23 @@
       "required": [
         "exceptions",
         "mode"
+      ],
+      "type": "object"
+    },
+    "CaughtSubject": {
+      "additionalProperties": false,
+      "description": "受けた例外の match（docs/ir.md「配線」の subject kind \"caught\"）。name は Catch.name。",
+      "properties": {
+        "kind": {
+          "const": "caught"
+        },
+        "name": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "name"
       ],
       "type": "object"
     },
@@ -605,7 +650,7 @@
           "const": "check"
         },
         "protocol": {
-          "const": "0.19"
+          "const": "0.20"
         },
         "view": {
           "$ref": "#/$defs/View"
@@ -702,8 +747,17 @@
         "description": {
           "$ref": "#/$defs/Doc"
         },
+        "exceptions": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
         "name": {
           "type": "string"
+        },
+        "rest": {
+          "type": "boolean"
         },
         "span": {
           "$ref": "#/$defs/Span"
@@ -741,6 +795,9 @@
         },
         {
           "$ref": "#/$defs/StatesSubject"
+        },
+        {
+          "$ref": "#/$defs/ExceptionSubject"
         }
       ]
     },
@@ -815,7 +872,7 @@
           "type": "array"
         },
         "protocol": {
-          "const": "0.19"
+          "const": "0.20"
         }
       },
       "required": [
@@ -1360,7 +1417,7 @@
           "const": "emit"
         },
         "protocol": {
-          "const": "0.19"
+          "const": "0.20"
         },
         "transpiler": {
           "type": "string"
@@ -1441,6 +1498,19 @@
         "decorators",
         "span",
         "params"
+      ],
+      "type": "object"
+    },
+    "ExceptionSubject": {
+      "additionalProperties": false,
+      "description": "例外の分類の対象（docs/ir.md「classify」の subject kind \"exception\"）。",
+      "properties": {
+        "kind": {
+          "const": "exception"
+        }
+      },
+      "required": [
+        "kind"
       ],
       "type": "object"
     },
@@ -1578,7 +1648,7 @@
           "type": "string"
         },
         "protocol": {
-          "const": "0.19"
+          "const": "0.20"
         }
       },
       "required": [
@@ -1807,6 +1877,9 @@
         },
         {
           "$ref": "#/$defs/ClassifyOwnedSubject"
+        },
+        {
+          "$ref": "#/$defs/CaughtSubject"
         }
       ]
     },
@@ -2395,7 +2468,7 @@
           "type": "array"
         },
         "version": {
-          "const": "0.19"
+          "const": "0.20"
         }
       },
       "required": [
@@ -2857,6 +2930,12 @@
         },
         {
           "$ref": "#/$defs/ForStmt"
+        },
+        {
+          "$ref": "#/$defs/TryStmt"
+        },
+        {
+          "$ref": "#/$defs/ThrowStmt"
         }
       ]
     },
@@ -2957,13 +3036,16 @@
     },
     "ThrowBody": {
       "additionalProperties": false,
-      "description": "アームの本体の throw（docs/ir.md「配線」）。exception は FQN。",
+      "description": "throw（docs/ir.md「配線」の Throw）。exception は FQN。throw e なら、exception は空で、caught が、受けた例外の名前。",
       "properties": {
         "args": {
           "items": {
             "$ref": "#/$defs/CallArg"
           },
           "type": "array"
+        },
+        "caught": {
+          "type": "string"
         },
         "exception": {
           "type": "string"
@@ -2979,6 +3061,27 @@
         "kind",
         "exception",
         "args",
+        "span"
+      ],
+      "type": "object"
+    },
+    "ThrowStmt": {
+      "additionalProperties": false,
+      "description": "catch のブロックの最後の throw の文（docs/ir.md「配線」の Statement kind \"throw\"）。",
+      "properties": {
+        "kind": {
+          "const": "throw"
+        },
+        "span": {
+          "$ref": "#/$defs/Span"
+        },
+        "throw": {
+          "$ref": "#/$defs/ThrowBody"
+        }
+      },
+      "required": [
+        "kind",
+        "throw",
         "span"
       ],
       "type": "object"
@@ -3028,6 +3131,34 @@
         "of",
         "from",
         "to"
+      ],
+      "type": "object"
+    },
+    "TryStmt": {
+      "additionalProperties": false,
+      "description": "例外を受ける文（docs/ir.md「配線」の Statement kind \"try\"）。",
+      "properties": {
+        "body": {
+          "items": {
+            "$ref": "#/$defs/Statement"
+          },
+          "type": "array"
+        },
+        "catch": {
+          "$ref": "#/$defs/Catch"
+        },
+        "kind": {
+          "const": "try"
+        },
+        "span": {
+          "$ref": "#/$defs/Span"
+        }
+      },
+      "required": [
+        "kind",
+        "body",
+        "catch",
+        "span"
       ],
       "type": "object"
     },
@@ -3290,7 +3421,7 @@
           "$ref": "#/$defs/Program"
         },
         "version": {
-          "const": "0.19"
+          "const": "0.20"
         },
         "viewer": {
           "type": "string"

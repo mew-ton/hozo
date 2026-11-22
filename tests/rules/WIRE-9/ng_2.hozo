@@ -1,0 +1,17 @@
+// WIRE-9: 「返らない」文は、try のブロックには書けず、catch のブロックでは、最後の文にだけ書ける
+namespace a {
+  exception Failed;
+  fn send(): throws Failed;
+  fn fail(): never
+    throws Failed;
+  fn note();
+  fn f() {
+    try {
+      send();
+      fail();                          // ERROR: WIRE-9
+    } catch (e) {
+      fail();                          // ERROR: WIRE-9
+      note();
+    }
+  }
+}

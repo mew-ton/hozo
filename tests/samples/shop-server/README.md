@@ -372,6 +372,21 @@ HOZO_PLUGIN_PATH="$PWD/../../../plugins" /tmp/hozoc tests --coverage /tmp/cover.
 - `client` は、自分の型を持たないので、型のパッケージも、ない。
 - 下の節と「分かったこと」が、`gen/server/inner/types.go`（型の定義）、`gen/server/inner/validate.go` と書いている所は、この節より前の形。
 
+### 例外を受ける文で足したこと
+
+`docs/decisions.md`「決めたこと」419、422（`docs/check.md`「例外を受ける」、`docs/plugin-go.md`「例外を受ける文」）。`resendNotices` の、配送（`mailer.send`）を、例外を受ける文で囲んだ: 受けて、葉 `recordAudit` で記録して、`throw e` で、そのまま投げ直す。
+
+| ファイル | 足したこと |
+|---|---|
+| `server.hozo` | `resendNotices` の `for` の中の `try { mailer.send(notice); } catch (e) { recordAudit(); throw e; }`。op の説明 |
+| `gen/server/inner/wiring.go` | `ResendNotices` の本体の、`// try` から `}` まで（手で書いた、期待する出力）。import に `errors` と runtime パッケージ |
+| `gen/server/ops.go`、`gen/server/inner/ops.go` | `ResendNotices` のコメント（op の説明） |
+| `app/server_test.go` | `TestResendNoticesCatch`: 仕様の例外は、受けて、記録して、そのまま投げ直す。仕様にない失敗は、受けない。失敗しなければ、`catch` は動かない |
+| `app/httpcases_test.go` | `NotificationFailedSend` のケースに、`recordAudit` が、一度呼ばれることの確かめ |
+
+- **op の関数の型と、テストの口は、変わらない。** `throw e` は、`try` の中の出どころ（`mailer.send`）を、そのまま出どころにする（`docs/ide-chain.md`「インテグレーションテストの作り直し」の「Hozo が作る、例外のケース」）ので、口のメソッドは `NotificationFailedSend` のまま。計算した例外も、効果も、同じ。
+- 分類して受ける形（`catch (e by 分類)`）と、例外の分類の例は、`tests/samples/order-app` の `payment.prepay`、`notice.bestEffort`。
+
 ## 入力
 
 仕様は名前空間ごとに一つのファイル。

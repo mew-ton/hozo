@@ -1,0 +1,33 @@
+// SYNTAX（docs/grammar.md「配線」の Try、「classify」）: throw の文は、catch のブロックの最後にだけ書ける。catch (e by 分類) の
+// 波括弧の中は、アームだけ。例外の分類のケースに as none は書けない。try と catch は、予約語
+namespace a {
+  exception Failed;
+  fn send(): throws Failed;
+  fn note();
+  fn early() {
+    try {
+      send();
+    } catch (e) {
+      throw e;                         // ERROR: SYNTAX
+      note();
+    }
+  }
+}
+namespace b {
+  exception Failed;
+  fn send(): throws Failed;
+  fn outside() {
+    send();
+    throw Failed;                      // ERROR: SYNTAX
+  }
+}
+namespace c {
+  exception Failed;
+  classify Failure of any exception {
+    Soft: any exception as none;       // ERROR: SYNTAX
+    Hard: any exception as Failed;
+  }
+}
+namespace d {
+  fn try();                            // ERROR: SYNTAX
+}

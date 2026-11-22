@@ -205,3 +205,55 @@ func TestThrowSourcesDecoratorBody(t *testing.T) {
 		"a.Failed a.note made Leaves.Note.Throws(a.Failed)",
 	)
 }
+
+// tryCatch は `try { body } catch (e) { handler }`。
+func tryCatch(body []ir.Statement, handler ...ir.Statement) ir.Statement {
+	never := false
+	if n := len(handler); n > 0 {
+		_, never = handler[n-1].(ir.ThrowStmt)
+	}
+	return ir.TryStmt{Body: body, Catch: ir.Catch{Name: "e", Body: handler, Never: never}}
+}
+
+// 例外を受ける文（docs/ide-chain.md「Hozo が作る、例外のケース」の「例外を受ける文」）: try のブロックの中の出どころは、catch が
+// 受けるので、数えない。throw e は、try の中の出どころを、そのまま、出どころにする（作れるかも、そのまま）。受けた例外の match の
+// アームの throw e は、そのアームが受けるケースの例外だけ。catch のブロックの中の、ほかの出どころ（呼び出し、throw 例外）は、作れない。
+func TestThrowSourcesTry(t *testing.T) {
+	failure := classify("app.Failure", ir.ExceptionSubject{}, ir.DecidedByType, "Soft", "Hard")
+	failure.Cases[0].Exceptions = []string{"app.Refused"}
+	failure.Cases[1].Rest = true
+	rethrow := ir.ThrowStmt{Throw: ir.ThrowBody{Caught: "e"}}
+	caught := func(arms ...ir.MatchArm) ir.Statement {
+		return ir.MatchStmt{Match: ir.Match{Subject: ir.CaughtSubject{Name: "e"}, Classify: "app.Failure", Arms: arms}}
+	}
+	send := []ir.Statement{call("app.send")}
+	build := func(entry *ir.Op) *ir.View {
+		return viewOf("app", namespace("app",
+			exception("app.Refused"), exception("app.Broken"), exception("app.Other"), failure,
+			with(op("app.send", nil), throwing("app.Refused", "app.Broken")),
+			with(op("app.note", nil), throwing("app.Other")),
+			entry,
+		))
+	}
+	// 受けて、何もしない: 入口は、例外を持たない
+	wantSources(t, sourcesOf(t, build(with(op("app.run", nil), wired(tryCatch(send)))), "app.run"))
+	// 受けて、葉を呼んで、投げ直す: try の中の出どころが、そのまま。catch の中の呼び出しは、作れない
+	wantSources(t, sourcesOf(t, build(with(op("app.run", nil), throwing("app.Refused", "app.Broken", "app.Other"),
+		wired(tryCatch(send, call("app.note"), rethrow)))), "app.run"),
+		"app.Refused app.send made Leaves.Send.Throws(app.Refused)",
+		"app.Broken app.send made Leaves.Send.Throws(app.Broken)",
+		"app.Other app.note human")
+	// 分類して受ける: Soft（Refused）は、受けて終わり、Hard（残り: Broken）だけを、投げ直す
+	wantSources(t, sourcesOf(t, build(with(op("app.run", nil), throwing("app.Broken", "app.Other"),
+		wired(tryCatch(send, caught(armCall("app.note", "Soft"), ir.MatchArm{Cases: []string{"Hard"}, Body: ir.ThrowBody{Caught: "e"}}))))), "app.run"),
+		"app.Broken app.send made Leaves.Send.Throws(app.Broken)",
+		"app.Other app.note human")
+	// 別の例外に替える: 出どころは <op>.catch で、作れない
+	wantSources(t, sourcesOf(t, build(with(op("app.run", nil), throwing("app.Other"),
+		wired(tryCatch(send, ir.ThrowStmt{Throw: ir.ThrowBody{Exception: "app.Other"}})))), "app.run"),
+		"app.Other app.run.catch human")
+	// try のブロックの外で、同じ例外を投げる呼び出しは、ふつうの出どころ（try の中の分は、数えない）
+	wantSources(t, sourcesOf(t, build(with(op("app.run", nil), throwing("app.Other"),
+		wired(tryCatch([]ir.Statement{call("app.note")}), call("app.note")))), "app.run"),
+		"app.Other app.note made Leaves.Note.Throws(app.Other)")
+}

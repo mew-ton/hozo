@@ -56,7 +56,7 @@ type Ops interface {
 	// Effects: store.createOrder, store.notifyUser
 	PlaceOrder(ctx context.Context, in PlaceOrderInput) (pkgtype.Order, error)
 
-	// ResendNotices は自分の注文の通知を、もう一度、送る。一つ失敗したら、そこで止まり、送れた分の記録は、残る
+	// ResendNotices は自分の注文の通知を、もう一度、送る。一つ失敗したら、失敗したことを記録して（recordAudit）、そこで止まり、送れた分の記録は、残る
 	//
 	// Throws: type.Unauthorized, type.NotificationFailed
 	// Reads: store.sessions, store.orders

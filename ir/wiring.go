@@ -14,7 +14,8 @@ func (w Wiring) MarshalJSON() ([]byte, error) { type alias Wiring; return marsha
 func (w *Wiring) UnmarshalJSON(data []byte) error { return unmarshalStruct(data, w) }
 
 // Statement は配線の文（docs/ir.md「配線」の Statement）。
-// 具体型は値型の [ValStmt]、[AssignStmt]、[CollectStmt]、[ReturnStmt]、[CallStmt]、[MatchStmt]、[DisjointStmt]、[ForStmt]。
+// 具体型は値型の [ValStmt]、[AssignStmt]、[CollectStmt]、[ReturnStmt]、[CallStmt]、[MatchStmt]、[DisjointStmt]、[ForStmt]、
+// [TryStmt]、[ThrowStmt]。
 type Statement interface {
 	// Kind は JSON の判別子（"val"、"assign"、"collect"、"return"、"call"、"match"、"disjoint"、"for"）。
 	Kind() string
@@ -99,7 +100,40 @@ type ForStmt struct {
 	Span     Span `json:"span"`
 }
 
+// TryStmt は例外を受ける文（docs/ir.md「配線」の Statement kind "try"）: `try { … } catch (e) { … }`。
+type TryStmt struct {
+	// Body は try のブロック。
+	Body  []Statement `json:"body"`
+	Catch Catch       `json:"catch"`
+	Span  Span        `json:"span"`
+}
+
+// Catch は catch のブロック（docs/ir.md「配線」の Catch）。`catch (e by C) { アーム … }` は、`match (e by C) { アーム … }` の
+// 文一つにして、Body に入れる。
+type Catch struct {
+	// Name は、受けた例外の名前（`catch (e)` の e）。
+	Name string      `json:"name"`
+	Body []Statement `json:"body"`
+	// Never は、ブロックが「返らない」か（最後の文が throw か、「返らない」式の文。docs/check.md「例外を受ける」）。
+	Never bool `json:"never"`
+	Span  Span `json:"span"`
+}
+
+// MarshalJSON は docs/ir.md「JSON」の形で書く。
+func (c Catch) MarshalJSON() ([]byte, error) { type alias Catch; return marshalStruct(alias(c)) }
+
+// UnmarshalJSON は docs/ir.md「JSON」の形を読む。
+func (c *Catch) UnmarshalJSON(data []byte) error { return unmarshalStruct(data, c) }
+
+// ThrowStmt は、catch のブロックの最後の文の `throw`（docs/ir.md「配線」の Statement kind "throw"）。
+type ThrowStmt struct {
+	Throw ThrowBody `json:"throw"`
+	Span  Span      `json:"span"`
+}
+
 var (
+	_ Statement = TryStmt{}
+	_ Statement = ThrowStmt{}
 	_ Statement = ValStmt{}
 	_ Statement = AssignStmt{}
 	_ Statement = CollectStmt{}
@@ -133,6 +167,33 @@ func (DisjointStmt) Kind() string { return "disjoint" }
 
 // Kind は "for"。
 func (ForStmt) Kind() string { return "for" }
+
+// Kind は "try"。
+func (TryStmt) Kind() string { return "try" }
+
+// Kind は "throw"。
+func (ThrowStmt) Kind() string { return "throw" }
+
+func (TryStmt) isStatement()   {}
+func (ThrowStmt) isStatement() {}
+
+// MarshalJSON は kind を付けて書く。
+func (s TryStmt) MarshalJSON() ([]byte, error) {
+	type alias TryStmt
+	return marshalKind("try", alias(s))
+}
+
+// MarshalJSON は kind を付けて書く。
+func (s ThrowStmt) MarshalJSON() ([]byte, error) {
+	type alias ThrowStmt
+	return marshalKind("throw", alias(s))
+}
+
+// UnmarshalJSON は docs/ir.md「JSON」の形を読む。
+func (s *TryStmt) UnmarshalJSON(data []byte) error { return unmarshalStruct(data, s) }
+
+// UnmarshalJSON は docs/ir.md「JSON」の形を読む。
+func (s *ThrowStmt) UnmarshalJSON(data []byte) error { return unmarshalStruct(data, s) }
 
 func (ValStmt) isStatement()      {}
 func (AssignStmt) isStatement()   {}
@@ -218,10 +279,13 @@ var statementTable = map[string]func([]byte) (Statement, error){
 	"match":    asValue[Statement, MatchStmt],
 	"disjoint": asValue[Statement, DisjointStmt],
 	"for":      asValue[Statement, ForStmt],
+	"try":      asValue[Statement, TryStmt],
+	"throw":    asValue[Statement, ThrowStmt],
 }
 
 // WalkStatements は、文を、辿る順に、fn に渡す（docs/check.md「Sig(O, v)」の手順 0）: 書いた順で、中のブロックにも入る。
 // for は、文そのものの後に、ブロックの文を上から。disjoint は、文そのものの後に、アームを書いた順に、アームの中の文を上から。
+// try は、文そのものの後に、try のブロックの文、catch のブロックの文の順。
 func WalkStatements(stmts []Statement, fn func(st Statement)) {
 	for _, st := range stmts {
 		fn(st)
@@ -232,11 +296,14 @@ func WalkStatements(stmts []Statement, fn func(st Statement)) {
 			}
 		case ForStmt:
 			WalkStatements(s.Body, fn)
+		case TryStmt:
+			WalkStatements(s.Body, fn)
+			WalkStatements(s.Catch.Body, fn)
 		}
 	}
 }
 
-// StatementExpr は、文の式。式を持たない文（空の val、disjoint、for）は ok が偽。
+// StatementExpr は、文の式。式を持たない文（空の val、disjoint、for、try、throw）は ok が偽。
 // 呼び出しの文と match の文は、その呼び出しと match を、式にして返す。
 func StatementExpr(st Statement) (expr Expr, ok bool) {
 	switch s := st.(type) {
@@ -652,7 +719,7 @@ type Match struct {
 }
 
 // MatchSubject は match の対象（docs/ir.md「配線」の Match の subject）。具体型は値型の [ValueSubject]
-// （kind "value"）と [ClassifyOwnedSubject]（kind "classify"）。
+// （kind "value"）、[ClassifyOwnedSubject]（kind "classify"）、[CaughtSubject]（kind "caught"）。
 type MatchSubject interface {
 	// Kind は JSON の判別子（"value" か "classify"）。
 	Kind() string
@@ -669,7 +736,28 @@ type ValueSubject struct {
 // （docs/ir.md「配線」の subject kind "classify"）。
 type ClassifyOwnedSubject struct{}
 
+// CaughtSubject は、受けた例外の match（`match (e by C)`、`catch (e by C)`。docs/ir.md「配線」の subject kind "caught"）。
+type CaughtSubject struct {
+	// Name は、受けた例外の名前（[Catch] の Name）。
+	Name string `json:"name"`
+}
+
+// Kind は "caught"。
+func (CaughtSubject) Kind() string { return "caught" }
+
+func (CaughtSubject) isMatchSubject() {}
+
+// MarshalJSON は kind を付けて書く。
+func (s CaughtSubject) MarshalJSON() ([]byte, error) {
+	type alias CaughtSubject
+	return marshalKind("caught", alias(s))
+}
+
+// UnmarshalJSON は docs/ir.md「JSON」の形を読む。
+func (s *CaughtSubject) UnmarshalJSON(data []byte) error { return unmarshalStruct(data, s) }
+
 var (
+	_ MatchSubject = CaughtSubject{}
 	_ MatchSubject = ValueSubject{}
 	_ MatchSubject = ClassifyOwnedSubject{}
 )
@@ -698,6 +786,7 @@ func (s *ValueSubject) UnmarshalJSON(data []byte) error { return unmarshalStruct
 var matchSubjectTable = map[string]func([]byte) (MatchSubject, error){
 	"value":    asValue[MatchSubject, ValueSubject],
 	"classify": asValue[MatchSubject, ClassifyOwnedSubject],
+	"caught":   asValue[MatchSubject, CaughtSubject],
 }
 
 // UnmarshalMatchSubject は kind で分けて MatchSubject を読む（docs/ir.md「JSON」）。
@@ -765,13 +854,16 @@ type ArmBody interface {
 // NoneBody はアームの本体の `none`（docs/ir.md「配線」の MatchArm の body kind "none"）。
 type NoneBody struct{}
 
-// ThrowBody はアームの本体の `throw E`、`throw E(値, …)`（docs/ir.md「配線」の MatchArm の body kind "throw"）。
+// ThrowBody は `throw E`、`throw E(値, …)`、`throw e`（docs/ir.md「配線」の Throw）。アームの本体（MatchArm の body kind "throw"）と、
+// catch のブロックの最後の文（[ThrowStmt]）に使う。
 type ThrowBody struct {
-	// Exception は例外の FQN。
+	// Exception は例外の FQN。`throw e`（受けた例外を、そのまま投げ直す）なら空。
 	Exception string `json:"exception"`
 	// Args は位置で書いた値を、例外の Params の名前に対応付けたもの。なければ空（JSON では []）。
 	Args []CallArg `json:"args"`
-	Span Span      `json:"span"`
+	// Caught は、`throw e` のとき、受けた例外の名前（[Catch] の Name）。ほかは空（JSON ではキーごと省く）。
+	Caught string `json:"caught,omitempty"`
+	Span   Span   `json:"span"`
 }
 
 // UnmarshalJSON は docs/ir.md「JSON」の形を読む。

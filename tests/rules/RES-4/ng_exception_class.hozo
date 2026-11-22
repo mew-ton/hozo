@@ -1,0 +1,12 @@
+// RES-4（docs/check.md「分類」の「例外の分類」）: 例外の分類を、型（T on C.K）と、効果の遷移の宛先に書いた
+namespace a {
+  exception Failed;
+  model M { id: string; }
+  state rows: list<M>;
+  classify Failure of any exception {
+    Soft: any exception as Failed;
+    Rest: any exception as else;
+  }
+  fn use(m: M on Failure.Soft);                         // ERROR: RES-4
+  effect fn move(): effects Failure as Soft -> Rest;    // ERROR: RES-4
+}

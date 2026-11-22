@@ -90,7 +90,7 @@ func TestTestsAllRan(t *testing.T) {
 	cov, _ := reqs[0]["coverage"].(map[string]any)
 	abs, _ := filepath.EvalSymlinks(dir)
 	got, _ := filepath.EvalSymlinks(filepath.Dir(cov["path"].(string)))
-	if reqs[0]["protocol"] != "0.19" || got != abs || filepath.Base(cov["path"].(string)) != "cover.out" || cov["content"] != "fake coverage\n" {
+	if reqs[0]["protocol"] != "0.20" || got != abs || filepath.Base(cov["path"].(string)) != "cover.out" || cov["content"] != "fake coverage\n" {
 		t.Errorf("coverage の要求 = %v", reqs[0])
 	}
 	if files, _ := json.Marshal(reqs[0]["files"]); string(files) != `["`+leavesPath+`"]` {

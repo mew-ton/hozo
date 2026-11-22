@@ -700,14 +700,16 @@ Go にした理由は「プラグインの書き方」に依る。設計書の�
 | DEC-8 | 名前付きのデコレータは、汎用のデコレータに引数を固定した別名としてだけ定義できる | §8.1、§8.2 |
 | DEC-9 | 適用順は op に近いものから。IR では入れ子にせず、順序付きの列に正規化する | §8.2、`docs/ir.md`「デコレータの適用」（`docs/decisions.md` の 16） |
 | DEC-10 | `outer throws` の例外は境界の外から見たときだけ加わる（前は `@external` の `throws`。`docs/decisions.md` の 407） | §8.2 |
-| DEC-19 | `proceed()` は、デコレータの本体の、文か、`match` のアームの本体にだけ書け、引数を取らない | `docs/decisions.md` の 392: `docs/grammar.md`「デコレータの本体」、`docs/check.md`「デコレータ」 |
+| DEC-19 | `proceed()` は、デコレータの本体の、文か、`match` のアームの本体にだけ書け、引数を取らない。`try` のブロックに書くなら、最初の文 | `docs/decisions.md` の 392: `docs/grammar.md`「デコレータの本体」、`docs/check.md`「デコレータ」 |
 | DEC-20 | デコレータの本体は、どの道も、`proceed()` を、ちょうど一度呼ぶか、例外を投げる | 同 |
 | DEC-21 | デコレータの本体に、`return` は書けない | 同 |
 | DEC-22 | 本体のあるデコレータは、`catches` の節を持てない | 同。`docs/check.md`「デコレータの本体」 |
 | DEC-23 | デコレータの本体で読める引数は、型を一つ書いた、値の引数だけ | 同 |
 | DEC-24 | 本体のあるデコレータの本体が呼べるのは、付けた op の名前空間の配線が、呼べるものだけ | 同 |
 | DEC-25 | `proceed()` の後ろに文を持つデコレータは、`never` を返す op には、付けられない | 同 |
-| WIRE-1 | 書けるのは、`val` の宣言、値を入れる文、集める文、`return`、`match`、値を返さない呼び出し（op か効果）、`disjoint`、`for` だけ | §9。効果の呼び出し: `docs/check.md`「配線からの呼び出し」。`val`、`disjoint`、`for`: `docs/grammar.md`「配線」 |
+| DEC-26 | `@hint` は、振る舞いを言う節、本体、`@entry` を持つ宣言には、付けられない | `docs/decisions.md` の 420: `docs/grammar.md`「decorator の宣言」 |
+| DEC-27 | `proceed()` の例外を受けて、「返らない」でない `catch` を持つデコレータは、値を返す op には、付けられない | `docs/decisions.md` の 419: `docs/check.md`「デコレータの本体」 |
+| WIRE-1 | 書けるのは、`val` の宣言、値を入れる文、集める文、`return`、`match`、値を返さない呼び出し（op か効果）、`disjoint`、`for`、例外を受ける文（`try`。`catch` のブロックの最後には `throw`）だけ | §9。効果の呼び出し: `docs/check.md`「配線からの呼び出し」。`val`、`disjoint`、`for`: `docs/grammar.md`「配線」 |
 | WIRE-2 | 値を返す呼び出しを `val` に受けずに書く、値を返さない（か、決して返らない）呼び出しを `val` に受ける、はどちらもエラー | §9。S19: `docs/types.md`「式の型」 |
 | WIRE-3 | 値を返さない配線の op は `return` を書かない | §9 |
 | WIRE-4 | 見えている名前と、同じ名前の `val` は、宣言できない。名前は使う前に上で定義する | §9。ブロックの中の名前: `docs/check.md`「値の入れ物」 |

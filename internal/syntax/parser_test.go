@@ -1869,12 +1869,12 @@ func TestBlockReject(t *testing.T) {
 		{"arm throw empty parens", "fn a() { match (x by K) { A => throw f(); }; }", "引数のない例外は括弧を書かない（throw f と書く"},
 		{"arm throw call in args", "fn a() { match (x by K) { A => throw f(g()); }; }", "呼び出しの引数に呼び出しは書けない"},
 		{"arm throw value", "fn a() { match (x by K) { A => throw 5; }; }", "名前が必要"},
-		{"throw statement", "fn a() { throw X; }", "throw は match のアームの本体にだけ書ける"},
-		{"return throw", "fn a(): T { return throw X; }", "throw は match のアームの本体にだけ書ける"},
-		{"const throw", "fn a() { val x = throw X; }", "throw は match のアームの本体にだけ書ける"},
+		{"throw statement", "fn a() { throw X; }", "throw を書けるのは、match のアームの本体と、catch のブロックの最後の文だけ"},
+		{"return throw", "fn a(): T { return throw X; }", "throw を書けるのは、match のアームの本体と、catch のブロックの最後の文だけ"},
+		{"const throw", "fn a() { val x = throw X; }", "throw を書けるのは、match のアームの本体と、catch のブロックの最後の文だけ"},
 		{"arm without arrow", "fn a() { match (x by K) { A f(); }; }", "「=>」が必要"},
 		{"if", "fn a() { if (x) { } }", "「;」が必要だが「{」がある"},
-		{"literal statement", "fn a() { 5; }", "文（val / 値を入れる / 集める / return / 呼び出し / match / disjoint / for）が必要"},
+		{"literal statement", "fn a() { 5; }", "文（val / 値を入れる / 集める / return / 呼び出し / match / disjoint / for / try）が必要"},
 		{"removed const", "fn a() { const x = g(); }", "const は、なくした書き方。val と書く"},
 		{"removed match head", "fn a(x: M) { match x by C { A => f(); }; }", "match の頭は、全体を、丸括弧で囲む"},
 		{"empty statement", "fn a() { f();; }", "「何もしない文」は、ない"},
@@ -2100,7 +2100,7 @@ func TestReservedWordReject(t *testing.T) {
 		{"reads as param", "fn f(reads: string);", "reads は予約語で、識別子には使えない"},
 		{"as as const", "fn f() { val as = g(); }", "as は予約語で、識別子には使えない"},
 		{"never as type name", "model A { x: a.never; }", "never は予約語で、名前には使えない"},
-		{"throw as callee", "fn f() { throw(); }", "throw は match のアームの本体にだけ書ける"},
+		{"throw as callee", "fn f() { throw(); }", "throw を書けるのは、match のアームの本体と、catch のブロックの最後の文だけ"},
 		{"external on reserved field", "model A { @external decorator: string; }", "@external はデコレータの宣言の直前にだけ書ける"},
 		{"member not a field", "model A { fn f(); }", "「:」が必要だが識別子 fがある"},
 	}
@@ -2683,5 +2683,57 @@ func TestDecoratorFn(t *testing.T) {
 	}
 	for _, tt := range rejects {
 		t.Run(tt.name, func(t *testing.T) { mustFail(t, tt.src, tt.want) })
+	}
+}
+
+// TestTry は、例外を受ける文（docs/grammar.md「配線」の Try）と、例外の分類（同「classify」）の構文木。
+func TestTry(t *testing.T) {
+	f := mustParse(t, `namespace a {
+  classify Failure of any exception {
+    Soft: any exception as Refused | net.Lost;
+    Hard: any exception as else;
+  }
+  fn f() {
+    try {
+      send();
+    } catch (e) {
+      note();
+      throw e;
+    }
+    try { send(); } catch (err by Failure) {
+      Soft => note();
+      else => throw Broken(1);
+    };
+  }
+}`)
+	ns := f.Decls[0].(*ast.NamespaceDecl)
+	c := ns.Decls[0].(*ast.ClassifyDecl)
+	if !c.Exception || c.Never || len(c.Of) != 0 || len(c.Cases) != 2 {
+		t.Fatalf("classify = %+v", c)
+	}
+	soft := c.Cases[0].As[0]
+	if !soft.AnyException || soft.Subject != nil || len(soft.Exceptions) != 2 || soft.Exceptions[1].String() != "net.Lost" {
+		t.Errorf("Soft の as = %+v", soft)
+	}
+	if hard := c.Cases[1].As[0]; !hard.AnyException || !hard.Else || len(hard.Exceptions) != 0 {
+		t.Errorf("Hard の as = %+v", hard)
+	}
+	body := ns.Decls[1].(*ast.OpDecl).Body.Stmts
+	if len(body) != 2 {
+		t.Fatalf("文の数 = %d", len(body))
+	}
+	plain := body[0].(*ast.TryStmt)
+	if plain.Name.Name != "e" || plain.By != nil || len(plain.Body.Stmts) != 1 || plain.Catch == nil || len(plain.Catch.Stmts) != 2 {
+		t.Fatalf("try { } catch (e) { } = %+v", plain)
+	}
+	if th, ok := plain.Catch.Stmts[1].(*ast.ThrowStmt); !ok || th.Throw.Exception.String() != "e" || len(th.Throw.Args) != 0 {
+		t.Errorf("catch のブロックの最後の文が throw e でない: %+v", plain.Catch.Stmts[1])
+	}
+	short := body[1].(*ast.TryStmt)
+	if short.Name.Name != "err" || short.By == nil || short.By.String() != "Failure" || short.Catch != nil || len(short.Arms) != 2 {
+		t.Fatalf("try { } catch (err by Failure) { } = %+v", short)
+	}
+	if th, ok := short.Arms[1].Body.(*ast.Throw); !ok || !short.Arms[1].Else || th.Exception.String() != "Broken" || len(th.Args) != 1 {
+		t.Errorf("else のアームが throw Broken(1) でない: %+v", short.Arms[1])
 	}
 }
