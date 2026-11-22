@@ -1,6 +1,6 @@
 name     = "go-sqlite"
 wasm     = "plugin.wasm"
-protocol = "0.23"
+protocol = "1.0"
 
 # 提供するトランスパイラは一つ。Go の基底 go に相乗りする（docs/plugin-go-sqlite.md「マニフェスト」）。
 # 読む語彙は db（標準の語彙。docs/vocab.md「同梱する語彙」）で、語彙は提供しない
@@ -12,3 +12,10 @@ requires = ["go"]
 seams    = ["db.transaction"]
 # db の語彙の検査（DB-*）を通った仕様だけを、受け取る（同「マニフェスト」）
 requires_vocabulary = ["db"]
+interprets = [
+  "db.table", "db.text", "db.int", "db.float",
+  "db.bool", "db.datetime", "db.date", "db.time",
+  "db.json", "db.key", "db.unique", "db.ref",
+  "db.find", "db.list", "db.where", "db.latest",
+  "db.insert", "db.update", "db.delete", "db.conflict",
+]

@@ -314,8 +314,7 @@ func loadCorpus(t *testing.T, root string) *project.Project {
 	return project.LoadWith(project.Options{Root: root, PluginPath: repoPlugins(t), NoPlugins: true})
 }
 
-// warnFile は corpusWithWarning が足すファイル。設計書のコーパスには診断がない（error も warning もない。
-// tests/corpus/design/README.md の想定）ので、診断の発行と check との一致を空でない集合で
+// warnFile は corpusWithWarning が足すファイル。corpusWithWarning の写しには、ほかに診断がない（error も warning もない）ので、診断の発行と check との一致を空でない集合で
 // 確かめるために、意図した warning を一つ持たせる: 効果を持たない op の prevents effects（REL-2。docs/check.md「throws」）。
 const warnFile = `// internal/lsp のテストが足すファイル: 意図した warning（REL-2）を一つ出す
 namespace server {
@@ -355,6 +354,19 @@ func corpusWithWarning(t *testing.T) string {
 		t.Fatal(err)
 	}
 	writeFile(t, filepath.Join(dir, "warn.hozo"), warnFile)
+	// 写しの設定に、コーパスのデコレータを解釈する、と名乗る相乗り marks を足す（マニフェストと、にせものの WASM だけ）。コーパス自身の
+	// 設定（基底 go だけ）では、語彙のデコレータごとに CFG-26（解釈するトランスパイラがいない）が出るので、診断のないファイルを
+	// 持つ写しにするため。CFG-26 を含む、そのままのコーパスは、TestCheckAgreement の design が見る
+	writeFile(t, filepath.Join(dir, "plugins", "marks", hostplugin.ManifestFileName),
+		"name = \"marks\"\nwasm = "+fakeplugin.WasmTOML+"\nprotocol = \""+hostplugin.Protocol+"\"\n\n[[transpiler]]\nname = \"marks\"\nlanguage = \"go\"\nrequires = [\"go\"]\n"+
+			fakeplugin.Interprets(fakeplugin.DesignDecorators...))
+	fakeplugin.Place(t, filepath.Join(dir, "plugins", "marks", fakeplugin.WasmFile))
+	config := readFile(t, filepath.Join(dir, "hozo.toml"))
+	withMarks := strings.Replace(strings.Replace(config, "[hozo]\n", "[hozo]\nplugin_dirs = [\"plugins\"]\n", 1), `transpilers = ["go"]`, `transpilers = ["go", "marks"]`, 1)
+	if strings.Count(withMarks, "plugin_dirs") != 1 || !strings.Contains(withMarks, `"marks"`) {
+		t.Fatalf("コーパスの hozo.toml に、相乗り marks を足せない:\n%s", config)
+	}
+	writeFile(t, filepath.Join(dir, "hozo.toml"), withMarks)
 	return dir
 }
 

@@ -562,8 +562,10 @@ func (p *Project) relPath(path string) string {
 	return config.CleanRel(path)
 }
 
-// checkPlugins は CFG-6（unsupported のデコレータ）: 各単位について、その単位が出力する名前空間の、単位の対象の宣言に付いた
-// デコレータを、単位のトランスパイラのマニフェストの unsupported に照らす。同じ位置の同じ診断は一度だけ。
+// checkPlugins は CFG-6（unsupported のデコレータ）と CFG-26（解釈されないデコレータ）: 各単位について、その単位が出力する
+// 名前空間の、単位の対象の宣言に付いたデコレータを、単位のトランスパイラのマニフェストの unsupported（CFG-6）と、設定の
+// すべての単位のトランスパイラの interprets と seams（CFG-26。docs/config.md「解釈するトランスパイラ」）に照らす。
+// 同じ位置の同じ診断は一度だけ。
 func (p *Project) checkPlugins(checker check.Checker) []diag.Diagnostic {
 	var diags []diag.Diagnostic
 	if p.Sema == nil || p.Sema.Program == nil {
@@ -575,26 +577,38 @@ func (p *Project) checkPlugins(checker check.Checker) []diag.Diagnostic {
 		msg  string
 	}
 	seen := map[key]bool{}
+	add := func(ds []diag.Diagnostic) {
+		for _, d := range ds {
+			k := key{file: d.File, msg: d.Message}
+			if d.Span != nil {
+				k.span = *d.Span
+			}
+			if !seen[k] {
+				seen[k] = true
+				diags = append(diags, d)
+			}
+		}
+	}
+	// 設定が解釈するデコレータ: すべての単位の、すべてのトランスパイラの interprets と seams
+	interpreted := map[string]bool{}
+	for i := range p.Units {
+		for _, t := range p.Units[i].Transpilers {
+			for _, fqn := range t.Decl.Interpreted() {
+				interpreted[fqn] = true
+			}
+		}
+	}
 	for i := range p.Units {
 		u := &p.Units[i]
 		var unsupported []string
 		for _, t := range u.Transpilers {
 			unsupported = append(unsupported, t.Decl.Unsupported...)
 		}
-		if len(unsupported) == 0 {
-			continue
-		}
 		for _, ns := range p.covered(i) {
-			for _, d := range checker.CheckUnsupported(p.Sema.Program, ns, u.Files, unsupported) {
-				k := key{file: d.File, msg: d.Message}
-				if d.Span != nil {
-					k.span = *d.Span
-				}
-				if !seen[k] {
-					seen[k] = true
-					diags = append(diags, d)
-				}
+			if len(unsupported) > 0 {
+				add(checker.CheckUnsupported(p.Sema.Program, ns, u.Files, unsupported))
 			}
+			add(checker.CheckUninterpreted(p.Sema.Program, ns, u.Files, interpreted))
 		}
 	}
 	return diags

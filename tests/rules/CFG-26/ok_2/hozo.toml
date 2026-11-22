@@ -1,0 +1,14 @@
+# 解釈するトランスパイラ reads は、単位 b にだけいる。単位 a の宣言に付けたデコレータも、解釈されている
+# （設定の全体で見る。docs/config.md「解釈するトランスパイラ」）
+[hozo]
+plugin_dirs = ["plugins"]
+
+[[emit]]
+namespace   = "a"
+transpilers = ["plain"]
+out         = "gen/a"
+
+[[emit]]
+namespace   = "b"
+transpilers = ["plain", "reads"]
+out         = "gen/b"

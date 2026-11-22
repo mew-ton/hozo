@@ -1,0 +1,3 @@
+# 単位のない設定には、出さない
+[hozo]
+plugin_dirs = ["plugins"]

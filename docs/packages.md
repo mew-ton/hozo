@@ -138,6 +138,7 @@ Go のパッケージごとの、このモジュールの中で import してい
 `docs/ir.md` の型。`encoding/json` のタグはこの文書のフィールド名。`Program` / `View` と、`Type` などの判別付きユニオンは `kind` で分ける（Go では interface と `UnmarshalJSON`）。
 
 ```go
+func VersionAccepts(host, plugin string) bool      // 版 host の hozoc が、版 plugin を話すプラグインを動かせるか（docs/plugin-protocol.md「版の合わせ方」）。hozoc も SDK も、これで確かめる
 func (p *Program) Lookup(fqn string) Decl          // 宣言を引く。なければ nil
 func (p *Program) Namespace(fqn string) *Namespace
 func (v *View) Signature(op string) *ViewedSignature
@@ -604,12 +605,13 @@ func FileSetLocator(fs *source.FileSet) Locator
 type Checker struct { Locate Locator }
 func (c Checker) Check(p *ir.Program, cfg *config.Config) []diag.Diagnostic   // Compute を呼んでから規則を検査する。Locate が nil なら Span は nil で File だけ
 func (c Checker) CheckUnsupported(p *ir.Program, ns string, files []string, unsupported []string) []diag.Diagnostic   // CFG-6。files は単位の in に合ったファイル、unsupported はマニフェストから
+func (c Checker) CheckUninterpreted(p *ir.Program, ns string, files []string, interpreted map[string]bool) []diag.Diagnostic   // CFG-26。interpreted は、設定が解釈するデコレータ（すべての単位のトランスパイラの interprets と seams）
 type Unit struct { Language, Base string; Seams map[string]string; Files []string }   // 設定の外で決まる単位の情報: 言語と基底の名前、単位の継ぎ目（デコレータの FQN → 宣言したトランスパイラ。どれもマニフェストから）と、in に合ったファイル
 func (c Checker) CheckHomes(p *ir.Program, cfg *config.Config, units []Unit) []diag.Diagnostic   // CFG-22
 func Views(p *ir.Program, cfg *config.Config, units []Unit) []map[string]*ir.View   // 単位ごと（cfg.Units と同じ順）の、出力する名前空間 → View
 ```
 
-設定に関わる検査のうち、プログラムが要る CFG-10 は `Check` が（`cfg` を見て）出す。CFG-6 は `CheckUnsupported`、CFG-22 は `CheckHomes`（`docs/config.md`「型の置き場」の表を写す）。
+設定に関わる検査のうち、プログラムが要る CFG-10 は `Check` が（`cfg` を見て）出す。CFG-6 は `CheckUnsupported`、CFG-26 は `CheckUninterpreted`、CFG-22 は `CheckHomes`（`docs/config.md`「型の置き場」の表を写す）。
 
 規則ごとに一つのファイル（`throws.go`、`bind.go`、…）。各関数のコメントに規則の ID。
 
@@ -639,6 +641,7 @@ func Under(a, dir string) bool                              // 相対パス a �
 | CFG-7、CFG-12、CFG-17、CFG-21、CFG-24 | `internal/config`（`Load`） | `hozo.toml` だけ |
 | CFG-10 | `internal/check`（`Check`） | プログラム（名前空間） |
 | CFG-6 | `internal/check`（`CheckUnsupported`。呼ぶのは `internal/project`） | プログラムと、マニフェストの `unsupported` |
+| CFG-26 | `internal/check`（`CheckUninterpreted`。呼ぶのは `internal/project`） | プログラムと、すべての単位のトランスパイラの、マニフェストの `interprets` と `seams` |
 | CFG-22 | `internal/check`（`CheckHomes`。呼ぶのは `internal/project`） | プログラムと、単位ごとの基底と `in` に合ったファイル |
 | CFG-14〜CFG-16、CFG-18〜CFG-20、CFG-23 | `internal/project` | マニフェストと、読んだファイル |
 | CFG-5 と、設定なしで `emit` したときの CFG-7 | `internal/app` | 書き出すファイルの一覧 |
@@ -655,7 +658,7 @@ func Under(a, dir string) bool                              // 相対パス a �
 
 ```go
 type Manifest struct{ ...; Transpilers []Transpiler; Read Read; Coverage Coverage }   // Coverage.Enabled は [coverage] enabled。Read.Namespaces は [read] の namespaces（空でなければ、語彙のプラグイン: HasRead）
-type Transpiler struct { Name, Language string; Requires, Unsupported, Seams, RequiresVocabulary []string }  // [[transpiler]] 一つ。Requires が空なら基底。Seams は継ぎ目を要るデコレータの FQN。RequiresVocabulary は、語彙のプラグインを要る語彙の名前空間
+type Transpiler struct { Name, Language string; Requires, Unsupported, Seams, Interprets, RequiresVocabulary []string }  // [[transpiler]] 一つ。Requires が空なら基底。Seams は継ぎ目を要るデコレータの FQN。Interprets は、解釈するデコレータの FQN（Seams のものを除く。合わせたものは Interpreted()）。RequiresVocabulary は、語彙のプラグインを要る語彙の名前空間
 func LoadManifest(path string) (*Manifest, []diag.Diagnostic)                           // MAN-2 / MAN-4
 type Plugin struct { Name, Dir string; Manifest *Manifest; Mismatch []diag.Diagnostic } // 入っているプラグイン一つ。Dir は絶対パス。Mismatch は MAN-2（使うときにだけ報告する）
 type SearchEnv struct { PluginPath, Home string }                                       // 探索が見るプロジェクトの外の場所（HOZO_PLUGIN_PATH の値、ホーム）。呼ぶ側が渡す。零値なら plugin_dirs だけ

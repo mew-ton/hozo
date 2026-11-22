@@ -1,0 +1,17 @@
+# CFG-26 のための fixture。起動しない。
+# 基底 plain は、どのデコレータも解釈しない。相乗り reads は、a.mark と、名前付きデコレータ a.tagged を interprets に、
+# a.wrap を seams に書く（seams も、解釈するものに数える。docs/config.md「解釈するトランスパイラ」）
+name     = "interp"
+wasm     = "plugin.wasm"
+protocol = "1.0"
+
+[[transpiler]]
+name     = "plain"
+language = "go"
+
+[[transpiler]]
+name       = "reads"
+language   = "go"
+requires   = ["plain"]
+seams      = ["a.wrap"]
+interprets = ["a.mark", "a.tagged"]

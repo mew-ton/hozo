@@ -1,0 +1,8 @@
+# 単位は a だけ。名前空間 d は、どの単位の対象でもない（設計だけの名前空間）
+[hozo]
+plugin_dirs = ["plugins"]
+
+[[emit]]
+namespace   = "a"
+transpilers = ["plain", "reads"]
+out         = "gen/a"

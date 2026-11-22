@@ -101,7 +101,8 @@ func TestCorpusEmitGolden(t *testing.T) {
 			}
 			if c.noOutput {
 				// どのトランスパイラもファイルを返さない: 終了コード 0 で、何も書かない（.hozoc-outputs.json も置かない）
-				if len(got) != 0 || stdout.String() != "" {
+				// stdout に出てよいのは、CFG-26 の warning（と、その要約）だけ: コーパスの check.txt のゴールデンが持つもの
+				if rest, _ := splitUninterpreted(stdout.String()); len(got) != 0 || rest != "" {
 					t.Errorf("emit が書いた: %v\n%s", sortedKeys(got), stdout.String())
 				}
 				if _, err := os.Stat(filepath.Join(goldenDir(c.name), "emit")); !os.IsNotExist(err) {

@@ -1,5 +1,6 @@
 /** 業務フローの語彙（業務フロー図） */
 namespace business {
   /** この op は、業務フロー。操作の op（ユースケース）を、順に行う */
+  @hint
   decorator fn flow();
 }

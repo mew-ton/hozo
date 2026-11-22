@@ -62,6 +62,19 @@ func CheckUnsupported(p *ir.Program, ns string, files []string, unsupported []st
 	return Checker{}.CheckUnsupported(p, ns, files, unsupported)
 }
 
+// CheckUninterpreted は CFG-26（docs/config.md「解釈するトランスパイラ」）。名前空間 ns の宣言（フィールドと、分類のケースを含む）の
+// うち単位の対象のもの（Span.File が files にある。files が nil ならすべて）に付いた、本体のない、@hint でないデコレータのうち、
+// FQN が interpreted（設定が解釈するデコレータ）にないものを warning にする。interpreted は、hozo.toml のすべての単位の
+// トランスパイラのマニフェストの interprets と seams を、呼ぶ側が集めて渡す（docs/plugin-protocol.md「マニフェスト」）。
+func (c Checker) CheckUninterpreted(p *ir.Program, ns string, files []string, interpreted map[string]bool) []diag.Diagnostic {
+	if p == nil {
+		return nil
+	}
+	r := &reporter{loc: c.Locate}
+	checkUninterpreted(newIndex(p), ns, files, interpreted, r)
+	return r.diags
+}
+
 // Check は p を検査する。Check（パッケージ関数）と同じで、位置は c.Locate で直す。
 func (c Checker) Check(p *ir.Program, cfg *config.Config) []diag.Diagnostic {
 	if p == nil {

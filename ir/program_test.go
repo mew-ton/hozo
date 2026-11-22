@@ -77,7 +77,41 @@ func TestViewSignature(t *testing.T) {
 }
 
 func TestVersion(t *testing.T) {
-	if Version != "0.23" {
+	if Version != "1.0" {
 		t.Errorf("Version = %q", Version)
+	}
+}
+
+// TestVersionAccepts は docs/plugin-protocol.md「版の合わせ方」の表: 大きい版が同じで、プラグインの小さい版が、hozoc の
+// 小さい版以下なら、合う。版の文字列として読めないものは、合わない。
+func TestVersionAccepts(t *testing.T) {
+	cases := []struct {
+		host, plugin string
+		want         bool
+	}{
+		{"1.0", "1.0", true},
+		{"1.3", "1.0", true}, // 古いプラグインは、新しい小さい版の hozoc で動く
+		{"1.3", "1.3", true},
+		{"1.10", "1.9", true}, // 数として比べる（文字列の順ではない）
+		{"1.0", "1.1", false}, // 新しいプラグインは、古い hozoc では動かない
+		{"1.9", "1.10", false},
+		{"2.0", "1.0", false}, // 大きい版が違う
+		{"1.0", "2.0", false},
+		{"1.0", "0.23", false},
+		{"1.0", "", false},
+		{"1.0", "1", false},
+		{"1.0", "1.", false},
+		{"1.0", ".0", false},
+		{"1.0", "1.x", false},
+		{"1.0", "1.0.0", false},
+		{"1.0", "-1.0", false},
+		{"1.0", "+1.0", false},
+		{"1.0", " 1.0", false},
+		{"", "1.0", false},
+	}
+	for _, c := range cases {
+		if got := VersionAccepts(c.host, c.plugin); got != c.want {
+			t.Errorf("VersionAccepts(%q, %q) = %v, want %v", c.host, c.plugin, got, c.want)
+		}
 	}
 }

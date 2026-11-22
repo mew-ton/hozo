@@ -1,1 +1,2 @@
-0 errors, 0 warnings
+shop.hozo:38:3: warning[CFG-26]: @marks.requirement を解釈するトランスパイラが、hozo.toml のどの単位にもない（何も生成されない）。デコレータの宣言に本体を書く。または、解釈するトランスパイラを、hozo.toml の単位の transpilers に並べる
+0 errors, 1 warning

@@ -3,11 +3,34 @@
 # （docs/testing.md「規則ごとのテスト」）。このテストは、プラグインを起動しない（tests/rules_test.go）
 name     = "std"
 wasm     = "plugin.wasm"
-protocol = "0.23"
+protocol = "1.0"
 
+# go の interprets は、ほかの規則の例が、単位の対象の宣言に付ける、本体のないデコレータ（docs/testing.md「規則ごとのテスト」）。
+# これがないと、どの例にも CFG-26（解釈するトランスパイラがいない）が出る。CFG-26 そのものの例は、自分の fixture を使う
+# （tests/rules/CFG-26/plugins/interp）。例に、新しい名前の、本体のないデコレータを足したら、ここに足す
 [[transpiler]]
 name     = "go"
 language = "go"
+interprets = [
+  "a.a1", "a.absorb", "a.alias", "a.all", "a.any1", "a.any2",
+  "a.anyCase", "a.anyCase2", "a.audited", "a.between", "a.both", "a.boundary",
+  "a.byName", "a.bySubject", "a.byType", "a.catching", "a.counting", "a.d",
+  "a.doing", "a.doingE", "a.e", "a.effect", "a.effects", "a.everything",
+  "a.fallback", "a.fixed", "a.fixedAll", "a.for", "a.forAll", "a.forEffect",
+  "a.forField", "a.forOp", "a.forRead", "a.from", "a.fromOwnRead", "a.fromRead",
+  "a.fromUsers", "a.haltOnX", "a.hot", "a.ignoreE", "a.inner", "a.int",
+  "a.known", "a.l", "a.legacy", "a.list", "a.mark", "a.mixed",
+  "a.named", "a.nothing", "a.ok", "a.onError", "a.onPut", "a.once",
+  "a.onlyEffect", "a.onlyException", "a.onlyOp", "a.onlyRead", "a.op", "a.opOrEffect",
+  "a.opt", "a.peeking", "a.posting", "a.posts", "a.readOrEffect", "a.reading",
+  "a.recoverE", "a.requiresAuth", "a.sized", "a.some", "a.states", "a.subj",
+  "a.swallow", "a.table", "a.tag", "a.tags", "a.text", "a.toOpen",
+  "a.typed", "a.viaNetwork", "a.viaProxy", "a.wait", "a.where", "a.wrap",
+  "a.writing", "b.haltOnX", "b.haltWith", "b.mark", "db.delete", "db.find",
+  "db.insert", "db.key", "db.latest", "db.list", "db.table", "db.text",
+  "db.transaction", "db.update", "db.where", "http.get", "http.retry", "http.status",
+  "localStorage", "valid.min", "vocplugMark",
+]
 
 [[transpiler]]
 name     = "go-b"

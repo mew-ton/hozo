@@ -1,5 +1,5 @@
 {
-  "version": "0.23",
+  "version": "1.0",
   "viewer": "page",
   "config": {
     "index": 3,
@@ -74,7 +74,7 @@
     ]
   },
   "program": {
-    "version": "0.23",
+    "version": "1.0",
     "namespaces": [
       {
         "name": "",
@@ -14266,7 +14266,7 @@
                 "col": 3
               },
               "end": {
-                "line": 4,
+                "line": 5,
                 "col": 37
               }
             },
@@ -14283,7 +14283,7 @@
               }
             ],
             "entry": false,
-            "hint": false,
+            "hint": true,
             "repeatable": false,
             "throws": [],
             "outerThrows": [],
@@ -14305,11 +14305,11 @@
             "span": {
               "file": "hozo:vocab/actor.hozo",
               "start": {
-                "line": 7,
+                "line": 8,
                 "col": 3
               },
               "end": {
-                "line": 7,
+                "line": 9,
                 "col": 35
               }
             },
@@ -14326,7 +14326,7 @@
               }
             ],
             "entry": false,
-            "hint": false,
+            "hint": true,
             "repeatable": false,
             "throws": [],
             "outerThrows": [],
@@ -14348,11 +14348,11 @@
             "span": {
               "file": "hozo:vocab/actor.hozo",
               "start": {
-                "line": 10,
+                "line": 12,
                 "col": 3
               },
               "end": {
-                "line": 10,
+                "line": 13,
                 "col": 34
               }
             },
@@ -14369,7 +14369,7 @@
               }
             ],
             "entry": false,
-            "hint": false,
+            "hint": true,
             "repeatable": false,
             "throws": [],
             "outerThrows": [],
@@ -14407,7 +14407,7 @@
                 "col": 3
               },
               "end": {
-                "line": 4,
+                "line": 5,
                 "col": 23
               }
             },
@@ -14418,7 +14418,7 @@
             ],
             "caseTargets": [],
             "entry": false,
-            "hint": false,
+            "hint": true,
             "repeatable": false,
             "throws": [],
             "outerThrows": [],
@@ -16521,7 +16521,7 @@
                 "col": 3
               },
               "end": {
-                "line": 8,
+                "line": 9,
                 "col": 88
               }
             },
@@ -16551,7 +16551,7 @@
             ],
             "caseTargets": [],
             "entry": false,
-            "hint": false,
+            "hint": true,
             "repeatable": false,
             "throws": [],
             "outerThrows": [],
@@ -16699,7 +16699,7 @@
                 "col": 3
               },
               "end": {
-                "line": 8,
+                "line": 9,
                 "col": 49
               }
             },
@@ -16725,7 +16725,7 @@
             ],
             "caseTargets": [],
             "entry": false,
-            "hint": false,
+            "hint": true,
             "repeatable": false,
             "throws": [],
             "outerThrows": [],

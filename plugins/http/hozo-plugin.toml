@@ -2,7 +2,7 @@
 # トランスパイラも、語彙の宣言も、持たない（宣言は、hozoc に同梱の vocab/http.hozo）
 name     = "http"
 wasm     = "plugin.wasm"
-protocol = "0.23"
+protocol = "1.0"
 
 [read]
 namespaces = ["http"]

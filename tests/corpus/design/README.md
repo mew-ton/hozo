@@ -73,7 +73,7 @@
 | `gen/browser/` | 同じく `inner/` と入口。述語で決まる分類（`WarrantyKind`、`WarrantyAvailable`）の `classify.go`、`server` の op の口 `ServerOps`、`server` の入口のパッケージの型の import |
 | `gen/http/`、`gen/page/` | 語彙の型（`http` の例外、`page.Route` など）だけ。op を持たないので、`inner/` はない。`http.BadRequest` は、二つの引数（`message`、`violations`）が、そのまま二つのフィールド |
 
-相乗りを並べていないので、語彙のデコレータ（`@http.get`、`@page.route`、`@db.table` など）と、利用者が `valid` に足した制約（§6.5）は印のままで、出力に現れない（`docs/plugin-go.md`「デコレータ」）。`http`、`valid`、`db` の語彙の検査は、相乗りを並べていなくても、掛かる（語彙のプラグイン `http`、`valid`、`db`。`docs/plugin-http.md`、`docs/plugin-valid.md`、`docs/plugin-db.md`）。`db` の、しまい方のデコレータは、表を出すトランスパイラが求めるもので、ここでは、書いていない（`docs/plugin-db.md`「しまい方」）。利用者が `valid` に足した制約は、語彙のプラグイン `valid` も、読まない（`docs/plugin-valid.md`「対象」）。
+相乗りを並べていないので、語彙のデコレータ（`@http.get`、`@page.route`、`@db.table` など）と、利用者が `valid` に足した制約（§6.5）は印のままで、出力に現れない（`docs/plugin-go.md`「デコレータ」）。印のままのデコレータは、どのトランスパイラも解釈しないので、付けた所ごとに、CFG-26 の warning が出る（64 個。`docs/config.md`「解釈するトランスパイラ」。一覧は、ゴールデン `testdata/expected/check.txt`）。`http`、`valid`、`db` の語彙の検査は、相乗りを並べていなくても、掛かる（語彙のプラグイン `http`、`valid`、`db`。`docs/plugin-http.md`、`docs/plugin-valid.md`、`docs/plugin-db.md`）。`db` の、しまい方のデコレータは、表を出すトランスパイラが求めるもので、ここでは、書いていない（`docs/plugin-db.md`「しまい方」）。利用者が `valid` に足した制約は、語彙のプラグイン `valid` も、読まない（`docs/plugin-valid.md`「対象」）。
 
 ## 設計書の例が規則に触れるところ
 
@@ -93,4 +93,4 @@
 | §10.2 `@page.interaction(page: openProduct, when: ProductPage.Ready)`、§11.2 `orders: OrderRow[]`、§7.3 の `CancelInput` / `Order` / `refund` など | 宣言がないので RES-1 | 「追加した宣言」で補った |
 | §11.1 `fetchMe` の `@redirectToLogin`（`catches server.Unauthorized halts transitionToLogin`） | `server.getMe` が `server.Unauthorized` を投げること（`@requiresAuth`）を前提にしているが、`getMe` の宣言は設計書にない | 表の 9 |
 
-このコーパスで `hozoc build --no-emit` に error も warning も出ない想定（`docs/check.md` の各規則を手で追った結果。REL-4 は、関係の節を書いた配線（表の 20）の本体と照合し（節と、計算した分の、過不足を見る THROWS-1 と EFF-2 は、欠番になった: `docs/decisions.md`「決めたこと」381）、STATE-5 は葉の op が `reads` / `effects` を書いていないこと、MATCH-2 は `WarrantyKind` の三つのケースと `WarrantyAvailable` の `default`、BIND-4 は `server.*` への呼び出し六つ（`logout` `getMe` `getOrders` `getItem` `addToCart` `attachWarranty`）の必須の入力を確かめた）。
+このコーパスで `hozoc build --no-emit` に error は出ず、warning は CFG-26 だけが出る想定（CFG-26 は、すぐ下の段落。ほかは、`docs/check.md` の各規則を手で追った結果。REL-4 は、関係の節を書いた配線（表の 20）の本体と照合し（節と、計算した分の、過不足を見る THROWS-1 と EFF-2 は、欠番になった: `docs/decisions.md`「決めたこと」381）、STATE-5 は葉の op が `reads` / `effects` を書いていないこと、MATCH-2 は `WarrantyKind` の三つのケースと `WarrantyAvailable` の `default`、BIND-4 は `server.*` への呼び出し六つ（`logout` `getMe` `getOrders` `getItem` `addToCart` `attachWarranty`）の必須の入力を確かめた）。

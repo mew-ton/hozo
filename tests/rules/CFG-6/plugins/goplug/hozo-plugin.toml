@@ -1,9 +1,11 @@
-# テストの fixture: トランスパイラ goplug は a.legacy に対応しない。起動しない
+# テストの fixture: トランスパイラ goplug は a.legacy に対応しない（どのトランスパイラも解釈しないので、CFG-26 も出る）。
+# a.wrap は、解釈する。起動しない
 name     = "goplug"
 wasm     = "plugin.wasm"
-protocol = "0.23"
+protocol = "1.0"
 
 [[transpiler]]
 name        = "goplug"
 language    = "go"
 unsupported = ["a.legacy"]
+interprets  = ["a.wrap"]

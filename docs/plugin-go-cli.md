@@ -11,7 +11,7 @@
 ```toml
 name     = "go-cli"
 wasm     = "plugin.wasm"
-protocol = "0.23"
+protocol = "1.0"
 
 vocabulary = ["cli.hozo"]
 
@@ -19,8 +19,13 @@ vocabulary = ["cli.hozo"]
 name     = "go-cli"
 language = "go"
 requires = ["go", "go-valid"]
+interprets = [
+  "cli.command", "cli.arg", "cli.flag", "cli.env",
+  "cli.required", "cli.default", "cli.exitCode",
+]
 ```
 
+- `interprets`（`docs/plugin-protocol.md`「マニフェスト `hozo-plugin.toml`」）は、自分の語彙 `cli` の七つ。既定値を確かめるために読む `valid` の制約は、書かない（解釈するのは、`requires` の `go-valid`）。
 - 提供するトランスパイラは `go-cli` の一つ（`hozo.toml` の `transpilers = ["go", "go-valid", "go-cli"]` で選ぶ）。頼まれたトランスパイラがそれ以外なら `code: "unsupported"`（`docs/plugin-protocol.md`「要求と応答」）。
 - `cli` の語彙はこのプラグインが提供する（`docs/vocab.md`「同梱しない語彙」）。`plugins/go-cli/cli.hozo`（マニフェストの `vocabulary = ["cli.hozo"]` はマニフェストからの相対パス）の中身は「語彙」。
 - 読む語彙は、`cli` の `command` / `arg` / `flag` / `env` / `required` / `default` / `exitCode`（「語彙」）。`@proc.stdio` などのほかの語彙は読まない（基底が、付いた op を人が実装する葉として出す）。

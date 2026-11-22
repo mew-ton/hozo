@@ -7,6 +7,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -38,6 +39,31 @@ func TestSelfCheck(t *testing.T) {
 	t.Logf("hozoc build --no-emit:\n%s", stdout.String())
 }
 
+// splitUninterpreted は、hozoc の text の出力 stdout から、CFG-26（解釈するトランスパイラがいないデコレータ。docs/config.md
+// 「解釈するトランスパイラ」）の warning の行と、それを数えた要約の行（"0 errors, N warnings"）を除いた残りと、除いた warning の行を返す。
+// warning が CFG-26 だけの出力に使う: ほかの診断の行と、要約の数の食い違いは、残りに残るので、呼ぶ側の比べで、失敗する。
+func splitUninterpreted(stdout string) (rest string, warnings []string) {
+	var kept []string
+	for _, l := range strings.SplitAfter(stdout, "\n") {
+		if strings.Contains(l, ": warning[CFG-26]: @") {
+			warnings = append(warnings, strings.TrimSuffix(l, "\n"))
+			continue
+		}
+		kept = append(kept, l)
+	}
+	summary := "0 errors, " + strconv.Itoa(len(warnings)) + " warnings\n"
+	if len(warnings) == 1 {
+		summary = "0 errors, 1 warning\n"
+	}
+	for i, l := range kept {
+		if len(warnings) > 0 && l == summary {
+			kept = append(kept[:i:i], kept[i+1:]...)
+			break
+		}
+	}
+	return strings.Join(kept, ""), warnings
+}
+
 // TestSelfEmitDryRun は hozoc 自身への emit --dry-run が、コミット済みの生成物（二つの単位の出力: 基底 go と go-valid と go-cli の
 // internal/gen/hozoc/ と、基底 go の internal/gen/proc/）と、ちょうど同じファイルを書く予定にすること（出力先ごとの記録
 // .hozoc-outputs.json は、トランスパイラのファイルではないので、予定には出ない）。書き出さないこと。プラグインの WASM は、
@@ -57,8 +83,20 @@ func TestSelfEmitDryRun(t *testing.T) {
 	if code != 0 {
 		t.Fatalf("hozoc build --dry-run の終了コード %d\n%s%s", code, stdout.String(), stderr.String())
 	}
+	// hozoc 自身の仕様の warning は、CFG-26 が三つ: @fs.files（状態 sources と config）と、@proc.stdio（runEmit）。どのトランスパイラも
+	// 解釈せず、中身は、人が書いている（docs/vocab.md「解釈されなくてよいデコレータ」、docs/decisions.md「決めたこと」433）
+	rest, warnings := splitUninterpreted(stdout.String())
+	var marks []string
+	for _, w := range warnings {
+		_, after, _ := strings.Cut(w, "warning[CFG-26]: ")
+		mark, _, _ := strings.Cut(after, " ")
+		marks = append(marks, mark)
+	}
+	if got := strings.Join(marks, ","); got != "@fs.files,@fs.files,@proc.stdio" {
+		t.Errorf("CFG-26 の warning = %v, want [@fs.files @fs.files @proc.stdio]", marks)
+	}
 	var written []string
-	for _, l := range strings.Split(strings.TrimSpace(stdout.String()), "\n") {
+	for _, l := range strings.Split(strings.TrimSpace(rest), "\n") {
 		if p, ok := strings.CutPrefix(l, "written: "); ok {
 			written = append(written, p)
 		} else {

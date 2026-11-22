@@ -313,7 +313,8 @@ type Diagnostic struct {
 // 終了コードを返す（docs/plugin-protocol.md「起動」）: 成功なら 0、protocol が合わないか
 // direction を実装していなければ 2（標準出力に {"error":{"code":...,"message":...}}）、
 // それ以外の誤り（要求が JSON のオブジェクトとして読めない、h が誤りを返した、書き出せない）なら 1（標準エラーにメッセージ）。
-// protocol は文字列で、この SDK の版と等しくなければ「合わない」（ない、null、文字列でないものを含む）。
+// protocol は文字列で、この SDK の版（ir.Version）と合わなければ「合わない」（ない、null、文字列でないものを含む）。
+// 合うのは、大きい版が同じで、要求の小さい版が、この SDK の小さい版以上のとき（docs/plugin-protocol.md「版の合わせ方」）。
 func Main(h Handler) int {
 	return Run(h, os.Stdin, os.Stdout, os.Stderr)
 }
@@ -336,7 +337,7 @@ func Run(h Handler, in io.Reader, out, errOut io.Writer) int {
 		return fail(errOut, errors.New("decode request: not a JSON object"))
 	}
 	var head struct{ Protocol, Direction string }
-	if json.Unmarshal(fields["protocol"], &head.Protocol) != nil || head.Protocol != ir.Version {
+	if json.Unmarshal(fields["protocol"], &head.Protocol) != nil || !ir.VersionAccepts(head.Protocol, ir.Version) {
 		got := `""`
 		if p, ok := fields["protocol"]; ok {
 			got = compact(p)

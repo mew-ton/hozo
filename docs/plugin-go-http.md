@@ -13,15 +13,21 @@
 ```toml
 name     = "go-http"
 wasm     = "plugin.wasm"
-protocol = "0.23"
+protocol = "1.0"
 
 [[transpiler]]
 name     = "go-http"
 language = "go"
 requires = ["go", "go-valid"]
 requires_vocabulary = ["http"]
+interprets = [
+  "http.get", "http.post", "http.status", "http.header",
+  "http.query", "http.body", "http.headerObj", "http.queryObj",
+  "http.bodyObj", "http.required", "http.default",
+]
 ```
 
+- `interprets`（`docs/plugin-protocol.md`「マニフェスト `hozo-plugin.toml`」）は、読む十一のデコレータ。`http.retry` は、書かない（読まない）。
 - 読む語彙は、標準の `http`: op の `@http.get(path)` / `@http.post(path)`、フィールドの `@http.header` / `@http.query` / `@http.body`（項目の形）と `@http.headerObj` / `@http.queryObj` / `@http.bodyObj`（全体の形）、`@http.required` と `@http.default(value)`（項目がないときの扱い）、例外の `@http.status(code)`。`@http.retry` は読まない（印）。語彙は提供しない。
 - **`http` の語彙のプラグインが、要る**（`requires_vocabulary`。`docs/plugin-protocol.md`「語彙のプラグイン」）: このトランスパイラは、`http` の語彙の使い方の検査（HTTP-*。`docs/plugin-http.md`「診断」）を、自分では返さない。語彙のプラグインが入っていなければ CFG-25（`docs/config.md`「診断」）。
 - `go-valid` への依存は、オプションによらない（`docs/config.md`「基底と相乗り」）。`validate = false` でも、単位の `transpilers` に `go-valid` が要る。

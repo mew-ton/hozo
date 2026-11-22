@@ -45,7 +45,7 @@ capabilities: `textDocumentSync: { openClose: true, change: Full, save: { includ
 | `Data` | `data`（コードアクションが使う） |
 | 位置のない診断（`hozo.toml` の誤り） | `hozo.toml` の 1 行 1 列。ファイルもないものは `hozo.toml` の URI に付ける |
 
-`hozoc build --no-emit` と同じ `internal/check` の呼び出しなので、同じ入力に同じ診断が出る（`docs/testing.md`「言語サーバーと check の一致」）。違いは、二つ。
+`hozoc build --no-emit` と同じ `internal/check` の呼び出しなので、同じ入力に同じ診断が出る（`docs/testing.md`「言語サーバーと check の一致」）。設定とマニフェストだけで決まる診断（CFG-6、CFG-26 など。`docs/config.md`「診断」）も、プラグインを起動せずに、解析のたびに出る。違いは、二つ。
 
 - プラグインの診断（`docs/cli.md`「検査」の 4。HTTP-5 など、語彙のプラグインが返す誤りと、GOHTTP-16 など、トランスパイラが返す誤りと、warning）は、解析のたびには出さず、後から足す（「プラグインの診断」）。
 - 言語サーバーだけが出す診断が、二つある:

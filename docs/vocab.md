@@ -207,7 +207,8 @@ effect fn deleteSession(token: type.Token): effects sessions.delete;
 - **同梱する理由**: 図と検査が、プラグインを入れていなくても、担い手、ユースケース、フロー、要求を、読めるようにする（同 364）。
 - **担い手と、要求は、対象のない分類（`classify … of never`）のケース**（`docs/check.md`「分類」の「対象のない分類」）。使う人が、自分の名前空間に宣言する。語彙が持つのは、それに付けるデコレータと、それを指すデコレータだけ。なので、どのデコレータも、対象で絞る形（`case of never`）で、ケースを受ける（`docs/grammar.md`「decorator の宣言」）。
 - **名前は、仮**。図に対応するデコレータの名前は、後で変えてよい（同 364）。
-- **意味をコードにするプラグインは、まだない**（「語彙の意味の実装」）。今は、印のまま: 検査が見るのは、付ける先（DEC-1）と、引数のケース（DEC-7）だけ。
+- **検査が見るのは、付ける先（DEC-1）と、引数のケース（DEC-7）だけ。** 読むトランスパイラは「語彙の意味の実装」。
+- **六つのデコレータは、核の印 `@hint` を持つ**（「解釈されなくてよいデコレータ」）。
 
 `vocab/actor.hozo` の全文は次のとおり。
 
@@ -215,12 +216,15 @@ effect fn deleteSession(token: type.Token): effects sessions.delete;
 /** 担い手の種類の語彙（ユースケース図）。担い手は、対象のない分類のケースで、種類は、そのケースに付ける */
 namespace actor {
   /** 人が、呼び出す */
+  @hint
   decorator human for case of never;
 
   /** 機械的な動機で、呼び出す（外の仕組みからの知らせ、時刻で動く処理） */
+  @hint
   decorator bot for case of never;
 
   /** 生成 AI の判断で、呼び出す */
+  @hint
   decorator ai for case of never;
 }
 ```
@@ -235,6 +239,7 @@ namespace usecase {
    *
    * @param actors 行う担い手。対象のない分類のケース
    */
+  @hint
   decorator fn of(...actors: any case of never);
 }
 ```
@@ -245,6 +250,7 @@ namespace usecase {
 /** 業務フローの語彙（業務フロー図） */
 namespace business {
   /** この op は、業務フロー。操作の op（ユースケース）を、順に行う */
+  @hint
   decorator fn flow();
 }
 ```
@@ -259,6 +265,7 @@ namespace prd {
    *
    * @param requirements 指す要求。対象のない分類のケース
    */
+  @hint
   decorator ref(...requirements: any case of never) for op, model, state, effect, read;
 }
 ```
@@ -299,6 +306,13 @@ namespace flows {
 - **`prd.ref`** は、op、model、状態、効果、`read` に付ける。辿るための印で、テストの中身は、ここから作らない（`docs/decisions.md`「決めたこと」377）。
 - 使う人が、同じ名前の名前空間（`actor`、`usecase`、`business`、`prd`）に、宣言を足してもよい（「読み込み」）。同じ名前の宣言（`actor.human` など）を足せば RES-6。
 
+### 解釈されなくてよいデコレータ
+
+標準の語彙で、核の印 `@hint`（`docs/grammar.md`「decorator の宣言」）を持つのは、設計の図の語彙の六つ: `prd.ref`、`actor.human`、`actor.bot`、`actor.ai`、`usecase.of`、`business.flow`（`docs/decisions.md`「決めたこと」433）。読むトランスパイラ（`go-design`）を並べていない設定で書いても、warning（CFG-26。`docs/config.md`「解釈するトランスパイラ」）は、出ない。
+
+- 理由: 六つは、振る舞いにも、出力の中身にも効かず、設計を説明するだけ。読まれなくても、落ちるものがない。
+- ほかの標準のデコレータ（`db`、`http`、`valid`、`page`、`localstorage`、`fs`、`proc`）は、持たない。状態の置き場（`fs.files`、`localStorage`）も、振る舞いに効くので、持たない: 解釈するトランスパイラのいない設定で、単位の対象に書けば、CFG-26 が出る（人が中身を書いている、という事実の提示）。
+
 ## 同梱しない語彙
 
 - `cli`（`examples/hozoc.hozo` の `namespace cli { command / arg / flag / env / exitCode }`）: go-cli プラグインが `vocabulary` で提供する（`plugins/go-cli/cli.hozo`。宣言の全文と、出典から変えたところ（`arg` の位置、`flag` と `env` の省ける名前、足した `required` と `default`）の持ち主は `docs/plugin-go-cli.md`「語彙」）。`http` や `page` と同じく、意味をコードにするプラグインが語彙の持ち主になる。hozoc 自身は `hozo.toml` の単位の `transpilers = ["go", "go-valid", "go-cli"]` で読む。
@@ -313,10 +327,10 @@ namespace flows {
 | `valid`（言語に依らない決まり: 制約の意味、使い方の検査） | 語彙のプラグイン `valid`（`docs/plugin-valid.md`） |
 | `valid` の標準の制約（確かめる関数） | `go-valid`（`docs/plugin-go-valid.md`） |
 | `cli`（go-cli の語彙） | `plugins/go-cli/`（`docs/plugin-go-cli.md`） |
-| `fs` / `proc` | 語彙を実装するプラグインはない。`@proc.stdio` の付いた op は、基底が、人が実装する葉として出す（`docs/plugin-go.md`「op の置き場」。hozoc 自身では `runEmit`。`docs/cli.md`「手で書くもの」）。`@fs.files` は読むトランスパイラがなく、印のまま（`docs/plugin-go.md`「デコレータ」）。`proc` の例外の型は、`proc` の単位の基底が出す |
+| `fs` / `proc` | 語彙を実装するプラグインはない。`@proc.stdio` の付いた op は、基底が、人が実装する葉として出す（`docs/plugin-go.md`「op の置き場」。hozoc 自身では `runEmit`。`docs/cli.md`「手で書くもの」）。`@fs.files` は読むトランスパイラがなく、印のまま（`docs/plugin-go.md`「デコレータ」）。どちらも、解釈するトランスパイラがないので、単位の対象に書けば、CFG-26 の warning が出る（hozoc 自身の仕様で、三か所。「解釈されなくてよいデコレータ」）。`proc` の例外の型は、`proc` の単位の基底が出す |
 | `http`（言語に依らない決まり: 経路、通信の上の形、使い方の検査） | 語彙のプラグイン `http`（`docs/plugin-http.md`） |
 | `http`（サーバー） | `go-http`（`docs/plugin-go-http.md`） |
 | `db` | `go-sqlite`（`docs/plugin-go-sqlite.md`） |
 | `http`（クライアント）/ `localStorage` / `page` | 段階 5 のプラグイン |
 | `usecase` / `business` / `prd` | `go-design`（`docs/plugin-go-design.md`）: `business.flow` の op に、E2E テストの口。`usecase.of` は、フローが呼べる op の印。`prd.ref` は、要求を指している設計の一覧（要求ごとの、テストの入れ物の口のコメントと、どこからも指されていない要求の warning）。`go-design` を並べない単位では、印のまま |
-| `actor` | まだ、ない。読むトランスパイラがなく、印のまま |
+| `actor` | まだ、ない。読むトランスパイラがなく、印のまま（`@hint` を持つので、CFG-26 は出ない。「解釈されなくてよいデコレータ」） |

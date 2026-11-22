@@ -20,15 +20,19 @@ func TestRequirements(t *testing.T) { flowstest.RunRequirements(t, requirements{
 ```toml
 name     = "go-design"
 wasm     = "plugin.wasm"
-protocol = "0.23"
+protocol = "1.0"
 
 [[transpiler]]
 name     = "go-design"
 language = "go"
 requires = ["go"]
+interprets = [
+  "business.flow", "usecase.of", "prd.ref",
+]
 ```
 
-- 読む語彙は、標準の `business`（op の `@business.flow`）、`usecase`（op の `@usecase.of`）、`prd`（`@prd.ref`）。`actor` の語彙（担い手の種類）は、読まない（印のまま）。語彙は提供しない。
+- `interprets`（`docs/plugin-protocol.md`「マニフェスト `hozo-plugin.toml`」）は、読む三つ。三つとも `@hint` を持つので、このトランスパイラを並べなくても、CFG-26 は出ない（`docs/vocab.md`「解釈されなくてよいデコレータ」）。
+- 読む語彙は、標準の `business`（op の `@business.flow`）、`usecase`（op の `@usecase.of`）、`prd`（`@prd.ref`）。`actor` の語彙（担い手の種類）は、読まない（印のまま）。マニフェストの `interprets` は、読む三つ（`business.flow`、`usecase.of`、`prd.ref`）。語彙は提供しない。
 - 継ぎ目は宣言しない。基底の出力（配線、`Ops`、`New`）は、変えない。
 
 ## オプション

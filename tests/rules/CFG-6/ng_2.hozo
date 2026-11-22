@@ -2,7 +2,7 @@
 namespace a {
   decorator legacy for field, op;
   model M {
-    @legacy                            // WARN: CFG-6
+    @legacy                            // WARN: CFG-6, CFG-26
     id: string;
   }
   fn f(): M;

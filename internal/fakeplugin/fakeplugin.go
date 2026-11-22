@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"sync"
 	"testing"
 
@@ -100,4 +101,28 @@ func PlaceAt(path string) error {
 		return err
 	}
 	return out.Close()
+}
+
+// DesignDecorators は、設計書のコーパス（tests/corpus/design）が、単位の対象の宣言に付ける、本体のない、@hint でないデコレータの FQN。
+// コーパスの .hozo を、にせもののトランスパイラだけの設定で使うテストが、にせものの [[transpiler]] の interprets に書く（[Interprets]）:
+// 書かなければ、付けた所ごとに CFG-26（解釈するトランスパイラがいない。docs/config.md「解釈するトランスパイラ」）が出て、
+// そのテストが見たい診断に、混ざる。コーパスに、新しいデコレータを足したら、ここに足す（足し忘れは、CFG-26 が、テストに出て分かる）。
+// コーパス自身の設定（基底 go だけ）での CFG-26 は、ゴールデン tests/corpus/design/testdata/expected/check.txt が持つ。
+var DesignDecorators = []string{
+	"browser.ignoreFailure", "browser.unavailableOnFailure",
+	"db.key", "db.ref", "db.table", "db.unique",
+	"http.body", "http.bodyObj", "http.default", "http.get", "http.header", "http.post", "http.query", "http.status",
+	"localStorage",
+	"page.dialog", "page.fallback", "page.interaction", "page.path", "page.query", "page.route",
+	"server.validated",
+	"valid.checkDigit", "valid.format", "valid.length", "valid.min", "valid.pattern",
+}
+
+// Interprets は、マニフェストの [[transpiler]] に足す一行: interprets = [fqns...]（docs/plugin-protocol.md「マニフェスト」）。
+func Interprets(fqns ...string) string {
+	quoted := make([]string, len(fqns))
+	for i, f := range fqns {
+		quoted[i] = `"` + f + `"`
+	}
+	return "interprets = [" + strings.Join(quoted, ", ") + "]\n"
 }

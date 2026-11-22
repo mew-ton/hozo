@@ -353,7 +353,7 @@ DecoEffectsClause = "effects" EffectElem { "," EffectElem } ;
 
 - `@repeatable`、`@entry`、`@hint` は核の印（`CoreMark`）で、デコレータの宣言にだけ付く。`decorator` の直前に置き、引数を取らず、別名の形には付けられない。並べてよく、順は問わない。同じ印を二度書く、ほかの位置に書く、は構文エラー。
   - `@entry`: このデコレータの付いた fn は、境界の入口（`docs/decisions.md`「決めたこと」408）。プラグインが、その境界を知るための印。付けられるのは、`decorator fn` だけ（`for` の形に付けたら、SYNTAX）。節や本体の有無は、問わない。
-  - `@hint`: このデコレータは、解釈されなくても、よい（同 420。読める道具が、読めばよい印）。振る舞いを言う節（`throws`、`outer throws`、`catches`、`reads`、`effects`）か、本体を持つ宣言と、`@entry` の宣言には、付けられない（DEC-26。`docs/check.md`「デコレータ」）。
+  - `@hint`: このデコレータは、解釈されなくても、よい（同 420。読める道具が、読めばよい印）。本体のないデコレータを、設定のどのトランスパイラも解釈しないときの warning（CFG-26。`docs/config.md`「解釈するトランスパイラ」）を、出さない。振る舞いを言う節（`throws`、`outer throws`、`catches`、`reads`、`effects`）か、本体を持つ宣言と、`@entry` の宣言には、付けられない（DEC-26。`docs/check.md`「デコレータ」）。
   - **`@external` は、なくした**（同 407）。パーサーは、`@external` を、新しい書き方（節 `outer throws`）をメッセージで示して SYNTAX にし、その宣言の `throws` の節を、`outer throws` として読み進める。
 - **`throws E` と `outer throws E`**（同 407）。`throws E` は、包むことで、その fn が、E を投げる。`outer throws E` は、その fn は、E を投げないが、fn の外（境界と、fn の間。行きも、帰りも）で、E が起きうる: 境界の外（別の名前空間）から呼んだときだけ、加わる（`docs/check.md`「計算」の手順 i。DEC-10）。関係（`prevents effects` / `keeps effects`）は、どちらにも書け、書かなければ、「分からない」。一つの宣言が、両方を持てる（`decorator fn post(path: string): throws TooLarge outer throws ServerError, NetworkError;`）。`outer` は文脈キーワードで、節の頭の、直後が `throws` の位置でだけ、この意味になる。
   - `@repeatable`: そのデコレータを、一つの宣言に何度でも付けられる（`@repeatable decorator where(column: string, value: string | int | float | boolean) for read;`）。印のないデコレータは、一つの宣言に一度だけ（DEC-13。`docs/check.md`「デコレータ」）。何度も付けた適用は、書いた順に IR に並ぶ（`docs/ir.md`「デコレータの適用」）。

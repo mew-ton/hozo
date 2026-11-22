@@ -1,0 +1,17 @@
+// CFG-26（docs/config.md「解釈するトランスパイラ」）: @hint のデコレータと、本体のあるデコレータには、出さない
+namespace a {
+  @hint
+  decorator fn note();
+  @hint
+  decorator memo for field;
+  decorator fn logged() { proceed(); }
+
+  model M {
+    @memo
+    id: string;
+  }
+
+  @note
+  @logged
+  fn f(): M;
+}

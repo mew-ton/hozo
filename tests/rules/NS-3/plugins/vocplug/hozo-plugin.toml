@@ -1,9 +1,10 @@
 # テストの fixture: 語彙を提供するプラグイン。起動しない
 name       = "vocplug"
 wasm       = "plugin.wasm"
-protocol = "0.23"
+protocol = "1.0"
 vocabulary = ["v.hozo"]
 
 [[transpiler]]
 name     = "vocplug"
 language = "go"
+interprets = ["vocplugMark"]   # 自分の語彙のデコレータを、解釈する（なければ、付けた所に CFG-26）

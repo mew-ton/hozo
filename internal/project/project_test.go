@@ -97,8 +97,9 @@ func copyCorpus(t *testing.T) string {
 	return dir
 }
 
-// TestDesignCorpus は設計書のコーパス（docs/testing.md「コーパス」）: error も warning もない
-// （tests/corpus/design/README.md の想定。§7.3 の placeOrder を配線に直した経緯はその表の 14）。
+// TestDesignCorpus は設計書のコーパス（docs/testing.md「コーパス」）: error はなく、warning は CFG-26 だけ（単位のトランスパイラは
+// 基底 go だけで、語彙のデコレータを、どのトランスパイラも解釈しない。一覧は、ゴールデン testdata/expected/check.txt が持つ。
+// tests/corpus/design/README.md の想定。§7.3 の placeOrder を配線に直した経緯はその表の 14）。
 func TestDesignCorpus(t *testing.T) {
 	p := loadCorpus(t, corpusDir, "", nil)
 	if p.NoConfig {
@@ -107,8 +108,13 @@ func TestDesignCorpus(t *testing.T) {
 	if p.Errors() != 0 {
 		t.Fatalf("errors:\n%s", text(p))
 	}
-	if got := strings.Join(codes(p.Diags), ","); got != "" {
-		t.Fatalf("codes = %v, want none\n%s", got, text(p))
+	for _, d := range p.Diags {
+		if d.Code != "CFG-26" || d.Severity != diag.Warning {
+			t.Fatalf("codes = %v, want CFG-26 の warning だけ\n%s", strings.Join(codes(p.Diags), ","), text(p))
+		}
+	}
+	if len(p.Diags) == 0 {
+		t.Fatal("CFG-26 が一つも出ていない（基底 go だけの単位で、語彙のデコレータは、解釈されない）")
 	}
 	if got := strings.Join(p.Sources, ","); got != "browser.hozo,server.hozo" {
 		t.Fatalf("Sources = %v", p.Sources)
@@ -334,7 +340,7 @@ func fakePlugin(t *testing.T, dir, name, lang, extra, result string, exit int, t
 	fakeplugin.Install(t, pluginDir)
 	write(t, filepath.Join(pluginDir, "response.json"), result)
 	write(t, filepath.Join(pluginDir, "exit"), string(rune('0'+exit)))
-	manifest := "name = \"" + name + "\"\nwasm = " + fakeplugin.WasmTOML + "\nprotocol = \"0.23\"\n" + extra
+	manifest := "name = \"" + name + "\"\nwasm = " + fakeplugin.WasmTOML + "\nprotocol = \"1.0\"\n" + extra
 	for _, tr := range transpilers {
 		manifest += "\n[[transpiler]]\nname = \"" + tr + "\"\nlanguage = \"" + lang + "\"\n"
 	}
@@ -517,7 +523,7 @@ func TestPluginAnswersPerOutput(t *testing.T) {
 	dir := t.TempDir()
 	write(t, filepath.Join(dir, "a.hozo"), "namespace a {\n  fn f();\n}\nnamespace b {\n  fn g();\n}\n")
 	fakePlugin(t, dir, "chk", "go", "", `{"files":[{"path":"@DIR@/@T@.txt","content":"@NS@"}],"warnings":[]}`, 0)
-	m := "name = \"chk\"\nwasm = " + fakeplugin.WasmTOML + "\nprotocol = \"0.23\"\n" +
+	m := "name = \"chk\"\nwasm = " + fakeplugin.WasmTOML + "\nprotocol = \"1.0\"\n" +
 		"\n[[transpiler]]\nname = \"chk\"\nlanguage = \"go\"\n\n[[transpiler]]\nname = \"chk2\"\nlanguage = \"go\"\nrequires = [\"chk\"]\n"
 	write(t, filepath.Join(dir, "plugins", "chk", "hozo-plugin.toml"), m)
 
@@ -617,7 +623,7 @@ func (c *cancelAfterFirst) Err() error {
 // （name と language のほかの行: requires、seams など）を、トランスパイラの名前 → 行で。
 func manifest(t *testing.T, dir, name string, transpilers ...[2]string) {
 	t.Helper()
-	m := "name = \"" + name + "\"\nwasm = \"plugin.wasm\"\nprotocol = \"0.23\"\n"
+	m := "name = \"" + name + "\"\nwasm = \"plugin.wasm\"\nprotocol = \"1.0\"\n"
 	for _, tr := range transpilers {
 		lang := "go"
 		if strings.HasPrefix(tr[0], "ts") {
@@ -791,7 +797,8 @@ func TestHomes(t *testing.T) {
 	dir := t.TempDir()
 	write(t, filepath.Join(dir, "type.hozo"), "namespace type {\n  model User { id: string; }\n}\n")
 	write(t, filepath.Join(dir, "server.hozo"), "namespace server {\n  @http.status(404)\n  exception Gone;\n  export fn get(): type.User throws Gone, http.BadRequest;\n}\n")
-	manifest(t, dir, "kit", [2]string{"go", ""}, [2]string{"go-b", ""})
+	// go は @http.status を解釈する（解釈するトランスパイラがいなければ CFG-26: このテストが見るものではない）
+	manifest(t, dir, "kit", [2]string{"go", "interprets = [\"http.status\"]\n"}, [2]string{"go-b", "interprets = [\"http.status\"]\n"})
 	load := func(units string) *Project {
 		write(t, filepath.Join(dir, "hozo.toml"), pluginDirs+units)
 		return Load(dir, "", nil)
@@ -852,7 +859,7 @@ func TestDiscoveryEnvironmentComesFromCaller(t *testing.T) {
 	envDir, home := t.TempDir(), t.TempDir()
 	// env-t と home-t は、基底 t に相乗りする（一つの単位は、基底をちょうど一つ持つ）
 	manifest := func(name, transpiler string) string {
-		return "name = \"" + name + "\"\nwasm = \"plugin.wasm\"\nprotocol = \"0.23\"\n\n[[transpiler]]\nname = \"" + transpiler + "\"\nlanguage = \"go\"\nrequires = [\"t\"]\n"
+		return "name = \"" + name + "\"\nwasm = \"plugin.wasm\"\nprotocol = \"1.0\"\n\n[[transpiler]]\nname = \"" + transpiler + "\"\nlanguage = \"go\"\nrequires = [\"t\"]\n"
 	}
 	write(t, filepath.Join(envDir, "from-env", "hozo-plugin.toml"), manifest("from-env", "env-t"))
 	write(t, filepath.Join(envDir, "t", "hozo-plugin.toml"), "name = \n") // plugin_dirs の t が先なので読まない
@@ -901,13 +908,13 @@ func TestManifestDiagnosticsOfInstalledPlugins(t *testing.T) {
 	// 読めないマニフェストと name の違うマニフェストは、使っていなくても報告する
 	write(t, filepath.Join(dir, "hozo.toml"), pluginDirs+unit("a", "gen/a"))
 	write(t, filepath.Join(dir, "plugins", "broken", "hozo-plugin.toml"), "name = \n")
-	write(t, filepath.Join(dir, "plugins", "renamed", "hozo-plugin.toml"), "name = \"other\"\nwasm = \"plugin.wasm\"\nprotocol = \"0.23\"\n")
+	write(t, filepath.Join(dir, "plugins", "renamed", "hozo-plugin.toml"), "name = \"other\"\nwasm = \"plugin.wasm\"\nprotocol = \"1.0\"\n")
 	p = Load(dir, "", nil)
 	if got := strings.Join(codes(p.Diags), ","); got != "MAN-4,MAN-3" {
 		t.Fatalf("codes = %v, want [MAN-4 MAN-3]\n%s", got, text(p))
 	}
 	// なくした書き方 command のマニフェスト（MAN-6）も、使っていなくても報告する。メッセージは、新しい書き方（wasm）を示す
-	write(t, filepath.Join(dir, "plugins", "legacy", "hozo-plugin.toml"), "name = \"legacy\"\ncommand = [\"go\", \"run\", \"example.com/legacy\"]\nwasm = \"plugin.wasm\"\nprotocol = \"0.23\"\n")
+	write(t, filepath.Join(dir, "plugins", "legacy", "hozo-plugin.toml"), "name = \"legacy\"\ncommand = [\"go\", \"run\", \"example.com/legacy\"]\nwasm = \"plugin.wasm\"\nprotocol = \"1.0\"\n")
 	p = Load(dir, "", nil)
 	if got := strings.Join(codes(p.Diags), ","); got != "MAN-4,MAN-6,MAN-3" {
 		t.Fatalf("codes = %v, want [MAN-4 MAN-6 MAN-3]\n%s", got, text(p))
@@ -987,13 +994,56 @@ func userFiles(files []string) string {
 	return strings.Join(out, ",")
 }
 
+// TestUninterpreted は CFG-26（docs/config.md「解釈するトランスパイラ」）: 本体のない、@hint でないデコレータが、単位の対象の宣言に
+// 付いているが、設定のどの単位のトランスパイラも、解釈しない。見るのは、設定の全体（別の単位のトランスパイラが解釈していれば、
+// 出ない）。同じ宣言を二つの単位が対象にしていても一度だけ。in の外の宣言と、単位のない設定には、出ない。
+// 場合ごとの例は tests/rules/CFG-26。
+func TestUninterpreted(t *testing.T) {
+	dir := t.TempDir()
+	manifest(t, dir, "kit", [2]string{"plain", ""}, [2]string{"reads", "requires = [\"plain\"]\ninterprets = [\"a.mark\"]\nseams = [\"a.wrap\"]\n"})
+	write(t, filepath.Join(dir, "a.hozo"), "namespace a {\n  decorator fn wrap();\n  decorator fn mark();\n  @wrap @mark fn f();\n}\n")
+	write(t, filepath.Join(dir, "b.hozo"), "namespace a {\n  @mark fn g();\n}\n")
+	write(t, filepath.Join(dir, "c.hozo"), "namespace c {\n  fn h();\n}\n")
+	warnings := func(units string) []string {
+		t.Helper()
+		write(t, filepath.Join(dir, "hozo.toml"), pluginDirs+units)
+		p := Load(dir, "", nil)
+		var out []string
+		for _, d := range p.Diags {
+			if d.Code != "CFG-26" || d.Severity != diag.Warning || d.Span == nil {
+				t.Fatalf("diags:\n%s", text(p))
+			}
+			pos := p.Files.Position(d.Span.File, d.Span.Start)
+			out = append(out, p.Files.Path(d.Span.File)+":"+strconv.Itoa(pos.Line)+":"+strconv.Itoa(pos.Col))
+		}
+		return out
+	}
+	cases := []struct {
+		name, units string
+		want        []string
+	}{
+		{"どのトランスパイラも解釈しない", unit("a", "gen/a", "plain"), []string{"a.hozo:4:3", "a.hozo:4:9", "b.hozo:2:3"}},
+		{"同じ宣言を、二つの単位が対象にしても、一度だけ", unit("a", "gen/a", "plain") + unit("a", "gen/a2", "plain"), []string{"a.hozo:4:3", "a.hozo:4:9", "b.hozo:2:3"}},
+		{"同じ単位のトランスパイラが解釈する（interprets と seams）", unit("a", "gen/a", "plain", "reads"), nil},
+		{"別の単位のトランスパイラが解釈する", unit("a", "gen/a", "plain") + unit("c", "gen/c", "plain", "reads"), nil},
+		{"in の外の宣言には、出ない", "[[emit]]\nnamespace = \"a\"\ntranspilers = [\"plain\"]\nout = \"gen/a\"\nin = [\"a.hozo\"]\n", []string{"a.hozo:4:3", "a.hozo:4:9"}},
+		{"単位のない設定には、出ない", "", nil},
+	}
+	for _, c := range cases {
+		if got := warnings(c.units); strings.Join(got, ",") != strings.Join(c.want, ",") {
+			t.Errorf("%s: CFG-26 = %v, want %v", c.name, got, c.want)
+		}
+	}
+}
+
 // TestUnsupported は CFG-6（docs/config.md「診断」）: 単位のトランスパイラの unsupported にあるデコレータが、その単位の
 // 対象の宣言に付いている。同じ宣言を二つの単位が対象にしていても一度だけ。in の外の宣言には出ない。
 func TestUnsupported(t *testing.T) {
 	dir := t.TempDir()
 	write(t, filepath.Join(dir, "plugins", "t", "hozo-plugin.toml"),
-		"name = \"t\"\nwasm = \"plugin.wasm\"\nprotocol = \"0.23\"\n\n[[transpiler]]\nname = \"t\"\nlanguage = \"go\"\nunsupported = [\"a.legacy\"]\n\n[[transpiler]]\nname = \"u\"\nlanguage = \"go\"\n")
-	write(t, filepath.Join(dir, "a.hozo"), "namespace a {\n  decorator fn legacy();\n  @legacy fn f();\n}\n")
+		"name = \"t\"\nwasm = \"plugin.wasm\"\nprotocol = \"1.0\"\n\n[[transpiler]]\nname = \"t\"\nlanguage = \"go\"\nunsupported = [\"a.legacy\"]\n\n[[transpiler]]\nname = \"u\"\nlanguage = \"go\"\n")
+	// legacy は @hint: どのトランスパイラも解釈しないが、CFG-26 は出ない（このテストが見るのは CFG-6 だけ）
+	write(t, filepath.Join(dir, "a.hozo"), "namespace a {\n  @hint decorator fn legacy();\n  @legacy fn f();\n}\n")
 	write(t, filepath.Join(dir, "b.hozo"), "namespace a {\n  @legacy fn g();\n}\n")
 	count := func(units string) int {
 		t.Helper()
@@ -1040,7 +1090,8 @@ func readerPlugin(t *testing.T, dir, name, protocol, response string, namespaces
 // ときだけで、単位がなくても頼む。一度の実行で、一回。errors は error の診断、warnings は PLUGIN の warning。語彙のプラグインが
 // error を返したら、emit は、頼まない。protocol の合わない語彙のプラグイン（MAN-2）は、頼むときにだけ、報告する。
 func TestVocabularyPlugins(t *testing.T) {
-	const vocabulary = "namespace voc {\n  /** 印 */\n  decorator fn mark();\n  /** フィールドの印 */\n  decorator tag for field;\n}\n"
+	// 印は @hint: トランスパイラ pick は解釈しないが、CFG-26 は出ない（このテストが見るのは、語彙のプラグインへの頼みごと）
+	const vocabulary = "namespace voc {\n  /** 印 */\n  @hint\n  decorator fn mark();\n  /** フィールドの印 */\n  @hint\n  decorator tag for field;\n}\n"
 	const marked = "namespace a {\n  /** f */\n  @voc.mark\n  export fn f();\n}\n"
 	const plain = "namespace a {\n  /** f */\n  export fn f();\n}\n"
 	const bad = `{"errors":[{"code":"VOC-1","at":"a.f","message":"bad use"}],"warnings":[{"at":"a.f","message":"hint"}]}`

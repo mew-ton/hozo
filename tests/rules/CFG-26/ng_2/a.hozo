@@ -1,0 +1,23 @@
+// CFG-26: 設定が解釈するのは a.mark、a.wrap、名前付きデコレータ a.tagged。ほかの、本体のないデコレータには、出す。
+// 名前付きデコレータを通さずに、元のデコレータ a.label を直に付けた所にも、出す（interprets にあるのは a.tagged だけ）
+namespace a {
+  decorator fn wrap();
+  decorator fn retried(): throws Failed;
+  exception Failed;
+  decorator mark for field;
+  decorator label(name: string) for field;
+  decorator tagged = label("t");
+
+  model M {
+    @mark
+    id: string;
+    @tagged
+    name: string;
+    @label("u")                        // WARN: CFG-26
+    other: string;
+  }
+
+  @wrap
+  @retried                             // WARN: CFG-26
+  fn f(): M;
+}

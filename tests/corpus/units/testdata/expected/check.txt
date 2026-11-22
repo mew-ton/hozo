@@ -1,1 +1,6 @@
-0 errors, 0 warnings
+shop/api.hozo:18:3: warning[CFG-26]: @t.api を解釈するトランスパイラが、hozo.toml のどの単位にもない（何も生成されない）。デコレータの宣言に本体を書く。または、解釈するトランスパイラを、hozo.toml の単位の transpilers に並べる。または、解釈されなくてよい印なら、デコレータの宣言に @hint を付ける
+shop/batch.hozo:10:3: warning[CFG-26]: @t.batch を解釈するトランスパイラが、hozo.toml のどの単位にもない（何も生成されない）。デコレータの宣言に本体を書く。または、解釈するトランスパイラを、hozo.toml の単位の transpilers に並べる。または、解釈されなくてよい印なら、デコレータの宣言に @hint を付ける
+shop/batch.hozo:20:3: warning[CFG-26]: @t.batch を解釈するトランスパイラが、hozo.toml のどの単位にもない（何も生成されない）。デコレータの宣言に本体を書く。または、解釈するトランスパイラを、hozo.toml の単位の transpilers に並べる。または、解釈されなくてよい印なら、デコレータの宣言に @hint を付ける
+shop/batch.hozo:28:3: warning[CFG-26]: @t.admin を解釈するトランスパイラが、hozo.toml のどの単位にもない（何も生成されない）。デコレータの宣言に本体を書く。または、解釈するトランスパイラを、hozo.toml の単位の transpilers に並べる。または、解釈されなくてよい印なら、デコレータの宣言に @hint を付ける
+stock.hozo:13:3: warning[CFG-26]: @t.stock を解釈するトランスパイラが、hozo.toml のどの単位にもない（何も生成されない）。デコレータの宣言に本体を書く。または、解釈するトランスパイラを、hozo.toml の単位の transpilers に並べる。または、解釈されなくてよい印なら、デコレータの宣言に @hint を付ける
+0 errors, 5 warnings

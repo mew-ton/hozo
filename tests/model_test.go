@@ -10,6 +10,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/mew-ton/hozo/internal/diag"
 	"github.com/mew-ton/hozo/internal/fakeplugin"
 	"github.com/mew-ton/hozo/internal/project"
 	"github.com/mew-ton/hozo/ir"
@@ -21,16 +22,21 @@ const modelCorpus = "corpus/model"
 // designCorpus は tests/corpus/design（設計書の例）。
 const designCorpus = "corpus/design"
 
-// loadClean はコーパス root を internal/project で解析する。診断が一つでもあれば失敗（error も warning も想定しない）。
+// loadClean はコーパス root を internal/project で解析する。CFG-26 の warning のほかに、診断が一つでもあれば失敗。
 func loadClean(t *testing.T, root string) *project.Project {
 	t.Helper()
 	p := project.LoadWith(project.Options{Root: root, Stderr: io.Discard, PluginPath: repoPlugins(t)})
-	if len(p.Diags) > 0 {
-		var b strings.Builder
-		for _, d := range p.Diags {
-			fmt.Fprintf(&b, "%s[%s]: %s\n", d.Severity, d.Code, d.Message)
+	// CFG-26（解釈するトランスパイラがいないデコレータ。docs/config.md「解釈するトランスパイラ」）は、コーパスの想定のうち: 単位の
+	// トランスパイラは、基底だけで、語彙のデコレータを解釈しない。その一覧は、ゴールデン testdata/expected/check.txt が持つ
+	var b strings.Builder
+	for _, d := range p.Diags {
+		if d.Code == "CFG-26" && d.Severity == diag.Warning {
+			continue
 		}
-		t.Fatalf("tests/%s に診断がある（error も warning も想定しない）:\n%s", root, b.String())
+		fmt.Fprintf(&b, "%s[%s]: %s\n", d.Severity, d.Code, d.Message)
+	}
+	if b.Len() > 0 {
+		t.Fatalf("tests/%s に、CFG-26 の warning のほかの診断がある（想定しない）:\n%s", root, b.String())
 	}
 	return p
 }
@@ -228,7 +234,10 @@ func TestModelCorpus(t *testing.T) {
 			}
 		}
 		var stdout, stderr bytes.Buffer
-		if code := hozocMainIn(dir, []string{"build"}, &stdout, &stderr); code != 0 || stdout.String() != "removed: gen/shop/ops.go\n" || stderr.String() != "" {
+		code := hozocMainIn(dir, []string{"build"}, &stdout, &stderr)
+		// warning は、@marks.requirement の CFG-26 が一つ（README.md の marks.hozo の行）
+		rest, warnings := splitUninterpreted(stdout.String())
+		if code != 0 || rest != "removed: gen/shop/ops.go\n" || len(warnings) != 1 || !strings.Contains(warnings[0], "@marks.requirement ") || stderr.String() != "" {
 			t.Fatalf("hozoc build: code=%d stdout=%q stderr=%q", code, stdout.String(), stderr.String())
 		}
 		var left []string
@@ -238,7 +247,8 @@ func TestModelCorpus(t *testing.T) {
 		expect(t, "gen に残るファイル", left, []string{"shop/hand.go"})
 		// 二度目は何も書かず、何も消さない
 		stdout.Reset()
-		if code := hozocMainIn(dir, []string{"build"}, &stdout, &stderr); code != 0 || stdout.String() != "" {
+		code = hozocMainIn(dir, []string{"build"}, &stdout, &stderr)
+		if rest, warnings := splitUninterpreted(stdout.String()); code != 0 || rest != "" || len(warnings) != 1 {
 			t.Errorf("二度目の hozoc build: code=%d stdout=%q stderr=%q", code, stdout.String(), stderr.String())
 		}
 	})

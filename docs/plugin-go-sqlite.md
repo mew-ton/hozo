@@ -20,7 +20,7 @@
 ```toml
 name     = "go-sqlite"
 wasm     = "plugin.wasm"
-protocol = "0.23"
+protocol = "1.0"
 
 [[transpiler]]
 name     = "go-sqlite"
@@ -28,8 +28,16 @@ language = "go"
 requires = ["go"]
 seams    = ["db.transaction"]
 requires_vocabulary = ["db"]
+interprets = [
+  "db.table", "db.text", "db.int", "db.float",
+  "db.bool", "db.datetime", "db.date", "db.time",
+  "db.json", "db.key", "db.unique", "db.ref",
+  "db.find", "db.list", "db.where", "db.latest",
+  "db.insert", "db.update", "db.delete", "db.conflict",
+]
 ```
 
+- `interprets`（`docs/plugin-protocol.md`「マニフェスト `hozo-plugin.toml`」）は、読む二十のデコレータ。`db.transaction` は、`seams` に書いたので、書かない（継ぎ目は、解釈するものに数える）。
 - 読む語彙は、状態の `@db.table`、フィールドの、しまい方（`@db.text` / `@db.int` / `@db.float` / `@db.bool` / `@db.datetime` / `@db.date` / `@db.time` / `@db.json`）と `@db.key` / `@db.unique` / `@db.ref`、`read` の `@db.find` / `@db.list` / `@db.where` / `@db.latest`、効果の `@db.insert` / `@db.update` / `@db.delete`、op の `@db.transaction`。語彙は提供しない。
 - **`@db.transaction` は継ぎ目**（`seams`。`docs/config.md`「継ぎ目」）: このトランスパイラを並べた単位では、基底が、`@db.transaction` の付いた op を二層で出し、継ぎ目の口（`Seams` のメソッド）を出す。中身は、このトランスパイラが出す（「トランザクション」）。並べていない単位では、`@db.transaction` は印で、何も起きない（同「継ぎ目」の「読む者がなければ、何も出ない」）。
 - **`requires_vocabulary = ["db"]`**: 語彙のプラグイン `db`（`docs/plugin-db.md`）が入っていなければ CFG-25（`docs/plugin-protocol.md`「語彙のプラグイン」）。このトランスパイラは、`db` の語彙の検査（DB-*）を通った仕様だけを、受け取る（「診断」）。

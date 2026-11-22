@@ -1,2 +1,37 @@
+api.hozo:13:5: warning[CFG-26]: @db.key を解釈するトランスパイラが、hozo.toml のどの単位にもない（何も生成されない）。解釈するトランスパイラを、hozo.toml の単位の transpilers に並べる。または、解釈されなくてよい印なら、デコレータの宣言に @hint を付ける
+api.hozo:34:3: warning[CFG-26]: @db.table を解釈するトランスパイラが、hozo.toml のどの単位にもない（何も生成されない）。解釈するトランスパイラを、hozo.toml の単位の transpilers に並べる。または、解釈されなくてよい印なら、デコレータの宣言に @hint を付ける
+api.hozo:35:3: warning[CFG-26]: @db.table を解釈するトランスパイラが、hozo.toml のどの単位にもない（何も生成されない）。解釈するトランスパイラを、hozo.toml の単位の transpilers に並べる。または、解釈されなくてよい印なら、デコレータの宣言に @hint を付ける
+api.hozo:43:3: warning[CFG-26]: @http.status を解釈するトランスパイラが、hozo.toml のどの単位にもない（何も生成されない）。解釈するトランスパイラを、hozo.toml の単位の transpilers に並べる。または、解釈されなくてよい印なら、デコレータの宣言に @hint を付ける
+api.hozo:46:3: warning[CFG-26]: @http.status を解釈するトランスパイラが、hozo.toml のどの単位にもない（何も生成されない）。解釈するトランスパイラを、hozo.toml の単位の transpilers に並べる。または、解釈されなくてよい印なら、デコレータの宣言に @hint を付ける
+api.hozo:49:3: warning[CFG-26]: @http.status を解釈するトランスパイラが、hozo.toml のどの単位にもない（何も生成されない）。解釈するトランスパイラを、hozo.toml の単位の transpilers に並べる。または、解釈されなくてよい印なら、デコレータの宣言に @hint を付ける
+api.hozo:72:3: warning[CFG-26]: @db.find を解釈するトランスパイラが、hozo.toml のどの単位にもない（何も生成されない）。解釈するトランスパイラを、hozo.toml の単位の transpilers に並べる。または、解釈されなくてよい印なら、デコレータの宣言に @hint を付ける
+api.hozo:75:3: warning[CFG-26]: @db.list を解釈するトランスパイラが、hozo.toml のどの単位にもない（何も生成されない）。解釈するトランスパイラを、hozo.toml の単位の transpilers に並べる。または、解釈されなくてよい印なら、デコレータの宣言に @hint を付ける
+api.hozo:76:3: warning[CFG-26]: @db.where を解釈するトランスパイラが、hozo.toml のどの単位にもない（何も生成されない）。解釈するトランスパイラを、hozo.toml の単位の transpilers に並べる。または、解釈されなくてよい印なら、デコレータの宣言に @hint を付ける
+api.hozo:77:3: warning[CFG-26]: @db.where を解釈するトランスパイラが、hozo.toml のどの単位にもない（何も生成されない）。解釈するトランスパイラを、hozo.toml の単位の transpilers に並べる。または、解釈されなくてよい印なら、デコレータの宣言に @hint を付ける
+api.hozo:97:3: warning[CFG-26]: @api.remote を解釈するトランスパイラが、hozo.toml のどの単位にもない（何も生成されない）。デコレータの宣言に本体を書く。または、解釈するトランスパイラを、hozo.toml の単位の transpilers に並べる
+api.hozo:98:3: warning[CFG-26]: @api.requiresAuth を解釈するトランスパイラが、hozo.toml のどの単位にもない（何も生成されない）。デコレータの宣言に本体を書く。または、解釈するトランスパイラを、hozo.toml の単位の transpilers に並べる
+api.hozo:111:3: warning[CFG-26]: @api.remote を解釈するトランスパイラが、hozo.toml のどの単位にもない（何も生成されない）。デコレータの宣言に本体を書く。または、解釈するトランスパイラを、hozo.toml の単位の transpilers に並べる
+api.hozo:122:3: warning[CFG-26]: @api.remote を解釈するトランスパイラが、hozo.toml のどの単位にもない（何も生成されない）。デコレータの宣言に本体を書く。または、解釈するトランスパイラを、hozo.toml の単位の transpilers に並べる
+api.hozo:155:5: warning[CFG-26]: @db.unique を解釈するトランスパイラが、hozo.toml のどの単位にもない（何も生成されない）。解釈するトランスパイラを、hozo.toml の単位の transpilers に並べる。または、解釈されなくてよい印なら、デコレータの宣言に @hint を付ける
+api.hozo:156:5: warning[CFG-26]: @db.unique を解釈するトランスパイラが、hozo.toml のどの単位にもない（何も生成されない）。解釈するトランスパイラを、hozo.toml の単位の transpilers に並べる。または、解釈されなくてよい印なら、デコレータの宣言に @hint を付ける
+api.hozo:241:3: warning[CFG-26]: @api.into を解釈するトランスパイラが、hozo.toml のどの単位にもない（何も生成されない）。解釈するトランスパイラを、hozo.toml の単位の transpilers に並べる。または、解釈されなくてよい印なら、デコレータの宣言に @hint を付ける
+api.hozo:253:3: warning[CFG-26]: @api.find を解釈するトランスパイラが、hozo.toml のどの単位にもない（何も生成されない）。デコレータの宣言に本体を書く。または、解釈するトランスパイラを、hozo.toml の単位の transpilers に並べる
+api.hozo:257:3: warning[CFG-26]: @api.effects を解釈するトランスパイラが、hozo.toml のどの単位にもない（何も生成されない）。デコレータの宣言に本体を書く。または、解釈するトランスパイラを、hozo.toml の単位の transpilers に並べる
+api.hozo:261:3: warning[CFG-26]: @api.effects を解釈するトランスパイラが、hozo.toml のどの単位にもない（何も生成されない）。デコレータの宣言に本体を書く。または、解釈するトランスパイラを、hozo.toml の単位の transpilers に並べる
+api.hozo:263:3: warning[CFG-26]: @api.both を解釈するトランスパイラが、hozo.toml のどの単位にもない（何も生成されない）。デコレータの宣言に本体を書く。または、解釈するトランスパイラを、hozo.toml の単位の transpilers に並べる
+api.hozo:277:3: warning[CFG-26]: @api.find を解釈するトランスパイラが、hozo.toml のどの単位にもない（何も生成されない）。デコレータの宣言に本体を書く。または、解釈するトランスパイラを、hozo.toml の単位の transpilers に並べる
+api.hozo:278:3: warning[CFG-26]: @api.effects を解釈するトランスパイラが、hozo.toml のどの単位にもない（何も生成されない）。デコレータの宣言に本体を書く。または、解釈するトランスパイラを、hozo.toml の単位の transpilers に並べる
+api.hozo:287:3: warning[CFG-26]: @api.find を解釈するトランスパイラが、hozo.toml のどの単位にもない（何も生成されない）。デコレータの宣言に本体を書く。または、解釈するトランスパイラを、hozo.toml の単位の transpilers に並べる
+api.hozo:288:3: warning[CFG-26]: @api.effects を解釈するトランスパイラが、hozo.toml のどの単位にもない（何も生成されない）。デコレータの宣言に本体を書く。または、解釈するトランスパイラを、hozo.toml の単位の transpilers に並べる
+web.hozo:6:3: warning[CFG-26]: @localStorage を解釈するトランスパイラが、hozo.toml のどの単位にもない（何も生成されない）。解釈するトランスパイラを、hozo.toml の単位の transpilers に並べる。または、解釈されなくてよい印なら、デコレータの宣言に @hint を付ける
+web.hozo:8:3: warning[CFG-26]: @page.path を解釈するトランスパイラが、hozo.toml のどの単位にもない（何も生成されない）。解釈するトランスパイラを、hozo.toml の単位の transpilers に並べる。または、解釈されなくてよい印なら、デコレータの宣言に @hint を付ける
+web.hozo:57:3: warning[CFG-26]: @web.limits を解釈するトランスパイラが、hozo.toml のどの単位にもない（何も生成されない）。解釈するトランスパイラを、hozo.toml の単位の transpilers に並べる。または、解釈されなくてよい印なら、デコレータの宣言に @hint を付ける
+web.hozo:77:3: warning[CFG-26]: @web.offlineFallback を解釈するトランスパイラが、hozo.toml のどの単位にもない（何も生成されない）。デコレータの宣言に本体を書く。または、解釈するトランスパイラを、hozo.toml の単位の transpilers に並べる
+web.hozo:114:3: warning[CFG-26]: @t.entry を解釈するトランスパイラが、hozo.toml のどの単位にもない（何も生成されない）。デコレータの宣言に本体を書く。または、解釈するトランスパイラを、hozo.toml の単位の transpilers に並べる。または、解釈されなくてよい印なら、デコレータの宣言に @hint を付ける
+web.hozo:115:3: warning[CFG-26]: @web.redirectToLogin を解釈するトランスパイラが、hozo.toml のどの単位にもない（何も生成されない）。デコレータの宣言に本体を書く。または、解釈するトランスパイラを、hozo.toml の単位の transpilers に並べる
+web.hozo:116:3: warning[CFG-26]: @web.traced を解釈するトランスパイラが、hozo.toml のどの単位にもない（何も生成されない）。デコレータの宣言に本体を書く。または、解釈するトランスパイラを、hozo.toml の単位の transpilers に並べる。または、解釈されなくてよい印なら、デコレータの宣言に @hint を付ける
+web.hozo:129:3: warning[CFG-26]: @t.entry を解釈するトランスパイラが、hozo.toml のどの単位にもない（何も生成されない）。デコレータの宣言に本体を書く。または、解釈するトランスパイラを、hozo.toml の単位の transpilers に並べる。または、解釈されなくてよい印なら、デコレータの宣言に @hint を付ける
+web.hozo:130:3: warning[CFG-26]: @web.ignoreTimeout を解釈するトランスパイラが、hozo.toml のどの単位にもない（何も生成されない）。デコレータの宣言に本体を書く。または、解釈するトランスパイラを、hozo.toml の単位の transpilers に並べる
+web.hozo:142:3: warning[CFG-26]: @web.offlineFallback を解釈するトランスパイラが、hozo.toml のどの単位にもない（何も生成されない）。デコレータの宣言に本体を書く。または、解釈するトランスパイラを、hozo.toml の単位の transpilers に並べる
 web.hozo:142:3: warning[DEC-5]: @offlineFallback は api.Timeout を recovers で吸収するが、api.Timeout のとき効果 api.createSession は不明なので、web.login の成功のアームでも不明になる
-0 errors, 1 warning
+0 errors, 36 warnings

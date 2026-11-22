@@ -1,0 +1,17 @@
+// CFG-26: 別の単位のトランスパイラが解釈する（interprets の a.mark、seams の a.wrap、名前付きデコレータ a.tagged）
+namespace a {
+  decorator fn wrap();
+  decorator mark for field;
+  decorator label(name: string) for field;
+  decorator tagged = label("t");
+
+  model M {
+    @mark
+    id: string;
+    @tagged
+    name: string;
+  }
+
+  @wrap
+  fn f(): M;
+}

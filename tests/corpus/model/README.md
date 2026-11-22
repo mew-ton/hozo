@@ -6,7 +6,7 @@
 |---|---|
 | `hozo.toml` | 単位が三つ: 出力したい `namespace = "shop"` と、`shop` が使う型（例外 `carrier.Closed`、`marks.NotApproved`）の置き場の `"carrier"`、`"marks"`（`docs/config.md`「型の置き場」。なければ CFG-22）。どれも `transpilers = ["none"]`。`customer` はどの単位の対象でもない |
 | `plugins/none/` | テスト用のプラグインのマニフェスト。トランスパイラ `none`（`requires` を持たない、テストのための基底。中身は、にせもののプラグイン `internal/fakeplugin` の WASM で、テストが置く）は、ファイルを返さない |
-| `marks.hozo` | `namespace marks`。どのプラグインも読まない印のデコレータ: `context`（`for model, state, op`）、`manual`（`for op`）、`requirement`（op。`throws NotApproved prevents effects` を宣言する） |
+| `marks.hozo` | `namespace marks`。どのプラグインも読まない印のデコレータ: `context`（`for model, state, op`）、`manual`（`for op`）、`requirement`（op。`throws NotApproved prevents effects` を宣言する）。`context` と `manual` は、解釈されなくてよい印として、`@hint` を持つ。`requirement` は、節を持つので、`@hint` を付けられず（DEC-26）、付けた所（`shop.hozo` の `placeOrder`）に、CFG-26 の warning が、一つ出る（`docs/config.md`「解釈するトランスパイラ」） |
 | `shop.hozo` | `namespace shop`。出力する名前空間。`@marks.context("販売")` の付いた model と状態、効果を呼ぶ配線（`addToCart`、`@marks.requirement` の付いた `placeOrder`）と、その葉（`checkStock`、`newOrder`）、`carrier` の op を呼ぶ配線 |
 | `carrier.hozo` | `namespace carrier`。外部のシステム。状態・効果・例外と、効果を呼ぶ配線（`pickup`）、その葉（`checkOpen`）を持つ。単位は、`shop` が使う例外の置き場としてだけ持つ。状態と op に `@marks.context("配送")` |
 | `customer.hozo` | `namespace customer` のブロックが二つ。人の操作。`@marks.manual` の付いた op（効果を呼ぶ配線 `pick`、葉の `choose` と `leave`）と、`shop` の op を呼ぶ配線を持つが、出力しない |

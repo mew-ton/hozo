@@ -1,7 +1,7 @@
 # CFG-25 の fixture: 語彙 voc を読み解く、語彙のプラグイン（トランスパイラは、持たない）
 name     = "reader"
 wasm     = "plugin.wasm"
-protocol = "0.23"
+protocol = "1.0"
 
 [read]
 namespaces = ["voc"]

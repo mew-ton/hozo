@@ -1,0 +1,8 @@
+# 単位は一つ: 名前空間 a を、どのデコレータも解釈しない基底 plain で出す
+[hozo]
+plugin_dirs = ["plugins"]
+
+[[emit]]
+namespace   = "a"
+transpilers = ["plain"]
+out         = "gen/a"

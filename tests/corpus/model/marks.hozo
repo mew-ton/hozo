@@ -6,18 +6,22 @@
 namespace marks {
   // docs/grammar.md「ファイルと宣言」: デコレータは名前空間には付けられないので、文脈の印は宣言（model / state / op）に付ける
   // docs/grammar.md「decorator の宣言」Target、docs/ir.md「decorator」: targets は ["model", "state", "op"]（書いた順）
+  // docs/grammar.md「decorator の宣言」の @hint: 解釈されなくてよい印（どのトランスパイラも解釈しなくても、CFG-26 は出ない）
   /** 分かれた文脈（境界づけられたコンテキスト）に属する宣言 */
+  @hint
   decorator context(name: string) for model, state, op;
 
   // docs/ir.md「decorator」: targets は ["op"]
   /** 人が担い手であること（人の手で行う） */
+  @hint
   decorator fn manual();
 
   /** 要求の承認がまだ下りていない */
   exception NotApproved;
 
   // docs/check.md「計算」手順 i の throws: 印でも、throws を宣言していれば付けた op の Signature に効く
-  // （external ではないので、op の名前空間から見ても投げる）
+  // （external ではないので、op の名前空間から見ても投げる）。節を持つので、@hint は付けられない（DEC-26）: 解釈するトランスパイラが
+  // いないことを、付けた所の CFG-26（warning）が知らせる（docs/config.md「解釈するトランスパイラ」）
   /** 要求（PRD）の項目に対応する op。承認されるまで始めない */
   decorator fn requirement(id: string): throws NotApproved prevents effects;
 }

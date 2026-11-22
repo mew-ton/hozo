@@ -1,0 +1,13 @@
+// CFG-26（docs/config.md「解釈するトランスパイラ」）: 単位のない設定には、出さない
+namespace a {
+  decorator fn wrap();
+  decorator mark for field;
+
+  model M {
+    @mark
+    id: string;
+  }
+
+  @wrap
+  fn f(): M;
+}

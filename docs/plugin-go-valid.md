@@ -13,15 +13,20 @@
 ```toml
 name     = "go-valid"
 wasm     = "plugin.wasm"
-protocol = "0.23"
+protocol = "1.0"
 
 [[transpiler]]
 name     = "go-valid"
 language = "go"
 requires = ["go"]
 requires_vocabulary = ["valid"]
+interprets = [
+  "valid.min", "valid.max", "valid.length", "valid.pattern",
+  "valid.format",
+]
 ```
 
+- `interprets`（`docs/plugin-protocol.md`「マニフェスト `hozo-plugin.toml`」）は、読む五つの制約。
 - 読む語彙は、標準の `valid`（`min` / `max` / `length` / `pattern` / `format`）。語彙は提供しない。
 - `requires_vocabulary`（`docs/plugin-protocol.md`「マニフェスト `hozo-plugin.toml`」）: 語彙のプラグイン `valid` が入っていなければ CFG-25。制約の使い方の検査（VALID-*）を通った仕様だけを、受け取るため（「診断」）。`go-valid` を `requires` に書く相乗り（`go-http`、`go-cli`）は、自分では書かない: 単位に `go-valid` が並ぶ（CFG-19）ので、同じ CFG-25 が掛かる。
 - オプションはない。`[emit.options.go-valid]` にキーがあれば GOVALID-7。

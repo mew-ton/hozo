@@ -416,7 +416,7 @@ out         = "internal/gen/proc"
 | `hozoc build --dry-run` | 書き出さずに、書き出す予定のファイルを表示する（「書き出し」の 4） |
 
 - 配線は、`check` の後、`writeOutputs`（「cli.hozo」）。`--no-emit` も、同じ道を通り、書き出す予定に「書き出さない」と書いて運ぶ（`EmitPlan.noEmit`）: 配線は、条件で道を分けない。
-- **`--no-emit` の表示**は、検査の結果だけ: text は、warning と、数の行（`0 errors, 0 warnings`。`docs/diagnostics.md`「text」）。json は、`{"warnings": [...]}`。`written` と `removed` は、出さない（いつも空）。`--no-emit` のない `build` は、warning と、`written: <パス>` / `removed: <パス>` の行（json は、`warnings`、`written`、`removed`）。
+- **`--no-emit` の表示**は、検査の結果だけ: text は、warning と、数の行（`0 errors, 0 warnings`。`docs/diagnostics.md`「text」）。warning だけなら、終了コードは 0（hozoc 自身の仕様では、CFG-26 が三つ出る: `docs/vocab.md`「解釈されなくてよいデコレータ」）。json は、`{"warnings": [...]}`。`written` と `removed` は、出さない（いつも空）。`--no-emit` のない `build` は、warning と、`written: <パス>` / `removed: <パス>` の行（json は、`warnings`、`written`、`removed`）。
 - `--no-emit` と `--dry-run` を、両方書けば、`--no-emit`（書き出す予定も、表示しない）。
 - 名前空間の引数は、`--no-emit` でも、集めて確かめるファイルの範囲を選ぶ（「書き出し」の 1。`UnknownNamespace` も、同じ）。
 - **`hozo.toml` がないとき**: `build --no-emit` は、設定なしで検査する（「検査」の 1）。`build` は、書き出す単位がないので、CFG-7 で `ConfigInvalid`（「書き出し」の 0）。

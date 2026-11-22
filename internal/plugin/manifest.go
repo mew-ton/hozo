@@ -19,7 +19,8 @@ import (
 // ManifestFileName はマニフェストのファイル名（docs/plugin-protocol.md「マニフェスト」）。
 const ManifestFileName = "hozo-plugin.toml"
 
-// Protocol は hozoc が対応する docs/ir.md の version（ir.Version）。マニフェストの protocol と要求の protocol はこの値（MAN-2）。
+// Protocol は hozoc が対応する docs/ir.md の version（ir.Version）。要求の protocol はこの値。マニフェストの protocol は、
+// この値と合わなければ MAN-2（ir.VersionAccepts。docs/plugin-protocol.md「版の合わせ方」）。
 const Protocol = ir.Version
 
 // Manifest は hozo-plugin.toml（docs/plugin-protocol.md「マニフェスト」）。プラグイン（入れるもの）一つ分。
@@ -42,8 +43,18 @@ type Transpiler struct {
 	Requires    []string // 出力の形を前提にするトランスパイラの名前。空なら基底、空でなければ相乗り（docs/config.md「基底と相乗り」）
 	Unsupported []string // 意味を保てない記法（デコレータの FQN）。使われていれば CFG-6
 	Seams       []string // 継ぎ目を要るデコレータの FQN（docs/config.md「継ぎ目」）
+	// Interprets は、解釈するデコレータの FQN（docs/config.md「解釈するトランスパイラ」）。Seams のものは、入っていない
+	// （解釈するものに数えるのは、Interprets と Seams の両方: [Transpiler.Interpreted]）
+	Interprets []string
 	// RequiresVocabulary は、語彙のプラグインを要る語彙の名前空間（docs/plugin-protocol.md「語彙のプラグイン」）。なければ CFG-25
 	RequiresVocabulary []string
+}
+
+// Interpreted は、このトランスパイラが解釈するデコレータの FQN（Interprets と Seams。docs/config.md「解釈するトランスパイラ」）。
+func (t *Transpiler) Interpreted() []string {
+	out := make([]string, 0, len(t.Interprets)+len(t.Seams))
+	out = append(out, t.Interprets...)
+	return append(out, t.Seams...)
 }
 
 // IsBase は、このトランスパイラが基底か（requires が空。docs/config.md「基底と相乗り」）。
@@ -108,6 +119,7 @@ type rawManifest struct {
 		Requires    []string `toml:"requires"`
 		Unsupported []string `toml:"unsupported"`
 		Seams       []string `toml:"seams"`
+		Interprets  []string `toml:"interprets"`
 		Vocabulary  []string `toml:"requires_vocabulary"`
 	} `toml:"transpiler"`
 	Read *struct {
@@ -124,9 +136,10 @@ type rawManifest struct {
 // LoadManifest は path のマニフェストを読む。診断は MAN-6（なくした書き方 command がある）と、
 // MAN-4（TOML の誤り、知らないキー、wasm がない・空・文字列でない・相対パスでない・ディレクトリの外に出る、値の型違い、
 // [[transpiler]] に name か language がない、language が空、requires に自分の名前か同じ名前が二度ある、
-// seams に空の文字列か同じ FQN が二度ある、requires_vocabulary に空の文字列か同じ名前が二度ある、同じ名前の [[transpiler]] が二つ、
+// seams に空の文字列か同じ FQN が二度ある、interprets に空の文字列か同じ FQN が二度ある、同じ FQN が seams と interprets の両方にある、
+// requires_vocabulary に空の文字列か同じ名前が二度ある、同じ名前の [[transpiler]] が二つ、
 // [read] の namespaces がない・空・空の文字列がある・同じ名前が二度ある）と
-// MAN-2（protocol が Protocol と違う）。MAN-4 か MAN-6 なら Manifest は nil。MAN-2 だけなら Manifest も返す。
+// MAN-2（protocol が Protocol と合わない: ir.VersionAccepts）。MAN-4 か MAN-6 なら Manifest は nil。MAN-2 だけなら Manifest も返す。
 // 設計書 §4.6 の [emit]（decorate / entry / stop）とトップレベルの language は持たないので、書いてあれば知らないキー（MAN-4）。
 func LoadManifest(path string) (*Manifest, []diag.Diagnostic) {
 	var diags []diag.Diagnostic
@@ -237,6 +250,21 @@ func LoadManifest(path string) (*Manifest, []diag.Diagnostic) {
 			}
 			declared[fqn] = true
 		}
+		read := map[string]bool{}
+		for _, fqn := range t.Interprets {
+			switch {
+			case fqn == "":
+				errorf("MAN-4", "マニフェストの [[transpiler]] %s の interprets に空の文字列がある", t.Name)
+				bad = true
+			case read[fqn]:
+				errorf("MAN-4", "マニフェストの [[transpiler]] %s の interprets に %s が二度ある", t.Name, fqn)
+				bad = true
+			case declared[fqn]:
+				errorf("MAN-4", "マニフェストの [[transpiler]] %s の %s が、seams と interprets の両方にある（seams に書いたデコレータは、解釈するものに数えるので、interprets には書かない）", t.Name, fqn)
+				bad = true
+			}
+			read[fqn] = true
+		}
 		needed := map[string]bool{}
 		for _, ns := range t.Vocabulary {
 			switch {
@@ -253,7 +281,7 @@ func LoadManifest(path string) (*Manifest, []diag.Diagnostic) {
 			continue
 		}
 		m.Transpilers = append(m.Transpilers, Transpiler{Name: t.Name, Language: *t.Language,
-			Requires: orEmpty(t.Requires), Unsupported: orEmpty(t.Unsupported), Seams: orEmpty(t.Seams),
+			Requires: orEmpty(t.Requires), Unsupported: orEmpty(t.Unsupported), Seams: orEmpty(t.Seams), Interprets: orEmpty(t.Interprets),
 			RequiresVocabulary: orEmpty(t.Vocabulary)})
 	}
 	if raw.Read != nil {
@@ -279,8 +307,8 @@ func LoadManifest(path string) (*Manifest, []diag.Diagnostic) {
 	if len(diags) > 0 {
 		return nil, diags
 	}
-	if m.Protocol != Protocol {
-		errorf("MAN-2", "プラグイン %s の protocol %q は hozoc の %q と違う", m.Name, m.Protocol, Protocol)
+	if !ir.VersionAccepts(Protocol, m.Protocol) {
+		errorf("MAN-2", "プラグイン %s の protocol %q は hozoc の %q と合わない（合うのは、大きい版が同じで、小さい版が hozoc 以下のもの）", m.Name, m.Protocol, Protocol)
 	}
 	return m, diags
 }

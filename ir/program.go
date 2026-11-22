@@ -1,7 +1,48 @@
 package ir
 
 // Version は IR の構造の版（docs/ir.md「Program」の version）。構造が変わったら上げる。
-const Version = "0.23"
+const Version = "1.0"
+
+// VersionAccepts は、版 host の hozoc が、版 plugin を話すプラグインを動かせるか（docs/plugin-protocol.md「版の合わせ方」）:
+// 大きい版が同じで、plugin の小さい版が、host の小さい版以下。版は「大きい版.小さい版」（十進の数二つ）で、そう読めなければ false。
+// hozoc は、マニフェストの protocol を plugin に、プラグインは、要求の protocol を host に渡して、同じ決まりで確かめる。
+func VersionAccepts(host, plugin string) bool {
+	hMajor, hMinor, ok := splitVersion(host)
+	if !ok {
+		return false
+	}
+	pMajor, pMinor, ok := splitVersion(plugin)
+	return ok && hMajor == pMajor && pMinor <= hMinor
+}
+
+// splitVersion は「大きい版.小さい版」を、二つの数に分ける。数字だけの二つの部分でなければ ok は false。
+func splitVersion(v string) (major, minor int, ok bool) {
+	dot := -1
+	for i := 0; i < len(v); i++ {
+		switch c := v[i]; {
+		case c == '.' && dot < 0:
+			dot = i
+		case c < '0' || c > '9':
+			return 0, 0, false
+		}
+	}
+	if dot <= 0 || dot == len(v)-1 {
+		return 0, 0, false
+	}
+	number := func(s string) (int, bool) {
+		n := 0
+		for i := 0; i < len(s); i++ {
+			n = n*10 + int(s[i]-'0')
+			if n > 1<<30 {
+				return 0, false
+			}
+		}
+		return n, true
+	}
+	major, ok1 := number(v[:dot])
+	minor, ok2 := number(v[dot+1:])
+	return major, minor, ok1 && ok2
+}
 
 // Program は IR 全体（docs/ir.md「Program」）。
 //

@@ -1,6 +1,6 @@
 name     = "go-valid"
 wasm     = "plugin.wasm"
-protocol = "0.23"
+protocol = "1.0"
 
 # 提供するトランスパイラは一つ。Go の基底 go に相乗りする（docs/plugin-go-valid.md「マニフェスト」）
 [[transpiler]]
@@ -9,3 +9,7 @@ language = "go"
 requires = ["go"]
 # 制約の使い方の検査（VALID-*）を通った仕様だけを、受け取る（docs/plugin-go-valid.md「マニフェスト」）
 requires_vocabulary = ["valid"]
+interprets = [
+  "valid.min", "valid.max", "valid.length", "valid.pattern",
+  "valid.format",
+]

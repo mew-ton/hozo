@@ -5,5 +5,6 @@ namespace prd {
    *
    * @param requirements 指す要求。対象のない分類のケース
    */
+  @hint
   decorator ref(...requirements: any case of never) for op, model, state, effect, read;
 }
