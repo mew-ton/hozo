@@ -230,14 +230,21 @@ test('フィールド名の位置の予約語は予約語として塗らない',
   assertScope(st, 'state token', 'state', 'keyword.declaration.hozo');
 });
 
-test('デコレータと @external', () => {
+test('デコレータと、核の印', () => {
   const s = linesOf(files.server);
   assertScope(s, '@http.post("/login")', '@http.post', 'entity.name.function.decorator.hozo');
   assertScope(s, '@validated', '@validated', 'entity.name.function.decorator.hozo');
   assertScope(s, '@db.key    id: UserId;', '@db.key', 'entity.name.function.decorator.hozo');
   const h = linesOf(files.http);
-  assertScope(h, '@external', '@external', 'storage.modifier.hozo');
-  assertNoScope(h, '@external', '@external', 'entity.name.function.decorator.hozo');
+  assertScope(h, '@entry', '@entry', 'storage.modifier.hozo');
+  assertNoScope(h, '@entry', '@entry', 'entity.name.function.decorator.hozo');
+  // outer は、節 outer throws の頭でだけ、文脈キーワード
+  assertScope(h, 'decorator fn get(path: string): outer throws', 'outer', 'keyword.other.hozo');
+  assertScope(h, 'decorator fn get(path: string): outer throws', 'throws', 'keyword.control.hozo');
+  const o = tokensOf('fn outer(outer: int): int;');
+  assertNoScope(o, 'fn outer', 'outer', 'keyword.other.hozo');
+  const hint = tokensOf('@hint decorator tag(name: string) for model;');
+  assertScope(hint, 'decorator tag', '@hint', 'storage.modifier.hozo');
 });
 
 test('宣言の名前', () => {
@@ -610,9 +617,9 @@ test('read の宣言、@repeatable、引数を持つ例外、直に呼ぶ組み�
   assertNoScope(d, '@repeatable', '@repeatable', 'entity.name.function.decorator.hozo');
   assertScope(d, 'decorator find for read;', 'read', 'keyword.declaration.hozo');
   assertScope(d, 'decorator find for read;', 'find', 'entity.name.function.hozo');
-  const marks = tokensOf('@repeatable @external decorator tag(name: string) for read, effect, exception;');
+  const marks = tokensOf('@repeatable @entry decorator tag(name: string) for read, effect, exception;');
   assertScope(marks, 'decorator tag', '@repeatable', 'storage.modifier.hozo');
-  assertScope(marks, 'decorator tag', '@external', 'storage.modifier.hozo');
+  assertScope(marks, 'decorator tag', '@entry', 'storage.modifier.hozo');
   assertScope(marks, 'decorator tag', 'read', 'keyword.declaration.hozo');
   assertScope(marks, 'decorator tag', 'effect', 'keyword.declaration.hozo');
   assertScope(marks, 'decorator tag', 'exception', 'keyword.declaration.hozo');
@@ -761,7 +768,7 @@ test('すべての実物の .hozo が落ちずに字句に分かれる', () => {
     for (const line of lines) {
       for (const tk of line.tokens) {
         assert.equal(tk.scopes[0], 'source.hozo');
-        // @ で始まる字句は、デコレータ（か @external）一つになる。予約語の名前でも分かれない
+        // @ で始まる字句は、デコレータ（か、核の印）一つになる。予約語の名前でも分かれない
         if (tk.text.startsWith('@') && !tk.scopes.some((x) => x.startsWith('comment.'))) {
           assert.ok(
             tk.scopes.includes('entity.name.function.decorator.hozo') || tk.scopes.includes('storage.modifier.hozo'),

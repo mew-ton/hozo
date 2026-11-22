@@ -1,5 +1,5 @@
 // サンプル order-app の仕様（README.md）。配送業者の API をまとめて引き受ける外部の仕組み carriergw。
-// 出力の単位を置かない（コードを出さない）。op は、相手の HTTP の口を、こちらが呼ぶ形で書いたもの: @http.post は @external なので、
+// 出力の単位を置かない（コードを出さない）。op は、相手の HTTP の口を、こちらが呼ぶ形で書いたもの: @http.post は outer throws を持つので、
 // 呼ぶ側（carrier）には http.NetworkError と http.ServerError が加わる。
 // 買った送り状は、相手の持つ状態（labels）で、買うことは、その効果（issueLabel）。店の金が動くことを、仕様の効果として見えるようにする。
 

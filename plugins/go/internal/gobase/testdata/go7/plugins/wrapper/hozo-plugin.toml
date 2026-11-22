@@ -2,7 +2,7 @@
 # 基底 go の単体テストが読むのは View.config.seams だけで、このプラグインは起動しない。
 name     = "wrapper"
 command  = ["sh", "-c", "cat >/dev/null; echo '{\"files\":[],\"warnings\":[]}'"]
-protocol = "0.18"
+protocol = "0.19"
 
 [[transpiler]]
 name     = "go-wrap"

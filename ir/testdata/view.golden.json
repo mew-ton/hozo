@@ -1,5 +1,5 @@
 {
-  "version": "0.18",
+  "version": "0.19",
   "viewer": "browser",
   "config": {
     "index": 1,
@@ -115,7 +115,7 @@
     ]
   },
   "program": {
-    "version": "0.18",
+    "version": "0.19",
     "namespaces": [
       {
         "name": "",
@@ -1651,7 +1651,8 @@
               "op"
             ],
             "caseTargets": [],
-            "external": false,
+            "entry": false,
+            "hint": false,
             "repeatable": false,
             "throws": [
               {
@@ -1675,6 +1676,7 @@
                 ]
               }
             ],
+            "outerThrows": [],
             "catches": [
               {
                 "exceptions": [
@@ -1718,9 +1720,11 @@
             "fn": false,
             "targets": [],
             "caseTargets": [],
-            "external": false,
+            "entry": false,
+            "hint": false,
             "repeatable": false,
             "throws": [],
+            "outerThrows": [],
             "catches": [],
             "reads": [],
             "effects": [],
@@ -1781,9 +1785,11 @@
               "effect"
             ],
             "caseTargets": [],
-            "external": false,
+            "entry": false,
+            "hint": false,
             "repeatable": false,
             "throws": [],
+            "outerThrows": [],
             "catches": [],
             "reads": [],
             "effects": []
@@ -1824,9 +1830,11 @@
               "read"
             ],
             "caseTargets": [],
-            "external": false,
+            "entry": false,
+            "hint": false,
             "repeatable": true,
             "throws": [],
+            "outerThrows": [],
             "catches": [],
             "reads": [],
             "effects": []
@@ -1871,9 +1879,11 @@
               "op"
             ],
             "caseTargets": [],
-            "external": false,
+            "entry": false,
+            "hint": false,
             "repeatable": false,
             "throws": [],
+            "outerThrows": [],
             "catches": [],
             "reads": [
               {

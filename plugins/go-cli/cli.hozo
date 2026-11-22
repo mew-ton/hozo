@@ -5,6 +5,7 @@ namespace cli {
    *
    * @param name サブコマンドの名前
    */
+  @entry
   decorator fn command(name: string);
 
   /**

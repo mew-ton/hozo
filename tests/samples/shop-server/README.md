@@ -467,7 +467,7 @@ HOZO_PLUGIN_PATH="$PWD/../../../plugins" /tmp/hozoc tests --coverage /tmp/cover.
 
 ### 語彙と、型の置き場
 
-- **デコレータ `rate.limited`**: 付いた op を呼べる頻度を制限する。制限を超えた呼び出しは、op の中身を呼ばずに `rate.LimitExceeded`。引数はない（何回まで、どの間隔で、を仕様には書かない。数え方は、実行のときに人が渡す）。`@external` ではない: 同じ名前空間の配線から呼んでも、例外は返る。`prevents effects` は、制限を超えたときに中身を呼ばないこと。
+- **デコレータ `rate.limited`**: 付いた op を呼べる頻度を制限する。制限を超えた呼び出しは、op の中身を呼ばずに `rate.LimitExceeded`。引数はない（何回まで、どの間隔で、を仕様には書かない。数え方は、実行のときに人が渡す）。`outer throws` ではない（前の `@external`）: 同じ名前空間の配線から呼んでも、例外は返る。`prevents effects` は、制限を超えたときに中身を呼ばないこと。
 - **例外 `rate.LimitExceeded`** は、語彙の名前空間 `rate` に置いた（`http.BadRequest`、`proc.Crashed` と同じく、仕組みの語彙が、その失敗の例外を持つ）。`@http.status(429)` は、標準の語彙 `http` のデコレータで、`go-http` が読む（材料）。Go の型は、`rate` の単位（単位 2。`gen/rate/types.go`）の基底が出し、`gen/server` の `http.go` と `ratelimit.go` は、それを import する。プロジェクトの型の名前空間（`type`）に置いて、デコレータの引数で渡す形（`@rate.limited(type.TooManyRequests)`）も書けるが、語彙だけで閉じる方を取った。
 - 語彙のファイルは `plugin_dirs` の下にあるので、仕様としては読まれず（`sources` から除かれる）、`go-ratelimit` が使うプラグインである（単位 4 が、そのトランスパイラを書いている）ので、語彙として読まれる（`docs/vocab.md`「読み込み」）。
 

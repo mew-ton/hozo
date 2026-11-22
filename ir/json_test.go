@@ -530,7 +530,7 @@ func TestEmptyProgramJSON(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := `{"version":"0.18","namespaces":[],"binds":[]}`
+	want := `{"version":"0.19","namespaces":[],"binds":[]}`
 	if string(b) != want {
 		t.Errorf("want %s\ngot  %s", want, b)
 	}
@@ -538,7 +538,7 @@ func TestEmptyProgramJSON(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want = `{"version":"0.18","viewer":"","config":{"index":0,"language":"","base":"","out":"","dir":"","transpilers":[],"options":{},"seams":{}},"files":[],"namespaces":{},"program":{"version":"0.18","namespaces":[],"binds":[]},"ops":{}}`
+	want = `{"version":"0.19","viewer":"","config":{"index":0,"language":"","base":"","out":"","dir":"","transpilers":[],"options":{},"seams":{}},"files":[],"namespaces":{},"program":{"version":"0.19","namespaces":[],"binds":[]},"ops":{}}`
 	if string(b) != want {
 		t.Errorf("want %s\ngot  %s", want, b)
 	}
@@ -584,7 +584,7 @@ func TestEmptySlicesAndOptionals(t *testing.T) {
 		t.Errorf("read: %s", b)
 	}
 	b, _ = json.Marshal(&Decorator{DeclBase: DeclBase{Name: "d", Span: sp()}, Repeatable: true})
-	if !strings.Contains(string(b), `"repeatable":true`) || !strings.Contains(string(b), `"external":false`) {
+	if !strings.Contains(string(b), `"repeatable":true`) || !strings.Contains(string(b), `"entry":false,"hint":false`) || !strings.Contains(string(b), `"outerThrows":[]`) {
 		t.Errorf("repeatable decorator: %s", b)
 	}
 	b, _ = json.Marshal(Application{Decorator: "d", Span: sp()})

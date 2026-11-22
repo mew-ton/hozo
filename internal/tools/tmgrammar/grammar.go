@@ -296,10 +296,10 @@ func Build() Grammar {
 		}},
 
 		// ---- デコレータ ----
-		{Key: "external", Rule: Rule{
-			Comment: "@external と @repeatable は核の印でデコレータではない（docs/grammar.md「予約語」）",
+		{Key: "core-marks", Rule: Rule{
+			Comment: "@repeatable、@entry、@hint は核の印でデコレータではない（docs/grammar.md「予約語」）",
 			Name:    "storage.modifier.hozo",
-			Match:   `@(?:external|repeatable)\b`,
+			Match:   `@(?:repeatable|entry|hint)\b`,
 		}},
 		{Key: "decorator", Rule: Rule{
 			Comment: "@ から DecoratorRef まで。最後の要素は予約語でもよい（@db.list、@effects。docs/grammar.md「識別子」）。予約語のパターンより先に拾い、予約語として塗らない",
@@ -359,6 +359,11 @@ func Build() Grammar {
 				},
 			},
 			caseOfRule,
+			{
+				Comment: "outer は、節 outer throws の頭でだけ文脈キーワード（docs/grammar.md「decorator の宣言」の ThrowsClause）",
+				Name:    "keyword.other.hozo",
+				Match:   `\bouter(?=\s+throws\b)`,
+			},
 			{
 				Comment: "any の種類: variant は any の後ろでだけ文脈キーワード",
 				Match:   `\b(any)\s+(variant)\b`,
@@ -478,7 +483,7 @@ func Build() Grammar {
 			{Include: "#string"},
 			{Include: "#override-name"},
 			{Include: "#field-names"},
-			{Include: "#external"},
+			{Include: "#core-marks"},
 			{Include: "#decorator"},
 			{Include: "#declarations"},
 			{Include: "#contextual"},

@@ -702,7 +702,7 @@ func typesString(ts []ir.Type) string {
 
 // lowerDecoratorDecl は decorator の宣言。名前付き（別名）なら Alias だけを持つ。
 func (a *analyzer) lowerDecoratorDecl(s *symbol, d *ast.DecoratorDecl, sc *scope) ir.Decl {
-	dec := &ir.Decorator{External: d.External, Repeatable: d.Repeatable, Fn: d.Fn}
+	dec := &ir.Decorator{Entry: d.Entry, Hint: d.Hint, Repeatable: d.Repeatable, Fn: d.Fn}
 	if d.Alias != nil {
 		dec.DeclBase = a.base(s, d.Doc, d.Span, docContext{})
 		a.addSite(d.Decorators, siteDecorator, sc, &dec.DeclBase.Decorators)
@@ -734,7 +734,11 @@ func (a *analyzer) lowerDecoratorDecl(s *symbol, d *ast.DecoratorDecl, sc *scope
 	for _, c := range d.Clauses {
 		switch c := c.(type) {
 		case *ast.ThrowsClause:
-			dec.Throws = append(dec.Throws, a.lowerThrows(c, csc))
+			if c.Outer {
+				dec.OuterThrows = append(dec.OuterThrows, a.lowerThrows(c, csc))
+			} else {
+				dec.Throws = append(dec.Throws, a.lowerThrows(c, csc))
+			}
 		case *ast.CatchesClause:
 			dec.Catches = append(dec.Catches, a.lowerCatches(c, csc))
 		case *ast.ReadsClause:
@@ -744,6 +748,23 @@ func (a *analyzer) lowerDecoratorDecl(s *symbol, d *ast.DecoratorDecl, sc *scope
 		}
 	}
 	a.checkREL1(s.fqn, dec.Throws, d.Span)
+	a.checkREL1(s.fqn, dec.OuterThrows, d.Span)
+	if d.Hint {
+		// DEC-26: @hint を、付けられない宣言（docs/check.md「デコレータ」）
+		var why []string
+		if len(d.Clauses) > 0 {
+			why = append(why, "振る舞いを言う節（throws、outer throws、catches、reads、effects）を持つ")
+		}
+		if d.Body != nil {
+			why = append(why, "本体を持つ")
+		}
+		if d.Entry {
+			why = append(why, "@entry を持つ（入口は、解釈されることを期待する）")
+		}
+		if len(why) > 0 {
+			a.errorf("DEC-26", d.HintSpan, "デコレータ %s に @hint は付けられない: %s。@hint は、解釈されなくても、よいデコレータの印", s.fqn, strings.Join(why, "。"))
+		}
+	}
 	if d.Body != nil {
 		for _, c := range d.Clauses {
 			if cc, ok := c.(*ast.CatchesClause); ok {

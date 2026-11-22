@@ -13,7 +13,7 @@ func checkNamespaces(c *computer, r *reporter) {
 }
 
 // checkDoc1Throws は DOC-1: op の @throws の例外が Signature.exceptions（Sig(O, ns(O))）にも、
-// O に付いた external なデコレータの throws にもない（docs/check.md「名前空間」）。
+// O に付いたデコレータの outer throws にもない（docs/check.md「名前空間」）。
 func checkDoc1Throws(c *computer, o *ir.Op, r *reporter) {
 	if o.Description == nil {
 		return

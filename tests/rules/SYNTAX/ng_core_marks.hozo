@@ -1,22 +1,33 @@
-// SYNTAX（docs/grammar.md「decorator の宣言」の CoreMark）: 核の印 @external / @repeatable は、デコレータの宣言の直前にだけ書け、
-// 引数を取らず、同じ印は一度まで。別名の形には付けられない
+// SYNTAX（docs/grammar.md「decorator の宣言」の CoreMark）: 核の印 @repeatable / @entry / @hint は、デコレータの宣言の直前にだけ書け、
+// 引数を取らず、同じ印は一度まで。別名の形には付けられない。@entry は、decorator fn にだけ。なくした @external は、新しい書き方を示す
 namespace a {
   model M { id: string; }
   state rows: list<M>;
+  exception Offline;
   @repeatable                                    // ERROR: SYNTAX
   model N { id: string; }
   @repeatable()                                  // ERROR: SYNTAX
   decorator withArgs for read;
   @repeatable @repeatable                        // ERROR: SYNTAX
   decorator twice for read;
-  @external @repeatable @external                // ERROR: SYNTAX
-  decorator fn twiceExternal();
+  @entry @repeatable @entry                      // ERROR: SYNTAX
+  decorator fn twiceEntry();
   decorator plain(column: string) for read;
   @repeatable                                    // ERROR: SYNTAX
   decorator alias = plain("id");
+  @hint                                          // ERROR: SYNTAX
+  decorator hinted = plain("id");
   @repeatable                                    // ERROR: SYNTAX
   read fn marked(): M[] reads rows;
+  @entry                                         // ERROR: SYNTAX
+  fn opened();
   model F { @repeatable x: int; }                // ERROR: SYNTAX
+  model G { @hint x: int; }                      // ERROR: SYNTAX
+  @entry                                         // ERROR: SYNTAX
+  decorator onRead for read;
+  @external                                      // ERROR: SYNTAX
+  decorator fn viaNetwork(): throws Offline;
+  decorator outerOnFor for read outer throws Offline;   // ERROR: SYNTAX
   @repeatable decorator ok(column: string) for read;
   @ok("a") @ok("b")
   read fn all(): M[] reads rows;

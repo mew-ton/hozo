@@ -1,5 +1,5 @@
 {
-  "version": "0.18",
+  "version": "0.19",
   "viewer": "web",
   "config": {
     "index": 2,
@@ -74,7 +74,7 @@
     ]
   },
   "program": {
-    "version": "0.18",
+    "version": "0.19",
     "namespaces": [
       {
         "name": "",
@@ -107,9 +107,11 @@
               "state"
             ],
             "caseTargets": [],
-            "external": false,
+            "entry": false,
+            "hint": false,
             "repeatable": false,
             "throws": [],
+            "outerThrows": [],
             "catches": [],
             "reads": [],
             "effects": []
@@ -1409,7 +1411,7 @@
               },
               "end": {
                 "line": 83,
-                "col": 41
+                "col": 47
               }
             },
             "params": [],
@@ -1418,9 +1420,11 @@
               "op"
             ],
             "caseTargets": [],
-            "external": true,
+            "entry": true,
+            "hint": false,
             "repeatable": false,
-            "throws": [
+            "throws": [],
+            "outerThrows": [
               {
                 "exceptions": [
                   "api.Timeout"
@@ -1453,7 +1457,8 @@
               "op"
             ],
             "caseTargets": [],
-            "external": false,
+            "entry": false,
+            "hint": false,
             "repeatable": false,
             "throws": [
               {
@@ -1467,6 +1472,7 @@
                 ]
               }
             ],
+            "outerThrows": [],
             "catches": [],
             "reads": [],
             "effects": []
@@ -4413,9 +4419,11 @@
               "op"
             ],
             "caseTargets": [],
-            "external": false,
+            "entry": false,
+            "hint": false,
             "repeatable": false,
             "throws": [],
+            "outerThrows": [],
             "catches": [],
             "reads": [
               {
@@ -4463,9 +4471,11 @@
               "op"
             ],
             "caseTargets": [],
-            "external": false,
+            "entry": false,
+            "hint": false,
             "repeatable": false,
             "throws": [],
+            "outerThrows": [],
             "catches": [],
             "reads": [
               {
@@ -4518,9 +4528,11 @@
               "effect"
             ],
             "caseTargets": [],
-            "external": false,
+            "entry": false,
+            "hint": false,
             "repeatable": false,
             "throws": [],
+            "outerThrows": [],
             "catches": [],
             "reads": [],
             "effects": []
@@ -4544,9 +4556,11 @@
             "fn": false,
             "targets": [],
             "caseTargets": [],
-            "external": false,
+            "entry": false,
+            "hint": false,
             "repeatable": false,
             "throws": [],
+            "outerThrows": [],
             "catches": [],
             "reads": [],
             "effects": [],
@@ -11198,9 +11212,11 @@
               "op"
             ],
             "caseTargets": [],
-            "external": false,
+            "entry": false,
+            "hint": false,
             "repeatable": false,
             "throws": [],
+            "outerThrows": [],
             "catches": [],
             "reads": [],
             "effects": []
@@ -11597,9 +11613,11 @@
               "op"
             ],
             "caseTargets": [],
-            "external": false,
+            "entry": false,
+            "hint": false,
             "repeatable": false,
             "throws": [],
+            "outerThrows": [],
             "catches": [
               {
                 "exceptions": [
@@ -11631,9 +11649,11 @@
             "fn": false,
             "targets": [],
             "caseTargets": [],
-            "external": false,
+            "entry": false,
+            "hint": false,
             "repeatable": false,
             "throws": [],
+            "outerThrows": [],
             "catches": [],
             "reads": [],
             "effects": [],
@@ -11678,7 +11698,8 @@
               "op"
             ],
             "caseTargets": [],
-            "external": false,
+            "entry": false,
+            "hint": false,
             "repeatable": false,
             "throws": [
               {
@@ -11688,6 +11709,7 @@
                 "relations": []
               }
             ],
+            "outerThrows": [],
             "catches": [
               {
                 "exceptions": [
@@ -11720,9 +11742,11 @@
               "op"
             ],
             "caseTargets": [],
-            "external": false,
+            "entry": false,
+            "hint": false,
             "repeatable": false,
             "throws": [],
+            "outerThrows": [],
             "catches": [
               {
                 "exceptions": [
@@ -11784,9 +11808,11 @@
               "op"
             ],
             "caseTargets": [],
-            "external": false,
+            "entry": false,
+            "hint": false,
             "repeatable": false,
             "throws": [],
+            "outerThrows": [],
             "catches": [],
             "reads": [],
             "effects": []
@@ -11992,9 +12018,11 @@
               "model"
             ],
             "caseTargets": [],
-            "external": false,
+            "entry": false,
+            "hint": false,
             "repeatable": false,
             "throws": [],
+            "outerThrows": [],
             "catches": [],
             "reads": [],
             "effects": []
@@ -14254,9 +14282,11 @@
                 }
               }
             ],
-            "external": false,
+            "entry": false,
+            "hint": false,
             "repeatable": false,
             "throws": [],
+            "outerThrows": [],
             "catches": [],
             "reads": [],
             "effects": []
@@ -14295,9 +14325,11 @@
                 }
               }
             ],
-            "external": false,
+            "entry": false,
+            "hint": false,
             "repeatable": false,
             "throws": [],
+            "outerThrows": [],
             "catches": [],
             "reads": [],
             "effects": []
@@ -14336,9 +14368,11 @@
                 }
               }
             ],
-            "external": false,
+            "entry": false,
+            "hint": false,
             "repeatable": false,
             "throws": [],
+            "outerThrows": [],
             "catches": [],
             "reads": [],
             "effects": []
@@ -14383,9 +14417,11 @@
               "op"
             ],
             "caseTargets": [],
-            "external": false,
+            "entry": false,
+            "hint": false,
             "repeatable": false,
             "throws": [],
+            "outerThrows": [],
             "catches": [],
             "reads": [],
             "effects": []
@@ -14423,9 +14459,11 @@
               "state"
             ],
             "caseTargets": [],
-            "external": false,
+            "entry": false,
+            "hint": false,
             "repeatable": false,
             "throws": [],
+            "outerThrows": [],
             "catches": [],
             "reads": [],
             "effects": []
@@ -14458,9 +14496,11 @@
               "field"
             ],
             "caseTargets": [],
-            "external": false,
+            "entry": false,
+            "hint": false,
             "repeatable": false,
             "throws": [],
+            "outerThrows": [],
             "catches": [],
             "reads": [],
             "effects": []
@@ -14493,9 +14533,11 @@
               "field"
             ],
             "caseTargets": [],
-            "external": false,
+            "entry": false,
+            "hint": false,
             "repeatable": false,
             "throws": [],
+            "outerThrows": [],
             "catches": [],
             "reads": [],
             "effects": []
@@ -14528,9 +14570,11 @@
               "field"
             ],
             "caseTargets": [],
-            "external": false,
+            "entry": false,
+            "hint": false,
             "repeatable": false,
             "throws": [],
+            "outerThrows": [],
             "catches": [],
             "reads": [],
             "effects": []
@@ -14563,9 +14607,11 @@
               "field"
             ],
             "caseTargets": [],
-            "external": false,
+            "entry": false,
+            "hint": false,
             "repeatable": false,
             "throws": [],
+            "outerThrows": [],
             "catches": [],
             "reads": [],
             "effects": []
@@ -14598,9 +14644,11 @@
               "field"
             ],
             "caseTargets": [],
-            "external": false,
+            "entry": false,
+            "hint": false,
             "repeatable": false,
             "throws": [],
+            "outerThrows": [],
             "catches": [],
             "reads": [],
             "effects": []
@@ -14633,9 +14681,11 @@
               "field"
             ],
             "caseTargets": [],
-            "external": false,
+            "entry": false,
+            "hint": false,
             "repeatable": false,
             "throws": [],
+            "outerThrows": [],
             "catches": [],
             "reads": [],
             "effects": []
@@ -14668,9 +14718,11 @@
               "field"
             ],
             "caseTargets": [],
-            "external": false,
+            "entry": false,
+            "hint": false,
             "repeatable": false,
             "throws": [],
+            "outerThrows": [],
             "catches": [],
             "reads": [],
             "effects": []
@@ -14703,9 +14755,11 @@
               "field"
             ],
             "caseTargets": [],
-            "external": false,
+            "entry": false,
+            "hint": false,
             "repeatable": false,
             "throws": [],
+            "outerThrows": [],
             "catches": [],
             "reads": [],
             "effects": []
@@ -14731,9 +14785,11 @@
               "field"
             ],
             "caseTargets": [],
-            "external": false,
+            "entry": false,
+            "hint": false,
             "repeatable": false,
             "throws": [],
+            "outerThrows": [],
             "catches": [],
             "reads": [],
             "effects": []
@@ -14759,9 +14815,11 @@
               "field"
             ],
             "caseTargets": [],
-            "external": false,
+            "entry": false,
+            "hint": false,
             "repeatable": false,
             "throws": [],
+            "outerThrows": [],
             "catches": [],
             "reads": [],
             "effects": []
@@ -14804,9 +14862,11 @@
               "field"
             ],
             "caseTargets": [],
-            "external": false,
+            "entry": false,
+            "hint": false,
             "repeatable": false,
             "throws": [],
+            "outerThrows": [],
             "catches": [],
             "reads": [],
             "effects": []
@@ -14839,9 +14899,11 @@
               "read"
             ],
             "caseTargets": [],
-            "external": false,
+            "entry": false,
+            "hint": false,
             "repeatable": false,
             "throws": [],
+            "outerThrows": [],
             "catches": [],
             "reads": [],
             "effects": []
@@ -14874,9 +14936,11 @@
               "read"
             ],
             "caseTargets": [],
-            "external": false,
+            "entry": false,
+            "hint": false,
             "repeatable": false,
             "throws": [],
+            "outerThrows": [],
             "catches": [],
             "reads": [],
             "effects": []
@@ -14950,9 +15014,11 @@
               "read"
             ],
             "caseTargets": [],
-            "external": false,
+            "entry": false,
+            "hint": false,
             "repeatable": true,
             "throws": [],
+            "outerThrows": [],
             "catches": [],
             "reads": [],
             "effects": []
@@ -15000,9 +15066,11 @@
               "read"
             ],
             "caseTargets": [],
-            "external": false,
+            "entry": false,
+            "hint": false,
             "repeatable": false,
             "throws": [],
+            "outerThrows": [],
             "catches": [],
             "reads": [],
             "effects": []
@@ -15035,9 +15103,11 @@
               "effect"
             ],
             "caseTargets": [],
-            "external": false,
+            "entry": false,
+            "hint": false,
             "repeatable": false,
             "throws": [],
+            "outerThrows": [],
             "catches": [],
             "reads": [],
             "effects": []
@@ -15070,9 +15140,11 @@
               "effect"
             ],
             "caseTargets": [],
-            "external": false,
+            "entry": false,
+            "hint": false,
             "repeatable": false,
             "throws": [],
+            "outerThrows": [],
             "catches": [],
             "reads": [],
             "effects": []
@@ -15105,9 +15177,11 @@
               "effect"
             ],
             "caseTargets": [],
-            "external": false,
+            "entry": false,
+            "hint": false,
             "repeatable": false,
             "throws": [],
+            "outerThrows": [],
             "catches": [],
             "reads": [],
             "effects": []
@@ -15150,9 +15224,11 @@
               "effect"
             ],
             "caseTargets": [],
-            "external": false,
+            "entry": false,
+            "hint": false,
             "repeatable": false,
             "throws": [],
+            "outerThrows": [],
             "catches": [],
             "reads": [],
             "effects": []
@@ -15185,9 +15261,11 @@
               "op"
             ],
             "caseTargets": [],
-            "external": false,
+            "entry": false,
+            "hint": false,
             "repeatable": false,
             "throws": [],
+            "outerThrows": [],
             "catches": [],
             "reads": [],
             "effects": []
@@ -15252,9 +15330,11 @@
               "state"
             ],
             "caseTargets": [],
-            "external": false,
+            "entry": false,
+            "hint": false,
             "repeatable": false,
             "throws": [],
+            "outerThrows": [],
             "catches": [],
             "reads": [],
             "effects": []
@@ -15451,7 +15531,7 @@
               },
               "end": {
                 "line": 13,
-                "col": 68
+                "col": 74
               }
             },
             "params": [
@@ -15475,9 +15555,11 @@
               "op"
             ],
             "caseTargets": [],
-            "external": true,
+            "entry": true,
+            "hint": false,
             "repeatable": false,
-            "throws": [
+            "throws": [],
+            "outerThrows": [
               {
                 "exceptions": [
                   "http.ServerError",
@@ -15502,7 +15584,7 @@
               },
               "end": {
                 "line": 15,
-                "col": 69
+                "col": 75
               }
             },
             "params": [
@@ -15526,9 +15608,11 @@
               "op"
             ],
             "caseTargets": [],
-            "external": true,
+            "entry": true,
+            "hint": false,
             "repeatable": false,
-            "throws": [
+            "throws": [],
+            "outerThrows": [
               {
                 "exceptions": [
                   "http.ServerError",
@@ -15577,9 +15661,11 @@
               "exception"
             ],
             "caseTargets": [],
-            "external": false,
+            "entry": false,
+            "hint": false,
             "repeatable": false,
             "throws": [],
+            "outerThrows": [],
             "catches": [],
             "reads": [],
             "effects": []
@@ -15627,9 +15713,11 @@
               "field"
             ],
             "caseTargets": [],
-            "external": false,
+            "entry": false,
+            "hint": false,
             "repeatable": false,
             "throws": [],
+            "outerThrows": [],
             "catches": [],
             "reads": [],
             "effects": []
@@ -15677,9 +15765,11 @@
               "field"
             ],
             "caseTargets": [],
-            "external": false,
+            "entry": false,
+            "hint": false,
             "repeatable": false,
             "throws": [],
+            "outerThrows": [],
             "catches": [],
             "reads": [],
             "effects": []
@@ -15727,9 +15817,11 @@
               "field"
             ],
             "caseTargets": [],
-            "external": false,
+            "entry": false,
+            "hint": false,
             "repeatable": false,
             "throws": [],
+            "outerThrows": [],
             "catches": [],
             "reads": [],
             "effects": []
@@ -15762,9 +15854,11 @@
               "field"
             ],
             "caseTargets": [],
-            "external": false,
+            "entry": false,
+            "hint": false,
             "repeatable": false,
             "throws": [],
+            "outerThrows": [],
             "catches": [],
             "reads": [],
             "effects": []
@@ -15797,9 +15891,11 @@
               "field"
             ],
             "caseTargets": [],
-            "external": false,
+            "entry": false,
+            "hint": false,
             "repeatable": false,
             "throws": [],
+            "outerThrows": [],
             "catches": [],
             "reads": [],
             "effects": []
@@ -15832,9 +15928,11 @@
               "field"
             ],
             "caseTargets": [],
-            "external": false,
+            "entry": false,
+            "hint": false,
             "repeatable": false,
             "throws": [],
+            "outerThrows": [],
             "catches": [],
             "reads": [],
             "effects": []
@@ -15867,9 +15965,11 @@
               "field"
             ],
             "caseTargets": [],
-            "external": false,
+            "entry": false,
+            "hint": false,
             "repeatable": false,
             "throws": [],
+            "outerThrows": [],
             "catches": [],
             "reads": [],
             "effects": []
@@ -15933,9 +16033,11 @@
               "field"
             ],
             "caseTargets": [],
-            "external": false,
+            "entry": false,
+            "hint": false,
             "repeatable": false,
             "throws": [],
+            "outerThrows": [],
             "catches": [],
             "reads": [],
             "effects": []
@@ -15976,9 +16078,11 @@
               "op"
             ],
             "caseTargets": [],
-            "external": false,
+            "entry": false,
+            "hint": false,
             "repeatable": false,
             "throws": [],
+            "outerThrows": [],
             "catches": [],
             "reads": [],
             "effects": []
@@ -16109,9 +16213,11 @@
               "state"
             ],
             "caseTargets": [],
-            "external": false,
+            "entry": false,
+            "hint": false,
             "repeatable": false,
             "throws": [],
+            "outerThrows": [],
             "catches": [],
             "reads": [],
             "effects": []
@@ -16137,9 +16243,11 @@
               "state"
             ],
             "caseTargets": [],
-            "external": false,
+            "entry": false,
+            "hint": false,
             "repeatable": false,
             "throws": [],
+            "outerThrows": [],
             "catches": [],
             "reads": [],
             "effects": []
@@ -16155,7 +16263,7 @@
                 "col": 3
               },
               "end": {
-                "line": 13,
+                "line": 14,
                 "col": 78
               }
             },
@@ -16198,9 +16306,11 @@
               "op"
             ],
             "caseTargets": [],
-            "external": false,
+            "entry": true,
+            "hint": false,
             "repeatable": false,
             "throws": [],
+            "outerThrows": [],
             "catches": [],
             "reads": [],
             "effects": []
@@ -16219,11 +16329,11 @@
             "span": {
               "file": "hozo:vocab/page.hozo",
               "start": {
-                "line": 18,
+                "line": 19,
                 "col": 3
               },
               "end": {
-                "line": 18,
+                "line": 19,
                 "col": 58
               }
             },
@@ -16248,7 +16358,8 @@
               "op"
             ],
             "caseTargets": [],
-            "external": false,
+            "entry": false,
+            "hint": false,
             "repeatable": false,
             "throws": [
               {
@@ -16258,6 +16369,7 @@
                 "relations": []
               }
             ],
+            "outerThrows": [],
             "catches": [],
             "reads": [],
             "effects": []
@@ -16276,11 +16388,11 @@
             "span": {
               "file": "hozo:vocab/page.hozo",
               "start": {
-                "line": 20,
+                "line": 21,
                 "col": 3
               },
               "end": {
-                "line": 20,
+                "line": 21,
                 "col": 88
               }
             },
@@ -16309,9 +16421,11 @@
               "op"
             ],
             "caseTargets": [],
-            "external": false,
+            "entry": false,
+            "hint": false,
             "repeatable": false,
             "throws": [],
+            "outerThrows": [],
             "catches": [
               {
                 "exceptions": [
@@ -16330,11 +16444,11 @@
             "span": {
               "file": "hozo:vocab/page.hozo",
               "start": {
-                "line": 21,
+                "line": 22,
                 "col": 3
               },
               "end": {
-                "line": 21,
+                "line": 22,
                 "col": 61
               }
             },
@@ -16363,9 +16477,11 @@
               "op"
             ],
             "caseTargets": [],
-            "external": false,
+            "entry": false,
+            "hint": false,
             "repeatable": false,
             "throws": [],
+            "outerThrows": [],
             "catches": [],
             "reads": [],
             "effects": []
@@ -16434,9 +16550,11 @@
               "read"
             ],
             "caseTargets": [],
-            "external": false,
+            "entry": false,
+            "hint": false,
             "repeatable": false,
             "throws": [],
+            "outerThrows": [],
             "catches": [],
             "reads": [],
             "effects": []
@@ -16529,7 +16647,8 @@
               "op"
             ],
             "caseTargets": [],
-            "external": false,
+            "entry": false,
+            "hint": false,
             "repeatable": false,
             "throws": [
               {
@@ -16540,6 +16659,7 @@
                 "relations": []
               }
             ],
+            "outerThrows": [],
             "catches": [],
             "reads": [],
             "effects": []
@@ -16604,9 +16724,11 @@
               "op"
             ],
             "caseTargets": [],
-            "external": false,
+            "entry": false,
+            "hint": false,
             "repeatable": false,
             "throws": [],
+            "outerThrows": [],
             "catches": [],
             "reads": [],
             "effects": []
@@ -16657,9 +16779,11 @@
               "field"
             ],
             "caseTargets": [],
-            "external": false,
+            "entry": false,
+            "hint": false,
             "repeatable": false,
             "throws": [],
+            "outerThrows": [],
             "catches": [],
             "reads": [],
             "effects": []
@@ -16705,9 +16829,11 @@
               "field"
             ],
             "caseTargets": [],
-            "external": false,
+            "entry": false,
+            "hint": false,
             "repeatable": false,
             "throws": [],
+            "outerThrows": [],
             "catches": [],
             "reads": [],
             "effects": []
@@ -16770,9 +16896,11 @@
               "field"
             ],
             "caseTargets": [],
-            "external": false,
+            "entry": false,
+            "hint": false,
             "repeatable": false,
             "throws": [],
+            "outerThrows": [],
             "catches": [],
             "reads": [],
             "effects": []
@@ -16814,9 +16942,11 @@
               "field"
             ],
             "caseTargets": [],
-            "external": false,
+            "entry": false,
+            "hint": false,
             "repeatable": false,
             "throws": [],
+            "outerThrows": [],
             "catches": [],
             "reads": [],
             "effects": []
@@ -16858,9 +16988,11 @@
               "field"
             ],
             "caseTargets": [],
-            "external": false,
+            "entry": false,
+            "hint": false,
             "repeatable": false,
             "throws": [],
+            "outerThrows": [],
             "catches": [],
             "reads": [],
             "effects": []

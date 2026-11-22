@@ -60,10 +60,11 @@ DecoratorRef  = [ QualifiedName "." ] DecoratorName ;
 
 | 語 | 位置 |
 |---|---|
+| `outer` | デコレータの宣言の節の頭（`outer throws …`。「decorator の宣言」）。直後が `throws` のときだけ、この意味 |
 | `field` `variant` | デコレータの `for` の対象（`field`）と `any` の種類（`variant`）。`for` の対象の `effect` と `read` は予約語（宣言の頭）で、その位置でも同じ字句 |
 | `post` `put` `delete` | `effect ... on 状態.操作`、`any effect on 状態.操作`、`effects` の要素に直に書く `状態.操作`（「op」）、配線で直に呼ぶ `状態.操作(…)`（「配線」）の操作 |
 
-`@external` と `@repeatable` は予約語でもデコレータの宣言でもなく、核の印。デコレータの宣言の上にだけ書ける（「decorator の宣言」）。
+`@repeatable`、`@entry`、`@hint` は予約語でもデコレータの宣言でもなく、核の印。デコレータの宣言の上にだけ書ける（「decorator の宣言」）。
 
 `reads` `read` `as` `never` `throw` `override` `export` の七つは仮の綴りで、後で別の語に変えうる（「決めたこと」）。`is` と `omit` は予約語ではない（`model A is B omit …` をなくしたときに外した。「model」）。`const` も予約語ではない（配線の束縛を `val` に替えたときに外した。「配線」）。
 
@@ -311,7 +312,7 @@ ClassifySubject = "never" | Type { "," Type } ;
 DecoratorDecl = { CoreMark } "decorator" "fn" DecoratorName Params [ ":" DecoratorClause { DecoratorClause } ] ( ";" | Block )
               | { CoreMark } "decorator" DecoratorName [ Params ] "for" Target { "," Target } ";"
               | "decorator" DecoratorName "=" DecoratorRef Args ";" ;
-CoreMark      = "@external" | "@repeatable" ;          (* 核の印。それぞれ一度まで *)
+CoreMark      = "@repeatable" | "@entry" | "@hint" ;   (* 核の印。それぞれ一度まで。@entry は、一つ目の形（decorator fn）にだけ *)
 
 Params    = "(" [ Param { "," Param } [ "," RestParam ] | RestParam ] ")" ;
 Param     = Ident ":" ParamType ;
@@ -324,7 +325,7 @@ Target    = "op" | "field" | "state" | "exception" | "scalar" | "model" | "effec
 CaseKind  = "case" [ "of" ( "any" | "never" | Type ) ] ;   (* 分類のケース。Type は、型か、分類の名前 *)
 
 DecoratorClause = ThrowsClause | CatchesClause | DecoReadsClause | DecoEffectsClause ;
-ThrowsClause    = "throws" ExcRef { "," ExcRef } { Relation } ;
+ThrowsClause    = [ "outer" ] "throws" ExcRef { "," ExcRef } { Relation } ;   (* outer は文脈キーワード *)
 Relation        = ( "prevents" | "keeps" ) "effects" ;
 CatchesClause   = "catches" ExcRef { "," ExcRef } ( "recovers" | "halts" QualifiedName | "ignores" ) ;
 ExcRef          = QualifiedName ;
@@ -347,8 +348,11 @@ DecoEffectsClause = "effects" EffectElem { "," EffectElem } ;
 - **op だけに付けるデコレータを、`for` の形で書くことは、なくした**: `decorator x for op …;` と、`for` を省いた `decorator x …;`（前は、op の意味）。パーサーは、新しい書き方（`decorator fn x(…)`）をメッセージで示して SYNTAX にし、`decorator fn` として読み進める。op と、ほかの種類の、両方に付けるデコレータ（`for model, state, op`）と、`read fn`・`effect fn` に付けるデコレータ（`for read`、`for effect`）は、`for` の形のまま。
 - **`for` の形は、節も、本体も、持てない**（文法で閉じる。前は、検査の DEC-2）。`for` の対象の後ろに、節の頭（`throws`、`catches`、`reads`、`effects`）か、`{` が来たら、SYNTAX: メッセージは、節と本体を書けるのは `decorator fn` だけであることを示す。
 
-- `@external` と `@repeatable` は核の印（`CoreMark`）で、デコレータの宣言にだけ付く。`decorator` の直前に置き、引数を取らず、別名の形には付けられない。二つを並べてよく、順は問わない。同じ印を二度書く、ほかの位置に書く、は構文エラー。
-  - `@external`: そのデコレータの `throws` の例外は、境界の外から見たときだけ加わる（§8.2「境界の外から見たときの型の変化」。DEC-10）。
+- `@repeatable`、`@entry`、`@hint` は核の印（`CoreMark`）で、デコレータの宣言にだけ付く。`decorator` の直前に置き、引数を取らず、別名の形には付けられない。並べてよく、順は問わない。同じ印を二度書く、ほかの位置に書く、は構文エラー。
+  - `@entry`: このデコレータの付いた fn は、境界の入口（`docs/decisions.md`「決めたこと」408）。プラグインが、その境界を知るための印。付けられるのは、`decorator fn` だけ（`for` の形に付けたら、SYNTAX）。節や本体の有無は、問わない。
+  - `@hint`: このデコレータは、解釈されなくても、よい（同 420。読める道具が、読めばよい印）。振る舞いを言う節（`throws`、`outer throws`、`catches`、`reads`、`effects`）か、本体を持つ宣言と、`@entry` の宣言には、付けられない（DEC-26。`docs/check.md`「デコレータ」）。
+  - **`@external` は、なくした**（同 407）。パーサーは、`@external` を、新しい書き方（節 `outer throws`）をメッセージで示して SYNTAX にし、その宣言の `throws` の節を、`outer throws` として読み進める。
+- **`throws E` と `outer throws E`**（同 407）。`throws E` は、包むことで、その fn が、E を投げる。`outer throws E` は、その fn は、E を投げないが、fn の外（境界と、fn の間。行きも、帰りも）で、E が起きうる: 境界の外（別の名前空間）から呼んだときだけ、加わる（`docs/check.md`「計算」の手順 i。DEC-10）。関係（`prevents effects` / `keeps effects`）は、どちらにも書け、書かなければ、「分からない」。一つの宣言が、両方を持てる（`decorator fn post(path: string): throws TooLarge outer throws ServerError, NetworkError;`）。`outer` は文脈キーワードで、節の頭の、直後が `throws` の位置でだけ、この意味になる。
   - `@repeatable`: そのデコレータを、一つの宣言に何度でも付けられる（`@repeatable decorator where(column: string, value: string | int | float | boolean) for read;`）。印のないデコレータは、一つの宣言に一度だけ（DEC-13。`docs/check.md`「デコレータ」）。何度も付けた適用は、書いた順に IR に並ぶ（`docs/ir.md`「デコレータの適用」）。
 - 三つ目の形が名前付きのデコレータ（§8.1 `decorator redirectToLogin = redirectOn(server.Unauthorized, transitionToLogin);`）。`for` も節も持たない（汎用の側の宣言に従う）。
 - `ExcRef` は例外、例外のユニオン、またはデコレータの引数の名前（`catches error recovers`。§4.2）。
@@ -591,7 +595,8 @@ DocComment の中身 = { 本文の行 } { タグの行 } ;
 | 残りの引数は `...名前: 型` と書き、型は値一つの型。最後に一つだけ、省略可能にできない | 並べる数が決まらない引数（op が行う効果の並び）を、リスト（`[a, b]`）で囲ませない。TS の書き方に寄せるが、型は配列でなく値一つの型で書く: デコレータの引数の型には `any effect` のような、配列にできない種類がある |
 | デコレータの対象は、op が使う三つの単位のどれも（`exception`、`effect`、`read`） | 宣言が、それを使う op の実装の材料を言えるようにする（`@http.status(401)`、`@db.insert`、`@db.find`）。`union` や `classify` と違い、op が投げる、行う、読む「こと」の名前で、語彙が意味を足す相手になる |
 | デコレータは `namespace` に付けられない。`for namespace` という対象もない | 名前空間は、複数のファイルの複数のブロックに分けて宣言できる（TypeScript の `interface` と同じく、同じ名前のブロックは一つにまとまる）。名前空間に付けたデコレータは、ファイルをまたいで一つにまとめて管理することになり、どのブロックに何が付いているかが直感的でない。印は中の宣言（op、model など）に付ける |
-| `@external` と `@repeatable` は宣言ではなく核の印 | 語彙でも宣言できず、付く先がデコレータの宣言だけなので、文法で閉じる |
+| `@repeatable`、`@entry`、`@hint` は宣言ではなく核の印 | 語彙でも宣言できず、付く先がデコレータの宣言だけなので、文法で閉じる |
+| `@external` をなくし、節 `outer throws` を足した | `@external` は、「その fn が投げる」と「fn の外で起きる」の違いと、「境界の入口」を、一つの印に詰めていた。違いは、節ごとに言い（`outer throws`）、入口は、別の印（`@entry`）で言う（`docs/decisions.md`「決めたこと」407、408） |
 | 同じデコレータを一つの宣言に重ねられるのは、宣言が `@repeatable` を持つときだけ | 条件を一つずつ足す語彙（`@db.where(…)` を二つ）のように、重ねることに意味があるデコレータと、重ねれば書き間違いであるデコレータ（`@http.status` を二つ）を、宣言の側で分ける。既定は今までどおり一度だけ（DEC-13） |
 | その場で書く model はユニオンのアームにだけ置ける | 合成する名前（`docs/ir.md`「正規化」）が、そこにしか決まらない。例外の値に置けた形（`exception X: { … }`）は、例外が引数を持つ形になってなくなった |
 | 省略可能は型の `?` だけで表し、名前に付ける `x?: T` は書けない | 同じ意味の書き方を二つ持たない。型の `?` は `Item?[]` や、インデックスの値の型（`[name: string]: int?;`）のように、名前のない型の位置でも要るので、名前の側を落とす。設計書の例の `x?: T` は、`x: T?` と書く |

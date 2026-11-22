@@ -23,7 +23,7 @@
       "include": "#field-names"
     },
     {
-      "include": "#external"
+      "include": "#core-marks"
     },
     {
       "include": "#decorator"
@@ -157,10 +157,10 @@
       "name": "keyword.operator.rest.hozo",
       "match": "\\.\\.\\."
     },
-    "external": {
-      "comment": "@external と @repeatable は核の印でデコレータではない（docs/grammar.md「予約語」）",
+    "core-marks": {
+      "comment": "@repeatable、@entry、@hint は核の印でデコレータではない（docs/grammar.md「予約語」）",
       "name": "storage.modifier.hozo",
-      "match": "@(?:external|repeatable)\\b"
+      "match": "@(?:repeatable|entry|hint)\\b"
     },
     "decorator": {
       "comment": "@ から DecoratorRef まで。最後の要素は予約語でもよい（@db.list、@effects。docs/grammar.md「識別子」）。予約語のパターンより先に拾い、予約語として塗らない",
@@ -283,6 +283,11 @@
               "name": "entity.name.type.hozo"
             }
           }
+        },
+        {
+          "comment": "outer は、節 outer throws の頭でだけ文脈キーワード（docs/grammar.md「decorator の宣言」の ThrowsClause）",
+          "name": "keyword.other.hozo",
+          "match": "\\bouter(?=\\s+throws\\b)"
         },
         {
           "comment": "any の種類: variant は any の後ろでだけ文脈キーワード",

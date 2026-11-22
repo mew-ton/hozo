@@ -437,8 +437,8 @@ func TestSigThrowsClause(t *testing.T) {
 	}
 }
 
-// TestSigExternal は DEC-10: external なデコレータの throws は v = ns(O) なら飛ばし、別の名前空間から見れば加わる。
-func TestSigExternal(t *testing.T) {
+// TestSigOuterThrows は DEC-10: デコレータの outer throws は v = ns(O) なら飛ばし、別の名前空間から見れば加わる。
+func TestSigOuterThrows(t *testing.T) {
 	getMe := leaf("server.getMe", ir.String())
 	getMe.Decorators = []ir.Application{app("http.get", ir.Arg{Param: "path", Value: ir.LiteralValue{Literal: ir.StringLiteral{Value: "/me"}}})}
 	inside := wire("server.inside", ir.String(), nil, ret(call("server.getMe")))

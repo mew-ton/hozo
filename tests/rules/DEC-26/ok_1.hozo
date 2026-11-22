@@ -1,0 +1,15 @@
+// DEC-26: 節も、本体も、@entry も持たない宣言には、@hint を付けられる。@hint のない宣言は、何を持っていてもよい
+namespace a {
+  exception E;
+  @hint
+  decorator fn note(text: string);
+  @hint @repeatable
+  decorator label(name: string) for model, state;
+  @entry
+  decorator fn door(): outer throws E;
+  decorator fn thrower(): throws E;
+  @label("m") @label("n")
+  model M { id: string; }
+  @note("x")
+  fn f();
+}

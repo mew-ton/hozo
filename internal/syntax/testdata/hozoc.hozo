@@ -70,8 +70,7 @@ namespace proc {
    *
    * @param command 起動するコマンド
    */
-  @external
-  decorator fn stdio(command: string): throws Crashed, MalformedOutput;
+  decorator fn stdio(command: string): outer throws Crashed, MalformedOutput;
 }
 
 /** hozo の仕様を検査し、各言語のコードに展開する CLI */

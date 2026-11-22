@@ -605,7 +605,7 @@
           "const": "check"
         },
         "protocol": {
-          "const": "0.18"
+          "const": "0.19"
         },
         "view": {
           "$ref": "#/$defs/View"
@@ -815,7 +815,7 @@
           "type": "array"
         },
         "protocol": {
-          "const": "0.18"
+          "const": "0.19"
         }
       },
       "required": [
@@ -951,10 +951,13 @@
           },
           "type": "array"
         },
-        "external": {
+        "entry": {
           "type": "boolean"
         },
         "fn": {
+          "type": "boolean"
+        },
+        "hint": {
           "type": "boolean"
         },
         "kind": {
@@ -962,6 +965,12 @@
         },
         "name": {
           "type": "string"
+        },
+        "outerThrows": {
+          "items": {
+            "$ref": "#/$defs/ThrowsClause"
+          },
+          "type": "array"
         },
         "params": {
           "items": {
@@ -1003,9 +1012,11 @@
         "fn",
         "targets",
         "caseTargets",
-        "external",
+        "entry",
+        "hint",
         "repeatable",
         "throws",
+        "outerThrows",
         "catches",
         "reads",
         "effects"
@@ -1349,7 +1360,7 @@
           "const": "emit"
         },
         "protocol": {
-          "const": "0.18"
+          "const": "0.19"
         },
         "transpiler": {
           "type": "string"
@@ -1567,7 +1578,7 @@
           "type": "string"
         },
         "protocol": {
-          "const": "0.18"
+          "const": "0.19"
         }
       },
       "required": [
@@ -2384,7 +2395,7 @@
           "type": "array"
         },
         "version": {
-          "const": "0.18"
+          "const": "0.19"
         }
       },
       "required": [
@@ -3279,7 +3290,7 @@
           "$ref": "#/$defs/Program"
         },
         "version": {
-          "const": "0.18"
+          "const": "0.19"
         },
         "viewer": {
           "type": "string"

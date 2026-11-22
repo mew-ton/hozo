@@ -559,10 +559,14 @@ type DecoratorDecl struct {
 	Span       source.Span
 	Doc        *DocComment
 	Decorators []*Decorator
-	// External は @external の印。
-	External bool
-	// ExternalSpan は @external の範囲。External でなければゼロ値。
-	ExternalSpan source.Span
+	// Entry は @entry の印（このデコレータの付いた fn は、境界の入口。docs/grammar.md「decorator の宣言」の CoreMark）。
+	Entry bool
+	// EntrySpan は @entry の範囲。Entry でなければゼロ値。
+	EntrySpan source.Span
+	// Hint は @hint の印（解釈されなくても、よい）。
+	Hint bool
+	// HintSpan は @hint の範囲。Hint でなければゼロ値。
+	HintSpan source.Span
 	// Repeatable は @repeatable の印（docs/grammar.md「decorator の宣言」の CoreMark）。
 	Repeatable bool
 	// RepeatableSpan は @repeatable の範囲。Repeatable でなければゼロ値。
@@ -763,9 +767,11 @@ type Clause interface {
 	clauseNode()
 }
 
-// ThrowsClause は "throws X, Y { Relation }"。
+// ThrowsClause は "[ outer ] throws X, Y { Relation }"。
 type ThrowsClause struct {
-	Span       source.Span
+	Span source.Span
+	// Outer は、頭の outer（デコレータの宣言の節でだけ書ける。fn の外で起きる例外。docs/grammar.md「decorator の宣言」）。
+	Outer      bool
 	Exceptions []QualifiedName
 	Relations  []*Relation
 }

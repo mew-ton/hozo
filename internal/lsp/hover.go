@@ -380,11 +380,14 @@ func (r *renderer) decoratorHead(name string, d *ir.Decorator) string {
 		return "decorator " + name + " = " + r.rel(d.Alias.Target) + "(" + strings.Join(args, ", ") + ")"
 	}
 	var b strings.Builder
-	if d.External {
-		b.WriteString("@external ")
-	}
 	if d.Repeatable {
 		b.WriteString("@repeatable ")
+	}
+	if d.Entry {
+		b.WriteString("@entry ")
+	}
+	if d.Hint {
+		b.WriteString("@hint ")
 	}
 	if d.Fn {
 		// 関数に付けるデコレータ: decorator fn 名前(引数): 節（docs/grammar.md「decorator の宣言」）。本体は、出さない
@@ -428,6 +431,9 @@ func (r *renderer) decoratorClauses(d *ir.Decorator) string {
 	var b strings.Builder
 	for _, c := range d.Throws {
 		b.WriteString(" " + r.throwsClause(c))
+	}
+	for _, c := range d.OuterThrows {
+		b.WriteString(" outer " + r.throwsClause(c))
 	}
 	for _, c := range d.Catches {
 		b.WriteString(" catches " + r.rels(c.Exceptions) + " " + string(c.Mode))

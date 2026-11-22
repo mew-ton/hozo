@@ -13,7 +13,7 @@ Go の**基底**のトランスパイラ `go`（`docs/config.md`「基底と相�
 ```toml
 name     = "go"
 command  = ["go", "run", "github.com/mew-ton/hozo/plugins/go"]
-protocol = "0.18"
+protocol = "0.19"
 
 [[transpiler]]
 name     = "go"

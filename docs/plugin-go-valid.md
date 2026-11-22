@@ -11,7 +11,7 @@
 ```toml
 name     = "go-valid"
 command  = ["go", "run", "github.com/mew-ton/hozo/plugins/go-valid"]
-protocol = "0.18"
+protocol = "0.19"
 
 [[transpiler]]
 name     = "go-valid"

@@ -1755,3 +1755,50 @@ func TestDecoratorBody(t *testing.T) {
 		t.Errorf("hover(@guarded) に、本体が出ている:\n%s", hov.Contents.Value)
 	}
 }
+
+// TestCoreMarkHover は、核の印（@repeatable、@entry、@hint）と、節 outer throws が、ホバーの見出しに出ること
+// （docs/lsp.md「ホバー」: 印は、decorator の前に、この順で。outer throws の節は、throws の節の後ろに）。
+// @hint を、節を持つ宣言に付けたときの診断（DEC-26）が、言語サーバーにも出ること。
+func TestCoreMarkHover(t *testing.T) {
+	root := t.TempDir()
+	text := `namespace gate {
+  exception Offline;
+  exception TooLarge;
+  /** 境界の入口 */
+  @entry @repeatable
+  decorator fn door(path: string): throws TooLarge prevents effects outer throws Offline;
+  /** 読める道具が、読めばよい */
+  @hint
+  decorator fn note(text: string);
+  @hint
+  decorator fn wrong(): throws TooLarge;
+  @door("/a") @note("x")
+  fn open();
+}
+`
+	path := filepath.Join(root, "a.hozo")
+	writeFile(t, path, text)
+	c := startServer(t, Options{})
+	_, byURI := c.initialize(root, protocol.ClientCapabilities{})
+	uri, enc := fileURI(path), encUTF16
+	var codes []string
+	for _, d := range byURI[uri] {
+		if d.Code != codeNoConfig {
+			codes = append(codes, d.Code)
+		}
+	}
+	if len(codes) != 1 || codes[0] != "DEC-26" {
+		t.Fatalf("診断 = %v, want [DEC-26]", codes)
+	}
+	for _, tt := range []struct{ what, needle, want string }{
+		{"入口の適用", "@door(\"/a\")", "@repeatable @entry decorator fn door(path: string): throws TooLarge prevents effects outer throws Offline"},
+		{"印の適用", "@note(\"x\")", "@hint decorator fn note(text: string)"},
+	} {
+		var hov *protocol.Hover
+		c.result(protocol.MethodHover, protocol.TextDocumentPositionParams{TextDocument: textDoc(uri), Position: shift(positionOf(t, enc, text, tt.needle, 0), 1)}, &hov)
+		if hov == nil || !strings.Contains(hov.Contents.Value, tt.want) {
+			t.Errorf("hover(%s) に %q がない: %+v", tt.what, tt.want, hov)
+		}
+	}
+	c.shutdown()
+}

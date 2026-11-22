@@ -77,10 +77,10 @@ namespace api {
   @db.where("kind", "web")
   read fn sessionsOf(userId: UserId): Session[] reads sessions;
 
-  // docs/check.md「計算」手順 i の throws（DEC-10）: external の例外は、境界の外（web）から見たときだけ Sig に入る
+  // docs/check.md「計算」手順 i の outer throws（DEC-10）: fn の外で起きる例外は、境界の外（web）から見たときだけ Sig に入る
   /** ネットワーク越しに呼ぶ */
-  @external
-  decorator fn remote(): throws Timeout;
+  @entry
+  decorator fn remote(): outer throws Timeout;
   decorator fn requiresAuth(): throws Unauthorized prevents effects;
 
   // docs/check.md「bind」4: web.token の位置は model の中の Token?（path ["in", "token"]）。id は呼び出し側が渡す

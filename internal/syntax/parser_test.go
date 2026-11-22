@@ -133,9 +133,9 @@ func TestDeclReject(t *testing.T) {
 		{"decorator on bind", "@db bind a to b.*;", "bind にデコレータは付けられない"},
 		{"not a decl", "foo;", "宣言が必要"},
 		{"stray close brace", "model A {} }", "対応する「{」のない「}」"},
-		{"external on model", "@external model A {}", "@external はデコレータの宣言の直前にだけ書ける"},
-		{"external with args", "@external() decorator fn x();", "@external は引数を取らない"},
-		{"external before other decorator", "@external @db decorator fn x();", "@external はデコレータの宣言の直前にだけ書ける"},
+		{"entry on model", "@entry model A {}", "@entry はデコレータの宣言の直前にだけ書ける"},
+		{"entry with args", "@entry() decorator fn x();", "@entry は引数を取らない"},
+		{"entry before other decorator", "@entry @db decorator fn x();", "@entry はデコレータの宣言の直前にだけ書ける"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) { mustFail(t, tt.src, tt.want) })
@@ -164,7 +164,7 @@ func TestNamespace(t *testing.T) {
 	// デコレータは名前空間に付けられない（docs/grammar.md「ファイルと宣言」「決めたこと」）。入れ子でも同じ。
 	mustFail(t, "/** d */ @ctx.bounded(\"注文\") namespace shop {}", "namespace にデコレータは付けられない")
 	mustFail(t, "namespace shop { @inner namespace admin {} }", "namespace にデコレータは付けられない")
-	mustFail(t, "@external namespace a {}", "@external はデコレータの宣言の直前にだけ書ける")
+	mustFail(t, "@hint namespace a {}", "@hint はデコレータの宣言の直前にだけ書ける")
 }
 
 // --- デコレータの適用 ---
@@ -350,7 +350,7 @@ func TestModelReject(t *testing.T) {
 		{"no body", "model A;", "「{」か「extends」が必要"},
 		{"qualified field name", "model A { a.b: string; }", "修飾しない識別子"},
 		{"dangling doc in body", "model A { /** x */ }", "付く先のない"},
-		{"external on field", "model A { @external x: int; }", "@external はデコレータの宣言の直前にだけ書ける"},
+		{"hint on field", "model A { @hint x: int; }", "@hint はデコレータの宣言の直前にだけ書ける"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) { mustFail(t, tt.src, tt.want) })
@@ -873,7 +873,7 @@ func TestRemovedClassifyForms(t *testing.T) {
 
 func TestDecoratorDecl(t *testing.T) {
 	d := firstDecl[*ast.DecoratorDecl](t, "decorator fn retry(times: int);")
-	if d.Name.Name != "retry" || len(d.Params) != 1 || d.Params[0].Name.Name != "times" || len(d.Params[0].Type.Types) != 1 || len(d.For) != 0 || len(d.Clauses) != 0 || d.External || d.Alias != nil {
+	if d.Name.Name != "retry" || len(d.Params) != 1 || d.Params[0].Name.Name != "times" || len(d.Params[0].Type.Types) != 1 || len(d.For) != 0 || len(d.Clauses) != 0 || d.Entry || d.Hint || d.Alias != nil {
 		t.Errorf("Decorator = %+v", d)
 	}
 	d = firstDecl[*ast.DecoratorDecl](t, "decorator body for field;")
@@ -890,43 +890,60 @@ func TestDecoratorDecl(t *testing.T) {
 			t.Errorf("For[%d] = %s, want %s", i, d.For[i].Kind, w)
 		}
 	}
-	d = firstDecl[*ast.DecoratorDecl](t, "@external decorator fn get(path: string): throws ServerError, NetworkError;")
-	if !d.External || d.ExternalSpan.Start != 0 || d.ExternalSpan.End != 9 || len(d.Clauses) != 1 {
+	d = firstDecl[*ast.DecoratorDecl](t, "@entry decorator fn get(path: string): outer throws ServerError, NetworkError;")
+	if !d.Entry || d.EntrySpan.Start != 0 || d.EntrySpan.End != 6 || d.Hint || len(d.Clauses) != 1 {
 		t.Fatalf("Decorator = %+v", d)
 	}
 	th := d.Clauses[0].(*ast.ThrowsClause)
+	if !th.Outer || th.Span.Start != 39 {
+		t.Errorf("outer throws = %+v", th)
+	}
 	if names(th.Exceptions) != "ServerError|NetworkError" || len(th.Relations) != 0 {
 		t.Errorf("Throws = %+v", th)
 	}
-	// Span は @external から ";" まで。
+	// Span は @entry から ";" まで。
 	if d.Span.Start != 0 {
 		t.Errorf("Span = %+v", d.Span)
 	}
 }
 
-// TestCoreMarks は核の印 CoreMark = "@external" | "@repeatable"（docs/grammar.md「decorator の宣言」）。
+// TestCoreMarks は核の印 CoreMark = "@repeatable" | "@entry" | "@hint"（docs/grammar.md「decorator の宣言」）と、なくした "@external"。
 func TestCoreMarks(t *testing.T) {
 	d := firstDecl[*ast.DecoratorDecl](t, "@repeatable decorator where(column: string, value: string | int | float | boolean) for read;")
-	if !d.Repeatable || d.External || d.RepeatableSpan.Start != 0 || d.RepeatableSpan.End != source.Offset(len("@repeatable")) || d.Span.Start != 0 {
+	if !d.Repeatable || d.Entry || d.Hint || d.RepeatableSpan.Start != 0 || d.RepeatableSpan.End != source.Offset(len("@repeatable")) || d.Span.Start != 0 {
 		t.Fatalf("Decorator = %+v", d)
 	}
 	// 二つを並べてよく、順は問わない
-	for _, src := range []string{"@external @repeatable decorator fn x(): throws E;", "@repeatable @external decorator fn x(): throws E;"} {
+	for _, src := range []string{"@entry @repeatable decorator fn x(): outer throws E;", "@repeatable @entry decorator fn x(): outer throws E;"} {
 		d = firstDecl[*ast.DecoratorDecl](t, src)
-		if !d.Repeatable || !d.External || len(d.Decorators) != 0 {
+		if !d.Repeatable || !d.Entry || d.Hint || len(d.Decorators) != 0 {
 			t.Errorf("%s: Decorator = %+v", src, d)
 		}
 	}
 	// 印のない宣言
-	if d = firstDecl[*ast.DecoratorDecl](t, "decorator fn x();"); d.Repeatable || d.External {
+	if d = firstDecl[*ast.DecoratorDecl](t, "decorator fn x();"); d.Repeatable || d.Entry || d.Hint {
 		t.Errorf("Decorator = %+v", d)
+	}
+	// @hint。for の形にも、付けられる
+	if d = firstDecl[*ast.DecoratorDecl](t, "@hint decorator tag(name: string) for model;"); !d.Hint || d.HintSpan.End != 5 || d.Entry {
+		t.Errorf("Decorator = %+v", d)
+	}
+	// throws と outer throws を、一つの宣言に。outer は、直後が throws のときだけ、節の頭
+	d = firstDecl[*ast.DecoratorDecl](t, "decorator fn post(): throws A prevents effects outer throws B, C keeps effects;")
+	if len(d.Clauses) != 2 || d.Clauses[0].(*ast.ThrowsClause).Outer || !d.Clauses[1].(*ast.ThrowsClause).Outer || names(d.Clauses[1].(*ast.ThrowsClause).Exceptions) != "B|C" {
+		t.Errorf("Clauses = %+v", d.Clauses)
 	}
 	tests := []struct{ name, src, want string }{
 		{"on model", "@repeatable model A {}", "@repeatable はデコレータの宣言の直前にだけ書ける"},
 		{"with args", "@repeatable() decorator fn x();", "@repeatable は引数を取らない"},
 		{"before other decorator", "@repeatable @db decorator fn x();", "@repeatable はデコレータの宣言の直前にだけ書ける"},
 		{"twice", "@repeatable @repeatable decorator fn x();", "@repeatable を二度書いている"},
-		{"external twice", "@external @repeatable @external decorator fn x();", "@external を二度書いている"},
+		{"entry twice", "@entry @repeatable @entry decorator fn x();", "@entry を二度書いている"},
+		{"entry on for form", "@entry decorator x for read;", "@entry を付けられるのは、関数に付けるデコレータ"},
+		{"hint on alias", "@hint decorator a = b();", "名前付きのデコレータに @hint は付けられない"},
+		{"removed external", "@external decorator fn x(): throws E;", "@external はなくなった。fn の外で起きる例外は、節 outer throws で書く"},
+		{"outer on for form", "decorator x for read outer throws E;", "for で付ける先を書いたデコレータは、節も本体も持てない"},
+		{"outer without colon", "decorator fn x() outer throws E;", "「)」の後ろに、節を書くなら、「:」で始める"},
 		{"on alias", "@repeatable decorator a = b();", "名前付きのデコレータに @repeatable は付けられない"},
 		{"on field", "model A { @repeatable x: int; }", "@repeatable はデコレータの宣言の直前にだけ書ける"},
 		{"on reserved field", "model A { @repeatable decorator: string; }", "@repeatable はデコレータの宣言の直前にだけ書ける"},
@@ -1033,9 +1050,9 @@ func TestDecoratorName(t *testing.T) {
 	if len(mm.Doc.Tags) != 2 || mm.Doc.Tags[0].Name.String() != "db.list" || mm.Doc.Tags[1].Name.String() != "effects" {
 		t.Errorf("Tags = %+v", mm.Doc.Tags)
 	}
-	// @external は予約語のデコレータ名の宣言にも付く
-	x := firstDecl[*ast.DecoratorDecl](t, "@external decorator fn delete(): throws X;")
-	if !x.External || x.Name.Name != "delete" {
+	// 核の印は予約語のデコレータ名の宣言にも付く
+	x := firstDecl[*ast.DecoratorDecl](t, "@entry decorator fn delete(): outer throws X;")
+	if !x.Entry || x.Name.Name != "delete" {
 		t.Errorf("Decorator = %+v", x)
 	}
 }
@@ -1186,7 +1203,7 @@ func TestDecoratorDeclParamTypes(t *testing.T) {
 
 func TestDecoratorDeclReject(t *testing.T) {
 	tests := []struct{ name, src, want string }{
-		{"external on alias", "@external decorator a = b();", "名前付きのデコレータに @external は付けられない"},
+		{"entry on alias", "@entry decorator a = b();", "名前付きのデコレータに @entry は付けられない"},
 		{"catches without outcome", "decorator fn a(): catches X;", "catches の後の振る舞い"},
 		{"halts without effect", "decorator fn a(): catches X halts;", "名前が必要"},
 		{"bad any kind", "decorator fn a(x: any thing);", "any の種類"},
@@ -2631,8 +2648,8 @@ func TestDecoratorFn(t *testing.T) {
 	if d.Body == nil || len(d.Body.Stmts) != 2 || len(d.Clauses) != 0 {
 		t.Errorf("節のない、本体のある decorator fn = %+v", d)
 	}
-	d = firstDecl[*ast.DecoratorDecl](t, "@external @repeatable decorator fn get(path: string): throws ServerError;")
-	if !d.Fn || !d.External || !d.Repeatable {
+	d = firstDecl[*ast.DecoratorDecl](t, "@entry @repeatable decorator fn get(path: string): outer throws ServerError;")
+	if !d.Fn || !d.Entry || !d.Repeatable {
 		t.Errorf("核の印の付いた decorator fn = %+v", d)
 	}
 

@@ -1,5 +1,5 @@
 {
-  "version": "0.18",
+  "version": "0.19",
   "viewer": "browser",
   "config": {
     "index": 2,
@@ -68,7 +68,7 @@
     ]
   },
   "program": {
-    "version": "0.18",
+    "version": "0.19",
     "namespaces": [
       {
         "name": "http",
@@ -143,9 +143,11 @@
               "op"
             ],
             "caseTargets": [],
-            "external": true,
+            "entry": true,
+            "hint": false,
             "repeatable": false,
-            "throws": [
+            "throws": [],
+            "outerThrows": [
               {
                 "exceptions": [
                   "http.ServerError",
@@ -194,9 +196,11 @@
               "op"
             ],
             "caseTargets": [],
-            "external": true,
+            "entry": true,
+            "hint": false,
             "repeatable": false,
-            "throws": [
+            "throws": [],
+            "outerThrows": [
               {
                 "exceptions": [
                   "http.ServerError",
@@ -809,9 +813,11 @@
               "op"
             ],
             "caseTargets": [],
-            "external": false,
+            "entry": false,
+            "hint": false,
             "repeatable": false,
             "throws": [],
+            "outerThrows": [],
             "catches": [
               {
                 "exceptions": [

@@ -1,0 +1,24 @@
+// DEC-26（docs/check.md「デコレータ」）: @hint を、付けられない宣言に付けた。振る舞いを言う節、本体、@entry のどれかを持つ
+namespace a {
+  exception E;
+  model M { id: string; }
+  state rows: list<M>;
+  effect fn add(m: M): effects rows.post;
+  @hint                                // ERROR: DEC-26
+  decorator fn thrower(): throws E;
+  @hint                                // ERROR: DEC-26
+  decorator fn outside(): outer throws E;
+  @hint                                // ERROR: DEC-26
+  decorator fn catcher(): catches E ignores;
+  @hint                                // ERROR: DEC-26
+  decorator fn reader(): reads rows;
+  @hint                                // ERROR: DEC-26
+  decorator fn doer(): effects add;
+  @hint                                // ERROR: DEC-26
+  decorator fn bodied() {
+    proceed();
+  }
+  @hint @entry                         // ERROR: DEC-26
+  decorator fn door();
+  fn f();
+}

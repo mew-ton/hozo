@@ -21,8 +21,7 @@ func TestWrittenThrows(t *testing.T) {
 	catchY := decorator("server.catchY")
 	catchY.Catches = []ir.CatchesClause{catches(ir.Recovers, "", "server.Y")}
 	throwZ := decorator("server.throwZ")
-	throwZ.External = true
-	throwZ.Throws = []ir.ThrowsClause{throws([]string{"server.Z"})}
+	throwZ.OuterThrows = []ir.ThrowsClause{throws([]string{"server.Z"})}
 
 	t.Run("節に書いていない例外も、E に入る。書いた例外は、足される", func(t *testing.T) {
 		w := wire("server.w", nil, nil, cs(call("server.a")), cs(call("server.b")))
@@ -55,8 +54,8 @@ func TestWrittenThrows(t *testing.T) {
 		wantCodes(t, Check(p, cfgFor("server")))
 		wantStrings(t, "E", sigOf(t, p, "server.w").Exceptions, []string{"server.X", "server.Z"})
 	})
-	t.Run("external throws are not added inside (docs/check.md「throws」)", func(t *testing.T) {
-		// external なデコレータの throws は Sig(O, ns(O)) に入らない（DEC-10）。本体から出る Z は、節に書いていなくても、E に入る
+	t.Run("outer throws are not added inside (docs/check.md「throws」)", func(t *testing.T) {
+		// デコレータの outer throws は Sig(O, ns(O)) に入らない（DEC-10）。本体から出る Z は、節に書いていなくても、E に入る
 		w := wire("server.w", nil, nil, cs(call("server.a")), cs(call("server.b")))
 		w.Throws = []ir.ThrowsClause{throws([]string{"server.X"})}
 		w.Decorators = []ir.Application{app("server.throwZ"), app("server.catchY")}
@@ -201,25 +200,24 @@ func TestState2(t *testing.T) {
 	}
 }
 
-// TestDec6And14 は DEC-6（catches と throws に同じ例外）と DEC-14（external なのに throws がない）。別名の宣言は対象外。
-func TestDec6And14(t *testing.T) {
+// TestDec6 は DEC-6（catches と throws に同じ例外）。別名の宣言は対象外。outer throws だけを持つ宣言、節のない入口の宣言に、
+// 診断は出ない（DEC-14 は、欠番: docs/check.md「デコレータ」）。
+func TestDec6(t *testing.T) {
 	same := decorator("server.same")
 	same.Catches = []ir.CatchesClause{catches(ir.Recovers, "", "server.X")}
 	same.Throws = []ir.ThrowsClause{throws([]string{"server.X"})}
 	ext := decorator("server.ext")
-	ext.External = true
+	ext.Entry = true
 	extOK := decorator("server.extOK")
-	extOK.External = true
-	extOK.Throws = []ir.ThrowsClause{throws([]string{"server.X"})}
+	extOK.Entry = true
+	extOK.OuterThrows = []ir.ThrowsClause{throws([]string{"server.X"})}
 	alias := decorator("server.alias")
-	alias.External = true
 	alias.Alias = &ir.DecoratorAlias{Target: "server.extOK"}
 	fallback := decorator("server.fallback")
 	fallback.Catches = []ir.CatchesClause{catches(ir.Recovers, "", "server.X")}
 	fallback.Throws = []ir.ThrowsClause{throws([]string{"server.Y"})}
 	diags := Check(serverWith(same, ext, extOK, alias, fallback), cfgFor("server"))
-	wantOneCode(t, diags, "DEC-6")
-	wantOneCode(t, diags, "DEC-14")
+	wantCodes(t, diags, "DEC-6")
 }
 
 // TestWire6 は WIRE-6: const の数が [hozo].max_bindings を超える。

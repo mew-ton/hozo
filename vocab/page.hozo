@@ -10,6 +10,7 @@ namespace page {
 
   decorator path for state;
   decorator query for state;
+  @entry
   decorator fn route(path: string, from: any state?, onInvalid: any effect?);
   /**
    * ダイアログで入力を待つ。component はコンポーネントの実装の名前（例: "YamadaWarrantyModal"）。

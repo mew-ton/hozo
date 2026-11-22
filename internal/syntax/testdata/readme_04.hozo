@@ -8,10 +8,10 @@ namespace http {
   /** 運搬の失敗（ステータスなし） */
   exception NetworkError;
 
-  @external
-  decorator fn get(path: string): throws ServerError, NetworkError;
-  @external
-  decorator fn post(path: string): throws ServerError, NetworkError;
+  @entry
+  decorator fn get(path: string): outer throws ServerError, NetworkError;
+  @entry
+  decorator fn post(path: string): outer throws ServerError, NetworkError;
 
   decorator status(code: int) for exception;
   decorator header(name: string) for field;

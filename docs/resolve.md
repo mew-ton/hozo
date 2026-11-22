@@ -68,7 +68,7 @@
 | `halts e` の `e` | `effect`、デコレータの宣言の中なら `any effect` の引数 |
 | `effects` の要素 | 名前で書いた要素: `effect`、`union`（`set` で要素が効果）。直に書いた要素: `state`（基底の状態。どの名前空間のものでも解決する）から辿った `post` / `put` / `delete`（下の「`effects` の要素の読み分け」）。デコレータの宣言の中なら `any effect` の引数（残りの引数でもよい）も。操作を付けない `state` と `classify` は RES-4（分類の遷移は直に書けない）。操作が状態の形になければ STATE-1、葉の op が節を書けば STATE-5。配線の op に書いたものは、計算した効果に足される（`docs/check.md`「状態に触れるもの」の「節に書く要素」） |
 | `reads` の要素 | 名前で書いた要素: `read`。直に書いた要素: `state`（基底の状態）。どちらも、どの名前空間のものでも解決する。デコレータの宣言の中なら `any state` の引数（残りの引数でもよい）も。どれでもなければ RES-4（状態の分類も書けない）。同じ名前空間に同じ名前の `read` と `state` は宣言できない（RES-6）ので、名前がどちらを指すかは一つに決まる。葉の op が節を書けば STATE-5。配線の op に書いたものは、計算した読む状態に足される（`docs/check.md`「状態に触れるもの」の「節に書く要素」） |
-| `@name`（核の印 `@external` と `@repeatable` を除く。`docs/grammar.md`「予約語」） | `decorator`。名前の最後の要素は予約語でもよい（`@db.list`。`docs/grammar.md`「識別子」の `DecoratorRef`）。付ける先の種類との照合は DEC-1 |
+| `@name`（核の印 `@repeatable`、`@entry`、`@hint` を除く。`docs/grammar.md`「予約語」） | `decorator`。名前の最後の要素は予約語でもよい（`@db.list`。`docs/grammar.md`「識別子」の `DecoratorRef`）。付ける先の種類との照合は DEC-1 |
 | デコレータの引数の値 | `Param.type` による（`docs/types.md`「デコレータの引数」）。分類のケースを受け取る引数（`any case`、`any case of never`、`any case of Actor`）には、分類のケース（`Actor.Customer`。どの名前空間の分類でもよく、別の名前空間のものは、修飾して書く）。`any op` の引数に渡した op が、デコレータを付けた宣言とは別の名前空間の、`export` のない op なら NS-5 |
 | デコレータの宣言の、分類のケース（`case of 名前`。`docs/grammar.md`「decorator の宣言」の `CaseKind`）の、`of` の後ろの名前 | 型（上の「型」と同じ）か、`classify`（どの名前空間のものでもよく、別の名前空間のものは、修飾して書く）。`classify` なら、その分類のケース。型なら、対象が、その型の分類のケース。どちらでもなければ（op、状態など）RES-4 |
 | `match (x by C)` の `C` | `classify`（値の分類、op の分類、状態の分類。対象のない分類なら MATCH-7）。どの名前空間のものでもよく、別の名前空間のものは修飾して書く。対象の有無と分類の種類の照合は MATCH-7 |
@@ -83,7 +83,7 @@
 | `model D extends B` の `B` | `model`（その場で書いた model は名前を持たないので書けない）。循環は TYPE-10 |
 | `override f` の `f` | 元の model のフィールド（`docs/types.md`「継承した model」の「フィールド」で作った後の並び）。なければ TYPE-10 |
 | `@param x` | その宣言（op、デコレータ、`exception`、`effect`、`read`）の引数名 |
-| `@throws X` | その op の `Signature.exceptions` に含まれる例外か、その op に付いた `external` なデコレータの `throws` の例外（外から見たときだけ起きる例外も書ける。DOC-1 の手続きは `docs/check.md`「名前空間」） |
+| `@throws X` | その op の `Signature.exceptions` に含まれる例外か、その op に付いたデコレータの `outer throws` の例外（外から見たときだけ起きる例外も書ける。DOC-1 の手続きは `docs/check.md`「名前空間」） |
 | `@see X` | どの宣言でも |
 
 ### `effects` の要素の読み分け

@@ -573,7 +573,7 @@ const (
 )
 
 // Decorator は decorator 宣言（docs/ir.md「decorator」）。
-// Alias を持つ宣言は Params / Targets / Throws / Catches / Reads / Effects を持たず（JSON では []）、Alias.Target のものを使う。
+// Alias を持つ宣言は Params / Targets / Throws / OuterThrows / Catches / Reads / Effects を持たず（JSON では []）、Alias.Target のものを使う。
 type Decorator struct {
 	DeclBase
 	Params []Param `json:"params"`
@@ -584,12 +584,17 @@ type Decorator struct {
 	Targets []DecoratorTarget `json:"targets"`
 	// CaseTargets は、Targets の "case" ごとの絞り（書かれた順）。なければ空（JSON では []）。
 	CaseTargets []CaseKind `json:"caseTargets"`
-	// External は @external が付いているか（DEC-10）。
-	External bool `json:"external"`
+	// Entry は @entry が付いているか（このデコレータの付いた fn は、境界の入口。docs/grammar.md「decorator の宣言」）。
+	Entry bool `json:"entry"`
+	// Hint は @hint が付いているか（解釈されなくても、よい。DEC-26）。
+	Hint bool `json:"hint"`
 	// Repeatable は @repeatable が付いているか。偽なら、一つの宣言に一度だけ付けられる（DEC-13）。
-	Repeatable bool            `json:"repeatable"`
-	Throws     []ThrowsClause  `json:"throws"`
-	Catches    []CatchesClause `json:"catches"`
+	Repeatable bool `json:"repeatable"`
+	// Throws は `throws` の節（包むことで、その fn が投げる）。
+	Throws []ThrowsClause `json:"throws"`
+	// OuterThrows は `outer throws` の節（fn の外で起きる例外。境界の外から見たときだけ、加わる: DEC-10）。書かれた順。
+	OuterThrows []ThrowsClause  `json:"outerThrows"`
+	Catches     []CatchesClause `json:"catches"`
 	// Reads は `reads` の節の要素（書かれた順。節が複数なら連結）。FQN の位置に、デコレータの引数名 "$param:名前" も来る:
 	// any state の引数は [DirectRead] の State に。
 	// 付いた op に何が運ばれるかは Op.Carried（docs/check.md「デコレータが運ぶ reads と effects」）。

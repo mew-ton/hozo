@@ -5,8 +5,8 @@ import (
 	"github.com/mew-ton/hozo/ir"
 )
 
-// checkDecorators は DEC-4 / DEC-6 / DEC-14（docs/check.md「デコレータ」）。
-// DEC-5 / DEC-16 は計算の手順 i で出る（checkDec5 / checkDec16）。DEC-10 は計算（手順 i の throws）で、診断なし。
+// checkDecorators は DEC-4 / DEC-6（docs/check.md「デコレータ」）。
+// DEC-5 / DEC-16 は計算の手順 i で出る（checkDec5 / checkDec16）。DEC-10 は計算（手順 i の outer throws）で、診断なし。
 func checkDecorators(ix *index, c *computer, r *reporter) {
 	for i := range ix.p.Namespaces {
 		for _, d := range ix.p.Namespaces[i].Decls {
@@ -15,7 +15,6 @@ func checkDecorators(ix *index, c *computer, r *reporter) {
 				continue
 			}
 			checkDec6(dec, r)
-			checkDec14(dec, r)
 		}
 	}
 	for i, o := range ix.ops {
@@ -163,13 +162,6 @@ func checkDec6(d *ir.Decorator, r *reporter) {
 	}
 	if len(same) > 0 {
 		r.warnAt("DEC-6", d.Span, sprintf("%s は %s を吸収して投げ直すので、差し引きがゼロになる", d.Name, joinNames(same)))
-	}
-}
-
-// checkDec14 は DEC-14: external なデコレータが throws を持たない。
-func checkDec14(d *ir.Decorator, r *reporter) {
-	if d.External && len(d.Throws) == 0 {
-		r.warnAt("DEC-14", d.Span, sprintf("%s は @external だが throws を持たないので、境界の外から見ても型が変わらない", d.Name))
 	}
 }
 

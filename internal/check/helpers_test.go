@@ -270,14 +270,14 @@ func viewsOf(p *ir.Program, cfg *config.Config) map[string]*ir.View {
 	return out
 }
 
-// httpVocab は http の語彙の最小の写し（docs/vocab.md）。post は external で ServerError | NetworkError を投げる。
+// httpVocab は http の語彙の最小の写し（docs/vocab.md）。post と get は、入口（@entry）で、fn の外で ServerError と NetworkError が起きる（outer throws）。
 func httpVocab() ir.Namespace {
 	post := decorator("http.post", ir.Param{Name: "path", Type: ir.TypeParam{Types: []ir.Type{ir.String()}}})
-	post.External = true
-	post.Throws = []ir.ThrowsClause{{Exceptions: []string{"http.ServerError", "http.NetworkError"}}}
+	post.Entry = true
+	post.OuterThrows = []ir.ThrowsClause{{Exceptions: []string{"http.ServerError", "http.NetworkError"}}}
 	get := decorator("http.get", ir.Param{Name: "path", Type: ir.TypeParam{Types: []ir.Type{ir.String()}}})
-	get.External = true
-	get.Throws = []ir.ThrowsClause{{Exceptions: []string{"http.ServerError", "http.NetworkError"}}}
+	get.Entry = true
+	get.OuterThrows = []ir.ThrowsClause{{Exceptions: []string{"http.ServerError", "http.NetworkError"}}}
 	return namespace("http", exc("http.ServerError"), exc("http.NetworkError"), post, get)
 }
 

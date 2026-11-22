@@ -21,7 +21,7 @@ TypeScript 風の記法で書く。`?` は省略可（JSON での扱いは「JSO
 
 ```ts
 interface Program {
-  version: "0.18";                 // この文書の版。Program か View の構造が変わったら上げる（「版」）
+  version: "0.19";                 // この文書の版。Program か View の構造が変わったら上げる（「版」）
   namespaces: Namespace[];        // グローバルは name "" の Namespace として先頭に置く
   binds: Bind[];
 }
@@ -216,9 +216,11 @@ interface Decorator extends DeclBase {
                                   // 節（throws / catches / reads / effects）と body を持てるのは、fn が真の宣言だけ
   targets: ("op" | "field" | "state" | "exception" | "scalar" | "model" | "effect" | "read" | "case")[];   // `decorator fn` なら ["op"]。case は、分類のケース
   caseTargets: CaseKind[];        // targets の "case" ごとの、絞り（書かれた順）。なければ []
-  external: boolean;              // @external が付いているか（DEC-10）
+  entry: boolean;                 // @entry が付いているか（このデコレータの付いた fn は、境界の入口。docs/grammar.md「decorator の宣言」）
+  hint: boolean;                  // @hint が付いているか（解釈されなくても、よい。DEC-26）
   repeatable: boolean;            // @repeatable が付いているか。偽なら、一つの宣言に一度だけ付けられる（DEC-13）
-  throws: ThrowsClause[];
+  throws: ThrowsClause[];         // `throws` の節（包むことで、その fn が投げる）
+  outerThrows: ThrowsClause[];    // `outer throws` の節（fn の外で起きる。境界の外から見たときだけ、加わる: DEC-10）。書かれた順。なければ []
   catches: CatchesClause[];
   reads: ReadRef[];               // `reads` の節の要素（書かれた順。節が複数なら連結）。なければ []。形は「op」の ReadRef で、FQN の位置に
                                   // デコレータの引数名 "$param:名前" も来る: any state の引数は direct の state に
@@ -229,8 +231,8 @@ interface Decorator extends DeclBase {
                                   // 包んだ op の中身を呼ぶ所は、Callee が proceed の呼び出し。値の型の引数（Param）は、
                                   // Atom の name の、path の頭の名前で読む。意味は docs/check.md「デコレータの本体」
   alias?: { target: string; args: Arg[] };   // 名前付きデコレータ。target は汎用デコレータの FQN。
-                                             // alias を持つ宣言は params / targets / throws / catches / reads / effects を持たず、
-                                             // external と repeatable は false で、どれも target のものを使う
+                                             // alias を持つ宣言は params / targets / throws / outerThrows / catches / reads / effects を持たず、
+                                             // entry と hint と repeatable は false で、どれも target のものを使う
 }
 
 interface CaseKind {              // 分類のケースの絞り（docs/grammar.md「decorator の宣言」の CaseKind）。持つのは、どちらか一つか、
@@ -497,7 +499,7 @@ interface Bind {
 
 ```ts
 interface View {
-  version: "0.18";
+  version: "0.19";
   viewer: string;                 // 見る側の名前空間の FQN
   config: NamespaceConfig;        // この View の単位での viewer の設定
   files: string[];                // この View の単位の in に合ったユーザーのファイルと、読み込んだすべての語彙のファイル
@@ -555,10 +557,11 @@ interface ViewedSignature extends Signature {   // Signature は Sig(O, viewer)
 
 ## 版
 
-`Program.version` と `View.version` は同じ値で、どちらかの構造か、プラグインとのやり取りの形（`docs/plugin-protocol.md`「要求と応答」）が変わったら上げる。IR が決めている名前のうち、プラグインが、その値で出力を分けるもの（核の型の名前、標準の分類のケースの名前）が変わったときも、上げる。今の版は `"0.18"`。構造もやり取りの形も同じで、値の意味だけが変わる決定では、上げない: 配線の op の `Op.carried` が空でないことがあり、その `Signature` が運ばれたものを含むこと（`docs/decisions.md`「決めたこと」149）は、0.6 の中にある。
+`Program.version` と `View.version` は同じ値で、どちらかの構造か、プラグインとのやり取りの形（`docs/plugin-protocol.md`「要求と応答」）が変わったら上げる。IR が決めている名前のうち、プラグインが、その値で出力を分けるもの（核の型の名前、標準の分類のケースの名前）が変わったときも、上げる。今の版は `"0.19"`。構造もやり取りの形も同じで、値の意味だけが変わる決定では、上げない: 配線の op の `Op.carried` が空でないことがあり、その `Signature` が運ばれたものを含むこと（`docs/decisions.md`「決めたこと」149）は、0.6 の中にある。
 
 | 版 | 変わったこと |
 |---|---|
+| 0.19 | `Decorator.external` をなくし、`Decorator.outerThrows`（節 `outer throws`）と、`Decorator.entry`、`Decorator.hint`（核の印 `@entry`、`@hint`）を足した（`docs/grammar.md`「decorator の宣言」。`docs/decisions.md`「決めたこと」407、408、420） |
 | 0.18 | `Decorator.fn` と `Decorator.body` を足した（関数に付けるデコレータ `decorator fn` と、その本体。`docs/grammar.md`「decorator の宣言」「デコレータの本体」、`docs/decisions.md`「決めたこと」392〜394）。`Callee` に `proceed` を足した（デコレータの本体の `proceed()`）。`View` とやり取りの形は 0.17 と同じ |
 | 0.17 | やり取りに、direction `coverage` を足した（`docs/plugin-protocol.md`「coverage」、`docs/decisions.md`「決めたこと」380）。マニフェストの `[coverage]`。`emit` の応答の `files` のうち、名前が `hozo-tests.<トランスパイラの名前>.json` のものを、テストの対応表として読み、形を確かめる（同「テストの対応表」、PLG-4）。`Program` と `View` の構造、`emit` / `check` / `import` の要求と応答の形は、0.16 と同じ |
 | 0.16 | `RowTransition.from` をなくした: 効果の前のケースは、行の引数の型（`case`）が言う（`docs/check.md`「行の遷移」、`docs/decisions.md`「決めたこと」369）。値の分類と op の分類の `match` のアームの `narrowed` の型は、いつも `case`（型を書いたケースのアームと、`else` のアームでも。`docs/types.md`「アームの中の対象の型」、同 370）。`View` とやり取りの形は 0.15 と同じ |

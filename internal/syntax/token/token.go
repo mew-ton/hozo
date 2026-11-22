@@ -190,7 +190,7 @@ var Keywords = map[string]Kind{
 
 // Contextual は文脈キーワード（docs/grammar.md「予約語」の二つ目の表）。
 // 決まった位置でだけ意味を持ち、字句としては Ident。
-var Contextual = []string{"field", "variant", "post", "put", "delete"}
+var Contextual = []string{"outer", "field", "variant", "post", "put", "delete"}
 
 // IsContextual は s が文脈キーワードかを返す。
 func IsContextual(s string) bool {

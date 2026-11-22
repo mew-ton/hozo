@@ -37,7 +37,7 @@ hozoc が同梱して常に読み込む語彙（`vocab/*.hozo`）と、その読
 - `valid.length` は、付けた先で、数えるものが変わる: 文字列（scalar か、フィールド）なら、文字の数。配列のフィールドなら、要素の数。配列の要素に掛けるなら、要素の型（scalar）に付ける。意味の持ち主は `docs/plugin-go-valid.md`「制約」（`docs/decisions.md`「決めたこと」400、401）。
 - `actor`、`usecase`、`business`、`prd` は、設計書にはない。設計の図（ユースケース図、業務フロー図、要求の文書）から決めたもので、中身は「設計の図の語彙」。
 - `fs` / `proc` は `examples/hozoc.hozo` では同じファイルの中に語彙として書かれているが、hozoc 自身の境界（ファイルとプラグインの起動）なので標準に入れる。`cli.hozo` からはこれらの宣言を外す（二重に宣言すると RES-6）。
-- `@http.get` / `@http.post` の `@external` はそのまま写す。
+- `@http.get` / `@http.post` は、境界の入口（`@entry`）で、通信の途中の失敗（`ServerError`、`NetworkError`）は、fn の外で起きる例外（`outer throws`）として、宣言する（出典の `@external` は、なくした: `docs/grammar.md`「decorator の宣言」）。
 - `http` には、出典にない例外を一つ足す: op を呼ぶ前の失敗（要求を入力に読めない、入力が制約に合わない）を伝える `BadRequest`。運ぶ値は、例外の引数で書く（`docs/grammar.md`「exception / effect / read」）。HTTP のサーバーのトランスパイラが返し（`docs/plugin-go-http.md`「op を呼ぶ前の失敗」）、通信の上の名前 `http.BadRequest` と値の形の持ち主になる。`@http.get` / `@http.post` の `throws`（外から見たときに加わる例外）には、まだ入れない: 入れると、HTTP の op を呼ぶすべての配線が `http.BadRequest` を書くことになる。呼ぶ側のトランスパイラを作るときに決める。
 
 ```ts
@@ -49,7 +49,7 @@ hozoc が同梱して常に読み込む語彙（`vocab/*.hozo`）と、その読
 
 - `db` は、出典のグローバルのデコレータ `db`（`@db state …`）をなくして `db.table` に置き換え、出典にないデコレータを足す。中身は「`db` の語彙」。
 - `http` は、要求のどこから読むかを言うフィールドのデコレータを、出典から変える。中身は「`http` の語彙」。
-- `proc.stdio` だけは出典から変える: 引数 `command` を持たず、`@external` も付けない（`decorator fn stdio(): throws Crashed, MalformedOutput;`。節の区切りは `docs/grammar.md`「decorator の宣言」）。呼び先は呼び出す op の入力で渡し（`docs/cli.md` の `runEmit`）、例外は同じ名前空間の呼び出し元にも見えなければならないため。`docs/decisions.md`。
+- `proc.stdio` だけは出典から変える: 引数 `command` を持たず、`outer throws` にもしない（`decorator fn stdio(): throws Crashed, MalformedOutput;`。節の区切りは `docs/grammar.md`「decorator の宣言」）。呼び先は呼び出す op の入力で渡し（`docs/cli.md` の `runEmit`）、例外は同じ名前空間の呼び出し元にも見えなければならないため。`docs/decisions.md`。
 
 ### `db` の語彙
 

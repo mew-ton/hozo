@@ -10,6 +10,7 @@ namespace clock {
    *
    * @param every 動かす間隔
    */
+  @entry
   decorator fn tick(every: duration);
 
   /** 今の時刻 */

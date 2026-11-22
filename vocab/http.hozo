@@ -9,10 +9,10 @@ namespace http {
   /** 要求を op の入力に読めなかった、または入力が制約に合わなかった（op は呼ばれていない） */
   exception BadRequest(message: string, violations: Violation[]);
 
-  @external
-  decorator fn get(path: string): throws ServerError, NetworkError;
-  @external
-  decorator fn post(path: string): throws ServerError, NetworkError;
+  @entry
+  decorator fn get(path: string): outer throws ServerError, NetworkError;
+  @entry
+  decorator fn post(path: string): outer throws ServerError, NetworkError;
 
   decorator status(code: int) for exception;
 

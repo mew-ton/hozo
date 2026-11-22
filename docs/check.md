@@ -731,12 +731,13 @@ R と pure は v によらない（どの名前空間から見ても同じ）。
 
 D = D(dᵢ) が、本体を持てば、節を適用する代わりに、本体を、手順 0 の表で計算し、その結果を、新しい Sig にする（「デコレータの本体」）。本体を持たなければ、次のとおり。
 
-D = D(dᵢ) について、`catches` の節をすべて、次に `throws` の節をすべて適用する。`reads` / `effects` の節は、ここでは適用しない（葉でも配線でも、手順 0 と「reads」で数えてある）。
+D = D(dᵢ) について、`catches` の節をすべて、次に `throws` の節をすべて、最後に `outer throws` の節をすべて適用する。`reads` / `effects` の節は、ここでは適用しない（葉でも配線でも、手順 0 と「reads」で数えてある）。
 
 - `catches Xs mode`: 各 X ∈ Xs について、X ∉ E なら DEC-16（吸収する相手がない）。X ∈ E なら:
   - `recovers` / `ignores`: 各 e ∈ F について rel(X, e) ≠ `kept` なら succ(e) = `unknown`（§8.2「効果が不明な例外を `recovers` で吸収すると、成功のアームでもその効果は不明になる」）。X を E から除く。
   - `halts h`: X を E から除く。h ∉ F なら h を F の末尾に足し、残りのすべての Y ∈ E について rel(Y, h) = `prevented`、succ(h) = `prevented`。h ∈ F ならそのまま。h が `throws` を持てば、その例外 Z を、E の末尾に足す（既にあれば、位置はそのまま）: この出どころでの状態は、h が、ここで F に足したものなら、h は `prevented`、それ以外は、どの効果も `unknown`。Z が、もう E にあれば、同じならその状態、違えば `unknown`。
-- `throws Ys relations`: D が `external` で v = ns(O) なら飛ばす（DEC-10）。そうでなければ各 Y ∈ Ys について、Y を E の末尾に足し（既にあれば位置はそのまま）、各 e ∈ F について `relations` から状態を決める（葉の rel と同じ規則。目的語の `effects` は F のすべて）。Y が既に E にあって状態が違えば `unknown`。
+- `outer throws Ys relations`（`Decorator.outerThrows`）: v = ns(O) なら飛ばす（DEC-10: fn の外で起きる例外は、境界の外から見たときだけ、加わる。`docs/grammar.md`「decorator の宣言」）。そうでなければ、下の `throws` と同じに適用する。
+- `throws Ys relations`: 各 Y ∈ Ys について、Y を E の末尾に足し（既にあれば位置はそのまま）、各 e ∈ F について `relations` から状態を決める（葉の rel と同じ規則。目的語の `effects` は F のすべて）。Y が既に E にあって状態が違えば `unknown`。
 
 **結果**: `Signature.exceptions` = E、`effects` = F、`relations` = rel、`successEffects` = succ、`reads` = R、`pure` = pure。`Op.signature` = Sig(O, ns(O))。`View.ops` は Sig(O, viewer)（`docs/ir.md`「その名前空間から見た IR」）。
 
@@ -810,7 +811,7 @@ A の配線の呼び出し c（callee O）の `Call.bound` は、A のすべて�
 | NS-5 | error | 別の名前空間の、`export` のない op を呼んだ（「op の宣言と本体」の「export」の表の二つ: 配線の呼び出し、デコレータの引数に渡した op）。位置は呼び出しの op の名前（デコレータの引数ならその引数の値）。`Related` にその op の宣言 |
 | NS-6 | error | 配線が、別の名前空間の `read` か効果（`effect` の宣言）を呼んだ（「状態に触れるもの」の「配線からの呼び出し」）。位置は呼び出しの名前。`Related` にその宣言。メッセージに、その名前空間の op を通すことを示す。`Signature` を要しないので `internal/sema` が出す |
 | NAME-1 | warning | `model` / `scalar` / `exception` / `union` / `classify` とそのケースの名前の先頭が大文字でない。`state` / `op` / `effect` / `read` / `decorator` の名前の先頭が小文字でない。`_` で始まる名前も警告。語彙は対象外。強さは、ここで warning と決めた |
-| DOC-1 | error | `@param` が引数名にない（op、デコレータ、`exception`、`effect`、`read` の引数。引数を持たない種類の宣言に書いた `@param` も）、`@see` が解決できない（`internal/sema`）。`@throws` の例外が `Signature.exceptions` にも、O に付いた `external` なデコレータの `throws` にもない（`internal/check`。外から見たときだけ起きる例外も書けるようにするため）。効果の `@throws` の例外が、その効果の `throws`（`Effect.throws`）にない（`internal/sema`）。デコレータの宣言の `@param` は `Param` の名前 |
+| DOC-1 | error | `@param` が引数名にない（op、デコレータ、`exception`、`effect`、`read` の引数。引数を持たない種類の宣言に書いた `@param` も）、`@see` が解決できない（`internal/sema`）。`@throws` の例外が `Signature.exceptions` にも、O に付いたデコレータの `outer throws` にもない（`internal/check`。外から見たときだけ起きる例外も書けるようにするため）。効果の `@throws` の例外が、その効果の `throws`（`Effect.throws`）にない（`internal/sema`）。デコレータの宣言の `@param` は `Param` の名前 |
 | DOC-2 | error | 同じ `@param` 名、同じ `@throws` 例外が二度ある |
 | UNION-1 | error | `union` の要素にアーム（`A: T`）と参照（`X;`）が混ざる。または参照の要素に例外と効果が混ざる。または `arms` でアーム名が重複 |
 
@@ -873,12 +874,10 @@ REL-3 と REL-6 は欠番。`relations` の目的語に効果の名前を個別�
 | DEC-7 | error | `docs/types.md`「デコレータの引数」の、`any effect on` と、ユニオンのメンバーと、分類のケース（`any case of never`、`any case of Order`、`any case of Actor` の、絞りに合わないケース）の照合 |
 | DEC-8 | — | 文法で閉じる |
 | DEC-9 | — | 正規化（`docs/ir.md`「デコレータの適用」） |
-| DEC-10 | — | 計算（手順 i の `throws`） |
+| DEC-10 | — | 計算（手順 i の `outer throws`） |
 | DEC-11 | error | `docs/types.md`「デコレータの引数」の数と名前 |
 | DEC-12 | error | 別名の `target` が別名。または別名の `args` が `target` の `Param` に合わない（DEC-11 と同じ手続き） |
 | DEC-13 | error | `@repeatable` の印のないデコレータ（`Decorator.repeatable` が偽）が、同じ宣言に二度付いている（引数が違っても。名前付きデコレータは展開した汎用デコレータで比べ、印も汎用デコレータのものを見る） |
-| DEC-14 | warning | `external` なデコレータが `throws` を持たない |
-| DEC-15 | error | `@external` がデコレータの宣言以外に付いている（文法で閉じる。索引として残す） |
 | DEC-16 | warning | 計算の手順 i で、`catches` の例外がそこまでの E にない |
 | DEC-19 | error | `proceed()` を、書けない所に書いた（`docs/grammar.md`「デコレータの本体」）: デコレータの本体の外（その名前の op が、見えていないとき）。引数を書いた。`for` か `disjoint` の中。値の位置（`val` に入れる、`return` する）は、値がないので WIRE-2 |
 | DEC-20 | error | デコレータの本体に、`proceed()` を、ちょうど一度呼ばずに終わる道がある: 一度も呼ばない道、二度以上呼ぶ道。`throw` のアームで終わる道は、数えない。位置は、宣言の名前 |
@@ -887,8 +886,11 @@ REL-3 と REL-6 は欠番。`relations` の目的語に効果の名前を個別�
 | DEC-23 | error | デコレータの本体が、値として読めない引数を使った: `any <種類>` の引数、型を二つ以上書いた引数、残りの引数 |
 | DEC-25 | error | 本体のあるデコレータを、`never` を返す op に付けていて、本体の `proceed()`（か、`proceed()` のアームを持つ `match`）の後ろに、文がある（「デコレータの本体」。後ろの文が、評価されない）。位置は、適用。後ろの、最初の文を `Related` に示す |
 | DEC-24 | error | 本体のあるデコレータを、宣言した名前空間のほかの op に付けていて、本体が、その op の名前空間の配線からは呼べないものに触れている: `export` のない op、`read`、効果、状態（「デコレータの本体」）。位置は、適用。本体の、当たった所を `Related` に示す |
+| DEC-26 | error | `@hint` を、付けられない宣言に付けた（`docs/grammar.md`「decorator の宣言」）: 振る舞いを言う節（`throws`、`outer throws`、`catches`、`reads`、`effects`）を持つ。本体を持つ。`@entry` を持つ。節は、検査の計算に効き、入口は、解釈されることを期待するので、「解釈されなくても、よい」とは、言えない。位置は、`@hint` |
 
 DEC-17 は欠番。「`reads` か `effects` の節を持つデコレータが、配線の op（本体を持つ op）に付いている」という規則で、運ぶ節を持つデコレータを配線の op にも付けられるようにした（計算「デコレータが運ぶ reads と effects」）ときになくなった。番号は別の意味に使い回さない（欠番の一覧は `docs/requirements.md`「検査の規則の一覧」）。
+
+DEC-14 と DEC-15 も欠番。DEC-14 は「`external` なデコレータが `throws` を持たない」（warning）、DEC-15 は「`@external` がデコレータの宣言以外に付いている」（文法で閉じていた）という規則で、`@external` をなくした（`docs/grammar.md`「decorator の宣言」。`docs/decisions.md`「決めたこと」407）ときになくなった: 入口だが、外で起きる例外を持たないデコレータは、`@entry` だけを持つ。
 
 DEC-18 も欠番。「デコレータの宣言の、分類のケースで、名前と `of never` の両方を書いたのに、その名前の分類が、対象のない分類でない」という規則で、両方を書く形を、なくした（`docs/grammar.md`「decorator の宣言」の `CaseKind`）ときになくなった。
 

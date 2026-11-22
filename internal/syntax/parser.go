@@ -349,12 +349,40 @@ func (p *parser) parseLeadingDoc() *ast.DocComment {
 
 // coreMarks は核の印（docs/grammar.md「decorator の宣言」の CoreMark）の範囲。書かれていなければ nil。
 type coreMarks struct {
-	external   *source.Span
 	repeatable *source.Span
+	entry      *source.Span
+	hint       *source.Span
+	// external は、なくした印 @external（SYNTAX にして、読み進める。その宣言の throws は、outer throws として読む）。
+	external *source.Span
+}
+
+// coreMarkNames は、核の印の名前（"external" は、なくした印）。
+var coreMarkNames = map[string]bool{"repeatable": true, "entry": true, "hint": true, "external": true}
+
+// slot は、印の名前の置き場。
+func (m *coreMarks) slot(mark string) **source.Span {
+	switch mark {
+	case "repeatable":
+		return &m.repeatable
+	case "entry":
+		return &m.entry
+	case "hint":
+		return &m.hint
+	}
+	return &m.external
+}
+
+// each は、書かれた印を、名前と一緒に、決まった順で渡す。
+func (m *coreMarks) each(f func(mark string, span source.Span)) {
+	for _, mark := range []string{"repeatable", "entry", "hint", "external"} {
+		if sp := *m.slot(mark); sp != nil {
+			f(mark, *sp)
+		}
+	}
 }
 
 // parseDecorators はデコレータの適用の列を読む（docs/grammar.md「デコレータの適用」）。
-// "@external" と "@repeatable" は核の印なので列には入れず、その範囲を返す。印の後ろは、もう一つの印か "decorator" で
+// "@repeatable"、"@entry"、"@hint" は核の印なので列には入れず、その範囲を返す（なくした "@external" も、ここで拾う）。印の後ろは、もう一つの印か "decorator" で
 // なければ誤り。同じ印を二度書いても誤り。
 func (p *parser) parseDecorators() ([]*ast.Decorator, coreMarks) {
 	var decorators []*ast.Decorator
@@ -362,15 +390,12 @@ func (p *parser) parseDecorators() ([]*ast.Decorator, coreMarks) {
 	for p.at(token.At) {
 		start := p.advance().Span.Start
 		name := p.parseDecoratorRef()
-		if mark := name.String(); mark == "external" || mark == "repeatable" {
+		if mark := name.String(); coreMarkNames[mark] {
 			if p.at(token.LParen) {
 				p.fail(p.tok().Span, "@"+mark+" は引数を取らない")
 			}
 			s := p.spanFrom(start)
-			slot := &marks.external
-			if mark == "repeatable" {
-				slot = &marks.repeatable
-			}
+			slot := marks.slot(mark)
 			if *slot != nil {
 				p.fail(s, "@"+mark+" を二度書いている（docs/grammar.md「decorator の宣言」）")
 			}
@@ -390,13 +415,13 @@ func (p *parser) parseDecorators() ([]*ast.Decorator, coreMarks) {
 	return decorators, marks
 }
 
-// atCoreMark は今の位置が核の印（"@external" か "@repeatable"）の頭か。
+// atCoreMark は今の位置が核の印（"@repeatable"、"@entry"、"@hint" と、なくした "@external"）の頭か。
 func (p *parser) atCoreMark() bool {
 	if !p.at(token.At) {
 		return false
 	}
 	next := p.peek(1)
-	return next.Kind == token.Ident && (next.Text == "external" || next.Text == "repeatable")
+	return next.Kind == token.Ident && coreMarkNames[next.Text]
 }
 
 // parseArgs は "( Arg, ... )" を読む。名前で渡す引数の後ろに位置で渡す引数は書けない（docs/grammar.md「決めたこと」）。
@@ -614,12 +639,9 @@ func (p *parser) parseMember() (*ast.Field, *ast.Override, *ast.Index) {
 	start := p.tok().Span.Start
 	decorators, marks := p.parseDecorators()
 	// parseDecorators は直後の字句が decorator なら核の印を通すが、ここでの decorator はフィールド名。
-	if marks.external != nil {
-		p.fail(*marks.external, "@external はデコレータの宣言の直前にだけ書ける（docs/grammar.md「decorator の宣言」）")
-	}
-	if marks.repeatable != nil {
-		p.fail(*marks.repeatable, "@repeatable はデコレータの宣言の直前にだけ書ける（docs/grammar.md「decorator の宣言」）")
-	}
+	marks.each(func(mark string, span source.Span) {
+		p.fail(span, "@"+mark+" はデコレータの宣言の直前にだけ書ける（docs/grammar.md「decorator の宣言」）")
+	})
 	if doc != nil && p.at(token.RBrace) {
 		p.fail(doc.Span, "付く先のないドキュメンテーションコメント（docs/grammar.md「決めたこと」）")
 	}
@@ -1121,10 +1143,12 @@ func (p *parser) parseClassifySubject() []ast.Type {
 
 // parseDecoratorDecl は DecoratorDecl を読む（docs/grammar.md「decorator の宣言」）。
 //
-//	DecoratorDecl = [ "@external" ] "decorator" DecoratorName [ Params ] [ "for" Target { "|" Target } ] { DecoratorClause } ";"
+//	DecoratorDecl = { CoreMark } "decorator" "fn" DecoratorName Params [ ":" DecoratorClause { DecoratorClause } ] ( ";" | Block )
+//	              | { CoreMark } "decorator" DecoratorName [ Params ] "for" Target { "," Target } ";"
 //	              | "decorator" DecoratorName "=" DecoratorRef Args ";" ;
 //
 //	DecoratorClause = ThrowsClause | CatchesClause | DecoReadsClause | DecoEffectsClause ;
+//	ThrowsClause    = [ "outer" ] "throws" ExcRef { "," ExcRef } { Relation } ;
 //
 // デコレータの名前は DecoratorName なので予約語も書ける（`decorator list(…)`。docs/grammar.md「識別子」）。
 // reads / effects の節は op の節と同じ形で、同じ構文木（ReadsClause / EffectsClause）にする。
@@ -1135,9 +1159,25 @@ func (p *parser) parseDecoratorDecl(start source.Offset, doc *ast.DocComment, de
 		d.Fn, d.FnSpan = true, p.advance().Span
 	}
 	d.Name = p.parseDecoratorName()
+	if marks.entry != nil {
+		d.Entry, d.EntrySpan = true, *marks.entry
+	}
+	if marks.hint != nil {
+		d.Hint, d.HintSpan = true, *marks.hint
+	}
 	if marks.external != nil {
-		d.External = true
-		d.ExternalSpan = *marks.external
+		// なくした印: 新しい書き方（節 outer throws）を示して、読み進める。この宣言の throws は、outer throws として読む（下の outerOld）
+		p.errorAt(*marks.external, "@external はなくなった。fn の外で起きる例外は、節 outer throws で書く（decorator fn "+d.Name.Name+"(…): outer throws …。境界の入口なら、印 @entry を付ける。docs/grammar.md「decorator の宣言」）")
+	}
+	outerOld := func() {
+		if marks.external == nil {
+			return
+		}
+		for _, c := range d.Clauses {
+			if t, ok := c.(*ast.ThrowsClause); ok {
+				t.Outer = true
+			}
+		}
 	}
 	if marks.repeatable != nil {
 		d.Repeatable = true
@@ -1148,12 +1188,12 @@ func (p *parser) parseDecoratorDecl(start source.Offset, doc *ast.DocComment, de
 			p.errorAt(d.FnSpan, "名前付きのデコレータに fn は書かない（decorator 名前 = 元(…); と書く。docs/grammar.md「decorator の宣言」）")
 			d.Fn, d.FnSpan = false, source.Span{}
 		}
-		if marks.external != nil {
-			p.errorAt(*marks.external, "名前付きのデコレータに @external は付けられない（docs/grammar.md「decorator の宣言」）")
+		for _, mark := range []string{"repeatable", "entry", "hint"} {
+			if sp := *marks.slot(mark); sp != nil {
+				p.errorAt(*sp, "名前付きのデコレータに @"+mark+" は付けられない（docs/grammar.md「decorator の宣言」）")
+			}
 		}
-		if marks.repeatable != nil {
-			p.errorAt(*marks.repeatable, "名前付きのデコレータに @repeatable は付けられない（docs/grammar.md「decorator の宣言」）")
-		}
+		d.Entry, d.EntrySpan, d.Hint, d.HintSpan = false, source.Span{}, false, source.Span{}
 		aliasStart := p.advance().Span.Start
 		alias := &ast.DecoratorAlias{Name: p.parseDecoratorRef()}
 		alias.Args = p.parseArgs()
@@ -1170,8 +1210,13 @@ func (p *parser) parseDecoratorDecl(start source.Offset, doc *ast.DocComment, de
 		}
 		d.Params = p.parseParams()
 		p.parseDecoratorFnTail(d)
+		outerOld()
 		d.Span = p.spanFrom(start)
 		return d
+	}
+	if d.Entry {
+		p.errorAt(d.EntrySpan, "@entry を付けられるのは、関数に付けるデコレータ（decorator fn "+d.Name.Name+"(…)）だけ（docs/grammar.md「decorator の宣言」）")
+		d.Entry, d.EntrySpan = false, source.Span{}
 	}
 	if p.at(token.LParen) {
 		d.Params = p.parseParams()
@@ -1181,6 +1226,7 @@ func (p *parser) parseDecoratorDecl(start source.Offset, doc *ast.DocComment, de
 		p.errorAt(d.Name.Span, fmt.Sprintf("付ける先を書かない decorator %s … という書き方はなくなった。関数に付けるデコレータは decorator fn %s(…) と書き、そのほかは for で付ける先を書く（docs/grammar.md「decorator の宣言」）", name, name))
 		d.Fn = true
 		p.parseOldDecoratorClauses(d)
+		outerOld()
 		p.expect(token.Semicolon)
 		d.Span = p.spanFrom(start)
 		return d
@@ -1203,9 +1249,13 @@ func (p *parser) parseDecoratorDecl(start source.Offset, doc *ast.DocComment, de
 		p.errorAt(p.spanFrom(forSpan.Start), fmt.Sprintf("decorator %s for op … という書き方はなくなった。関数に付けるデコレータは decorator fn %s(…) と書く（節は「:」の後ろ。docs/grammar.md「decorator の宣言」）", name, name))
 		d.Fn, d.For = true, nil
 		p.parseOldDecoratorClauses(d)
+		outerOld()
 		p.expect(token.Semicolon)
 		d.Span = p.spanFrom(start)
 		return d
+	}
+	if p.atOuterThrows() {
+		p.fail(p.tok().Span, fmt.Sprintf("for で付ける先を書いたデコレータは、節も本体も持てない。節と本体を書けるのは、関数に付けるデコレータ（decorator fn %s(…): 節 { … }）だけ（docs/grammar.md「decorator の宣言」）", name))
 	}
 	switch p.tok().Kind {
 	case token.Throws, token.Catches, token.Reads, token.Effects, token.Colon, token.LBrace:
@@ -1228,7 +1278,7 @@ func (p *parser) parseDecoratorFnTail(d *ast.DecoratorDecl) {
 		case token.Throws, token.Catches, token.Reads, token.Effects:
 			return true
 		}
-		return false
+		return p.atOuterThrows()
 	}
 	switch {
 	case p.at(token.Colon):
@@ -1238,7 +1288,7 @@ func (p *parser) parseDecoratorFnTail(d *ast.DecoratorDecl) {
 			case token.Semicolon, token.LBrace:
 				p.fail(colon, fmt.Sprintf("「:」の後ろに、節が要る。何も書かないなら、「:」も書かない（decorator fn %s(…); か decorator fn %s(…) { … } と書く。docs/grammar.md「decorator の宣言」）", name, name))
 			}
-			p.fail(p.tok().Span, "decorator fn に、戻り値は書かない。「:」の後ろは、節（throws / catches / reads / effects）だけ（包んだ op の結果が、そのまま返る。docs/grammar.md「decorator の宣言」）")
+			p.fail(p.tok().Span, "decorator fn に、戻り値は書かない。「:」の後ろは、節（throws / outer throws / catches / reads / effects）だけ（包んだ op の結果が、そのまま返る。docs/grammar.md「decorator の宣言」）")
 		}
 	case atClause():
 		p.fail(p.tok().Span, fmt.Sprintf("「)」の後ろに、節を書くなら、「:」で始める（decorator fn %s(…): %s … と書く。docs/grammar.md「decorator の宣言」）", name, p.tok().Text))
@@ -1258,9 +1308,22 @@ func (p *parser) parseDecoratorFnTail(d *ast.DecoratorDecl) {
 	}
 }
 
+// atOuterThrows は、今の位置が、節 outer throws の頭か（outer は文脈キーワード: 直後が throws のときだけ、この意味）。
+func (p *parser) atOuterThrows() bool {
+	return p.at(token.Ident) && p.tok().Text == "outer" && p.peek(1).Kind == token.Throws
+}
+
 // parseOldDecoratorClauses は DecoratorClause の並びを読む（頭の「:」は、呼ぶ側が読む）。
 func (p *parser) parseOldDecoratorClauses(d *ast.DecoratorDecl) {
 	for {
+		if p.atOuterThrows() {
+			start := p.advance().Span.Start
+			c := p.parseThrowsClause()
+			c.Outer = true
+			c.Span.Start = start
+			d.Clauses = append(d.Clauses, c)
+			continue
+		}
 		switch p.tok().Kind {
 		case token.Throws:
 			d.Clauses = append(d.Clauses, p.parseThrowsClause())

@@ -77,8 +77,8 @@ namespace a {
   classify IsActive of User { Active; Inactive; }
   classify Kind of User { A; /** B の説明 */ B; /** それ以外 */ C; }
 
-  @external
-  decorator fn get(path: string): throws Unauthorized;
+  @entry
+  decorator fn get(path: string): outer throws Unauthorized;
   decorator fn fallback(error: any exception, view: any model): catches error recovers;
   decorator unavailable = fallback(AllErrors, User);
   decorator fn cache(key: string[], stale: duration?);
@@ -290,7 +290,7 @@ func TestNormalizeRefs(t *testing.T) {
 
 	// @repeatable: 同じデコレータの適用が、付けた数だけ、書かれた順に並ぶ
 	where := p.Lookup("lib.where").(*ir.Decorator)
-	eq("repeatable", []bool{where.Repeatable, where.External, p.Lookup("lib.find").(*ir.Decorator).Repeatable}, []bool{true, false, false})
+	eq("repeatable", []bool{where.Repeatable, where.Entry, p.Lookup("lib.find").(*ir.Decorator).Repeatable}, []bool{true, false, false})
 	var applied []any
 	for _, app := range read.Decorators {
 		applied = append(applied, []any{app.Decorator, app.Args[0].Value})
@@ -528,10 +528,11 @@ func TestNormalizeExpectations(t *testing.T) {
 	eq("ケースの as（状態）", session.Cases[0].As, []ir.CaseTyping{{State: "a.token", Type: ir.String(), By: ir.NarrowByPresence, Span: session.Cases[0].As[0].Span}})
 	eq("状態一つの、型で決まる分類", session.DecidedBy, ir.DecidedByType)
 
-	// デコレータの宣言: targets の既定、external、alias
+	// デコレータの宣言: targets の既定、核の印 @entry、節 outer throws、alias
 	get := p.Lookup("a.get").(*ir.Decorator)
 	eq("targets の既定", get.Targets, []ir.DecoratorTarget{ir.TargetOp})
-	eq("external", get.External, true)
+	eq("entry", []bool{get.Entry, get.Hint}, []bool{true, false})
+	eq("throws と outer throws", [][]ir.ThrowsClause{get.Throws, get.OuterThrows}, [][]ir.ThrowsClause{nil, {{Exceptions: []string{"a.Unauthorized"}}}})
 	alias := p.Lookup("a.unavailable").(*ir.Decorator)
 	eq("alias", alias.Alias, &ir.DecoratorAlias{Target: "a.fallback", Args: []ir.Arg{
 		{Param: "error", Value: ir.RefsValue{Targets: []string{"a.Unauthorized", "a.Invalid", "a.Wrapped"}}},

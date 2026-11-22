@@ -717,6 +717,24 @@ func (c *computer) decoratorSteps(o *ir.Op, ns, viewer string, s *sigState, emit
 			args = app.Args
 		}
 		subst := substituter(args)
+		// applyThrows は、throws の節（か、outer throws の節）を、手順 i のとおりに適用する。
+		applyThrows := func(clauses []ir.ThrowsClause) {
+			for _, cl := range clauses {
+				for _, raw := range cl.Exceptions {
+					for _, y := range subst(raw) {
+						existed := s.hasE(y)
+						s.addE(y)
+						for _, e := range s.F {
+							st := relationState([]ir.ThrowsClause{cl}, y, subst)
+							if existed && s.relOf(y, e) != st {
+								st = ir.Unknown
+							}
+							s.setRel(y, e, st)
+						}
+					}
+				}
+			}
+		}
 		if d.Body != nil {
 			// 本体のあるデコレータ: 付けた所で、広げたものとして計算する（docs/check.md「デコレータの本体」）。
 			// 本体を、配線として手順 0 と同じに計算し、proceed() の Sc を、ここまでの Sig にする。
@@ -731,6 +749,9 @@ func (c *computer) decoratorSteps(o *ir.Op, ns, viewer string, s *sigState, emit
 			}
 			c.blockStep(d.Body, ns, s, written, d.Throws)
 			c.proceed = outer
+			if viewer != ns {
+				applyThrows(d.OuterThrows) // DEC-10
+			}
 			continue
 		}
 		for _, cl := range d.Catches {
@@ -776,23 +797,10 @@ func (c *computer) decoratorSteps(o *ir.Op, ns, viewer string, s *sigState, emit
 				}
 			}
 		}
-		if d.External && viewer == ns {
-			continue // DEC-10: external の例外は境界の外から見たときだけ
-		}
-		for _, cl := range d.Throws {
-			for _, raw := range cl.Exceptions {
-				for _, y := range subst(raw) {
-					existed := s.hasE(y)
-					s.addE(y)
-					for _, e := range s.F {
-						st := relationState([]ir.ThrowsClause{cl}, y, subst)
-						if existed && s.relOf(y, e) != st {
-							st = ir.Unknown
-						}
-						s.setRel(y, e, st)
-					}
-				}
-			}
+		// throws の節、次に outer throws の節。DEC-10: outer throws の例外（fn の外で起きる）は、境界の外から見たときだけ
+		applyThrows(d.Throws)
+		if viewer != ns {
+			applyThrows(d.OuterThrows)
 		}
 	}
 }
@@ -843,9 +851,9 @@ func refTargets(v ir.ArgValue) []string {
 	return nil
 }
 
-// decoratorSets は O に付いたデコレータの ∪Catches(dᵢ)、∪Throws(dᵢ, ns(O))（external の throws を除く）、
-// external の throws（docs/check.md「名前空間」の DOC-1 が使う）。`$param:` は置き換え済み。
-func (c *computer) decoratorSets(o *ir.Op) (catches, throws, externalThrows []string) {
+// decoratorSets は O に付いたデコレータの ∪Catches(dᵢ)、∪Throws(dᵢ, ns(O))（throws の節）、
+// outer throws の節の例外（docs/check.md「名前空間」の DOC-1 が使う）。`$param:` は置き換え済み。
+func (c *computer) decoratorSets(o *ir.Op) (catches, throws, outerThrows []string) {
 	for _, app := range o.Decorators {
 		d, args := c.ix.decorator(app.Decorator)
 		if d == nil {
@@ -865,16 +873,19 @@ func (c *computer) decoratorSets(o *ir.Op) (catches, throws, externalThrows []st
 		for _, cl := range d.Throws {
 			for _, raw := range cl.Exceptions {
 				for _, x := range subst(raw) {
-					if d.External {
-						externalThrows = appendUnique(externalThrows, x)
-					} else {
-						throws = appendUnique(throws, x)
-					}
+					throws = appendUnique(throws, x)
+				}
+			}
+		}
+		for _, cl := range d.OuterThrows {
+			for _, raw := range cl.Exceptions {
+				for _, x := range subst(raw) {
+					outerThrows = appendUnique(outerThrows, x)
 				}
 			}
 		}
 	}
-	return catches, throws, externalThrows
+	return catches, throws, outerThrows
 }
 
 // fillBound はすべての配線の呼び出しの Call.Bound を埋める（docs/check.md「bind」の Call.bound）。

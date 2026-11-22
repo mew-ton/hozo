@@ -470,15 +470,16 @@ func TestViewFromEntry(t *testing.T) {
 		expect(t, "onlyArrived のアーム", []any{len(o), o[0].Cases, o[0].Else, narrowed(o[0])}, []any{1, []string{"Arrived"}, false, []string{"api.User on api.Arrival.Arrived"}})
 	})
 
-	t.Run("ir.md decorator/$param と external", func(t *testing.T) {
+	t.Run("ir.md decorator/$param と outer throws", func(t *testing.T) {
 		d := declOf(t, prog, "web.redirectOn").(*ir.Decorator)
 		expect(t, "redirectOn の params", renderParams(d.Params), []string{"error: any exception", "target: any effect"})
 		expect(t, "redirectOn の catches（引数名は $param:名前）", renderCatches(d.Catches), []string{"catches $param:error halts $param:target"})
 		expect(t, "targets の省略は [op]", d.Targets, []ir.DecoratorTarget{ir.TargetOp})
-		expect(t, "external の既定", d.External, false)
+		expect(t, "核の印の既定", []bool{d.Entry, d.Hint}, []bool{false, false})
 		r := declOf(t, prog, "api.remote").(*ir.Decorator)
-		expect(t, "@external", r.External, true)
-		expect(t, "remote の throws", renderThrows(r.Throws), []string{"throws api.Timeout"})
+		expect(t, "@entry", r.Entry, true)
+		expect(t, "remote の throws（outer throws は、別の並び）", renderThrows(r.Throws), []string{})
+		expect(t, "remote の outer throws", renderThrows(r.OuterThrows), []string{"throws api.Timeout"})
 		f := declOf(t, prog, "web.offlineFallback").(*ir.Decorator)
 		expect(t, "offlineFallback の catches", renderCatches(f.Catches), []string{"catches api.Timeout recovers"})
 		expect(t, "offlineFallback の throws", renderThrows(f.Throws), []string{"throws web.Offline"})

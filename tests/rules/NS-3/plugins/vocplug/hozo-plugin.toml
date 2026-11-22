@@ -1,7 +1,7 @@
 # テストの fixture: 語彙を提供するプラグイン。起動しない
 name       = "vocplug"
 command    = ["true"]
-protocol = "0.18"
+protocol = "0.19"
 vocabulary = ["v.hozo"]
 
 [[transpiler]]

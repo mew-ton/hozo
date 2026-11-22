@@ -1,6 +1,0 @@
-// DEC-15（docs/check.md「デコレータ」。文法で閉じる）: @external はデコレータの宣言にだけ付く
-namespace a {
-  @external                            // ERROR: SYNTAX
-  fn f();
-  fn g();                              // @external の付いた op f は捨てられるので、名前空間 a の op はこれだけ
-}

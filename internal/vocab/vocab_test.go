@@ -11,7 +11,7 @@ import (
 // docs/vocab.md「同梱する語彙」の表。
 var expected = map[string][]string{
 	"hozo:vocab/valid.hozo": {"namespace valid {", "decorator min(", "decorator max(", "decorator length(min: int?, max: int?)", "decorator pattern(", "decorator format("},
-	"hozo:vocab/http.hozo": {"namespace http {", "exception ServerError;", "exception NetworkError;", "model Violation {", "exception BadRequest(message: string, violations: Violation[]);", "@external\n  decorator fn get(", "@external\n  decorator fn post(", "decorator status(",
+	"hozo:vocab/http.hozo": {"namespace http {", "exception ServerError;", "exception NetworkError;", "model Violation {", "exception BadRequest(message: string, violations: Violation[]);", "@entry\n  decorator fn get(path: string): outer throws", "@entry\n  decorator fn post(path: string): outer throws", "decorator status(",
 		"decorator header(name: string?) for field;", "decorator query(name: string?) for field;", "decorator body(name: string?) for field;",
 		"decorator headerObj for field;", "decorator queryObj for field;", "decorator bodyObj for field;", "decorator required for field;", "decorator default(value:", "decorator fn retry("},
 	"hozo:vocab/db.hozo": {"namespace db {", "decorator table for state;",
