@@ -100,6 +100,7 @@ func analyze(fs *source.FileSet, files []*ast.File) *analyzer {
 	a.lowerAll()
 	a.lowerApplications()
 	a.finalizeModels()
+	a.checkFiniteTypes()
 	a.checkNeverOps()
 	a.lowerWirings()
 	a.checkPendingCaseTypes()

@@ -1,0 +1,34 @@
+// TYPE-19（docs/types.md「値を、有限に作れない型」）: 有限に作れる型は、輪があっても、書ける
+namespace a {
+  // 持たなくてよい（?）
+  model Comment { body: string; replyTo: Comment?; }
+
+  // 空にできる（[]）
+  model Category { name: string; children: Category[]; }
+
+  // インデックスの model は、空の構造を持てる
+  model Folder { name: string; entries: Entries; }
+  model Entries { [name: string]: Folder; }
+
+  // union は、終われるアームが、一つあればよい
+  union Tree {
+    Leaf: {};
+    Fork: { left: Tree; right: Tree; };
+  }
+  model Forest { root: Tree; }
+
+  // 互いを使っても、どこかで切れていれば、持てる
+  model Parent { child: Child; }
+  model Child { parent: Parent?; }
+
+  // 輪のない入れ子
+  model Outer { inner: Inner; }
+  model Inner { leaf: Leaf; }
+  model Leaf { n: int; }
+
+  // 名前空間をまたぐ輪も、切れていれば、言語は、止めない（基底 go は、型どうしの輪を GO-3 で止める。ここの単位の go は、代役）
+  model Here { there: b.There?; }
+}
+namespace b {
+  model There { here: a.Here; }
+}

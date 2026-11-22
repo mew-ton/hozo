@@ -1,0 +1,18 @@
+// TYPE-19: union は、どのアームも戻るなら、持てない。その場で書いた model も、辿る
+namespace a {
+  // どのアームも、自分に戻る
+  union Loop {                         // ERROR: TYPE-19
+    One: Loop;
+    Two: { again: Loop; };
+  }
+
+  // model と union が、互いに戻る。union のアームは、どれも Pair に戻る
+  model Pair { either: Either; }       // ERROR: TYPE-19
+  union Either {
+    Left: Pair;
+    Right: { pair: Pair; note: string?; };
+  }
+}
+namespace b {
+  model Unused { n: int; }
+}

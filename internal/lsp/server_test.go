@@ -472,6 +472,22 @@ func TestConfigDiagnostic(t *testing.T) {
 	c.shutdown()
 }
 
+// TestFiniteTypeDiagnostic は、値を有限に作れない型（TYPE-19。docs/types.md「値を、有限に作れない型」）が、ほかの規則と同じ道で、
+// エディタに出ること: 位置は、輪の上で最初に現れる宣言の名前。
+func TestFiniteTypeDiagnostic(t *testing.T) {
+	root := t.TempDir()
+	writeFile(t, filepath.Join(root, "hozo.toml"), "[hozo]\nsources = [\"**/*.hozo\"]\n")
+	writeFile(t, filepath.Join(root, "a.hozo"), "namespace a {\n  model A { a: A; }\n  model Ok { next: Ok?; }\n}\n")
+	uri := fileURI(filepath.Join(root, "a.hozo"))
+	c := startServer(t, Options{})
+	_, byURI := c.initialize(root, protocol.ClientCapabilities{})
+	diags := byURI[uri]
+	if len(diags) != 1 || diags[0].Code != "TYPE-19" || diags[0].Range.Start.Line != 1 {
+		t.Fatalf("a.hozo の診断 = %+v（期待は、2 行目の TYPE-19 が一つ）", diags)
+	}
+	c.shutdown()
+}
+
 // TestPositionEncoding はサロゲートペア（UTF-16 で 2 単位、UTF-8 で 4 バイト）を含む行で、診断の列が
 // 交渉したエンコーディングの単位になること（docs/lsp.md「通信」）。
 func TestPositionEncoding(t *testing.T) {

@@ -1,0 +1,13 @@
+// TYPE-19: 値を、有限に作れない型（docs/types.md「値を、有限に作れない型」）
+namespace a {
+  model A { a: A; }                    // ERROR: TYPE-19
+  model B { c: C; }                    // ERROR: TYPE-19
+  model C { b: B; }
+  union Loop { One: Loop; Two: { again: Loop; }; }   // ERROR: TYPE-19
+
+  // 有限に作れる型は、輪があっても、通る
+  model Ok { next: Ok?; all: Ok[]; }
+  union Tree { Leaf: {}; Fork: { left: Tree; right: Tree; }; }
+  // 持てない型を持つだけの宣言には、出さない
+  model Holder { a: A; }
+}

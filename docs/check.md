@@ -816,6 +816,10 @@ A の配線の呼び出し c（callee O）の `Call.bound` は、A のすべて�
 
 NS-4 は欠番。「`classify` は宣言した名前空間の中でだけ使える」（型の位置の、絞り込んだ型の C と、`match` の C が、現在の名前空間の `classify` でなければエラー）という規則で、分類の置き場を自由にした（`docs/decisions.md`「設計書から離れた決定」S18）ときになくなった。番号は別の意味に使い回さない（欠番の一覧は `docs/requirements.md`「検査の規則の一覧」）。
 
+### 型
+
+型の規則（`TYPE-*`）の持ち主は `docs/types.md`「診断」。値を、有限に作れない型（`model A { a: A; }`。TYPE-19。`docs/decisions.md`「決めたこと」403）の決め方は、同「値を、有限に作れない型」。
+
 ### 設定
 
 `docs/config.md`「診断」。

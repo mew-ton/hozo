@@ -1,0 +1,22 @@
+// TYPE-19（docs/types.md「値を、有限に作れない型」）: 必ず、自分を持つ model。位置は、輪の上で、最初に現れる宣言の名前
+namespace a {
+  model A { a: A; }                    // ERROR: TYPE-19
+
+  // 二つの model が、互いを、省略できないフィールドで持つ。出るのは、輪ごとに一つ（先に現れる B）
+  model B { c: C; n: int; }            // ERROR: TYPE-19
+  model C { b: B; }
+
+  // 輪に入らず、持てない型を、省略できないフィールドに持つだけの宣言には、重ねて出さない
+  model D { a: A; label: string; }
+
+  // 省略できるフィールドが、ほかにあっても、省略できないフィールドが戻れば、持てない
+  model E { next: E; prev: E?; all: E[]; } // ERROR: TYPE-19
+
+  // scalar を挟んでも、絞り込んでも、戻る先は同じ
+  classify Kind of G { Odd: G as G; Even: G as G; }
+  model F { g: G on Kind.Odd; }        // ERROR: TYPE-19
+  model G { f: F; }
+}
+namespace b {
+  model Unused { n: int; }
+}

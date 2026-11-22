@@ -1,0 +1,7 @@
+// TYPE-19: 名前空間を、またぐかは、見ない。位置は、輪の上で、最初に現れる宣言（a.X）
+namespace a {
+  model X { y: b.Y; }                  // ERROR: TYPE-19
+}
+namespace b {
+  model Y { x: a.X; }
+}

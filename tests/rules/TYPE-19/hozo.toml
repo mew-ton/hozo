@@ -1,0 +1,13 @@
+# TYPE-19 の例は、名前空間をまたぐ輪を持つので、a と b の両方に、単位を置く。
+[hozo]
+plugin_dirs = ["plugins"]
+
+[[emit]]
+namespace   = "a"
+transpilers = ["go"]
+out         = "gen/a"
+
+[[emit]]
+namespace   = "b"
+transpilers = ["go"]
+out         = "gen/b"
