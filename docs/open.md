@@ -474,7 +474,6 @@
 | `go-sqlite` は、`db` の語彙の検査（DB-*）を通っていない仕様を受け取ったら、診断にせず、異常終了する（`Crashed`。`go-http`、`go-valid` と、同じ扱い）。見るのは、出力の名前空間 N の読み解きだけ。`requires_vocabulary = ["db"]` を書くのは、`go-sqlite` だけ（`db` を読むトランスパイラは、ほかにない） | 同じ診断を、`go-sqlite` も返す | `plugin-go-sqlite.md`「診断」「マニフェスト」 |
 | `db` の読み解きのライブラリは、公開の `plugin/dbvocab`（`plugin/golang` を使わない）。`go-sqlite` は、表、列、キー、参照、`read` と効果の条件を、その結果（`Reading`）から作り、しまい方だけを、自分で読む。リテラルの、仕様での書き方（`LiteralText`）は、`go-sqlite` から、ここに移した | `go-sqlite` が、読み解きを、自分でも持つ（二つの写し） | `packages.md`「`plugin/dbvocab`（公開）」 |
 | コーパス `tests/corpus/view` の直し（同 429 の当てはめ）: `read api.sessionsOf` の `@db.where("revoked", false)`、`@db.where("kind", "web")` が、表の model `api.Session` にない列を名指ししていた（DB-4）ので、`api.Session` に、フィールド `revoked: boolean`、`kind: string` を足した（期待する View は、その二つのフィールドの分だけ変わった） | `@db.where` の列を、今あるフィールドに変える（`tests/view_test.go` が、二つのリテラルの種類を、名指しで確かめているので、テストも変わる） | `tests/corpus/view/api.hozo` |
-| 解釈するデコレータは、マニフェストの `[[transpiler]]` の `interprets`（FQN の並び。ワイルドカードなし）で言う。`seams` のデコレータは、解釈するものに数え、同じ FQN を両方に書けば MAN-4。宣言されていない FQN を書いても、確かめない（`seams` と同じ）。語彙のプラグイン（`[read]`）は、数えない | `seams` を `interprets` に一本化し、継ぎ目かどうかを、項目で言う。宣言されていない FQN を error にする。名前空間ごと（`http.*`）に書けるようにする | `plugin-protocol.md`「マニフェスト `hozo-plugin.toml`」、`config.md`「解釈するトランスパイラ」 |
 | CFG-26 は、`unsupported`（CFG-6）と、別に出す: どのトランスパイラも解釈せず、単位のトランスパイラが `unsupported` に書いたデコレータには、同じ所に、二つの warning が出る | CFG-6 が出る所には、CFG-26 を出さない | `config.md`「解釈するトランスパイラ」 |
 | CFG-26 のメッセージは、消す道を示す: `decorator fn` なら「本体を書く」、いつも「トランスパイラを並べる」、節も `@entry` も持たない宣言なら「`@hint` を付ける」。位置は、付けた所。名前付きデコレータを通した適用は、その名前で言う | 解釈するトランスパイラ（入っているプラグインのうち、`interprets` に持つもの）の名前を、メッセージに示す | `config.md`「解釈するトランスパイラ」 |
 | 標準のプラグインの `interprets`: `go-valid` は `valid` の五つ、`go-http` は `http` の十一（`http.retry` を除く）、`go-sqlite` は `db` の二十（`db.transaction` は `seams`）、`go-cli` は `cli` の七つ、`go-design` は `business.flow`、`usecase.of`、`prd.ref`。基底 `go` は、持たない。`go-cli` と `go-http` が、確かめのために読む `valid` の制約は、書かない（解釈するのは、`requires` の `go-valid`） | 読むものを、すべて書く | 各プラグインの文書の「マニフェスト」 |
@@ -562,6 +561,7 @@ GitHub Actions の無料の枠が尽きて、CI が動かない間は、手元�
 | `d0cd5a4` の次のコミット | 文書だけ: 「何を、どの基準で、標準の語彙にするか」を、未決の点として足した | 同じ |
 | `f831ec3` の次のコミット | 文書だけ: 標準のプラグインを、hozoc に組み込まない決定（同 437）と、プラグインの遅さの出どころの実測 | 同じ |
 | `b6b9f31` の次のコミット | 文書だけ: 語彙のプラグインの、名乗り方と頼み方を、今のままにする決定（同 438） | 同じ |
+| `8bdd6e3` の次のコミット | 文書だけ: 解釈するデコレータの書き方（`interprets`）を、今のままにする決定（同 439） | 同じ |
 
 - この例外で、`main` に入れたものは、この表に、足す。
 - 枠が戻ったら、`main` の先頭で、CI を走らせ、緑を確かめて、この見出しを消す。赤なら、原因を直してから、消す。
