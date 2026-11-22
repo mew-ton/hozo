@@ -21,9 +21,9 @@ type Ops interface {
 	//   - checked: 検査の結果
 	//
 	// Throws: hozoc.OutputConflict, hozoc.UnknownNamespace, proc.MalformedOutput
-	CollectOutputs(ctx context.Context, in EmitInput, checked CheckResult) (EmitPlan, error)
+	CollectOutputs(ctx context.Context, in BuildInput, checked CheckResult) (EmitPlan, error)
 
-	// WriteOutputs は検査がプラグインから受け取った答えの、出力ごとのファイルを書き出す。
+	// WriteOutputs は検査がプラグインから受け取った答えの、出力ごとのファイルを書き出す。in の noEmit が真なら、集めて確かめるだけで、書き出さない。
 	// 例外は、どれも書き出しを始める前に起きる（集めるのが先）。
 	//
 	// 引数:
@@ -33,9 +33,9 @@ type Ops interface {
 	// Throws: hozoc.OutputConflict, hozoc.UnknownNamespace, proc.MalformedOutput
 	// Reads: hozoc.outputs
 	// Effects: hozoc.syncOutputs
-	WriteOutputs(ctx context.Context, in EmitInput, checked CheckResult) (EmitResult, error)
+	WriteOutputs(ctx context.Context, in BuildInput, checked CheckResult) (BuildResult, error)
 
-	// Emit は仕様を検査し、プラグインから受け取ったファイルを書き出す。
+	// Build は仕様を検査し、プラグインから受け取ったファイルを書き出す。--no-emit なら、検査だけを行い、ファイルを書き出さない。
 	//
 	// 引数:
 	//   - in: コマンドの入力
@@ -43,7 +43,7 @@ type Ops interface {
 	// Throws: hozoc.CheckFailed, hozoc.ConfigInvalid, hozoc.LanguageMismatch, proc.Crashed, proc.MalformedOutput, hozoc.OutputConflict, hozoc.UnknownNamespace
 	// Reads: hozoc.outputs
 	// Effects: hozoc.syncOutputs
-	Emit(ctx context.Context, in EmitInput) (EmitResult, error)
+	Build(ctx context.Context, in BuildInput) (BuildResult, error)
 
 	// MatchTests は検査がプラグインから受け取った答えから、テストの対応表を集め、カバレッジの「実行された行」と突き合わせる。ファイルは書き出さない。
 	//
@@ -96,7 +96,7 @@ type Leaves interface {
 	//   - checked: 検査の結果
 	//
 	// Throws: hozoc.OutputConflict, hozoc.UnknownNamespace, proc.MalformedOutput
-	CollectOutputs(ctx context.Context, in EmitInput, checked CheckResult) (EmitPlan, error)
+	CollectOutputs(ctx context.Context, in BuildInput, checked CheckResult) (EmitPlan, error)
 
 	// MatchTests は検査がプラグインから受け取った答えから、テストの対応表を集め、カバレッジの「実行された行」と突き合わせる。ファイルは書き出さない。
 	//
@@ -142,7 +142,7 @@ func (o *ops) Check(ctx context.Context, in CheckInput) (CheckResult, error) {
 	return o.leaves.Check(ctx, in)
 }
 
-func (o *ops) CollectOutputs(ctx context.Context, in EmitInput, checked CheckResult) (EmitPlan, error) {
+func (o *ops) CollectOutputs(ctx context.Context, in BuildInput, checked CheckResult) (EmitPlan, error) {
 	return o.leaves.CollectOutputs(ctx, in, checked)
 }
 

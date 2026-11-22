@@ -106,10 +106,10 @@ func staleOutputs(pl *outputPlan) []hozoc.Diagnostic {
 		switch {
 		case err != nil:
 			out = append(out, testsDiagnostic("TESTS-2", o.path, 0,
-				fmt.Sprintf("%s が、置き場にない（hozoc emit をやり直して、テストを走らせ直す）", o.path)))
+				fmt.Sprintf("%s が、置き場にない（hozoc build をやり直して、テストを走らせ直す）", o.path)))
 		case !bytes.Equal(disk, o.content):
 			out = append(out, testsDiagnostic("TESTS-2", o.path, 0,
-				fmt.Sprintf("置き場の %s が、今の仕様から集めたものと違う（hozoc emit をやり直して、テストを走らせ直す）", o.path)))
+				fmt.Sprintf("置き場の %s が、今の仕様から集めたものと違う（hozoc build をやり直して、テストを走らせ直す）", o.path)))
 		}
 	}
 	return out

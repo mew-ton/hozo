@@ -7,7 +7,7 @@
 //
 //  1. 今のソース（今の置き場を含む）で hozoc をビルドする。
 //  2. 一時ディレクトリに仕様と設定（cli.hozo、hozo.toml、go.mod、go.sum）を写し、プラグインが要るディレクトリ
-//     （ir、plugin、plugins、runtime）をシンボリックリンクで足して、そこで hozoc emit を走らせる。
+//     （ir、plugin、plugins、runtime）をシンボリックリンクで足して、そこで hozoc build を走らせる。
 //     生成されるコードの import パスは、hozo.toml の [options.go] の module から決まる（docs/plugin-go.md「パッケージと import パス」）
 //     ので、リポジトリで生成したときと同じになる。go.mod は、3 の vet とビルドのために写す。
 //  3. 生成した置き場の中身を、その一時ディレクトリで vet に通し、次に、リポジトリの今のものの代わりに
@@ -108,8 +108,8 @@ func run(repo string, stdout, stderr io.Writer) error {
 	if err != nil {
 		return err
 	}
-	if err := commandEnv(work, env, io.Discard, stderr, hozoc, "emit"); err != nil {
-		return fmt.Errorf("hozoc emit が失敗した: %w", err)
+	if err := commandEnv(work, env, io.Discard, stderr, hozoc, "build"); err != nil {
+		return fmt.Errorf("hozoc build が失敗した: %w", err)
 	}
 
 	// 3. vet と、置き換えたつもりでのビルド

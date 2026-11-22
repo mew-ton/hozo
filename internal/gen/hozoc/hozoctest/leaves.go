@@ -48,7 +48,7 @@ type CollectOutputsCases interface {
 
 // CollectOutputsCase は、葉 hozoc.collectOutputs の、ケース一つ: 渡す引数と、足りない確かめ。
 type CollectOutputsCase struct {
-	In      hozoc.EmitInput
+	In      hozoc.BuildInput
 	Checked hozoc.CheckResult
 	// Then は、結果が、そのケースのものだと確かめた後に、呼ばれる（nil なら、呼ばない）。got は、葉が返した値、err は、葉が返した失敗（正常のケースでは nil）。
 	Then func(t *testing.T, got hozoc.EmitPlan, err error)

@@ -19,7 +19,7 @@ import (
 	sdk "github.com/mew-ton/hozo/plugin"
 )
 
-// outputKey は出力一つ: 単位（Project.Units の添字）と、その単位が出力する名前空間（docs/cli.md「emit」）。
+// outputKey は出力一つ: 単位（Project.Units の添字）と、その単位が出力する名前空間（docs/cli.md「書き出し」）。
 type outputKey struct {
 	unit int
 	ns   string
@@ -34,7 +34,7 @@ type output struct {
 	dir     string // その出力の Dir(U, N)。記録（.hozoc-outputs.json）の置き場
 }
 
-// CollectOutputs は cli.hozo の op collectOutputs（docs/cli.md「emit」の 1〜3）: 検査（Check）が、プラグインから受け取った答えから、
+// CollectOutputs は cli.hozo の op collectOutputs（docs/cli.md「書き出し」の 1〜3）: 検査（Check）が、プラグインから受け取った答えから、
 // 出力ごとのファイルを集める。プラグインは、起動しない。hozoc.Leaves のメソッド。葉の op なので、状態（生成したファイル）には触れない: 読むのも書くのも、
 // 配線 writeOutputs が、この後に呼ぶ read outputChanges（[App.Outputs]）と効果 syncOutputs（[App.OutputsSync]）。内部の op で、
 // テストは、内側のパッケージ internal/gen/hozoc/inner の Ops から呼ぶ。checked は Check が返したもの（warning）で、その中身
@@ -42,25 +42,30 @@ type output struct {
 // 返したもの。
 //
 //  0. 設定なし（hozo.toml が見つからない。docs/config.md「置き場と探し方」）なら、書き出すものがないので CFG-7 を
-//     一つ作って ConfigInvalid（docs/cli.md「手で書くもの」）。check の warning も一緒に運ぶ。
+//     一つ作って ConfigInvalid（docs/cli.md「書き出し」の 0）。check の warning も一緒に運ぶ。検査だけ（in の noEmit）なら、
+//     誤りにせず、空の予定を返す。
 //  1. namespaces が空でなければ、名前空間がそのどれかと同じか子孫である出力だけを対象にする。引数とその子孫のどれも、
 //     どの単位の対象でもなければ UnknownNamespace。
 //  2. 対象の各出力について、単位の各トランスパイラの答えから、files を集める（path とテストの対応表を確かめる:
 //     PLG-1 / PLG-2 / PLG-4 は proc.MalformedOutput）。
 //  3. すべての出力のファイルを集めてからパスの重複を確かめる（CFG-5 → OutputConflict）。
 //
-// 1〜3 は [App.collect]。返す予定（hozoc.EmitPlan）は、warning と、ファイル（パスの辞書順）と、入力の dryRun。置き場を含む形は
+// 1〜3 は [App.collect]。返す予定（hozoc.EmitPlan）は、warning と、ファイル（パスの辞書順）と、入力の dryRun と noEmit。置き場を含む形は
 // a.planned に置く（[App.plannedFor]）。
 //
 // ctx が中断されていれば、その error を返す（[App.collect]）。
-func (a *App) CollectOutputs(ctx context.Context, in hozoc.EmitInput, checked hozoc.CheckResult) (hozoc.EmitPlan, error) {
+func (a *App) CollectOutputs(ctx context.Context, in hozoc.BuildInput, checked hozoc.CheckResult) (hozoc.EmitPlan, error) {
 	a.planned = nil
 	p := a.checked
 	if p == nil || len(checked.Warnings) != len(p.Diags) {
 		return hozoc.EmitPlan{}, errors.New("hozoc: CollectOutputs の checked が直前の Check の結果でない")
 	}
-	// 0. 設定なし
+	// 0. 設定なし。検査だけ（--no-emit）なら、集めるものがないので、空の予定を返す
 	if p.NoConfig {
+		if in.NoEmit != nil && *in.NoEmit {
+			a.planned = &outputPlan{root: p.Root, warnings: p.Diags}
+			return hozoc.EmitPlan{Warnings: toDiagnostics(p.Diags, p.Files), Files: []hozoc.OutputFile{}, DryRun: in.DryRun, NoEmit: in.NoEmit}, nil
+		}
 		return hozoc.EmitPlan{}, noConfig(p)
 	}
 	pl, err := a.collect(ctx, p, in.Namespaces)
@@ -68,7 +73,7 @@ func (a *App) CollectOutputs(ctx context.Context, in hozoc.EmitInput, checked ho
 		return hozoc.EmitPlan{}, err
 	}
 	a.planned = pl
-	plan := hozoc.EmitPlan{Warnings: toDiagnostics(pl.warnings, p.Files), Files: make([]hozoc.OutputFile, 0, len(pl.outputs)), DryRun: in.DryRun}
+	plan := hozoc.EmitPlan{Warnings: toDiagnostics(pl.warnings, p.Files), Files: make([]hozoc.OutputFile, 0, len(pl.outputs)), DryRun: in.DryRun, NoEmit: in.NoEmit}
 	for _, o := range pl.outputs {
 		plan.Files = append(plan.Files, hozoc.OutputFile{Path: hozoc.Path(o.path), Content: string(o.content)})
 	}
@@ -92,6 +97,10 @@ func (a *App) plannedFor(plan hozoc.EmitPlan) (*outputPlan, error) {
 // dryRun は、予定 plan が、書き出さずに、書き出す予定だけを返すものか（cli.hozo の EmitPlan.dryRun）。
 func dryRun(plan hozoc.EmitPlan) bool { return plan.DryRun != nil && *plan.DryRun }
 
+// noEmit は、予定 plan が、検査だけのものか（cli.hozo の EmitPlan.noEmit。hozoc build --no-emit）: 書き出さず、書き出す予定も
+// 返さない。置き場は、読まない。
+func noEmit(plan hozoc.EmitPlan) bool { return plan.NoEmit != nil && *plan.NoEmit }
+
 // noConfig は、設定なしで emit しようとしたときの ConfigInvalid（CFG-7。docs/cli.md「手で書くもの」）。
 func noConfig(p *project.Project) error {
 	missing := diag.Diagnostic{Severity: diag.Error, Code: "CFG-7", File: config.FileName,
@@ -99,13 +108,13 @@ func noConfig(p *project.Project) error {
 	return configInvalid(append([]diag.Diagnostic{missing}, p.Diags...), p.Files)
 }
 
-// outputPlan は一度の emit が書き出す予定のすべて（docs/cli.md「emit」の 1〜3 の結果）。境界の hozoc.EmitPlan が持たない、
+// outputPlan は一度の emit が書き出す予定のすべて（docs/cli.md「書き出し」の 1〜3 の結果）。境界の hozoc.EmitPlan が持たない、
 // 置き場（ルートと、出力ごとの Dir(U, N)）を持つ。
 type outputPlan struct {
 	// root はプロジェクトのルート（パスの基準）。
 	root string
 	// dirs は対象の出力の Dir(U, N)（ルートからの相対パス。単位の設定の順、名前空間の IR の順）。対象の単位の対象の名前空間で、
-	// in のせいで出力でなくなったものの Dir(U, N) も含む（前回のファイルを消すため。docs/cli.md「emit」の 5）。
+	// in のせいで出力でなくなったものの Dir(U, N) も含む（前回のファイルを消すため。docs/cli.md「書き出し」の 5）。
 	dirs []string
 	// outputs は書く予定のファイル（パスの辞書順。重複はない）。
 	outputs []output
@@ -148,7 +157,7 @@ func (pl *outputPlan) record(dir string) []byte {
 	return append(data, '\n')
 }
 
-// collect は docs/cli.md「emit」の 1〜3: 対象を決め、対象の出力ごとに、単位のトランスパイラの答え（p.Answers）から files を
+// collect は docs/cli.md「書き出し」の 1〜3: 対象を決め、対象の出力ごとに、単位のトランスパイラの答え（p.Answers）から files を
 // 集め、パスの重複を確かめる。ファイルには触れない。誤りは cli.hozo の例外で返す（UnknownNamespace、proc.MalformedOutput、
 // OutputConflict）。
 //
@@ -205,7 +214,7 @@ func (a *App) collect(ctx context.Context, p *project.Project, namespaces []stri
 	}
 
 	// warnings は check の warning（p.Diags）: トランスパイラの warning（PLUGIN）も、Check が、もう足している
-	// （docs/cli.md「check」の 4）。
+	// （docs/cli.md「検査」の 4）。
 	warnings := append([]diag.Diagnostic{}, p.Diags...)
 	var outputs []output
 

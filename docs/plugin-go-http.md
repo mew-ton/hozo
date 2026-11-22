@@ -526,7 +526,7 @@ func RunHTTP(t *testing.T, leaves server.Leaves, c HTTPCases) {
 
 ## 診断
 
-`emit` の応答の `errors` で返す。検査だけの実行（`hozoc check`）も、同じ応答の診断を使う（`docs/plugin-protocol.md`「起動」「emit」）: `hozoc check` で出て、`hozoc emit` は、どのファイルも書く前に、止まる。位置は、表に書いた宣言の FQN。
+`emit` の応答の `errors` で返す。検査だけの実行（`hozoc build --no-emit`）も、同じ応答の診断を使う（`docs/plugin-protocol.md`「起動」「emit」）: `hozoc build --no-emit` で出て、`hozoc build` は、どのファイルも書く前に、止まる。位置は、表に書いた宣言の FQN。
 
 | ID | 重さ | 意味 |
 |---|---|---|

@@ -542,7 +542,7 @@ func quoteList(list []string) string {
 
 // badOut は単位の out が出力先にできない理由を返す（CFG-7。docs/config.md「形」）: 絶対パス、ルートの外へ出るパス、
 // ルートそのもの。出力先にできるなら ""。空の out は CFG-12 が報告するので、ここでは数えない。
-// ルートの外を許さないのは、hozoc が書いて消すファイルをプロジェクトの中に限るため（docs/cli.md「emit」）。ルートそのものを
+// ルートの外を許さないのは、hozoc が書いて消すファイルをプロジェクトの中に限るため（docs/cli.md「書き出し」）。ルートそのものを
 // 許さないのは、out の下は sources から常に除くので、何も読めなくなるため。
 func badOut(out string) string {
 	if out == "" {

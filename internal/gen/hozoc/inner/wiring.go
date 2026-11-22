@@ -4,7 +4,7 @@ package inner
 
 import "context"
 
-// WriteOutputs は検査がプラグインから受け取った答えの、出力ごとのファイルを書き出す。
+// WriteOutputs は検査がプラグインから受け取った答えの、出力ごとのファイルを書き出す。in の noEmit が真なら、集めて確かめるだけで、書き出さない。
 // 例外は、どれも書き出しを始める前に起きる（集めるのが先）。
 //
 // 引数:
@@ -14,22 +14,22 @@ import "context"
 // Throws: hozoc.OutputConflict, hozoc.UnknownNamespace, proc.MalformedOutput
 // Reads: hozoc.outputs
 // Effects: hozoc.syncOutputs
-func (o *ops) WriteOutputs(ctx context.Context, in EmitInput, checked CheckResult) (EmitResult, error) {
+func (o *ops) WriteOutputs(ctx context.Context, in BuildInput, checked CheckResult) (BuildResult, error) {
 	plan, err := o.CollectOutputs(ctx, in, checked)
 	if err != nil {
-		return EmitResult{}, err
+		return BuildResult{}, err
 	}
 	result, err := o.outputs.OutputChanges(ctx, plan)
 	if err != nil {
-		return EmitResult{}, err
+		return BuildResult{}, err
 	}
 	if err := o.outputsSync.SyncOutputs(ctx, plan); err != nil {
-		return EmitResult{}, err
+		return BuildResult{}, err
 	}
 	return result, nil
 }
 
-// Emit は仕様を検査し、プラグインから受け取ったファイルを書き出す。
+// Build は仕様を検査し、プラグインから受け取ったファイルを書き出す。--no-emit なら、検査だけを行い、ファイルを書き出さない。
 //
 // 引数:
 //   - in: コマンドの入力
@@ -37,10 +37,10 @@ func (o *ops) WriteOutputs(ctx context.Context, in EmitInput, checked CheckResul
 // Throws: hozoc.CheckFailed, hozoc.ConfigInvalid, hozoc.LanguageMismatch, proc.Crashed, proc.MalformedOutput, hozoc.OutputConflict, hozoc.UnknownNamespace
 // Reads: hozoc.outputs
 // Effects: hozoc.syncOutputs
-func (o *ops) Emit(ctx context.Context, in EmitInput) (EmitResult, error) {
+func (o *ops) Build(ctx context.Context, in BuildInput) (BuildResult, error) {
 	checked, err := o.Check(ctx, CheckInput{Config: in.Config, Format: in.Format, PluginPath: in.PluginPath})
 	if err != nil {
-		return EmitResult{}, err
+		return BuildResult{}, err
 	}
 	return o.WriteOutputs(ctx, in, checked)
 }

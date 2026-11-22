@@ -103,8 +103,8 @@ namespace hozoc {
   /** 検査の結果（誤りではない指摘） */
   model CheckResult { warnings: Diagnostic[]; }
 
-  /** 書き出しの結果 */
-  model EmitResult {
+  /** build の結果。--no-emit なら、written も removed も空 */
+  model BuildResult {
     warnings: Diagnostic[];
     /** 書いたファイル（新規と更新） */
     written: Path[];
@@ -119,24 +119,26 @@ namespace hozoc {
     ran: string[];
   }
 
-  /** check の入力 */
+  /** 検査（check）の入力。コマンドの入力（BuildInput、TestsInput）から、配線が作る */
   model CheckInput {
     /** 設定ファイルの場所 */
-    @cli.flag("config") @cli.env("HOZO_CONFIG") config: Path?;
+    config: Path?;
     /** 表示の形式 */
-    @cli.flag("format") format: OutputFormat?;
+    format: OutputFormat?;
     /** プラグインを探すディレクトリ（OS のパス区切りで複数） */
-    @cli.env("HOZO_PLUGIN_PATH") pluginPath: string?;
+    pluginPath: string?;
   }
 
-  /** emit の入力 */
-  model EmitInput {
+  /** build の入力 */
+  model BuildInput {
     /** 設定ファイルの場所 */
     @cli.flag("config") @cli.env("HOZO_CONFIG") config: Path?;
     /** 表示の形式 */
     @cli.flag("format") format: OutputFormat?;
     /** 生成する名前空間（一つもなければすべて）。その名前空間と子孫を出力する単位の分を書き出す */
     @cli.arg(1) namespaces: string[];
+    /** 検査だけを行い、ファイルを書き出さない */
+    @cli.flag("no-emit") noEmit: boolean?;
     /** 書き出さずに、書き出す予定のファイルだけを表示する */
     @cli.flag("dry-run") dryRun: boolean?;
     /** プラグインを探すディレクトリ（OS のパス区切りで複数） */
@@ -179,6 +181,8 @@ namespace hozoc {
     files: OutputFile[];
     /** 書き出さずに、書き出す予定だけを返す */
     dryRun: boolean?;
+    /** 検査だけ: 書き出さず、書き出す予定も返さない */
+    noEmit: boolean?;
   }
 
   /**
@@ -186,7 +190,7 @@ namespace hozoc {
    *
    * @param plan 書き出す予定
    */
-  read fn outputChanges(plan: EmitPlan): EmitResult reads outputs;
+  read fn outputChanges(plan: EmitPlan): BuildResult reads outputs;
 
   /**
    * 生成したファイルを今の仕様と設定に合わせる（足りないものを書き、古いものを書き換え、余分なものを消す）。
@@ -202,10 +206,9 @@ namespace hozoc {
    * @throws LanguageMismatch 一つの単位のトランスパイラの language がそろっていない（docs/config.md の CFG-16）
    * @throws CheckFailed 仕様に誤りがある、または、トランスパイラが errors を返した
    * @throws proc.Crashed プラグインが異常終了した
-   * @see emit
+   * @see build
    */
-  @cli.command("check")
-  export fn check(in: CheckInput): CheckResult
+  fn check(in: CheckInput): CheckResult
     throws CheckFailed, ConfigInvalid, LanguageMismatch
     throws proc.Crashed, proc.MalformedOutput;
 
@@ -218,18 +221,18 @@ namespace hozoc {
    * @throws UnknownNamespace 引数の名前空間も、その子孫も、どの単位の対象でもない
    * @throws proc.MalformedOutput トランスパイラの返したファイルのパスか、テストの対応表が、約束の形でない
    */
-  fn collectOutputs(in: EmitInput, checked: CheckResult): EmitPlan
+  fn collectOutputs(in: BuildInput, checked: CheckResult): EmitPlan
     throws OutputConflict, UnknownNamespace
     throws proc.MalformedOutput;
 
   /**
-   * 検査がプラグインから受け取った答えの、出力ごとのファイルを書き出す。
+   * 検査がプラグインから受け取った答えの、出力ごとのファイルを書き出す。in の noEmit が真なら、集めて確かめるだけで、書き出さない。
    * 例外は、どれも書き出しを始める前に起きる（集めるのが先）。
    *
    * @param in コマンドの入力
    * @param checked 検査の結果
    */
-  fn writeOutputs(in: EmitInput, checked: CheckResult): EmitResult
+  fn writeOutputs(in: BuildInput, checked: CheckResult): BuildResult
     effects syncOutputs
     throws OutputConflict, UnknownNamespace prevents effects
     throws proc.MalformedOutput prevents effects
@@ -241,13 +244,13 @@ namespace hozoc {
   }
 
   /**
-   * 仕様を検査し、プラグインから受け取ったファイルを書き出す。
+   * 仕様を検査し、プラグインから受け取ったファイルを書き出す。--no-emit なら、検査だけを行い、ファイルを書き出さない。
    *
    * @param in コマンドの入力
-   * @see check
+   * @see tests
    */
-  @cli.command("emit")
-  export fn emit(in: EmitInput): EmitResult
+  @cli.command("build")
+  export fn build(in: BuildInput): BuildResult
     throws CheckFailed, ConfigInvalid, LanguageMismatch, OutputConflict, UnknownNamespace prevents effects
     throws proc.Crashed, proc.MalformedOutput prevents effects
   {
@@ -274,7 +277,7 @@ namespace hozoc {
    * 仕様を検査し、求めるテストが走ったかを、カバレッジと突き合わせて確かめる。テストは走らせない。
    *
    * @param in コマンドの入力
-   * @see check
+   * @see build
    */
   @cli.command("tests")
   export fn tests(in: TestsInput): TestsResult {

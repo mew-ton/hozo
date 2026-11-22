@@ -9,9 +9,9 @@
 | `api.hozo` | サーバー側 `namespace api`。`web` から呼ばれる（呼ばれる op は `export`）。`docs/ir.md`「版」の 0.3 で足した形（継承した model の `override`、形の語、状態の型、`reads`、op の分類とケースの `as`、状態の参照、アームの値と `throw`、`never`）と、0.6 で足した形（`read` の宣言、引数を持つ例外と効果、`read` と効果の呼び出し、直に呼ぶ組み込みの効果、引数を渡す `throw`、`@repeatable`）と、0.7 で足した形（残りのケース `対象 as else`。`presence` と `variant`）と、0.8 で足した形（`else` のアーム、残りのケースを書かない型で決まる分類）はここに置く |
 | `web.hozo` | ブラウザ側 `namespace web`。テストが見る `View` の viewer。`@t.entry` の付いた op が、`plugin.OpsWith` の対象 |
 | `plugins/view-dump/` | テスト用のプラグイン。トランスパイラ `view-dump`（`requires` を持たない、テストのための基底）を提供する: 受け取った `view` を 2 スペースの字下げで JSON にし直し、`<view.config.dir>/view.json` の一つのファイルとして返す。ほかの名前の `transpiler` は `code: "unsupported"` |
-| `testdata/expected/check.txt` | `hozoc check` の text 出力のゴールデン（下の warning を含む） |
+| `testdata/expected/check.txt` | `hozoc build --no-emit` の text 出力のゴールデン（下の warning を含む） |
 | `testdata/expected/view.web.json` | `Views()["web"]` の JSON のゴールデン（`tests/view_test.go` の `TestViewFromEntry`） |
-| `testdata/expected/emit/` | `hozoc emit` が書き出すファイルの木のゴールデン: 単位ごとの `view.json`（`gen/api`、`gen/web`、`gen/page`。`gen/web/view.json` は `view.web.json` と同じ内容）と記録。Go のファイルは出ない（hozoc 本体はコードを出力しない。`docs/plugin-protocol.md`「この文書が決めること」） |
+| `testdata/expected/emit/` | `hozoc build` が書き出すファイルの木のゴールデン: 単位ごとの `view.json`（`gen/api`、`gen/web`、`gen/page`。`gen/web/view.json` は `view.web.json` と同じ内容）と記録。Go のファイルは出ない（hozoc 本体はコードを出力しない。`docs/plugin-protocol.md`「この文書が決めること」） |
 
 ゴールデンの更新は `go test ./tests -update`。`.hozo` の各ブロックの上の `// docs/...「見出し」` のコメントが、その構文が確かめる文書の見出し。
 
@@ -65,14 +65,14 @@
 | 同 手順 i: `throws`（DEC-10） | `@external decorator remote` を `api.getUser` / `login` / `logout` に | `Program` の `signature` に `Timeout` はなく、`web` から見た `ops` にはある。`api` から見た `View` は `Program` と一致 |
 | `docs/check.md`「bind」 | `bind token to api.*;`、`api.getUser(in: GetUserInput { token: Token?; id })`、`api.logout(token: Token?)`、`api.touch(id)` | Pos が model のフィールドなら `web.getUser$in` を合成して `ref`、引数そのものなら引数を除く、位置のない op はそのまま。`Call.bound` は明示していない位置だけ（BIND-3） |
 | `docs/packages.md`「`plugin`（公開）」の `OpsWith` | `@t.entry` | `TestViewFromEntry`: `plugin.OpsWith(view, "t.entry")` は、viewer の op のうち `@t.entry` の付いたもの（`openUser`、`signOut`）を返す。相乗りは、これで自分の対象を探す |
-| `docs/plugin-protocol.md`「要求と応答」 | `plugins/view-dump` | `TestViewDeliveredToPlugin`: 実物の `hozoc emit` がトランスパイラ `view-dump` に渡す `View` が、`internal/project` の `web` の `View` とバイト単位で同じ。`protocol` が違えば `code: "protocol"`（MAN-2）、`import` と、知らない `transpiler` は `code: "unsupported"`（MAN-5） |
+| `docs/plugin-protocol.md`「要求と応答」 | `plugins/view-dump` | `TestViewDeliveredToPlugin`: 実物の `hozoc build` がトランスパイラ `view-dump` に渡す `View` が、`internal/project` の `web` の `View` とバイト単位で同じ。`protocol` が違えば `code: "protocol"`（MAN-2）、`import` と、知らない `transpiler` は `code: "unsupported"`（MAN-5） |
 | `docs/config.md`「単位の対象」、`docs/ir.md`「その名前空間から見た IR」の `NamespaceConfig` | `hozo.toml` | `View.config`: `index = 2`、`base = "view-dump"`、`dir = "gen/web"`、`options` と `seams` は空。`namespaces[api][0].dir = "gen/api"`。`View.files` は、語彙のファイル（`hozo:vocab/...`）を含む |
 
 このコーパスに一か所しかない構文: 対象が複数の状態の分類、遷移の効果（`Effect.target` の `transition`）、状態の分類での `match` の計算（効果を持つアーム）は、専用のコーパス `tests/corpus/state` に置いた（その `README.md`。IR は `TestStateCorpusIR`、基底 `go` の出力は `TestCorpusEmitGolden` が確かめる）。ここへ足すと `view.web.json` のゴールデンと `TestViewFromEntry` の見出しごとの期待値をまとめて書き直すことになるので、分けたままにしている。
 
 ## 想定する warning
 
-`hozoc check` の error はない。warning は一つで、意図したもの。
+`hozoc build --no-emit` の error はない。warning は一つで、意図したもの。
 
 | 位置 | ID | 理由 |
 |---|---|---|

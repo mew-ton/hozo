@@ -30,7 +30,7 @@ type OutputsState interface {
 	// Get は問い合わせ（形 list で決まる）: hozoc.outputs の値。すべての要素を、足した順に。
 	Get(ctx context.Context) ([]OutputFile, error)
 	// OutputChanges は問い合わせ（read hozoc.outputChanges）: 書き出す予定を、今の生成したファイルと比べて、書くファイルと消すファイルを決める。
-	OutputChanges(ctx context.Context, plan EmitPlan) (EmitResult, error)
+	OutputChanges(ctx context.Context, plan EmitPlan) (BuildResult, error)
 }
 
 // OutputsSyncState は状態の分類 hozoc.OutputsSync（hozoc.outputs を対象にした classify）の単位。実装は New の引数 outputsSync に渡す。

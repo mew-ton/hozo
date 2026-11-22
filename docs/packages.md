@@ -56,7 +56,7 @@ Go のパッケージごとの、このモジュールの中で import してい
 
 | パッケージ | import する |
 |---|---|
-| `cmd/hozoc` | `internal/app`、`internal/gen/hozoc/cli` |
+| `cmd/hozoc` | `internal/app` |
 | `internal/app` | `internal/config`、`internal/diag`、`internal/gen/hozoc`、`internal/gen/hozoc/cli`、`internal/gen/proc`、`internal/lsp`、`internal/plugin`、`internal/project`、`internal/source`、`internal/testmap`、`ir`、`plugin` |
 | `internal/lsp` | `internal/diag`、`internal/lsp/jsonrpc`、`internal/lsp/protocol`、`internal/project`、`internal/sema`、`internal/source`、`internal/syntax`、`internal/syntax/ast`、`internal/vocab`、`ir` |
 | `internal/lsp/jsonrpc` | — |
@@ -574,7 +574,7 @@ type Project struct {
     Plugins []*plugin.Plugin         // 入っているプラグイン（internal/plugin.Discover）
     Units   []Unit                   // 解決した単位（Config.Units と同じ順）
     Diags   []diag.Diagnostic        // 解析・解決・検査・設定と、プラグインの診断（emit の errors と warnings）のすべて。並べ替え済み
-    Answers []Answer                 // プラグインから受け取った答え（docs/cli.md「check」の 4）。単位の設定の順、名前空間の IR の順、transpilers に書いた順。起動しなかったら、空
+    Answers []Answer                 // プラグインから受け取った答え（docs/cli.md「検査」の 4）。単位の設定の順、名前空間の IR の順、transpilers に書いた順。起動しなかったら、空
 }
 type Answer struct { Unit int; Namespace string; Transpiler Transpiler; Response *sdk.EmitResponse }   // トランスパイラ一つの、出力一つ（Units の添字と、名前空間）への答え
 type Unit struct { *config.Unit; Language, Base string; Transpilers []Transpiler; Seams map[string]string; Files []string }   // 言語、基底の名前（CFG-20 なら空）、解決できたトランスパイラ、単位の継ぎ目（デコレータの FQN → 宣言したトランスパイラ。CFG-23 なら、設定の順で最初のもの）、in に合ったファイル（語彙のファイルを含む）
@@ -584,7 +584,7 @@ type Options struct {
     Overlay map[string][]byte        // ディスクの代わりに使う内容（言語サーバーの開いている文書）
     Stderr io.Writer; Env []string   // プラグインの標準エラーの流し先と、プラグインに渡す環境変数の元
     PluginPath, Home string          // プラグインの探索が見るプロジェクトの外の場所（internal/plugin.SearchEnv）。空なら探さない
-    NoPlugins bool                   // プラグインを、起動しない（docs/cli.md「check」の 4 を、しない）。仕様を読み直すだけの呼び出しと、言語サーバーの解析（docs/lsp.md「プラグインの診断」）
+    NoPlugins bool                   // プラグインを、起動しない（docs/cli.md「検査」の 4 を、しない）。仕様を読み直すだけの呼び出しと、言語サーバーの解析（docs/lsp.md「プラグインの診断」）
     Context context.Context          // プラグインの起動を、やめさせる口（言語サーバーの、裏の check）。nil なら、やめさせない。プラグインの起動と起動の間で見て、やめたら、Project.RunErr が、その誤り
 }
 func LoadWith(opts Options) *Project                                            // 解析の本体。NoConfig なら CFG-* の診断を除く
@@ -599,7 +599,7 @@ func (p *Project) PluginDiagnostic(plugin string, d sdk.Diagnostic) diag.Diagnos
 func (p *Project) PluginWarning(transpiler string, w sdk.Warning) diag.Diagnostic     // トランスパイラの warning を PLUGIN の診断に
 ```
 
-`hozoc` の `check` / `emit`（`internal/app`）と言語サーバー（`internal/lsp`）は `LoadWith` を呼ぶ。`Project` は `Root`、`Sources`、`RunErr`（プラグインが `proc.Crashed` / `proc.MalformedOutput` で終わったときの誤り）も持つ。`Covered` 以下の六つは、`internal/app` が `emit` の手順（`docs/cli.md`「emit」）で使うためのもの。
+`hozoc` の検査の op `check`（`internal/app`。`hozoc build` と `hozoc tests` が、はじめに呼ぶ）と言語サーバー（`internal/lsp`）は `LoadWith` を呼ぶ。`Project` は `Root`、`Sources`、`RunErr`（プラグインが `proc.Crashed` / `proc.MalformedOutput` で終わったときの誤り）も持つ。`Covered` 以下の六つは、`internal/app` が `emit` の手順（`docs/cli.md`「書き出し」）で使うためのもの。
 
 ### `internal/testmap`
 
@@ -615,7 +615,7 @@ func Match(tests []Test, covered []sdk.CoveredFile) []Status          // tests �
 
 ### `internal/app`
 
-`docs/cli.md`「手で書くもの」。葉の op と状態の単位の実装を持つ `App`（`*App` が生成した `hozoc.Leaves` を満たし、`Sources()` / `Config()` / `Outputs()` / `OutputsSync()` が状態の単位の実装を返し、`Ops()` がそれらを `hozoc.New` に渡す。状態に触れる `read outputChanges` と効果 `syncOutputs` は、`Outputs()` と `OutputsSync()` が返す単位のメソッド）と、`cli.Presenter`（`internal/gen/hozoc/cli`）の実装 `Presenter`。引数の解釈は持たない（生成した `cli.Main`）。`App` はプロセスの環境を自分で読まない: ホームディレクトリは `App.Home`（`cmd/hozoc` が入れる）、環境変数は `cli.hozo` の入力のフィールドで届く。特定の言語のコードは持たない: トランスパイラを起動し、返ったファイルを書き出すだけ（`docs/cli.md`「emit」）。
+`docs/cli.md`「手で書くもの」。葉の op と状態の単位の実装を持つ `App`（`*App` が生成した `hozoc.Leaves` を満たし、`Sources()` / `Config()` / `Outputs()` / `OutputsSync()` が状態の単位の実装を返し、`Ops()` がそれらを `hozoc.New` に渡す。状態に触れる `read outputChanges` と効果 `syncOutputs` は、`Outputs()` と `OutputsSync()` が返す単位のメソッド）と、`cli.Presenter`（`internal/gen/hozoc/cli`）の実装 `Presenter`。引数の解釈は持たない（生成した `cli.Main`）。入口の `Main(ctx, a, args, env, stdout, stderr)` は、`cli.Main` を呼ぶ前に、古い名前のコマンド（`check`、`emit`）を見て、新しい書き方を示す（`Renamed(args)` が、その文を返す。`docs/cli.md`「build」の「古い名前」）。`App` はプロセスの環境を自分で読まない: ホームディレクトリは `App.Home`（`cmd/hozoc` が入れる）、環境変数は `cli.hozo` の入力のフィールドで届く。特定の言語のコードは持たない: トランスパイラを起動し、返ったファイルを書き出すだけ（`docs/cli.md`「書き出し」）。
 
 ### `internal/lsp`
 
@@ -652,10 +652,10 @@ Go のプラグインは、どれも同じ形: `main` パッケージが `plugin
 `internal/gen/hozoc` と `internal/gen/proc`（以下、合わせて「置き場」）は `cmd/hozoc` が import するパッケージなので、hozoc がそこへ直に書くと、プラグインの不具合でコンパイルできない Go が出たときに hozoc 自身がビルドできなくなり、生成し直すこともできなくなる。そうならないように、`make generate`（`go run ./internal/tools/selfgen`）は、置き場に、コンパイルできると確かめたものしか置かない。
 
 1. 今のソース（今の置き場を含む）で `hozoc` を一時ディレクトリにビルドする。
-2. 別の一時ディレクトリに `cli.hozo`、`hozo.toml`、`go.mod`、`go.sum` を写し、プラグイン（`plugins/` の `go`、`go-valid`、`go-cli`）を `go run` で動かすのに要る `ir`、`plugin`、`plugins`、`runtime` をシンボリックリンクで足して、そこで 1 の `hozoc emit` を走らせる（`tests/generated_test.go` と同じ組み立て。import パスは、`hozo.toml` の `[options.go]` の `module` から決まるので、同じになる。`go.mod` は、3 の vet とビルドのために写す）。プラグインの探索が見るプロジェクトの外の場所（`HOZO_PLUGIN_PATH`、ホーム）は空にして、生成物が実行する人の環境に左右されないようにする。
+2. 別の一時ディレクトリに `cli.hozo`、`hozo.toml`、`go.mod`、`go.sum` を写し、プラグイン（`plugins/` の `go`、`go-valid`、`go-cli`）を `go run` で動かすのに要る `ir`、`plugin`、`plugins`、`runtime` をシンボリックリンクで足して、そこで 1 の `hozoc build` を走らせる（`tests/generated_test.go` と同じ組み立て。import パスは、`hozo.toml` の `[options.go]` の `module` から決まるので、同じになる。`go.mod` は、3 の vet とビルドのために写す）。プラグインの探索が見るプロジェクトの外の場所（`HOZO_PLUGIN_PATH`、ホーム）は空にして、生成物が実行する人の環境に左右されないようにする。
 3. 生成した `internal/gen/hozoc/**` と `internal/gen/proc/**` を、その一時ディレクトリで `go vet` に通し、次に、リポジトリの今のものの代わりに置いたつもりで（`go build -overlay`。ディスクの上の置き場には触れない）、それを import するパッケージ（`cmd/hozoc`、`internal/app`）ごと `go build` する。
 4. 3 が通ったときだけ、置き場の中身を生成したものに置き換える（なくなったファイルは消し、同じ内容のファイルには触れない）。通らなければ何も変えず、生成したものを残した一時ディレクトリの場所を示して失敗する。
 
-- 生成は不動点: 生成し直した直後にもう一度 `make generate` しても、何も変わらない。置き換えた後の `hozoc emit` も同じ内容を書く。
-- リポジトリのルートで `go run ./cmd/hozoc emit` を直に走らせれば、確かめずに置き場へ書く。生成器を変えている間は `make generate` を使う。
+- 生成は不動点: 生成し直した直後にもう一度 `make generate` しても、何も変わらない。置き換えた後の `hozoc build` も同じ内容を書く。
+- リポジトリのルートで `go run ./cmd/hozoc build` を直に走らせれば、確かめずに置き場へ書く。生成器を変えている間は `make generate` を使う。
 - 置き場が壊れて 1 のビルドが通らないときは、`internal/gen/` を git で元に戻してからやり直す。`internal/tools/selfgen` 自身はこのモジュールのどのパッケージも import しないので、そのときも動く。

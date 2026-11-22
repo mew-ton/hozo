@@ -1077,7 +1077,7 @@ func TestStateCorpusIR(t *testing.T) {
 	})
 }
 
-// TestViewDeliveredToPlugin は、実物の `hozoc emit`（internal/app の App と生成した cli.Main。tests/selfcheck_test.go と同じ組み立て）が
+// TestViewDeliveredToPlugin は、実物の `hozoc build`（internal/app の App と生成した cli.Main。tests/selfcheck_test.go と同じ組み立て）が
 // view-dump プラグイン（tests/corpus/view/plugins/view-dump。`go run` で動く）に渡す View が、internal/project の web の View と
 // 同じであることを確かめる。プラグインは受け取った view を <view.config.dir>/view.json に書き出すので、それを読み戻して比べる。
 // コーパスは一時ディレクトリに写してモジュールのルートにする（copyCorpusAsModule）。
@@ -1085,9 +1085,9 @@ func TestViewDeliveredToPlugin(t *testing.T) {
 	requireGo(t)
 	root, _ := copyCorpusAsModule(t, "view")
 	var stdout, stderr bytes.Buffer
-	code := hozocCorpus(t, root, []string{"emit"}, &stdout, &stderr)
+	code := hozocCorpus(t, root, []string{"build"}, &stdout, &stderr)
 	if code != 0 {
-		t.Fatalf("hozoc emit の終了コード %d\n%s%s", code, stdout.String(), stderr.String())
+		t.Fatalf("hozoc build の終了コード %d\n%s%s", code, stdout.String(), stderr.String())
 	}
 	if !strings.Contains(stdout.String(), "written: gen/web/view.json\n") {
 		t.Errorf("プラグインの view.json が written にない:\n%s", stdout.String())
@@ -1141,7 +1141,7 @@ func TestViewDeliveredToPlugin(t *testing.T) {
 				written = append(written, p)
 			}
 		}
-		expect(t, "hozoc emit が書いたファイル", written, []string{"gen/api/view.json", "gen/page/view.json", "gen/web/view.json"})
+		expect(t, "hozoc build が書いたファイル", written, []string{"gen/api/view.json", "gen/page/view.json", "gen/web/view.json"})
 	})
 
 	// docs/plugin-protocol.md「要求と応答」: protocol が合わなければ code "protocol"（MAN-2）、direction か、頼まれたトランスパイラを

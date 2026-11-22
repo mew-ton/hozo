@@ -76,8 +76,8 @@ enabled = false                 # true なら hozoc tests で direction "coverag
   - 出力ごとに、**頼むトランスパイラ**を並べる: その単位の `transpilers` のうち、P が提供するもの（`transpilers` に書いた順）。一つのプラグインの二つのトランスパイラを同じ単位に書いても、起動は一回。
   - 起動する順は、プラグインが、最初に現れた順（単位の設定の順、名前空間の IR の順、`transpilers` に書いた順に見て）。
   - 相手は、使うプラグイン（「探索」）。`protocol` の合わないプラグイン（MAN-2）は、起動しない。受け持つ出力が一つもないプラグイン（どの単位も、名前空間を出力しない）も、起動しない。
-  - **起動するのは、仕様と設定の検査（`docs/cli.md`「check」の 1〜3）に、error がないときだけ。** error があれば、`View` は、検査を通っていない仕様のもので、トランスパイラは、それを前提にしていない。先の error を直してから、プラグインの診断が出る。
-  - **検査だけの実行（`hozoc check`、言語サーバー）も、書き出す実行（`hozoc emit`、`hozoc tests`）も、同じ頼みごとを使う**（同 416）: 検査は、応答の診断（`errors`、`warnings`）だけを使い、ファイルを書かない。書き出すときは、同じ応答のファイルを書く。hozoc は、一度の実行で、同じプラグインに、同じことを、二度、頼まない。
+  - **起動するのは、仕様と設定の検査（`docs/cli.md`「検査」の 1〜3）に、error がないときだけ。** error があれば、`View` は、検査を通っていない仕様のもので、トランスパイラは、それを前提にしていない。先の error を直してから、プラグインの診断が出る。
+  - **検査だけの実行（`hozoc build --no-emit`、言語サーバー）も、書き出す実行（`hozoc build`、`hozoc tests`）も、同じ頼みごとを使う**（同 416）: 検査は、応答の診断（`errors`、`warnings`）だけを使い、ファイルを書かない。書き出すときは、同じ応答のファイルを書く。hozoc は、一度の実行で、同じプラグインに、同じことを、二度、頼まない。
 - **答えは、出力ごとに独立。** どのトランスパイラも、一つの出力の答えを、仕様と、その出力の `View` だけから作り、同じ要求のほかの出力にも、ほかのトランスパイラの応答（ファイル、warning）にも、依らない。相乗りは、基底の応答を見ずに、基底と同じファイルの置き場と名前を自分で求める（「相乗りが基底の形を知る方法」）。出力の並びと、`transpilers` に書いた順は、起動の順と診断の並びにだけ効き、書き出すファイルを変えない。
 - `coverage` は、`hozoc tests` が、プラグインごとに、多くて一回起動する。相手と、渡すものは「coverage」。
 - 並列には起動しない（診断の順序を決定的にするため）。
@@ -113,7 +113,7 @@ enabled = false                 # true なら hozoc tests で direction "coverag
 
 | きっかけ | 起動するか |
 |---|---|
-| `hozoc emit`、`hozoc check`、`hozoc tests` | する。コマンドを打つことが、走らせる意思（`hozoc check` も、検査のために、`emit` を頼む: 「起動」） |
+| `hozoc build`（`--no-emit` も）、`hozoc tests` | する。コマンドを打つことが、走らせる意思（`hozoc build --no-emit` も、検査のために、`emit` を頼む: 「起動」） |
 | 言語サーバー（`hozoc lsp`） | クライアントが、許したときだけ（`docs/lsp.md`「プラグインの診断」の「許し」）。既定は、しない |
 
 サンドボックスの中で動かすことは、決まっているが、まだ、ない（`docs/decisions.md`「決めたこと」413）。
@@ -136,7 +136,7 @@ enabled = false                 # true なら hozoc tests で direction "coverag
 
 - **`emit` の応答の数が、要求と合う**: `outputs` の要素の数が、要求の `outputs` と同じで、その要素の `results` の数が、要求の、その出力の `transpilers` と同じ。
 
-形が合った後に、ファイルを集める実行（`hozoc emit`、`hozoc tests`）は、`path`（PLG-1 / PLG-2）と、テストの対応表（PLG-4）を確かめる。検査だけの実行（`hozoc check`、言語サーバー）は、`files` を使わないので、確かめない。`import` の応答の形は、段階 6 で `hozoc import` と一緒に決める。
+形が合った後に、ファイルを集める実行（`hozoc build`、`hozoc tests`）は、`path`（PLG-1 / PLG-2）と、テストの対応表（PLG-4）を確かめる。`hozoc build --no-emit` も、書かないだけで、集めて、確かめる（`docs/cli.md`「build」）。言語サーバーは、`files` を使わないので、確かめない。`import` の応答の形は、段階 6 で `hozoc import` と一緒に決める。
 
 ### emit
 
@@ -166,11 +166,11 @@ enabled = false                 # true なら hozoc tests で direction "coverag
 - **SDK が、並びを回す**: プラグインの書き手は、「トランスパイラ一つが、出力一つの `View` を受け取って、答えを一つ返す」関数を書く（`docs/packages.md`「`plugin`（公開）」の `Handler.Emit`）。SDK が、要求の `outputs` と `transpilers` の順に、それを呼び、応答に並べる。
 - `transpilers` の要素は、単位の `transpilers` に書かれた名前のうち、このプラグインが提供するもの。複数のトランスパイラを提供するプラグインは、この名前で処理を分ける。
 - **オプション**は、要求の別の項目ではなく、出力の `view.config.options` にある（`docs/ir.md`「その名前空間から見た IR」）。頼まれたトランスパイラへのオプションは `config.options[<トランスパイラの名前>]` で、書かれていなければキーがない（空のテーブルと同じに読む）。SDK がこの読み方を持つ（`docs/packages.md`「`plugin`（公開）」の `Options`）。知らないキーと、型の違う値は、トランスパイラが `errors` で返す。
-- `path` は、その出力 (U, N) の出力先 Dir(U, N)（要求の、その出力の `view.config.dir`。`docs/config.md`「単位の対象」）の下のファイルでなければならない。そうでなければ PLG-1: 絶対パス、`..` でルートや Dir(U, N) の外へ出るパス、ルートの中の別のディレクトリ、別の出力の Dir、Dir(U, N) そのもの。比べるのは `./` や `..` を畳んだパス。出力先ごとの記録（`docs/cli.md`「emit」の `.hozoc-outputs.json`）と、出力先の持ち主を一つに決める規則（CFG-17）が、どの出力のファイルもその Dir の下にあることを前提にしているため。トランスパイラ一つの答えの中で同じ `path` が二度あれば PLG-2。どちらも `proc.MalformedOutput` として終了する。同じ出力の二つのトランスパイラが同じ `path` を返せば CFG-5（`docs/config.md`「診断」）。
+- `path` は、その出力 (U, N) の出力先 Dir(U, N)（要求の、その出力の `view.config.dir`。`docs/config.md`「単位の対象」）の下のファイルでなければならない。そうでなければ PLG-1: 絶対パス、`..` でルートや Dir(U, N) の外へ出るパス、ルートの中の別のディレクトリ、別の出力の Dir、Dir(U, N) そのもの。比べるのは `./` や `..` を畳んだパス。出力先ごとの記録（`docs/cli.md`「書き出し」の `.hozoc-outputs.json`）と、出力先の持ち主を一つに決める規則（CFG-17）が、どの出力のファイルもその Dir の下にあることを前提にしているため。トランスパイラ一つの答えの中で同じ `path` が二度あれば PLG-2。どちらも `proc.MalformedOutput` として終了する。同じ出力の二つのトランスパイラが同じ `path` を返せば CFG-5（`docs/config.md`「診断」）。
 - `content` は UTF-8 の文字列。バイナリは出せない。
 - `outputs`、`results`、`files`、`warnings` は空でも `[]` で出す。省けるのは `errors`（「応答の形」）。
 - `warnings` は warning の診断（コード `PLUGIN`、メッセージの先頭にトランスパイラの名前）。**検査だけの実行でも、出る**（前は、書き出す実行でだけ出た）。
-- `errors` は、トランスパイラがその入力を変換できない理由（語彙の使い方の誤り、オプションの誤り、その言語で形にできない宣言。`docs/plugin-go.md`「診断」の GO-*、`docs/plugin-go-cli.md`「診断」の CLI-* など）。`code` はプラグインが決める。error の診断として報告し、`CheckFailed` になる（`docs/diagnostics.md`「終了コード」）。メッセージには、名前を付けない（`code` が、プラグインの規則を示す）。どれかのトランスパイラが `errors` を返せば、検査は通らず、何も書き出さない（`docs/cli.md`「check」「emit」）。
+- `errors` は、トランスパイラがその入力を変換できない理由（語彙の使い方の誤り、オプションの誤り、その言語で形にできない宣言。`docs/plugin-go.md`「診断」の GO-*、`docs/plugin-go-cli.md`「診断」の CLI-* など）。`code` はプラグインが決める。error の診断として報告し、`CheckFailed` になる（`docs/diagnostics.md`「終了コード」）。メッセージには、名前を付けない（`code` が、プラグインの規則を示す）。どれかのトランスパイラが `errors` を返せば、検査は通らず、何も書き出さない（`docs/cli.md`「検査」「emit」）。
 - `at` は FQN（その宣言の位置に付ける）か `"file:line:col"`。どちらでもなければ（省いたときも）位置なしで報告する。
 - **同じ診断は、一度だけ報告する。** 同じ名前空間を、二つの単位が出力していれば、同じトランスパイラが、出力ごとに、同じ診断を返しうる。重さ、`code`、位置、メッセージが、すべて同じ診断は、hozoc が、最初の一つだけを残す。
 - 応答は、同じ要求から同じバイト列でなければならない（`docs/requirements.md`「品質の要件」の決定性）。時刻、乱数、環境変数、実行する人の環境に入っているものに依らない。
@@ -226,12 +226,12 @@ enabled = false                 # true なら hozoc tests で direction "coverag
 ```
 
 - **ファイルの名前**は `hozo-tests.<トランスパイラの名前>.json`。置き場は、Dir(U, N) の下なら、どこでもよい（Go のトランスパイラは、テストのパッケージのディレクトリ）。名前にトランスパイラの名前を入れるのは、同じディレクトリに、基底と相乗りが、それぞれの対応表を置けるようにするため（同じ `path` は CFG-5）。hozoc は、名前が `hozo-tests.` で始まり `.json` で終わるファイルを、対応表として読む。
-- 対応表は、ほかの `files` と同じに書き出され、出力先ごとの記録（`docs/cli.md`「emit」の `.hozoc-outputs.json`）に載る。hozoc が、置き場から読み直すことはない: `hozoc tests` は、今の仕様から集め直した応答の対応表を使い、置き場のものは、それと同じ内容かを確かめるだけ（`docs/cli.md`「tests」）。
+- 対応表は、ほかの `files` と同じに書き出され、出力先ごとの記録（`docs/cli.md`「書き出し」の `.hozoc-outputs.json`）に載る。hozoc が、置き場から読み直すことはない: `hozoc tests` は、今の仕様から集め直した応答の対応表を使い、置き場のものは、それと同じ内容かを確かめるだけ（`docs/cli.md`「tests」）。
 - **`lines` の約束**: その範囲の行のどこかが実行されるのは、そのテストが走ったときだけで、そのテストが走れば、その範囲のどこかが、必ず実行される。範囲をどう取るかは、トランスパイラが、その言語のカバレッジの数え方に合わせて決める（Go は `docs/plugin-go.md`「テストの対応表」）。
 - `name` は、その対応表の中で重ならない。テストを受け取る口の文書が「テストの名前」と呼ぶもの（`<op の FQN>/<結果>` など）。
 - `file` は、同じ答え（トランスパイラ一つの `files`）の `path` の一つ。
 - テストを受け取る口を一つも出さない応答は、対応表を出さない。
-- hozoc は、`emit` の応答のファイルを集めるとき（`hozoc emit`、`hozoc tests`）に、対応表の形を確かめる。次のどれかなら PLG-4（`proc.MalformedOutput`。「診断」）: 名前の `<トランスパイラの名前>` が、その答えを返したトランスパイラの名前でない。中身が、上の形の JSON でない（`tests` が配列でない、要素に `name`、`file`、`lines` のどれかがない、型が違う、`lines` が、1 以上の整数二つで、始まり ≦ 終わり、でない）。`name` が空か、重なる。`file` が、同じ答えの `files` にない。知らない項目は、読まれない（「応答の形」と同じ）。
+- hozoc は、`emit` の応答のファイルを集めるとき（`hozoc build`、`hozoc tests`）に、対応表の形を確かめる。次のどれかなら PLG-4（`proc.MalformedOutput`。「診断」）: 名前の `<トランスパイラの名前>` が、その答えを返したトランスパイラの名前でない。中身が、上の形の JSON でない（`tests` が配列でない、要素に `name`、`file`、`lines` のどれかがない、型が違う、`lines` が、1 以上の整数二つで、始まり ≦ 終わり、でない）。`name` が空か、重なる。`file` が、同じ答えの `files` にない。知らない項目は、読まれない（「応答の形」と同じ）。
 
 ## 相乗りが基底の形を知る方法
 
@@ -256,7 +256,7 @@ enabled = false                 # true なら hozoc tests で direction "coverag
 
 ## 検査のための頼みごとを、なくしたこと
 
-版 0.21 までは、検査のための頼みごと（direction `check`: `{ "view": … }` を受け取り、`{ "diagnostics": [ … ] }` を返す）と、マニフェストの `[check] enabled` があり、`hozoc check` は、プラグインと出力の組ごとに `check` を、`hozoc emit` は、その後に、トランスパイラと出力の組ごとに `emit` を、頼んでいた。版 0.22 でなくした（`docs/decisions.md`「決めたこと」411、416）。
+版 0.21 までは、検査のための頼みごと（direction `check`: `{ "view": … }` を受け取り、`{ "diagnostics": [ … ] }` を返す）と、マニフェストの `[check] enabled` があり、`hozoc build --no-emit` は、プラグインと出力の組ごとに `check` を、`hozoc build` は、その後に、トランスパイラと出力の組ごとに `emit` を、頼んでいた。版 0.22 でなくした（`docs/decisions.md`「決めたこと」411、416）。
 
 - 言語のプラグインへの頼みごとは、`emit` の一つ。検査は、同じ答えの、診断だけを使う（「起動」）。
 - `check` を、`emit` と同じ検査で答える SDK の関数（`CheckByEmit`）と、`Handler` の `Check` は、持たない。

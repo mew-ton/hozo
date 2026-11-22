@@ -64,15 +64,15 @@ func corpusDir(name string) string { return filepath.Join("corpus", name) }
 // ゴールデンの .go を `go build ./...` / `go vet ./...` がパッケージとして拾わないように、Go が無視する testdata の下に置く。
 func goldenDir(name string) string { return filepath.Join(corpusDir(name), "testdata", "expected") }
 
-// TestCorpusCheckGolden は各コーパスの `hozoc check` の text 出力（warning を含む）がゴールデン
+// TestCorpusCheckGolden は各コーパスの `hozoc build --no-emit` の text 出力（warning を含む）がゴールデン
 // `tests/corpus/<名前>/testdata/expected/check.txt` と一致すること（docs/testing.md「コーパス」）。error が出れば失敗。
 func TestCorpusCheckGolden(t *testing.T) {
 	for _, c := range corpora {
 		t.Run(c.name, func(t *testing.T) {
 			var stdout, stderr bytes.Buffer
-			code := hozocCorpus(t, corpusDir(c.name), []string{"check"}, &stdout, &stderr)
+			code := hozocCorpus(t, corpusDir(c.name), []string{"build", "--no-emit"}, &stdout, &stderr)
 			if code != 0 {
-				t.Fatalf("hozoc check の終了コード %d\n%s%s", code, stdout.String(), stderr.String())
+				t.Fatalf("hozoc build --no-emit の終了コード %d\n%s%s", code, stdout.String(), stderr.String())
 			}
 			golden := filepath.Join(goldenDir(c.name), "check.txt")
 			compareGolden(t, golden, stdout.Bytes())
@@ -80,7 +80,7 @@ func TestCorpusCheckGolden(t *testing.T) {
 	}
 }
 
-// TestCorpusEmitGolden は各コーパスの `hozoc emit` が書き出すファイルの木が、ゴールデン `tests/corpus/<名前>/testdata/expected/emit/`
+// TestCorpusEmitGolden は各コーパスの `hozoc build` が書き出すファイルの木が、ゴールデン `tests/corpus/<名前>/testdata/expected/emit/`
 // とバイト単位で一致すること（docs/testing.md「コーパス」）。コーパスを一時ディレクトリに写して emit し
 // （copyCorpusAsModule）、新しくできたファイルをすべて比べる。差分はファイルごとに示す。更新は `go test ./tests -update`。
 func TestCorpusEmitGolden(t *testing.T) {
@@ -93,9 +93,9 @@ func TestCorpusEmitGolden(t *testing.T) {
 			}
 			root, before := copyCorpusAsModule(t, c.name)
 			var stdout, stderr bytes.Buffer
-			code := hozocCorpus(t, root, []string{"emit"}, &stdout, &stderr)
+			code := hozocCorpus(t, root, []string{"build"}, &stdout, &stderr)
 			if code != 0 {
-				t.Fatalf("hozoc emit の終了コード %d\n%s%s", code, stdout.String(), stderr.String())
+				t.Fatalf("hozoc build の終了コード %d\n%s%s", code, stdout.String(), stderr.String())
 			}
 			got := readTree(t, root)
 			for p := range before {

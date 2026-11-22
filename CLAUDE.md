@@ -84,7 +84,7 @@ go generate ./... && make generate && git diff --exit-code
 ```
 
 ```bash
-go run ./cmd/hozoc check
+go run ./cmd/hozoc build --no-emit
 ```
 
 ```bash

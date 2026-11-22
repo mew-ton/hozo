@@ -31,7 +31,7 @@ const baseWithMap = `{"files":[
 
 const coverageEnabled = "\n[coverage]\nenabled = true\n"
 
-// testsProject は、単位が一つ（namespace shop、基底 base、out は gen/shop）のプロジェクトを作り、hozoc emit で出力を置き、
+// testsProject は、単位が一つ（namespace shop、基底 base、out は gen/shop）のプロジェクトを作り、hozoc build で出力を置き、
 // カバレッジのファイル cover.out を置く。base の emit の応答は emitResponse、マニフェストに足す行は manifestExtra、
 // direction "coverage" の応答は coverage。
 func testsProject(t *testing.T, manifestExtra, emitResponse, coverage string) string {
@@ -42,7 +42,7 @@ func testsProject(t *testing.T, manifestExtra, emitResponse, coverage string) st
 	write(t, filepath.Join(dir, "hozo.toml"), pluginDirs+"[options.base]\nmodule = \"example.com/shop\"\n\n"+unit("shop", "gen/shop", `"base"`))
 	fakePlugin(t, dir, "base", "go", manifestExtra, emitResponse, 0)
 	write(t, filepath.Join(dir, "plugins", "base", "coverage.json"), coverage)
-	if code, stdout, stderr := run(t, dir, nil, "emit"); code != 0 {
+	if code, stdout, stderr := run(t, dir, nil, "build"); code != 0 {
 		t.Fatalf("emit: code=%d stdout=%q stderr=%q", code, stdout, stderr)
 	}
 	write(t, filepath.Join(dir, "cover.out"), "fake coverage\n")
@@ -168,8 +168,8 @@ func TestTestsStaleOutputs(t *testing.T) {
 		t.Fatal(err)
 	}
 	code, stdout, stderr := run(t, dir, nil, "tests", "--coverage", "cover.out")
-	want := "gen/shop/shoptest/hozo-tests.base.json: error[TESTS-2]: gen/shop/shoptest/hozo-tests.base.json が、置き場にない（hozoc emit をやり直して、テストを走らせ直す）\n" +
-		leavesPath + ": error[TESTS-2]: 置き場の " + leavesPath + " が、今の仕様から集めたものと違う（hozoc emit をやり直して、テストを走らせ直す）\n2 errors, 0 warnings\n"
+	want := "gen/shop/shoptest/hozo-tests.base.json: error[TESTS-2]: gen/shop/shoptest/hozo-tests.base.json が、置き場にない（hozoc build をやり直して、テストを走らせ直す）\n" +
+		leavesPath + ": error[TESTS-2]: 置き場の " + leavesPath + " が、今の仕様から集めたものと違う（hozoc build をやり直して、テストを走らせ直す）\n2 errors, 0 warnings\n"
 	if code != exitCoverageUnusable || stdout != "" || stderr != want {
 		t.Fatalf("code=%d stdout=%q\nstderr=%q\n  want=%q", code, stdout, stderr, want)
 	}
@@ -266,7 +266,7 @@ func TestTestsRider(t *testing.T) {
 ],"warnings":[{"message":"w"}]}`, 0)
 	write(t, filepath.Join(dir, "plugins", "base", "coverage.json"),
 		`{"recognized":true,"files":[{"path":"`+leavesPath+`","lines":[[3,9]]},{"path":"gen/shop/shoptest/http.txt","lines":[[5,6]]}]}`)
-	if code, _, stderr := run(t, dir, nil, "emit"); code != 0 {
+	if code, _, stderr := run(t, dir, nil, "build"); code != 0 {
 		t.Fatalf("emit: code=%d stderr=%q", code, stderr)
 	}
 	write(t, filepath.Join(dir, "cover.out"), "fake coverage\n")
@@ -312,7 +312,7 @@ func TestTestMapMalformed(t *testing.T) {
 			write(t, filepath.Join(dir, "hozo.toml"), pluginDirs+unit("shop", "gen/shop", `"base"`))
 			fakePlugin(t, dir, "base", "go", coverageEnabled, `{"files":[`+file+`,`+mapFile+`],"warnings":[]}`, 0)
 			write(t, filepath.Join(dir, "cover.out"), "fake coverage\n")
-			for _, args := range [][]string{{"emit"}, {"tests", "--coverage", "cover.out"}} {
+			for _, args := range [][]string{{"build"}, {"tests", "--coverage", "cover.out"}} {
 				code, stdout, stderr := run(t, dir, nil, args...)
 				if code != exitSoftwareOrCrash || stdout != "" || !strings.Contains(stderr, "PLG-4: files の、テストの対応表") {
 					t.Fatalf("%v: code=%d stdout=%q stderr=%q", args, code, stdout, stderr)

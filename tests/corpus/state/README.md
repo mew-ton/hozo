@@ -1,13 +1,13 @@
 # コーパス `state`
 
-状態を分類で表す決定（`docs/decisions.md`「設計書から離れた決定」S1〜S6、S8）の構文を、一つの名前空間で一か所ずつ使うプロジェクト（`docs/testing.md`「コーパス」）。`hozoc check` が error なしで通ること、IR（`docs/ir.md`）に載る形、Go の基底 `go` の出力（`docs/plugin-go.md`）の形を確かめる。
+状態を分類で表す決定（`docs/decisions.md`「設計書から離れた決定」S1〜S6、S8）の構文を、一つの名前空間で一か所ずつ使うプロジェクト（`docs/testing.md`「コーパス」）。`hozoc build --no-emit` が error なしで通ること、IR（`docs/ir.md`）に載る形、Go の基底 `go` の出力（`docs/plugin-go.md`）の形を確かめる。
 
 | ファイル | 中身 |
 |---|---|
 | `hozo.toml` | 単位が一つ: `namespace = "shop"`、`transpilers = ["go"]`（Go の基底。リポジトリの `plugins/go`。テストが `HOZO_PLUGIN_PATH` として渡す）、`out = "gen/shop"` |
 | `shop.hozo` | `namespace shop`。三つの形の基底の状態、状態の分類、組み込みの効果と遷移の効果、効果を呼ぶ配線、状態での `match` |
-| `testdata/expected/check.txt` | `hozoc check` の text 出力のゴールデン（`tests/corpus_emit_test.go` の `TestCorpusCheckGolden`）。更新は `go test ./tests -update` |
-| `testdata/expected/emit/` | `hozoc emit` が書き出すファイルの木のゴールデン（同 `TestCorpusEmitGolden`。書き出した Go は一時のモジュールで `go vet` も通す） |
+| `testdata/expected/check.txt` | `hozoc build --no-emit` の text 出力のゴールデン（`tests/corpus_emit_test.go` の `TestCorpusCheckGolden`）。更新は `go test ./tests -update` |
+| `testdata/expected/emit/` | `hozoc build` が書き出すファイルの木のゴールデン（同 `TestCorpusEmitGolden`。書き出した Go は一時のモジュールで `go vet` も通す） |
 
 `.hozo` の各ブロックの上の `// docs/...「見出し」` のコメントが、その構文が確かめる文書の見出し。
 
@@ -38,7 +38,7 @@
 
 ## 想定する診断
 
-`hozoc check` の error も warning もない。
+`hozoc build --no-emit` の error も warning もない。
 
 ## 出力
 

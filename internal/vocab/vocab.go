@@ -1,7 +1,7 @@
 // Package vocab は埋め込んだ標準の語彙と、プラグインの語彙の読み込み（docs/vocab.md「読み込み」）。
 //
 // 標準の語彙 vocab/*.hozo は hozoc のバイナリに埋め込み（埋め込み自体はリポジトリ直下の vocab パッケージ。
-// go:embed はパッケージの外を参照できないため）、hozoc check / emit / lsp がプロジェクトのファイルの一部として読む。
+// go:embed はパッケージの外を参照できないため）、hozoc build --no-emit / emit / lsp がプロジェクトのファイルの一部として読む。
 // パスの形は docs/ir.md「Program」の Span.file: 標準の語彙は "hozo:vocab/<名前>.hozo"、
 // プラグインの語彙は "hozo:plugin/<プラグイン名>/<マニフェストからの相対パス>"。
 //

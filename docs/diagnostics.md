@@ -35,7 +35,7 @@ type Related struct {
 | ID | 重さ | 意味 |
 |---|---|---|
 | SYNTAX | error | 構文エラー（`docs/grammar.md` の文法に合わない）。誤りのある箇所を読み飛ばして続ける（回復のしかたは `docs/packages.md`「パッケージ」の `internal/syntax` の項） |
-| IO | error | `sources` に合うファイルを探せない、または読めない（`docs/cli.md`「check」の 2）。読めたファイルの検査は続ける。位置は持たず、読めなかったファイルが分かればそのファイル |
+| IO | error | `sources` に合うファイルを探せない、または読めない（`docs/cli.md`「検査」の 2）。読めたファイルの検査は続ける。位置は持たず、読めなかったファイルが分かればそのファイル |
 
 ほかに、トランスパイラの warning の `PLUGIN`（`docs/plugin-protocol.md`「診断」）、Go の基底の不具合の `GO-INTERNAL`（`docs/plugin-go.md`「診断」）、言語サーバーだけが出す `LSP-1`（`docs/lsp.md`「診断」）がある。持ち主はそれぞれの文書。
 
@@ -88,11 +88,11 @@ hozo.toml: error[CFG-12]: 2 番目の [[emit]]（namespace = "server"）に out 
 |---|---|---|
 | 0 | — | 成功。warning はあってよい |
 | 1 | `CheckFailed` | error の診断が一つ以上で、設定とマニフェストの error（下の 2）がない。トランスパイラの `errors`（GO-*、GOVALID-*、GOSQL-*、GOHTTP-*、CLI-* など。それぞれのプラグインの文書の「診断」）を含む |
-| 2 | `ConfigInvalid` / `LanguageMismatch` | 設定とマニフェストの error の診断が一つ以上: CFG-*（CFG-5 を除く。`docs/config.md`「診断」）と MAN-*（`docs/plugin-protocol.md`「診断」）。それがすべて CFG-16 なら `LanguageMismatch`、そうでなければ `ConfigInvalid`（`docs/cli.md`「check」の 5） |
+| 2 | `ConfigInvalid` / `LanguageMismatch` | 設定とマニフェストの error の診断が一つ以上: CFG-*（CFG-5 を除く。`docs/config.md`「診断」）と MAN-*（`docs/plugin-protocol.md`「診断」）。それがすべて CFG-16 なら `LanguageMismatch`、そうでなければ `ConfigInvalid`（`docs/cli.md`「検査」の 5） |
 | 3 | `OutputConflict` | CFG-5 |
 | 4 | `TestsNotRun` | 求めるテストのうち、走ったと確かめられないものがある（TESTS-1。`docs/cli.md`「tests」） |
 | 5 | `CoverageUnusable` | カバレッジを、求めるテストと突き合わせられない（TESTS-2、TESTS-3。同） |
 | 64 | `UnknownNamespace`、使い方の誤り | 引数・フラグの解釈の失敗と、`cli.hozo` で 64 を付けた例外 |
 | 70 | `proc.Crashed` / `proc.MalformedOutput`、宣言にない例外 | プラグインの異常終了（`proc.Crashed`）、プラグインの応答の誤り（`proc.MalformedOutput`: JSON でない、形が違う、PLG-1、PLG-2。診断にはならず、例外のメッセージで示す。`docs/plugin-protocol.md`「起動」「応答の形」「診断」）、`cli.exitCode` のない例外 |
 
-`hozoc check` は、error が一つもなければ 0。warning を error に格上げするフラグは持たない（必要になったら足す）。
+`hozoc build --no-emit` は、error が一つもなければ 0。warning を error に格上げするフラグは持たない（必要になったら足す）。

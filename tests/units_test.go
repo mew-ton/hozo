@@ -8,7 +8,7 @@ import (
 	"testing"
 )
 
-// TestUnitsCorpus は tests/corpus/units（単位のコーパス。README.md）を実物の `hozoc emit` で展開し、hozo.toml の単位の一覧
+// TestUnitsCorpus は tests/corpus/units（単位のコーパス。README.md）を実物の `hozoc build` で展開し、hozo.toml の単位の一覧
 // （docs/config.md「単位」「単位の対象」「in」「型の置き場」）がそのとおりに出力になることを確かめる。トランスパイラは、四つの単位とも、
 // リポジトリの plugins/ の基底 go。出力の全体は TestCorpusEmitGolden のゴールデンが、書き出した Go がコンパイルできることは
 // 同じテストの go vet が確かめる。
@@ -18,8 +18,8 @@ func TestUnitsCorpus(t *testing.T) {
 	emit := func(t *testing.T, args ...string) (map[string][]byte, string) {
 		t.Helper()
 		var stdout, stderr bytes.Buffer
-		if code := hozocCorpus(t, root, append([]string{"emit"}, args...), &stdout, &stderr); code != 0 {
-			t.Fatalf("hozoc emit %v の終了コード %d\n%s%s", args, code, stdout.String(), stderr.String())
+		if code := hozocCorpus(t, root, append([]string{"build"}, args...), &stdout, &stderr); code != 0 {
+			t.Fatalf("hozoc build %v の終了コード %d\n%s%s", args, code, stdout.String(), stderr.String())
 		}
 		got := readTree(t, root)
 		for p := range before {
@@ -133,7 +133,7 @@ func TestUnitsCorpus(t *testing.T) {
 		}
 		// どの単位の対象でもない名前空間（語彙の t）は UnknownNamespace（64）
 		var out, errOut bytes.Buffer
-		if code := hozocCorpus(t, root, []string{"emit", "t"}, &out, &errOut); code != 64 || !strings.Contains(errOut.String(), "どの単位の対象でもない") {
+		if code := hozocCorpus(t, root, []string{"build", "t"}, &out, &errOut); code != 64 || !strings.Contains(errOut.String(), "どの単位の対象でもない") {
 			t.Errorf("emit t: code=%d stderr=%q", code, errOut.String())
 		}
 	})

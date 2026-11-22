@@ -15,7 +15,6 @@ import (
 
 	"github.com/mew-ton/hozo/internal/fakeplugin"
 	"github.com/mew-ton/hozo/internal/gen/hozoc"
-	"github.com/mew-ton/hozo/internal/gen/hozoc/cli"
 	"github.com/mew-ton/hozo/internal/gen/hozoc/inner"
 	"github.com/mew-ton/hozo/internal/gen/proc"
 )
@@ -126,7 +125,7 @@ func runHome(t *testing.T, dir, home string, env map[string]string, args ...stri
 	}
 	defer func() { _ = os.Chdir(wd) }()
 	a := &App{Stderr: &errOut, Stdin: strings.NewReader(""), Home: home} // lsp は入力の終わりで戻る
-	code = cli.Main(context.Background(), a.Ops(), Presenter{}, args, func(k string) string { return env[k] }, &out, &errOut)
+	code = Main(context.Background(), a, args, func(k string) string { return env[k] }, &out, &errOut)
 	return code, out.String(), errOut.String()
 }
 
@@ -154,7 +153,7 @@ func golden(t *testing.T, name, got string) {
 
 func TestCheckDesignText(t *testing.T) {
 	dir := copyCorpus(t)
-	code, stdout, stderr := run(t, dir, nil, "check")
+	code, stdout, stderr := run(t, dir, nil, "build", "--no-emit")
 	if code != 0 || stderr != "" {
 		t.Fatalf("code=%d stderr=%q stdout=%q", code, stderr, stdout)
 	}
@@ -163,7 +162,7 @@ func TestCheckDesignText(t *testing.T) {
 
 func TestCheckDesignJSON(t *testing.T) {
 	dir := copyCorpus(t)
-	code, stdout, stderr := run(t, dir, nil, "check", "--format=json")
+	code, stdout, stderr := run(t, dir, nil, "build", "--no-emit", "--format=json")
 	if code != 0 || stderr != "" {
 		t.Fatalf("code=%d stderr=%q", code, stderr)
 	}
@@ -173,14 +172,14 @@ func TestCheckDesignJSON(t *testing.T) {
 func TestCheckFailed(t *testing.T) {
 	dir := copyCorpus(t)
 	write(t, filepath.Join(dir, "bad.hozo"), "namespace server {\n  model Bad { x: Nope; }\n}\n")
-	code, stdout, stderr := run(t, dir, nil, "check")
+	code, stdout, stderr := run(t, dir, nil, "build", "--no-emit")
 	if code != exitCheckFailed || stdout != "" {
 		t.Fatalf("code=%d stdout=%q stderr=%q", code, stdout, stderr)
 	}
 	if !strings.Contains(stderr, "bad.hozo:2:") || !strings.Contains(stderr, "error[RES-1]") || !strings.Contains(stderr, "1 error, 1 warning") {
 		t.Fatalf("stderr=%q", stderr)
 	}
-	code, stdout, stderr = run(t, dir, nil, "check", "--format", "json")
+	code, stdout, stderr = run(t, dir, nil, "build", "--no-emit", "--format", "json")
 	if code != exitCheckFailed {
 		t.Fatalf("code=%d", code)
 	}
@@ -223,22 +222,22 @@ func TestCheckFailed(t *testing.T) {
 func TestCheckWithoutConfig(t *testing.T) {
 	dir := t.TempDir()
 	write(t, filepath.Join(dir, "a.hozo"), "namespace a { fn f(); }\n")
-	code, stdout, stderr := run(t, dir, nil, "check")
+	code, stdout, stderr := run(t, dir, nil, "build", "--no-emit")
 	if code != 0 || stderr != "" || stdout != "0 errors, 0 warnings\n" {
 		t.Fatalf("check: code=%d stdout=%q stderr=%q", code, stdout, stderr)
 	}
 	// warning は出る（終了コードは 0 のまま）
 	write(t, filepath.Join(dir, "w.hozo"), "namespace a { model lower { id: string; } }\n")
-	code, stdout, stderr = run(t, dir, nil, "check")
+	code, stdout, stderr = run(t, dir, nil, "build", "--no-emit")
 	if code != 0 || stderr != "" || !strings.Contains(stdout, "warning[NAME-1]") || !strings.Contains(stdout, "0 errors, 1 warning") {
 		t.Fatalf("check: code=%d stdout=%q stderr=%q", code, stdout, stderr)
 	}
 	// emit は CFG-7（check の warning も一緒に運ぶ）。何も書かない
-	code, stdout, stderr = run(t, dir, nil, "emit")
+	code, stdout, stderr = run(t, dir, nil, "build")
 	if code != exitConfigInvalid || stdout != "" || !strings.Contains(stderr, "hozo.toml: error[CFG-7]") || !strings.Contains(stderr, "1 error, 1 warning") {
 		t.Fatalf("emit: code=%d stdout=%q stderr=%q", code, stdout, stderr)
 	}
-	code, _, stderr = run(t, dir, nil, "emit", "--dry-run", "--format=json")
+	code, _, stderr = run(t, dir, nil, "build", "--dry-run", "--format=json")
 	if code != exitConfigInvalid || !strings.Contains(stderr, `"error": "hozoc.ConfigInvalid"`) || !strings.Contains(stderr, `"code": "CFG-7"`) {
 		t.Fatalf("emit json: code=%d stderr=%q", code, stderr)
 	}
@@ -247,24 +246,24 @@ func TestCheckWithoutConfig(t *testing.T) {
 	}
 	// error があれば CheckFailed（1）。設定の誤りではない
 	write(t, filepath.Join(dir, "bad.hozo"), "namespace a { fn g(): Nope; }\n")
-	code, _, stderr = run(t, dir, nil, "check")
+	code, _, stderr = run(t, dir, nil, "build", "--no-emit")
 	if code != exitCheckFailed || !strings.Contains(stderr, "error[RES-1]") || strings.Contains(stderr, "CFG-") {
 		t.Fatalf("check: code=%d stderr=%q", code, stderr)
 	}
 	// emit でも、検査の error が先（check の例外。CFG-7 にはならない）
-	if code, _, stderr = run(t, dir, nil, "emit"); code != exitCheckFailed || strings.Contains(stderr, "CFG-7") {
+	if code, _, stderr = run(t, dir, nil, "build"); code != exitCheckFailed || strings.Contains(stderr, "CFG-7") {
 		t.Fatalf("emit: code=%d stderr=%q", code, stderr)
 	}
 	if err := os.Remove(filepath.Join(dir, "bad.hozo")); err != nil {
 		t.Fatal(err)
 	}
 	// 指定したファイルが読めなければ、設定なしではなく CFG-7（2）
-	for _, args := range [][]string{{"check", "--config", "nope.toml"}, {"emit", "--config", "nope.toml"}} {
+	for _, args := range [][]string{{"build", "--no-emit", "--config", "nope.toml"}, {"build", "--config", "nope.toml"}} {
 		if code, _, stderr = run(t, dir, nil, args...); code != exitConfigInvalid || !strings.Contains(stderr, "nope.toml: error[CFG-7]") {
 			t.Fatalf("%v: code=%d stderr=%q", args, code, stderr)
 		}
 	}
-	if code, _, stderr = run(t, dir, map[string]string{"HOZO_CONFIG": "nope.toml"}, "check"); code != exitConfigInvalid || !strings.Contains(stderr, "error[CFG-7]") {
+	if code, _, stderr = run(t, dir, map[string]string{"HOZO_CONFIG": "nope.toml"}, "build", "--no-emit"); code != exitConfigInvalid || !strings.Contains(stderr, "error[CFG-7]") {
 		t.Fatalf("HOZO_CONFIG: code=%d stderr=%q", code, stderr)
 	}
 	// 設定なしの App.Check は例外なしで結果（warning）を返す
@@ -286,9 +285,9 @@ func TestCheckWithoutConfig(t *testing.T) {
 			t.Fatalf("%s の診断 = %+v, want CFG-7 と、check の warning", what, diags)
 		}
 	}
-	_, err = innerOps(l).WriteOutputs(ctx, hozoc.EmitInput{}, res)
+	_, err = innerOps(l).WriteOutputs(ctx, hozoc.BuildInput{}, res)
 	cfg7("WriteOutputs", err)
-	_, err = l.CollectOutputs(ctx, hozoc.EmitInput{}, res)
+	_, err = l.CollectOutputs(ctx, hozoc.BuildInput{}, res)
 	cfg7("CollectOutputs", err)
 	_, err = l.OutputsSync().UpToDate(ctx)
 	cfg7("UpToDate", err)
@@ -301,22 +300,22 @@ func TestCheckInvalidConfig(t *testing.T) {
 	write(t, filepath.Join(dir, "a.hozo"), "namespace a { fn f(); }\n")
 	// 設定の誤り（CFG-12: 単位に out がない）は 2
 	write(t, filepath.Join(dir, "hozo.toml"), "[[emit]]\nnamespace = \"a\"\ntranspilers = [\"t\"]\n")
-	code, _, stderr := run(t, dir, nil, "check")
+	code, _, stderr := run(t, dir, nil, "build", "--no-emit")
 	if code != exitConfigInvalid || !strings.Contains(stderr, "hozo.toml: error[CFG-12]") {
 		t.Fatalf("code=%d stderr=%q", code, stderr)
 	}
 	// 名前空間ごとのテーブル（前の形）は知らないキー（CFG-7）
 	write(t, filepath.Join(dir, "old.toml"), "[a]\nlanguage = \"go\"\nout = \"gen\"\n")
-	if code, _, stderr := run(t, dir, nil, "check", "--config", "old.toml"); code != exitConfigInvalid || !strings.Contains(stderr, "error[CFG-7]") {
+	if code, _, stderr := run(t, dir, nil, "build", "--no-emit", "--config", "old.toml"); code != exitConfigInvalid || !strings.Contains(stderr, "error[CFG-7]") {
 		t.Fatalf("old form: code=%d stderr=%q", code, stderr)
 	}
 	// HOZO_CONFIG と --config
 	write(t, filepath.Join(dir, "alt.toml"), "# 単位なし（何も出力しない）\n")
 	write(t, filepath.Join(dir, "go.mod"), "module example.com/a\n")
-	if code, _, stderr := run(t, dir, map[string]string{"HOZO_CONFIG": "alt.toml"}, "check"); code != 0 {
+	if code, _, stderr := run(t, dir, map[string]string{"HOZO_CONFIG": "alt.toml"}, "build", "--no-emit"); code != 0 {
 		t.Fatalf("HOZO_CONFIG: code=%d stderr=%q", code, stderr)
 	}
-	if code, _, stderr := run(t, dir, map[string]string{"HOZO_CONFIG": "alt.toml"}, "check", "--config", "hozo.toml"); code != exitConfigInvalid {
+	if code, _, stderr := run(t, dir, map[string]string{"HOZO_CONFIG": "alt.toml"}, "build", "--no-emit", "--config", "hozo.toml"); code != exitConfigInvalid {
 		t.Fatalf("--config が HOZO_CONFIG より優先されていない: code=%d stderr=%q", code, stderr)
 	}
 }
@@ -327,11 +326,11 @@ func TestCheckLanguageMismatch(t *testing.T) {
 	dir := copyCorpus(t)
 	fakeRider(t, dir, "tsp", "ts", `"base"`, `{"files":[],"warnings":[]}`, 0)
 	write(t, filepath.Join(dir, "hozo.toml"), corpusConfig(`"base", "tsp"`))
-	code, _, stderr := run(t, dir, nil, "check")
+	code, _, stderr := run(t, dir, nil, "build", "--no-emit")
 	if code != exitConfigInvalid || !strings.Contains(stderr, "hozo.toml: error[CFG-16]") {
 		t.Fatalf("code=%d stderr=%q", code, stderr)
 	}
-	if code, _, stderr = run(t, dir, nil, "check", "--format=json"); code != exitConfigInvalid || !strings.Contains(stderr, `"error": "hozoc.LanguageMismatch"`) {
+	if code, _, stderr = run(t, dir, nil, "build", "--no-emit", "--format=json"); code != exitConfigInvalid || !strings.Contains(stderr, `"error": "hozoc.LanguageMismatch"`) {
 		t.Fatalf("json: code=%d stderr=%q", code, stderr)
 	}
 	l := &App{Dir: dir}
@@ -358,7 +357,7 @@ func TestCheckLanguageMismatch(t *testing.T) {
 		pluginDirs + unit("browser", "gen/browser", `"base"`): "error[CFG-22]",
 	} {
 		write(t, filepath.Join(dir, "hozo.toml"), cfg)
-		if code, _, stderr = run(t, dir, nil, "check"); code != exitConfigInvalid || !strings.Contains(stderr, want) {
+		if code, _, stderr = run(t, dir, nil, "build", "--no-emit"); code != exitConfigInvalid || !strings.Contains(stderr, want) {
 			t.Fatalf("%s: code=%d stderr=%q", want, code, stderr)
 		}
 	}
@@ -403,7 +402,7 @@ func TestEmit(t *testing.T) {
 	gen := filepath.Join(dir, "gen")
 
 	// dry-run は書かない
-	code, stdout, stderr := run(t, dir, nil, "emit", "--dry-run")
+	code, stdout, stderr := run(t, dir, nil, "build", "--dry-run")
 	if code != 0 {
 		t.Fatalf("dry-run: code=%d stderr=%q", code, stderr)
 	}
@@ -415,7 +414,7 @@ func TestEmit(t *testing.T) {
 	}
 
 	// 書く。書き出されるのは、トランスパイラが返したファイルと、出力先ごとの記録だけ（hozoc 本体はコードを出力しない）
-	code, stdout1, stderr := run(t, dir, nil, "emit")
+	code, stdout1, stderr := run(t, dir, nil, "build")
 	if code != 0 {
 		t.Fatalf("emit: code=%d stderr=%q", code, stderr)
 	}
@@ -440,7 +439,7 @@ func TestEmit(t *testing.T) {
 
 	// 二度目は何も書き直さない（mtime が変わらない）が、written には入る
 	before := mtimes(t, gen)
-	code, stdout2, _ := run(t, dir, nil, "emit")
+	code, stdout2, _ := run(t, dir, nil, "build")
 	if code != 0 || stdout2 != stdout1 {
 		t.Fatalf("second: code=%d\n%s\n%s", code, stdout1, stdout2)
 	}
@@ -451,13 +450,13 @@ func TestEmit(t *testing.T) {
 	}
 
 	// 名前空間を指定すれば、それだけ
-	code, stdout3, stderr := run(t, dir, nil, "emit", "--dry-run", "browser")
+	code, stdout3, stderr := run(t, dir, nil, "build", "--dry-run", "browser")
 	if code != 0 || strings.Contains(stdout3, "gen/server/") || !strings.Contains(stdout3, "gen/browser/") {
 		t.Fatalf("code=%d stdout=%q stderr=%q", code, stdout3, stderr)
 	}
 
 	// json
-	code, stdoutJ, _ := run(t, dir, nil, "emit", "--format=json", "--dry-run")
+	code, stdoutJ, _ := run(t, dir, nil, "build", "--format=json", "--dry-run")
 	var res struct {
 		Warnings []json.RawMessage `json:"warnings"`
 		Written  []string          `json:"written"`
@@ -476,7 +475,7 @@ func TestEmitStaleAndConflict(t *testing.T) {
 
 	// fake が gen/server/extra.txt を書く（warning も一つ）
 	fakeRider(t, dir, "fake", "go", `"base"`, `{"files":[{"path":"gen/server/extra.txt","content":"hi"}],"warnings":[{"at":"server.placeOrder","message":"careful"}]}`, 0)
-	code, stdout, stderr := run(t, dir, nil, "emit")
+	code, stdout, stderr := run(t, dir, nil, "build")
 	if code != 0 || !strings.Contains(stdout, "written: gen/server/extra.txt\n") || !strings.Contains(stdout, "warning[PLUGIN]: fake: careful") {
 		t.Fatalf("code=%d stdout=%q stderr=%q", code, stdout, stderr)
 	}
@@ -486,7 +485,7 @@ func TestEmitStaleAndConflict(t *testing.T) {
 
 	// トランスパイラを単位から外すと extra.txt は古いファイルとして消える。基底のファイルは残る
 	write(t, filepath.Join(dir, "hozo.toml"), corpusConfig(`"base"`))
-	code, stdout, stderr = run(t, dir, nil, "emit")
+	code, stdout, stderr = run(t, dir, nil, "build")
 	if code != 0 || !strings.Contains(stdout, "removed: gen/server/extra.txt\n") || strings.Contains(stdout, "removed: gen/server/out.txt") {
 		t.Fatalf("code=%d stdout=%q stderr=%q", code, stdout, stderr)
 	}
@@ -498,7 +497,7 @@ func TestEmitStaleAndConflict(t *testing.T) {
 	write(t, filepath.Join(dir, "hozo.toml"), corpusConfig(`"base", "fake"`))
 	fakeRider(t, dir, "fake", "go", `"base"`, `{"files":[{"path":"gen/server/out.txt","content":"x"}],"warnings":[]}`, 0)
 	before := mtimes(t, filepath.Join(dir, "gen"))
-	code, stdout, stderr = run(t, dir, nil, "emit")
+	code, stdout, stderr = run(t, dir, nil, "build")
 	if code != exitOutputConflict || stdout != "" || !strings.Contains(stderr, "gen/server/out.txt: error[CFG-5]") ||
 		!strings.Contains(stderr, "トランスパイラ fake（1 番目の [[emit]] の名前空間 server）") || !strings.Contains(stderr, "トランスパイラ base（1 番目の [[emit]] の名前空間 server）") {
 		t.Fatalf("code=%d stdout=%q stderr=%q", code, stdout, stderr)
@@ -516,7 +515,7 @@ func TestEmitStaleAndConflict(t *testing.T) {
 	for _, path := range []string{"../x.go", "gen/server/../../../x.go", "/abs/x.go", "", "x.go", "gen/x.go", "gen/browser/x.go", "gen/server", "gen/server/"} {
 		fakeRider(t, dir, "fake", "go", `"base"`, `{"files":[{"path":"`+path+`","content":"x"}],"warnings":[]}`, 0)
 		before := mtimes(t, dir)
-		if code, stdout, stderr = run(t, dir, nil, "emit"); code != exitSoftwareOrCrash || stdout != "" || !strings.Contains(stderr, "PLG-1") {
+		if code, stdout, stderr = run(t, dir, nil, "build"); code != exitSoftwareOrCrash || stdout != "" || !strings.Contains(stderr, "PLG-1") {
 			t.Fatalf("path %q: code=%d stdout=%q stderr=%q", path, code, stdout, stderr)
 		}
 		after := mtimes(t, dir)
@@ -529,46 +528,46 @@ func TestEmitStaleAndConflict(t *testing.T) {
 			t.Fatalf("path %q: ルートの外に書いた", path)
 		}
 	}
-	if code, _, stderr = run(t, dir, nil, "emit", "--format=json"); code != exitSoftwareOrCrash || !strings.Contains(stderr, `"error": "proc.MalformedOutput"`) {
+	if code, _, stderr = run(t, dir, nil, "build", "--format=json"); code != exitSoftwareOrCrash || !strings.Contains(stderr, `"error": "proc.MalformedOutput"`) {
 		t.Fatalf("json: code=%d stderr=%q", code, stderr)
 	}
 	// Dir(U, N) の下なら、深い場所でもよい
 	fakeRider(t, dir, "fake", "go", `"base"`, `{"files":[{"path":"gen/server/./deep/../deep/a.txt","content":"1"}],"warnings":[]}`, 0)
-	if code, stdout, stderr = run(t, dir, nil, "emit"); code != 0 || !strings.Contains(stdout, "written: gen/server/deep/a.txt\n") {
+	if code, stdout, stderr = run(t, dir, nil, "build"); code != 0 || !strings.Contains(stdout, "written: gen/server/deep/a.txt\n") {
 		t.Fatalf("code=%d stdout=%q stderr=%q", code, stdout, stderr)
 	}
 	// PLG-2: 同じ応答の中で同じ path が二度 → proc.MalformedOutput → 70
 	fakeRider(t, dir, "fake", "go", `"base"`, `{"files":[{"path":"gen/server/a.txt","content":"1"},{"path":"gen/server/./a.txt","content":"2"}],"warnings":[]}`, 0)
-	if code, _, stderr = run(t, dir, nil, "emit"); code != exitSoftwareOrCrash || !strings.Contains(stderr, "PLG-2") {
+	if code, _, stderr = run(t, dir, nil, "build"); code != exitSoftwareOrCrash || !strings.Contains(stderr, "PLG-2") {
 		t.Fatalf("code=%d stderr=%q", code, stderr)
 	}
 	// 応答の形が違う（必須の files / warnings がない、型が違う）→ 終了コード 0 でも proc.MalformedOutput → 70
 	// （docs/plugin-protocol.md「応答の形」）。知らない項目（版 0.3 までの select を含む）があるだけなら通る
 	for _, resp := range []string{`{"unknown":1}`, `{"files":[]}`, `{"files":[],"warnings":"none"}`, `{"files":[{"path":"gen/server/a.txt"}],"warnings":[]}`} {
 		fakeRider(t, dir, "fake", "go", `"base"`, resp, 0)
-		if code, stdout, stderr = run(t, dir, nil, "emit"); code != exitSoftwareOrCrash || stdout != "" || !strings.Contains(stderr, "応答の形が違う") {
+		if code, stdout, stderr = run(t, dir, nil, "build"); code != exitSoftwareOrCrash || stdout != "" || !strings.Contains(stderr, "応答の形が違う") {
 			t.Fatalf("%s: code=%d stdout=%q stderr=%q", resp, code, stdout, stderr)
 		}
 	}
 	fakeRider(t, dir, "fake", "go", `"base"`, `{"files":[],"warnings":[],"unknown":1,"select":{"roots":["server.nope"]}}`, 0)
-	if code, _, stderr = run(t, dir, nil, "emit"); code != 0 {
+	if code, _, stderr = run(t, dir, nil, "build"); code != 0 {
 		t.Fatalf("知らない項目: code=%d stderr=%q", code, stderr)
 	}
 	// 異常終了 → 70
 	fakeRider(t, dir, "fake", "go", `"base"`, ``, 3)
-	if code, _, stderr = run(t, dir, nil, "emit"); code != exitSoftwareOrCrash || !strings.Contains(stderr, "hozoc: ") {
+	if code, _, stderr = run(t, dir, nil, "build"); code != exitSoftwareOrCrash || !strings.Contains(stderr, "hozoc: ") {
 		t.Fatalf("code=%d stderr=%q", code, stderr)
 	}
 }
 
-// TestEmitErrors は docs/cli.md「emit」の 2: どれかのトランスパイラが errors を返せば、残りのトランスパイラも起動して errors を
+// TestEmitErrors は docs/cli.md「書き出し」の 2: どれかのトランスパイラが errors を返せば、残りのトランスパイラも起動して errors を
 // すべて集めたうえで CheckFailed（1）。emit の全体が、何も書き出さない（errors を返していない出力のファイルも）。
 func TestEmitErrors(t *testing.T) {
 	dir := copyCorpus(t)
 	write(t, filepath.Join(dir, "hozo.toml"), corpusConfig(`"base", "fake", "fake2"`))
 	fakeRider(t, dir, "fake", "go", `"base"`, `{"files":[{"path":"gen/server/extra.txt","content":"hi"}],"warnings":[{"message":"w"}],"errors":[{"code":"FAKE-1","at":"server.placeOrder","message":"nope"}]}`, 0)
 	fakeRider(t, dir, "fake2", "go", `"base"`, `{"files":[],"warnings":[],"errors":[{"code":"FAKE-2","message":"again"}]}`, 0)
-	code, stdout, stderr := run(t, dir, nil, "emit")
+	code, stdout, stderr := run(t, dir, nil, "build")
 	if code != exitCheckFailed || stdout != "" || !strings.Contains(stderr, "server.hozo:281:3: error[FAKE-1]: nope") ||
 		!strings.Contains(stderr, "error[FAKE-2]: again") || !strings.Contains(stderr, "warning[PLUGIN]: fake: w") {
 		t.Fatalf("code=%d stdout=%q stderr=%q", code, stdout, stderr)
@@ -580,18 +579,18 @@ func TestEmitErrors(t *testing.T) {
 	if n := len(requests(t, dir, "base")); n != 4 {
 		t.Errorf("基底 base が %d 回起動された（want 4: 出力ごとに一回）", n)
 	}
-	if code, _, stderr = run(t, dir, nil, "emit", "--format=json"); code != exitCheckFailed || !strings.Contains(stderr, `"error": "hozoc.CheckFailed"`) || !strings.Contains(stderr, `"code": "FAKE-2"`) {
+	if code, _, stderr = run(t, dir, nil, "build", "--format=json"); code != exitCheckFailed || !strings.Contains(stderr, `"error": "hozoc.CheckFailed"`) || !strings.Contains(stderr, `"code": "FAKE-2"`) {
 		t.Fatalf("json: code=%d stderr=%q", code, stderr)
 	}
 	// dry-run でも同じ（書く予定を返さない）
-	if code, stdout, _ = run(t, dir, nil, "emit", "--dry-run"); code != exitCheckFailed || stdout != "" {
+	if code, stdout, _ = run(t, dir, nil, "build", "--dry-run"); code != exitCheckFailed || stdout != "" {
 		t.Fatalf("dry-run: code=%d stdout=%q", code, stdout)
 	}
 }
 
 // TestEmitNestedOutput は PLG-1 の「別の出力の Dir」: 単位が子孫の名前空間も出力するとき、Dir(U, N.child) は Dir(U, N) の下にある。
 // N の出力のトランスパイラは、そこには書けない。記録は出力ごとで、消したファイルのディレクトリが空になれば、それも消す
-// （docs/cli.md「emit」の 5）。
+// （docs/cli.md「書き出し」の 5）。
 func TestEmitNestedOutput(t *testing.T) {
 	dir := t.TempDir()
 	write(t, filepath.Join(dir, "a.hozo"), "namespace a {\n  fn f();\n}\nnamespace a.child {\n  fn g();\n}\n")
@@ -599,7 +598,7 @@ func TestEmitNestedOutput(t *testing.T) {
 	fakePlugin(t, dir, "base", "go", "", baseResponse, 0)
 	// fake は、どの出力でも、Dir(U, N) の下の inner/deep/x.txt を書く
 	fakeRider(t, dir, "fake", "go", `"base"`, `{"files":[{"path":"@DIR@/inner/deep/x.txt","content":"@NS@"}],"warnings":[]}`, 0)
-	code, stdout, stderr := run(t, dir, nil, "emit")
+	code, stdout, stderr := run(t, dir, nil, "build")
 	if code != 0 {
 		t.Fatalf("code=%d stdout=%q stderr=%q", code, stdout, stderr)
 	}
@@ -614,7 +613,7 @@ func TestEmitNestedOutput(t *testing.T) {
 	}
 	// fake を外すと、x.txt が消え、空になった inner/deep と inner も消える。Dir(U, N) そのものと、子の出力の Dir は残る
 	write(t, filepath.Join(dir, "hozo.toml"), pluginDirs+unit("a", "gen/a", `"base"`))
-	code, stdout, stderr = run(t, dir, nil, "emit")
+	code, stdout, stderr = run(t, dir, nil, "build")
 	if code != 0 || !strings.Contains(stdout, "removed: gen/a/child/inner/deep/x.txt\n") || !strings.Contains(stdout, "removed: gen/a/inner/deep/x.txt\n") {
 		t.Fatalf("code=%d stdout=%q stderr=%q", code, stdout, stderr)
 	}
@@ -628,12 +627,12 @@ func TestEmitNestedOutput(t *testing.T) {
 	}
 	// 空でないディレクトリ（人が置いたファイルがある）は消さない
 	write(t, filepath.Join(dir, "hozo.toml"), pluginDirs+unit("a", "gen/a", `"base", "fake"`))
-	if code, _, stderr = run(t, dir, nil, "emit"); code != 0 {
+	if code, _, stderr = run(t, dir, nil, "build"); code != 0 {
 		t.Fatalf("code=%d stderr=%q", code, stderr)
 	}
 	write(t, filepath.Join(dir, "gen", "a", "inner", "keep.txt"), "mine")
 	write(t, filepath.Join(dir, "hozo.toml"), pluginDirs+unit("a", "gen/a", `"base"`))
-	if code, _, stderr = run(t, dir, nil, "emit"); code != 0 {
+	if code, _, stderr = run(t, dir, nil, "build"); code != 0 {
 		t.Fatalf("code=%d stderr=%q", code, stderr)
 	}
 	if _, err := os.Stat(filepath.Join(dir, "gen", "a", "inner", "keep.txt")); err != nil {
@@ -646,24 +645,24 @@ func TestEmitNestedOutput(t *testing.T) {
 	write(t, filepath.Join(dir, "hozo.toml"), pluginDirs+unit("a", "gen/a", `"base", "fake"`))
 	for _, path := range []string{"gen/a/child/x.txt", "gen/a/child/deep/x.txt", "gen/a/child"} {
 		fakeRider(t, dir, "fake", "go", `"base"`, `{"files":[{"path":"`+path+`","content":"x"}],"warnings":[]}`, 0)
-		if code, stdout, stderr = run(t, dir, nil, "emit", "a.child"); code != exitSoftwareOrCrash || stdout != "" || !strings.Contains(stderr, "PLG-1") {
+		if code, stdout, stderr = run(t, dir, nil, "build", "a.child"); code != exitSoftwareOrCrash || stdout != "" || !strings.Contains(stderr, "PLG-1") {
 			if path != "gen/a/child" { // a.child の出力から見れば、gen/a/child/x.txt は自分の Dir の下
 				continue
 			}
 			t.Fatalf("path %q: code=%d stdout=%q stderr=%q", path, code, stdout, stderr)
 		}
-		if code, stdout, stderr = run(t, dir, nil, "emit"); code != exitSoftwareOrCrash || stdout != "" || !strings.Contains(stderr, "PLG-1") {
+		if code, stdout, stderr = run(t, dir, nil, "build"); code != exitSoftwareOrCrash || stdout != "" || !strings.Contains(stderr, "PLG-1") {
 			t.Fatalf("path %q: code=%d stdout=%q stderr=%q", path, code, stdout, stderr)
 		}
 	}
 }
 
-// TestEmitStaleRecordStaysInDir は docs/cli.md「emit」の 5: .hozoc-outputs.json のパスに従って消すのは、その記録の持ち主の
+// TestEmitStaleRecordStaysInDir は docs/cli.md「書き出し」の 5: .hozoc-outputs.json のパスに従って消すのは、その記録の持ち主の
 // Dir(U, N) の下のファイルだけ。記録に `..` や絶対パス、ルートの中の別のディレクトリ、別の出力の Dir のパスが
 // 書かれていても（壊れた記録、手で直した記録）、そのファイルは消さず、removed にも出さない。Dir の下の古いファイルは消す。
 func TestEmitStaleRecordStaysInDir(t *testing.T) {
 	dir := copyCorpus(t)
-	if code, _, stderr := run(t, dir, nil, "emit"); code != 0 {
+	if code, _, stderr := run(t, dir, nil, "build"); code != 0 {
 		t.Fatalf("code=%d stderr=%q", code, stderr)
 	}
 	record := filepath.Join(dir, "gen", "server", OutputsFile)
@@ -712,7 +711,7 @@ func TestEmitStaleRecordStaysInDir(t *testing.T) {
 	}
 	write(t, record, string(out))
 
-	code, stdout, stderr := run(t, dir, nil, "emit")
+	code, stdout, stderr := run(t, dir, nil, "build")
 	if code != 0 {
 		t.Fatalf("code=%d stdout=%q stderr=%q", code, stdout, stderr)
 	}
@@ -746,13 +745,13 @@ func TestEmitStaleRecordStaysInDir(t *testing.T) {
 	}
 }
 
-// TestEmitNothing は docs/cli.md「emit」の 5 と 7: 単位のどのトランスパイラもファイルを返さなければ、その出力には何も書かない。
+// TestEmitNothing は docs/cli.md「書き出し」の 5 と 7: 単位のどのトランスパイラもファイルを返さなければ、その出力には何も書かない。
 // 前回の出力は古いファイルとして消え、.hozoc-outputs.json も残らない。エラーでも warning でもない。
 // 単位そのものを消したときは、前の出力先が分からないので何も消さない。
 func TestEmitNothing(t *testing.T) {
 	dir := copyCorpus(t)
 	gen := filepath.Join(dir, "gen")
-	if code, _, stderr := run(t, dir, nil, "emit"); code != 0 {
+	if code, _, stderr := run(t, dir, nil, "build"); code != 0 {
 		t.Fatalf("emit: code=%d stderr=%q", code, stderr)
 	}
 	if files := listFiles(t, gen); !containsStr(files, "server/out.txt") || !containsStr(files, "server/.hozoc-outputs.json") || !containsStr(files, "browser/out.txt") {
@@ -761,7 +760,7 @@ func TestEmitNothing(t *testing.T) {
 
 	// 基底が、どの出力にもファイルを返さなくなる。前回の出力は消え、記録も残らない
 	fakePlugin(t, dir, "base", "go", "", `{"files":[],"warnings":[]}`, 0)
-	code, stdout, stderr := run(t, dir, nil, "emit")
+	code, stdout, stderr := run(t, dir, nil, "build")
 	if code != 0 || strings.Contains(stdout, "written: ") || !strings.Contains(stdout, "removed: gen/server/out.txt\n") || !strings.Contains(stdout, "removed: gen/browser/out.txt\n") {
 		t.Fatalf("code=%d stdout=%q stderr=%q", code, stdout, stderr)
 	}
@@ -773,20 +772,20 @@ func TestEmitNothing(t *testing.T) {
 		t.Errorf("gen に残っている: %v", files)
 	}
 	// 二度目は何も書かず、何も消さない
-	code, stdout, _ = run(t, dir, nil, "emit")
+	code, stdout, _ = run(t, dir, nil, "build")
 	if code != 0 || strings.Contains(stdout, "removed: ") || strings.Contains(stdout, "written: ") {
 		t.Fatalf("second: code=%d stdout=%q", code, stdout)
 	}
 	fakePlugin(t, dir, "base", "go", "", baseResponse, 0)
 
 	// server の単位を hozo.toml から消す: server はどの単位の対象でもなくなり、前の出力先は分からないので何も消さない
-	// （docs/cli.md「emit」の 5）。エラーにもならない
-	if code, _, stderr := run(t, dir, nil, "emit"); code != 0 {
+	// （docs/cli.md「書き出し」の 5）。エラーにもならない
+	if code, _, stderr := run(t, dir, nil, "build"); code != 0 {
 		t.Fatalf("emit: code=%d stderr=%q", code, stderr)
 	}
 	// （browser は server の型を使うので、server の単位を消すなら、browser の単位も消す。docs/config.md「型の置き場」）
 	write(t, filepath.Join(dir, "hozo.toml"), pluginDirs+unit("http", "gen/http", `"base"`)+unit("page", "gen/page", `"base"`))
-	code, stdout, stderr = run(t, dir, nil, "emit")
+	code, stdout, stderr = run(t, dir, nil, "build")
 	if code != 0 || strings.Contains(stdout, "removed: ") || strings.Contains(stdout, "gen/server/") {
 		t.Fatalf("unit removed: code=%d stdout=%q stderr=%q", code, stdout, stderr)
 	}
@@ -794,7 +793,7 @@ func TestEmitNothing(t *testing.T) {
 		t.Errorf("単位を消したのに gen/server/out.txt が消えた: %v", err)
 	}
 	// どの単位の対象でもない名前空間を emit の引数に書けば UnknownNamespace
-	if code, _, stderr = run(t, dir, nil, "emit", "server"); code != exitUsage || !strings.Contains(stderr, "名前空間 server も、その子孫も、hozo.toml のどの単位の対象でもない") {
+	if code, _, stderr = run(t, dir, nil, "build", "server"); code != exitUsage || !strings.Contains(stderr, "名前空間 server も、その子孫も、hozo.toml のどの単位の対象でもない") {
 		t.Fatalf("emit server: code=%d stderr=%q", code, stderr)
 	}
 }
@@ -846,7 +845,7 @@ func TestUpToDate(t *testing.T) {
 	}
 	// 配線の emit（check → writeOutputs → collectOutputs、outputChanges、syncOutputs）。効果 syncOutputs は、状態の分類
 	// OutputsSync の単位の命令で、どの場合からも UpToDate に移す
-	res, err := ops.Emit(ctx, hozoc.EmitInput{})
+	res, err := ops.Build(ctx, hozoc.BuildInput{})
 	if err != nil || len(res.Written) == 0 {
 		t.Fatalf("Emit = %+v, %v", res, err)
 	}
@@ -885,7 +884,7 @@ func TestUpToDate(t *testing.T) {
 	if got := sync(); got != hozoc.OutputsSyncOutOfDate {
 		t.Errorf("基底がファイルを返さなくなった後: %v", got)
 	}
-	if _, err := ops.Emit(ctx, hozoc.EmitInput{}); err != nil {
+	if _, err := ops.Build(ctx, hozoc.BuildInput{}); err != nil {
 		t.Fatal(err)
 	}
 	if got := sync(); got != hozoc.OutputsSyncUpToDate {
@@ -900,7 +899,7 @@ func TestUpToDate(t *testing.T) {
 	}
 }
 
-// TestWriteOutputsSteps は、配線 writeOutputs が呼ぶ三つ（docs/cli.md「emit」「手で書くもの」）を、一つずつ動かす: 葉の op collectOutputs
+// TestWriteOutputsSteps は、配線 writeOutputs が呼ぶ三つ（docs/cli.md「書き出し」「手で書くもの」）を、一つずつ動かす: 葉の op collectOutputs
 // は、ファイルに触れずに、書き出す予定を集める。read outputChanges（状態 outputs の単位の問い合わせ）は、予定を今のファイルと比べて、
 // 書くファイルと消すファイルを決めるだけで、何も変えない。効果 syncOutputs（状態の分類 OutputsSync の単位の命令）が、書き出す。
 // dryRun の予定では、消すファイルを決めず、書き出さない。予定は、直前の collectOutputs が返したものでなければ、誤り。
@@ -912,7 +911,7 @@ func TestWriteOutputsSteps(t *testing.T) {
 	ctx := context.Background()
 	a := &App{Dir: dir, Stderr: &bytes.Buffer{}}
 	ops := innerOps(a)
-	if _, err := ops.Emit(ctx, hozoc.EmitInput{}); err != nil {
+	if _, err := ops.Build(ctx, hozoc.BuildInput{}); err != nil {
 		t.Fatal(err)
 	}
 	// fake を単位から外す: gen/server/extra.txt は、前回書いて、今回は書かないファイル。基底は、内容を変える
@@ -933,7 +932,7 @@ func TestWriteOutputsSteps(t *testing.T) {
 
 	// collectOutputs: トランスパイラのファイル（パスの辞書順）と、check の warning（トランスパイラの warning を含む: check が、
 	// プラグインに頼んで、もう受け取っている。四つの出力の基底が返す、同じ warning は、一度だけ。docs/plugin-protocol.md「emit」）
-	plan, err := ops.CollectOutputs(ctx, hozoc.EmitInput{}, checked)
+	plan, err := ops.CollectOutputs(ctx, hozoc.BuildInput{}, checked)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -968,7 +967,7 @@ func TestWriteOutputsSteps(t *testing.T) {
 
 	// dryRun の予定: 書くファイルだけを返し（消すファイルは決めない）、syncOutputs は何もしない
 	yes := true
-	dry, err := ops.CollectOutputs(ctx, hozoc.EmitInput{DryRun: &yes}, checked)
+	dry, err := ops.CollectOutputs(ctx, hozoc.BuildInput{DryRun: &yes}, checked)
 	if err != nil || dry.DryRun == nil || !*dry.DryRun {
 		t.Fatalf("dryRun の plan = %+v, %v", dry, err)
 	}
@@ -995,16 +994,16 @@ func TestWriteOutputsSteps(t *testing.T) {
 	// 配線 writeOutputs も、その error を、そのまま返し、何も書かない
 	cancelled, cancel := context.WithCancel(ctx)
 	cancel()
-	if _, err := ops.CollectOutputs(cancelled, hozoc.EmitInput{}, checked); !errors.Is(err, context.Canceled) {
+	if _, err := ops.CollectOutputs(cancelled, hozoc.BuildInput{}, checked); !errors.Is(err, context.Canceled) {
 		t.Errorf("中断された ctx の CollectOutputs: err = %v, want context.Canceled", err)
 	}
-	if _, err := ops.WriteOutputs(cancelled, hozoc.EmitInput{}, checked); !errors.Is(err, context.Canceled) {
+	if _, err := ops.WriteOutputs(cancelled, hozoc.BuildInput{}, checked); !errors.Is(err, context.Canceled) {
 		t.Errorf("中断された ctx の WriteOutputs: err = %v, want context.Canceled", err)
 	}
 	unchanged("中断された ctx の WriteOutputs")
 
 	// syncOutputs: 余分なファイルを消し、古いファイルを書き換え、記録を書く。その後は UpToDate で、消すファイルはない
-	if plan, err = ops.CollectOutputs(ctx, hozoc.EmitInput{}, checked); err != nil {
+	if plan, err = ops.CollectOutputs(ctx, hozoc.BuildInput{}, checked); err != nil {
 		t.Fatal(err)
 	}
 	if err := a.OutputsSync().SyncOutputs(ctx, plan); err != nil {
@@ -1059,16 +1058,16 @@ func TestPluginSearchEnvironment(t *testing.T) {
 	t.Setenv("HOZO_PLUGIN_PATH", envDir)
 	t.Setenv("HOME", home)
 	t.Setenv("USERPROFILE", home)
-	code, _, stderr := run(t, dir, nil, "check")
+	code, _, stderr := run(t, dir, nil, "build", "--no-emit")
 	if code != exitConfigInvalid || strings.Count(stderr, "error[CFG-14]") != 2 {
 		t.Fatalf("渡していない: code=%d stderr=%q", code, stderr)
 	}
 	// 渡せば見つかる。check も emit も lsp も同じ入力を持つ
 	env := map[string]string{"HOZO_PLUGIN_PATH": t.TempDir() + string(filepath.ListSeparator) + envDir}
-	if code, _, stderr = runHome(t, dir, home, env, "check"); code != 0 {
+	if code, _, stderr = runHome(t, dir, home, env, "build", "--no-emit"); code != 0 {
 		t.Fatalf("check: code=%d stderr=%q", code, stderr)
 	}
-	code, stdout, stderr := runHome(t, dir, home, env, "emit")
+	code, stdout, stderr := runHome(t, dir, home, env, "build")
 	if code != 0 || !strings.Contains(stdout, "written: gen/a/out.txt\n") || !strings.Contains(stdout, "written: gen/b/out.txt\n") {
 		t.Fatalf("emit: code=%d stdout=%q stderr=%q", code, stdout, stderr)
 	}
@@ -1076,29 +1075,29 @@ func TestPluginSearchEnvironment(t *testing.T) {
 		t.Fatalf("lsp: code=%d stderr=%q", code, stderr)
 	}
 	// 片方だけなら、もう片方の単位のトランスパイラが見つからない
-	if code, _, stderr = runHome(t, dir, "", env, "check"); code != exitConfigInvalid || !strings.Contains(stderr, "from-home を提供するプラグインが入っていない") {
+	if code, _, stderr = runHome(t, dir, "", env, "build", "--no-emit"); code != exitConfigInvalid || !strings.Contains(stderr, "from-home を提供するプラグインが入っていない") {
 		t.Fatalf("ホームなし: code=%d stderr=%q", code, stderr)
 	}
-	if code, _, stderr = runHome(t, dir, home, nil, "check"); code != exitConfigInvalid || !strings.Contains(stderr, "from-env を提供するプラグインが入っていない") {
+	if code, _, stderr = runHome(t, dir, home, nil, "build", "--no-emit"); code != exitConfigInvalid || !strings.Contains(stderr, "from-env を提供するプラグインが入っていない") {
 		t.Fatalf("HOZO_PLUGIN_PATH なし: code=%d stderr=%q", code, stderr)
 	}
 	// 外の場所の壊れたマニフェストは、使っていなくても報告する（MAN-4 → ConfigInvalid）
 	write(t, filepath.Join(home, ".hozo", "plugins", "broken", "hozo-plugin.toml"), "name = \n")
-	if code, _, stderr = runHome(t, dir, home, env, "check"); code != exitConfigInvalid || !strings.Contains(stderr, "error[MAN-4]") {
+	if code, _, stderr = runHome(t, dir, home, env, "build", "--no-emit"); code != exitConfigInvalid || !strings.Contains(stderr, "error[MAN-4]") {
 		t.Fatalf("壊れたマニフェスト: code=%d stderr=%q", code, stderr)
 	}
 }
 
 func TestEmitUnknownNamespace(t *testing.T) {
 	dir := copyCorpus(t)
-	code, stdout, stderr := run(t, dir, nil, "emit", "nope")
+	code, stdout, stderr := run(t, dir, nil, "build", "nope")
 	if code != exitUsage || stdout != "" || !strings.Contains(stderr, "名前空間 nope も、その子孫も、hozo.toml のどの単位の対象でもない") {
 		t.Fatalf("code=%d stdout=%q stderr=%q", code, stdout, stderr)
 	}
 	if _, err := os.Stat(filepath.Join(dir, "gen")); !os.IsNotExist(err) {
 		t.Fatal("書き出している")
 	}
-	code, _, stderr = run(t, dir, nil, "emit", "--format=json", "nope")
+	code, _, stderr = run(t, dir, nil, "build", "--format=json", "nope")
 	if code != exitUsage || strings.TrimSpace(stderr) != "{\n  \"error\": \"hozoc.UnknownNamespace\"\n}" {
 		t.Fatalf("code=%d stderr=%q", code, stderr)
 	}
@@ -1112,16 +1111,19 @@ func TestUsageAndLsp(t *testing.T) {
 	}{
 		{nil, exitUsage},
 		{[]string{"help"}, 0},
-		{[]string{"check", "--help"}, 0},
+		{[]string{"build", "--no-emit", "--help"}, 0},
 		{[]string{"bogus"}, exitUsage},
-		{[]string{"check", "--nope"}, exitUsage},
-		{[]string{"check", "--format"}, exitUsage},
-		{[]string{"check", "--format=yaml"}, exitUsage},
-		{[]string{"check", "server"}, exitUsage},
-		{[]string{"emit", "--dry-run=maybe"}, exitUsage},
+		{[]string{"build", "--no-emit", "--nope"}, exitUsage},
+		{[]string{"build", "--no-emit", "--format"}, exitUsage},
+		{[]string{"build", "--no-emit", "--format=yaml"}, exitUsage},
+		{[]string{"build", "--no-emit", "server"}, 0},          // 名前空間の引数は、--no-emit でも書ける（集めて確かめる範囲を選ぶ）
+		{[]string{"build", "--no-emit", "nowhere"}, exitUsage}, // UnknownNamespace も、同じ
+		{[]string{"check"}, exitUsage},                         // なくしたコマンド（TestRenamedCommands）
+		{[]string{"emit", "--dry-run"}, exitUsage},
+		{[]string{"build", "--dry-run=maybe"}, exitUsage},
 		{[]string{"lsp"}, 0}, // 入力が閉じれば終わる。終了コードは常に 0（docs/lsp.md「ライフサイクル」）
-		{[]string{"emit", "--dry-run", "--", "server"}, 0},
-		{[]string{"emit", "--format", "text", "--format", "json", "--dry-run", "-x"}, exitUsage}, // -x は位置引数（知らない名前空間）
+		{[]string{"build", "--dry-run", "--", "server"}, 0},
+		{[]string{"build", "--format", "text", "--format", "json", "--dry-run", "-x"}, exitUsage}, // -x は位置引数（知らない名前空間）
 	}
 	for _, c := range cases {
 		code, _, stderr := run(t, dir, nil, c.args...)
@@ -1323,10 +1325,10 @@ func unitsProject(t *testing.T) string {
 	return dir
 }
 
-// emitAll は dir で hozoc emit を走らせ、gen の下に書かれたファイル（gen からの相対パス → 内容）を返す。
+// emitAll は dir で hozoc build を走らせ、gen の下に書かれたファイル（gen からの相対パス → 内容）を返す。
 func emitAll(t *testing.T, dir string, args ...string) map[string]string {
 	t.Helper()
-	code, stdout, stderr := run(t, dir, nil, append([]string{"emit"}, args...)...)
+	code, stdout, stderr := run(t, dir, nil, append([]string{"build"}, args...)...)
 	if code != 0 {
 		t.Fatalf("emit %v: code=%d stdout=%q stderr=%q", args, code, stdout, stderr)
 	}
@@ -1415,7 +1417,7 @@ func TestEmitUnits(t *testing.T) {
 	})
 }
 
-// TestEmitUnitsTargets は docs/cli.md「emit」の 1: 引数は名前空間で、その名前空間と子孫を出力するすべての単位の分を
+// TestEmitUnitsTargets は docs/cli.md「書き出し」の 1: 引数は名前空間で、その名前空間と子孫を出力するすべての単位の分を
 // 書き出す。対象を絞っても、書き出す出力の内容は、すべてを対象にしたときと同じ。プラグインには、対象を絞っても、すべての
 // 出力を頼む（check が、すべての出力の診断を要る）: 絞るのは、書き出すファイルだけ。
 func TestEmitUnitsTargets(t *testing.T) {
@@ -1479,10 +1481,10 @@ func TestEmitUnitsTargets(t *testing.T) {
 	}
 	// 引数は仕様にある名前空間でなければならない（単位の対象の名前空間の下の名前でも）。子孫が単位の対象なら、
 	// 引数そのものがどの単位の対象でなくてもよい（下の TestEmitArgumentDescendantOnly）
-	if code, stdout, stderr := run(t, dir, nil, "emit", "shop.typo"); code != exitUsage || stdout != "" || !strings.Contains(stderr, "名前空間 shop.typo も") {
+	if code, stdout, stderr := run(t, dir, nil, "build", "shop.typo"); code != exitUsage || stdout != "" || !strings.Contains(stderr, "名前空間 shop.typo も") {
 		t.Errorf("仕様にない名前空間: code=%d stdout=%q stderr=%q", code, stdout, stderr)
 	}
-	if code, _, stderr := run(t, dir, nil, "emit", "shop", "nope"); code != exitUsage || !strings.Contains(stderr, "名前空間 nope も") || strings.Contains(stderr, "shop、") {
+	if code, _, stderr := run(t, dir, nil, "build", "shop", "nope"); code != exitUsage || !strings.Contains(stderr, "名前空間 nope も") || strings.Contains(stderr, "shop、") {
 		t.Errorf("引数の一つが対象でない: code=%d stderr=%q", code, stderr)
 	}
 	if err := os.Remove(filepath.Join(dir, "shop", "audit.hozo")); err != nil {
@@ -1490,7 +1492,7 @@ func TestEmitUnitsTargets(t *testing.T) {
 	}
 	// dry-run は書かない
 	clear()
-	code, stdout, _ := run(t, dir, nil, "emit", "--dry-run", "shop.admin")
+	code, stdout, _ := run(t, dir, nil, "build", "--dry-run", "shop.admin")
 	if code != 0 || !strings.Contains(stdout, "written: gen/admin/admin.txt\n") || strings.Contains(stdout, "gen/api/") {
 		t.Errorf("dry-run: code=%d stdout=%q", code, stdout)
 	}
@@ -1499,7 +1501,7 @@ func TestEmitUnitsTargets(t *testing.T) {
 	}
 }
 
-// TestEmitArgumentDescendantOnly は docs/cli.md「emit」の 1（docs/decisions.md 50）: 引数の名前空間そのものがどの単位の
+// TestEmitArgumentDescendantOnly は docs/cli.md「書き出し」の 1（docs/decisions.md 50）: 引数の名前空間そのものがどの単位の
 // 対象でなくても、その子孫を対象にする単位があれば、その出力が対象になる（UnknownNamespace ではない）。
 // 引数もその子孫もどの単位の対象でもなければ UnknownNamespace。
 func TestEmitArgumentDescendantOnly(t *testing.T) {
@@ -1510,7 +1512,7 @@ func TestEmitArgumentDescendantOnly(t *testing.T) {
 	write(t, filepath.Join(dir, "hozo.toml"), pluginDirs+unit("shop.admin", "gen/admin", `"admin"`))
 	fakePlugin(t, dir, "admin", "go", "", `{"files":[{"path":"@DIR@/admin.txt","content":"@NS@"}],"warnings":[]}`, 0)
 
-	code, stdout, stderr := run(t, dir, nil, "emit", "shop")
+	code, stdout, stderr := run(t, dir, nil, "build", "shop")
 	if code != 0 || !strings.Contains(stdout, "written: gen/admin/admin.txt\n") {
 		t.Fatalf("子孫だけが単位の対象: code=%d stdout=%q stderr=%q", code, stdout, stderr)
 	}
@@ -1518,14 +1520,14 @@ func TestEmitArgumentDescendantOnly(t *testing.T) {
 	if err := os.RemoveAll(filepath.Join(dir, "gen")); err != nil {
 		t.Fatal(err)
 	}
-	if code, _, stderr = run(t, dir, nil, "emit"); code != 0 {
+	if code, _, stderr = run(t, dir, nil, "build"); code != 0 {
 		t.Fatalf("code=%d stderr=%q", code, stderr)
 	}
 	if got := readAll(t, filepath.Join(dir, "gen", "admin")); !reflect.DeepEqual(got, want) {
 		t.Errorf("引数 shop の出力が、すべてを対象にしたときと違う")
 	}
 	// other は仕様にあるが、どの単位の対象でもない
-	if code, stdout, stderr = run(t, dir, nil, "emit", "other"); code != exitUsage || stdout != "" || !strings.Contains(stderr, "名前空間 other も") {
+	if code, stdout, stderr = run(t, dir, nil, "build", "other"); code != exitUsage || stdout != "" || !strings.Contains(stderr, "名前空間 other も") {
 		t.Errorf("code=%d stdout=%q stderr=%q", code, stdout, stderr)
 	}
 }
@@ -1549,10 +1551,10 @@ func TestEmitIn(t *testing.T) {
 	if got := emitAll(t, dir); got["x/extra/e.txt"] != "e" {
 		t.Fatalf("gen/x/extra/e.txt がない: %v", got)
 	}
-	// in に合うファイルに宣言を持たなくなった名前空間は、その単位では出力しない。前回の出力は消える（docs/cli.md「emit」の 5）
+	// in に合うファイルに宣言を持たなくなった名前空間は、その単位では出力しない。前回の出力は消える（docs/cli.md「書き出し」の 5）
 	write(t, filepath.Join(dir, "hozo.toml"), pluginDirs+
 		"[[emit]]\nin = [\"shop/api.hozo\"]\nnamespace = \"shop.extra\"\ntranspilers = [\"extra\"]\nout = \"gen/x/extra\"\n")
-	code, stdout, stderr := run(t, dir, nil, "emit")
+	code, stdout, stderr := run(t, dir, nil, "build")
 	if code != 0 || stdout != "removed: gen/x/extra/e.txt\n" {
 		t.Fatalf("in で出力でなくなった名前空間: code=%d stdout=%q stderr=%q", code, stdout, stderr)
 	}
@@ -1699,7 +1701,7 @@ func TestStateUnits(t *testing.T) {
 	if empty, err := a.Outputs().IsEmpty(ctx); err != nil || !empty {
 		t.Errorf("emit の前の outputs.IsEmpty = %v, %v", empty, err)
 	}
-	res, err := a.Ops().Emit(ctx, hozoc.EmitInput{})
+	res, err := a.Ops().Build(ctx, hozoc.BuildInput{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1746,14 +1748,14 @@ func TestStateUnits(t *testing.T) {
 	}
 }
 
-// TestEmitAsksEachPluginOnce は docs/plugin-protocol.md「起動」: 一度の実行で、プラグインごとに、多くて一回、起動する。hozoc emit は、
+// TestEmitAsksEachPluginOnce は docs/plugin-protocol.md「起動」: 一度の実行で、プラグインごとに、多くて一回、起動する。hozoc build は、
 // 検査（check）と、書き出し（collectOutputs）で、同じ答えを使い、同じプラグインに、二度、頼まない。プラグインが受け持つ出力は、
 // 一つの要求に並ぶ。
 func TestEmitAsksEachPluginOnce(t *testing.T) {
 	dir := unitsProject(t)
 	for _, c := range []struct {
 		args []string
-	}{{[]string{"check"}}, {[]string{"emit"}}, {[]string{"emit", "--dry-run"}}} {
+	}{{[]string{"build", "--no-emit"}}, {[]string{"build"}}, {[]string{"build", "--dry-run"}}} {
 		before := map[string]int{}
 		for _, name := range []string{"api", "rider", "admin"} {
 			before[name] = launches(t, dir, name)
@@ -1792,5 +1794,107 @@ func TestEmitAsksEachPluginOnce(t *testing.T) {
 		if view["program"] != nil || view["namespaces"] != nil || view["viewer"] == nil || view["config"] == nil || view["ops"] == nil {
 			t.Errorf("outputs[%d].view が、出力ごとの部分だけでない", i)
 		}
+	}
+}
+
+// TestRenamedCommands は docs/cli.md「build」の「古い名前」: hozoc check と hozoc emit は、なくした。その名前で呼ばれたら、何もせずに、
+// 新しい書き方（残りの引数を付けたもの）を、標準エラーに示して、使い方の誤りの終了コード（64）で終わる。
+func TestRenamedCommands(t *testing.T) {
+	dir := unitsProject(t)
+	for _, c := range []struct {
+		args []string
+		now  string
+	}{
+		{[]string{"check"}, "hozoc build --no-emit を使う"},
+		{[]string{"check", "--format", "json"}, "hozoc build --no-emit --format json を使う"},
+		{[]string{"emit"}, "hozoc build を使う"},
+		{[]string{"emit", "--dry-run", "shop.admin"}, "hozoc build --dry-run shop.admin を使う"},
+	} {
+		code, stdout, stderr := run(t, dir, nil, c.args...)
+		if code != exitUsage || stdout != "" || !strings.Contains(stderr, "コマンド "+c.args[0]+" は、なくなった") || !strings.Contains(stderr, c.now) {
+			t.Errorf("%v: code=%d stdout=%q stderr=%q（want 64 と、%q）", c.args, code, stdout, stderr, c.now)
+		}
+	}
+	// 何もしていない: プラグインは、起動せず、ファイルも、書いていない
+	for _, name := range []string{"api", "rider", "admin"} {
+		if n := launches(t, dir, name); n != 0 {
+			t.Errorf("古い名前のコマンドで、プラグイン %s を起動した（%d 回）", name, n)
+		}
+	}
+	if _, err := os.Stat(filepath.Join(dir, "gen")); !os.IsNotExist(err) {
+		t.Error("古い名前のコマンドで、ファイルを書いた")
+	}
+	// 新しい名前の引数（名前空間 check、emit）は、古い名前ではない
+	if msg, renamed := Renamed([]string{"build", "check"}); renamed || msg != "" {
+		t.Errorf("Renamed(build check) = %q, %v", msg, renamed)
+	}
+	if _, renamed := Renamed(nil); renamed {
+		t.Error("Renamed(nil) が、古い名前と言った")
+	}
+}
+
+// TestBuildNoEmit は docs/cli.md「build」: hozoc build --no-emit は、検査だけ。ファイルには、触れない（書かず、消さず、置き場も
+// 読まない）が、ファイルを集めて、path と衝突を確かめるところ（「書き出し」の 1〜3）までは、行う。表示は、検査の結果だけ。
+func TestBuildNoEmit(t *testing.T) {
+	dir := unitsProject(t)
+	// 先に、ふつうに書き出して、置き場を作る
+	all := emitAll(t, dir)
+	if len(all) == 0 {
+		t.Fatal("書き出したファイルがない")
+	}
+	gen := filepath.Join(dir, "gen")
+	// 置き場に、前回書いて、今回は書かないはずのファイルを、記録ごと足す（build なら、消す）
+	stale := filepath.Join(gen, "admin", "stale.txt")
+	write(t, stale, "old")
+	record := filepath.Join(gen, "admin", OutputsFile)
+	write(t, record, strings.Replace(readFile(t, record), "[", "[\n  \"gen/admin/stale.txt\",", 1))
+	before, beforeTimes := readAll(t, gen), mtimes(t, gen)
+
+	for _, args := range [][]string{{"build", "--no-emit"}, {"build", "--no-emit", "--dry-run"}, {"build", "--no-emit", "shop.admin"}} {
+		code, stdout, stderr := run(t, dir, nil, args...)
+		// text の表示は、検査の結果だけ（warning と、数の行）: written も removed も、出ない
+		if code != 0 || stderr != "" || strings.Contains(stdout, "written:") || strings.Contains(stdout, "removed:") || !strings.HasSuffix(stdout, "0 errors, 0 warnings\n") {
+			t.Errorf("%v: code=%d stdout=%q stderr=%q", args, code, stdout, stderr)
+		}
+		if !reflect.DeepEqual(readAll(t, gen), before) || !reflect.DeepEqual(mtimes(t, gen), beforeTimes) {
+			t.Fatalf("%v が、置き場に触れた", args)
+		}
+	}
+	// json は、warnings だけ
+	code, stdout, _ := run(t, dir, nil, "build", "--no-emit", "--format=json")
+	var shown map[string]json.RawMessage
+	if err := json.Unmarshal([]byte(stdout), &shown); err != nil || code != 0 || len(shown) != 1 || shown["warnings"] == nil {
+		t.Errorf("json: code=%d stdout=%q (%v)", code, stdout, err)
+	}
+	// --dry-run だけなら、書き出す予定を出す（--no-emit との違い）
+	if code, stdout, _ = run(t, dir, nil, "build", "--dry-run"); code != 0 || !strings.Contains(stdout, "written: gen/admin/admin.txt\n") {
+		t.Errorf("dry-run: code=%d stdout=%q", code, stdout)
+	}
+	// --no-emit のない build は、古いファイルを消す
+	if code, stdout, _ = run(t, dir, nil, "build"); code != 0 || !strings.Contains(stdout, "removed: gen/admin/stale.txt\n") {
+		t.Errorf("build: code=%d stdout=%q", code, stdout)
+	}
+
+	// 集めて確かめるところは、--no-emit でも、行う: 出力先の外の path は PLG-1（proc.MalformedOutput。70）
+	write(t, filepath.Join(dir, "plugins", "rider", "response.json"), `{"files":[{"path":"elsewhere/x.txt","content":"x"}],"warnings":[]}`)
+	if code, _, stderr := run(t, dir, nil, "build", "--no-emit"); code != exitSoftwareOrCrash || !strings.Contains(stderr, "PLG-1") {
+		t.Errorf("PLG-1: code=%d stderr=%q", code, stderr)
+	}
+	// 名前空間の引数は、確かめる範囲を選ぶ: rider の出力（単位 1 の shop）を含まない範囲なら、通る
+	if code, _, stderr := run(t, dir, nil, "build", "--no-emit", "shop.admin"); code != 0 {
+		t.Errorf("範囲の外の PLG-1 を、見た: code=%d stderr=%q", code, stderr)
+	}
+}
+
+// TestBuildNoEmitWithoutConfig は docs/cli.md「build」の「hozo.toml がないとき」: build --no-emit は、設定なしで検査する。build は、
+// 書き出す単位がないので、CFG-7。
+func TestBuildNoEmitWithoutConfig(t *testing.T) {
+	dir := t.TempDir()
+	write(t, filepath.Join(dir, "a.hozo"), "namespace a {\n  fn f();\n}\n")
+	if code, stdout, stderr := run(t, dir, nil, "build", "--no-emit"); code != 0 || stdout != "0 errors, 0 warnings\n" || stderr != "" {
+		t.Errorf("build --no-emit: code=%d stdout=%q stderr=%q", code, stdout, stderr)
+	}
+	if code, _, stderr := run(t, dir, nil, "build"); code != exitConfigInvalid || !strings.Contains(stderr, "hozo.toml: error[CFG-7]") {
+		t.Errorf("build: code=%d stderr=%q", code, stderr)
 	}
 }

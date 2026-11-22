@@ -21,7 +21,7 @@ var generatedDirs = []string{"internal/gen/hozoc", "internal/gen/proc"}
 // CI の `make generate && git diff --exit-code` と同じことをここでも確かめる。
 //
 // リポジトリを一時ディレクトリに写し（cli.hozo、hozo.toml、go.mod、go.sum は複製。プラグインを `go run` で動かすために
-// 要る ir/、plugin/、plugins/、runtime/ はシンボリックリンク）、そこで hozoc emit を走らせ、出た置き場の中身を
+// 要る ir/、plugin/、plugins/、runtime/ はシンボリックリンク）、そこで hozoc build を走らせ、出た置き場の中身を
 // コミット済みのものとバイト単位で比べる。go.mod が同じ module なので import パスも同じになる。
 // 差があれば `make generate` で生成し直してコミットする。
 func TestGeneratedUpToDate(t *testing.T) {
@@ -52,9 +52,9 @@ func TestGeneratedUpToDate(t *testing.T) {
 	}
 
 	var stdout, stderr bytes.Buffer
-	code := hozocMainIn(root, []string{"emit"}, &stdout, &stderr)
+	code := hozocMainIn(root, []string{"build"}, &stdout, &stderr)
 	if code != 0 {
-		t.Fatalf("hozoc emit の終了コード %d\n%s%s", code, stdout.String(), stderr.String())
+		t.Fatalf("hozoc build の終了コード %d\n%s%s", code, stdout.String(), stderr.String())
 	}
 
 	for _, generatedDir := range generatedDirs {

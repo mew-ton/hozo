@@ -16,7 +16,7 @@ import (
 // このファイルは、状態の分類 OutputsSync（cli.hozo の `classify OutputsSync of outputs`）の単位の実装と、生成したファイルと
 // 出力先ごとの記録に触れる補助。
 
-// OutputsFile は、出力（単位と名前空間の組）ごとの Dir(U, N) に置く、前回書いたパスの一覧（docs/cli.md「emit」の 5 と 7）。
+// OutputsFile は、出力（単位と名前空間の組）ごとの Dir(U, N) に置く、前回書いたパスの一覧（docs/cli.md「書き出し」の 5 と 7）。
 // JSON の文字列の配列で、パスはルートからの相対パス（"/" 区切り）、辞書順。
 const OutputsFile = ".hozoc-outputs.json"
 
@@ -27,7 +27,7 @@ func (a *App) OutputsSync() hozoc.OutputsSyncState { return outputsSync{a} }
 // outputsSync は [App.OutputsSync] が返す値。
 type outputsSync struct{ a *App }
 
-// SyncOutputs は cli.hozo の効果 syncOutputs（on OutputsSync: any -> UpToDate。docs/cli.md「emit」の 5〜7）: 生成したファイルを、
+// SyncOutputs は cli.hozo の効果 syncOutputs（on OutputsSync: any -> UpToDate。docs/cli.md「書き出し」の 5〜7）: 生成したファイルを、
 // 書き出す予定 plan に合わせる。配線 writeOutputs が、collectOutputs と outputChanges の後に呼ぶ。plan は、直前の
 // CollectOutputs が返したもの（置き場は [App.plannedFor] から取る）。plan が dryRun なら、何もしない（同 4）。
 //
@@ -46,7 +46,7 @@ func (s outputsSync) SyncOutputs(ctx context.Context, plan hozoc.EmitPlan) error
 		return err
 	}
 	// 4. dry-run
-	if dryRun(plan) {
+	if noEmit(plan) || dryRun(plan) {
 		return nil
 	}
 
@@ -156,7 +156,7 @@ type staleFile struct {
 }
 
 // stale は、予定 pl の対象の各出力の記録（<Dir(U, N)>/.hozoc-outputs.json。前回書いたパスの一覧）にあって、今回は書かないパスの
-// うち、ディスクにあるもの（docs/cli.md「emit」の 5 が消すファイル）。並びは、対象の出力の順、その中は記録の順。読むだけで、
+// うち、ディスクにあるもの（docs/cli.md「書き出し」の 5 が消すファイル）。並びは、対象の出力の順、その中は記録の順。読むだけで、
 // 何も変えない: 何を消すかを決める read outputChanges（[outputsState.OutputChanges]）と、消す効果 syncOutputs
 // （[outputsSync.SyncOutputs]）が、同じこの一覧を使う。
 //
@@ -209,7 +209,7 @@ func readOutputsFile(root, dir string) ([]string, error) {
 }
 
 // removeEmptyDirs は、消したファイル removed（ルートからの相対パス）のディレクトリが空になっていれば、出力先 dir の下の範囲で、
-// そのディレクトリも消す（docs/cli.md「emit」の 5: Go の基底の内側のフォルダ inner が要らなくなったとき）。親へ向かって、
+// そのディレクトリも消す（docs/cli.md「書き出し」の 5: Go の基底の内側のフォルダ inner が要らなくなったとき）。親へ向かって、
 // 空でないディレクトリか dir そのものに当たるまで続ける。dir そのものは消さない。
 func removeEmptyDirs(root, dir, removed string) {
 	for d := path.Dir(removed); config.Under(d, dir); d = path.Dir(d) {

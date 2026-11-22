@@ -59,7 +59,7 @@ func TestPluginViewFixtures(t *testing.T) {
 		}
 		t.Run(filepath.ToSlash(rel), func(t *testing.T) {
 			// プラグインは、起動しない: ここで要るのは View だけで、入力には、プラグインが診断を返すための仕様もある
-			// （その診断が、hozoc check で出ることは、TestPluginDiagnosticsAtCheck）
+			// （その診断が、hozoc build --no-emit で出ることは、TestPluginDiagnosticsAtCheck）
 			p := project.LoadWith(project.Options{Root: dir, PluginPath: repoPlugins(t) + samplePluginPath(t, dir), NoPlugins: true})
 			if n, _ := diag.Count(p.Diags); n > 0 {
 				var b strings.Builder

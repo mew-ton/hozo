@@ -1610,7 +1610,7 @@ func (f *FakeVoid[A]) Call(args A, impl func() error) error
 
 ## 診断
 
-`emit` の応答の `errors` で返す。検査だけの実行（`hozoc check`）も、同じ応答の診断を使う（どれも error の診断になり、`CheckFailed`。`docs/plugin-protocol.md`「起動」「emit」）。位置は、表に書いた宣言の FQN。
+`emit` の応答の `errors` で返す。検査だけの実行（`hozoc build --no-emit`）も、同じ応答の診断を使う（どれも error の診断になり、`CheckFailed`。`docs/plugin-protocol.md`「起動」「emit」）。位置は、表に書いた宣言の FQN。
 
 | ID | 重さ | 意味 |
 |---|---|---|

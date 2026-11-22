@@ -461,7 +461,7 @@ func dependencyFiles(t *testing.T, root string, views []*ir.View) map[string]str
 	return files
 }
 
-// compose は、root に、依存するトランスパイラの出力と、go-http の出力 files を書く（hozoc emit が書き出すものと同じ木）。
+// compose は、root に、依存するトランスパイラの出力と、go-http の出力 files を書く（hozoc build が書き出すものと同じ木）。
 func compose(t *testing.T, root string, views []*ir.View, files map[string]string) {
 	t.Helper()
 	deps := dependencyFiles(t, root, views)

@@ -14,7 +14,7 @@ import (
 type LeavesFake struct {
 	Check          runtime.Fake[struct{ In hozoc.CheckInput }, hozoc.CheckResult]
 	CollectOutputs runtime.Fake[struct {
-		In      hozoc.EmitInput
+		In      hozoc.BuildInput
 		Checked hozoc.CheckResult
 	}, hozoc.EmitPlan]
 	MatchTests runtime.Fake[struct {
@@ -40,9 +40,9 @@ func (o leavesFake) Check(ctx context.Context, in hozoc.CheckInput) (hozoc.Check
 	return o.f.Check.Call(struct{ In hozoc.CheckInput }{in}, func() (hozoc.CheckResult, error) { return o.impl.Check(ctx, in) })
 }
 
-func (o leavesFake) CollectOutputs(ctx context.Context, in hozoc.EmitInput, checked hozoc.CheckResult) (hozoc.EmitPlan, error) {
+func (o leavesFake) CollectOutputs(ctx context.Context, in hozoc.BuildInput, checked hozoc.CheckResult) (hozoc.EmitPlan, error) {
 	return o.f.CollectOutputs.Call(struct {
-		In      hozoc.EmitInput
+		In      hozoc.BuildInput
 		Checked hozoc.CheckResult
 	}{in, checked}, func() (hozoc.EmitPlan, error) { return o.impl.CollectOutputs(ctx, in, checked) })
 }
@@ -110,7 +110,7 @@ func (o configStateFake) Get(ctx context.Context) (*hozoc.SourceFile, error) {
 type OutputsStateFake struct {
 	IsEmpty       runtime.Fake[struct{}, bool]
 	Get           runtime.Fake[struct{}, []hozoc.OutputFile]
-	OutputChanges runtime.Fake[struct{ Plan hozoc.EmitPlan }, hozoc.EmitResult]
+	OutputChanges runtime.Fake[struct{ Plan hozoc.EmitPlan }, hozoc.BuildResult]
 }
 
 // outputsStateFake は、OutputsStateFake を、hozoc.OutputsState にする。
@@ -126,7 +126,7 @@ func (o outputsStateFake) Get(ctx context.Context) ([]hozoc.OutputFile, error) {
 	return o.f.Get.Call(struct{}{}, nil)
 }
 
-func (o outputsStateFake) OutputChanges(ctx context.Context, plan hozoc.EmitPlan) (hozoc.EmitResult, error) {
+func (o outputsStateFake) OutputChanges(ctx context.Context, plan hozoc.EmitPlan) (hozoc.BuildResult, error) {
 	return o.f.OutputChanges.Call(struct{ Plan hozoc.EmitPlan }{plan}, nil)
 }
 

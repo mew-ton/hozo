@@ -10,15 +10,7 @@ import (
 
 // Ops は、この名前空間の外から呼べる op: 仕様で export を付けた op。宣言順。New が返す。
 type Ops interface {
-	// Check は仕様を検査する。使うプラグインに、展開を頼み、その診断も集める。ファイルは書き出さない。
-	//
-	// 引数:
-	//   - in: コマンドの入力
-	//
-	// Throws: hozoc.CheckFailed, hozoc.ConfigInvalid, hozoc.LanguageMismatch, proc.Crashed, proc.MalformedOutput
-	Check(ctx context.Context, in CheckInput) (CheckResult, error)
-
-	// Emit は仕様を検査し、プラグインから受け取ったファイルを書き出す。
+	// Build は仕様を検査し、プラグインから受け取ったファイルを書き出す。--no-emit なら、検査だけを行い、ファイルを書き出さない。
 	//
 	// 引数:
 	//   - in: コマンドの入力
@@ -26,7 +18,7 @@ type Ops interface {
 	// Throws: hozoc.CheckFailed, hozoc.ConfigInvalid, hozoc.LanguageMismatch, proc.Crashed, proc.MalformedOutput, hozoc.OutputConflict, hozoc.UnknownNamespace
 	// Reads: hozoc.outputs
 	// Effects: hozoc.syncOutputs
-	Emit(ctx context.Context, in EmitInput) (EmitResult, error)
+	Build(ctx context.Context, in BuildInput) (BuildResult, error)
 
 	// Tests は仕様を検査し、求めるテストが走ったかを、カバレッジと突き合わせて確かめる。テストは走らせない。
 	//

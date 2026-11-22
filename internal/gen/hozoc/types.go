@@ -52,17 +52,17 @@ type UnknownNamespace = inner.UnknownNamespace
 // CheckResult は検査の結果（誤りではない指摘）
 type CheckResult = inner.CheckResult
 
-// EmitResult は書き出しの結果
-type EmitResult = inner.EmitResult
+// BuildResult は build の結果。--no-emit なら、written も removed も空
+type BuildResult = inner.BuildResult
 
 // TestsResult は突き合わせの結果
 type TestsResult = inner.TestsResult
 
-// CheckInput は check の入力
+// CheckInput は検査（check）の入力。コマンドの入力（BuildInput、TestsInput）から、配線が作る
 type CheckInput = inner.CheckInput
 
-// EmitInput は emit の入力
-type EmitInput = inner.EmitInput
+// BuildInput は build の入力
+type BuildInput = inner.BuildInput
 
 // TestsInput は tests の入力
 type TestsInput = inner.TestsInput

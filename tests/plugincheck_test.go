@@ -10,7 +10,7 @@ import (
 	"testing"
 )
 
-// このファイルは、プラグインの診断が、hozoc check で出ることを、本物のプラグインで確かめる（docs/cli.md「check」の 4、
+// このファイルは、プラグインの診断が、hozoc build --no-emit で出ることを、本物のプラグインで確かめる（docs/cli.md「検査」の 4、
 // docs/plugin-protocol.md「起動」「emit」、docs/decisions.md「決めたこと」404、416）。
 //
 // 検査は、プラグインに emit を頼み、その答えの診断を使う。SDK が、要求の並びを回すことは、plugin の TestRunEmitBatch、hozoc が、
@@ -72,7 +72,7 @@ func pluginCheckProject(t *testing.T, plugin, pkg, name string) string {
 }
 
 // TestPluginDiagnosticsAtCheck は、通信に出せない union（GOHTTP-5。docs/plugin-go-http.md「通信の形」の「union」）が、
-// hozoc check で、位置と一緒に出て、0 でない終了コードで終わること。hozoc emit も、同じ診断で止まり、何も書き出さない。
+// hozoc build --no-emit で、位置と一緒に出て、0 でない終了コードで終わること。hozoc build も、同じ診断で止まり、何も書き出さない。
 func TestPluginDiagnosticsAtCheck(t *testing.T) {
 	root := pluginCheckProject(t, "go-http", "gohttp", "gohttp5")
 	want, err := os.ReadFile(filepath.Join(repoPluginsDir, "go-http", "internal", "gohttp", "testdata", "gohttp5", "expected", "errors.txt"))
@@ -82,10 +82,10 @@ func TestPluginDiagnosticsAtCheck(t *testing.T) {
 	lines := strings.Split(strings.TrimSpace(string(want)), "\n")
 
 	var stdout, stderr bytes.Buffer
-	code := hozocCorpus(t, root, []string{"check"}, &stdout, &stderr)
+	code := hozocCorpus(t, root, []string{"build", "--no-emit"}, &stdout, &stderr)
 	out := stderr.String()
 	if code != 1 {
-		t.Fatalf("hozoc check の終了コード = %d（期待は 1: CheckFailed）\n%s", code, out)
+		t.Fatalf("hozoc build --no-emit の終了コード = %d（期待は 1: CheckFailed）\n%s", code, out)
 	}
 	// プラグインの単体テストが待つ診断（コード、位置の宣言、文面）が、すべて、位置（ファイル、行、列）と一緒に出る
 	located := regexp.MustCompile(`(?m)^app\.hozo:\d+:\d+: error\[GOHTTP-5\]: `)
@@ -105,26 +105,26 @@ func TestPluginDiagnosticsAtCheck(t *testing.T) {
 	// emit も、同じ診断で止まり、何も書き出さない
 	stdout.Reset()
 	stderr.Reset()
-	if code := hozocCorpus(t, root, []string{"emit"}, &stdout, &stderr); code != 1 || !strings.Contains(stderr.String(), "error[GOHTTP-5]") {
-		t.Errorf("hozoc emit の終了コード = %d\n%s", code, stderr.String())
+	if code := hozocCorpus(t, root, []string{"build"}, &stdout, &stderr); code != 1 || !strings.Contains(stderr.String(), "error[GOHTTP-5]") {
+		t.Errorf("hozoc build の終了コード = %d\n%s", code, stderr.String())
 	}
 	if _, err := os.Stat(filepath.Join(root, "gen")); err == nil {
 		t.Error("診断があるのに、emit が、ファイルを書き出した")
 	}
 }
 
-// TestCheckPassesThenEmitPasses は、hozoc check が通った仕様は、hozoc emit で、プラグインの errors に止められないこと:
+// TestCheckPassesThenEmitPasses は、hozoc build --no-emit が通った仕様は、hozoc build で、プラグインの errors に止められないこと:
 // 通信に出せる union を持つ入力（go-http の unions）で、check も emit も、0 で終わる。
 func TestCheckPassesThenEmitPasses(t *testing.T) {
 	root := pluginCheckProject(t, "go-http", "gohttp", "unions")
 	var stdout, stderr bytes.Buffer
-	if code := hozocCorpus(t, root, []string{"check"}, &stdout, &stderr); code != 0 || stdout.String() != "0 errors, 0 warnings\n" {
-		t.Fatalf("hozoc check の終了コード = %d\n%s%s", code, stdout.String(), stderr.String())
+	if code := hozocCorpus(t, root, []string{"build", "--no-emit"}, &stdout, &stderr); code != 0 || stdout.String() != "0 errors, 0 warnings\n" {
+		t.Fatalf("hozoc build --no-emit の終了コード = %d\n%s%s", code, stdout.String(), stderr.String())
 	}
 	stdout.Reset()
 	stderr.Reset()
-	if code := hozocCorpus(t, root, []string{"emit"}, &stdout, &stderr); code != 0 {
-		t.Fatalf("hozoc emit の終了コード = %d\n%s", code, stderr.String())
+	if code := hozocCorpus(t, root, []string{"build"}, &stdout, &stderr); code != 0 {
+		t.Fatalf("hozoc build の終了コード = %d\n%s", code, stderr.String())
 	}
 	if _, err := os.Stat(filepath.Join(root, "gen", "api", "http.go")); err != nil {
 		t.Errorf("emit が、gen/api/http.go を書き出していない: %v", err)

@@ -381,7 +381,7 @@ export fn start(id: JobId): Job throws NoJob, NotQueued {
 
 ## 分かったこと
 
-書けなかったもの、書きにくかったもの、規則がないまま決めたもの。それぞれ「何が起きたか → サンプルではどうしたか」。確かめた診断は、このサンプルの外の小さな仕様に `hozoc check` を掛けたもの。
+書けなかったもの、書きにくかったもの、規則がないまま決めたもの。それぞれ「何が起きたか → サンプルではどうしたか」。確かめた診断は、このサンプルの外の小さな仕様に `hozoc build --no-emit` を掛けたもの。
 
 ### 言語
 
@@ -433,7 +433,7 @@ export fn start(id: JobId): Job throws NoJob, NotQueued {
 - **F34 書く量をいちばん増やしたのは THROWS-1。** `staffApi.buyLabel` の `throws` は 13、`storefront.placeOrder` は 12。同じ並びを、`fulfilment.dispatch`、`staffApi.buyLabel`、`backoffice.onBuyLabel` の `@recover` で、三度書く。例外のユニオンでまとめることは、していない（G8）。 → 配線の op は、`throws` を書かなくてよくなり（`docs/decisions.md`「決めたこと」379）、`staffApi.buyLabel`、`storefront.placeOrder`、`fulfilment.dispatch` の節は、消した（「配線の op の `throws` を消したこと」）。同じ並びを書くのは、`backoffice.onBuyLabel` の `@recover` の一度だけ。
 - **F35 DEC-16 は、画面で役に立った。** `@recover` の相手を、その op が投げない例外にすると warning。
 - **F36 op が値を返すかどうかが、呼ぶ側の都合で決まった。** 確かめるためだけに呼ぶ op は、値を返せない（WIRE-2 と WIRE-8）。→ `staff.asPacker`、`inventory.pick`、`payment.settle` を、値を返さない op に直した。
-- **F37 `hozoc check` は、親のディレクトリの `hozo.toml` を拾う。** サンプルに `hozo.toml` を置く前は、リポジトリ直下の設定で検査され、「0 errors」と出た（`docs/config.md`「置き場と探し方」のとおりの振る舞い）。
+- **F37 `hozoc build --no-emit` は、親のディレクトリの `hozo.toml` を拾う。** サンプルに `hozo.toml` を置く前は、リポジトリ直下の設定で検査され、「0 errors」と出た（`docs/config.md`「置き場と探し方」のとおりの振る舞い）。
 
 ### 指針が引っ張り合ったところ
 
@@ -732,5 +732,5 @@ R6 の、言語の部分（`docs/requirements.md`「R6 の、言語の部分」�
 
 ## 確かめ方
 
-- このディレクトリで `go run ../../../cmd/hozoc check`。結果は `0 errors, 0 warnings`。
+- このディレクトリで `go run ../../../cmd/hozoc build --no-emit`。結果は `0 errors, 0 warnings`。
 - リポジトリで `go test ./tests/ -run TestSamples/order-app -count=1 -v`。走るのは `check` だけ（`../README.md`「仕様だけのサンプル」）。

@@ -26,7 +26,7 @@ func (k diagKey) String() string {
 	return fmt.Sprintf("%s:%d:%d %s sev=%d", k.file, k.line, k.col, k.code, k.severity)
 }
 
-// checkKeys は hozoc check 側（internal/project.Load）の診断の集合。
+// checkKeys は hozoc build --no-emit 側（internal/project.Load）の診断の集合。
 func checkKeys(p *project.Project) map[diagKey]bool {
 	out := map[diagKey]bool{}
 	for _, d := range p.Diags {

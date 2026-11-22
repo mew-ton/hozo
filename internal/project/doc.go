@@ -1,5 +1,5 @@
 // Package project は一度の解析のすべて（docs/packages.md「internal/project」）。CLI（internal/app）と
-// 言語サーバー（internal/lsp）の共通の入口で、docs/cli.md「check」の 1〜4 をこの順に行う:
+// 言語サーバー（internal/lsp）の共通の入口で、docs/cli.md「検査」の 1〜4 をこの順に行う:
 //
 //  1. hozo.toml を読む（docs/config.md「置き場と探し方」）。なければ既定の設定で動き（Project.NoConfig）、
 //     CFG-* の診断を除く（言語サーバーの「設定なしで動く」のため。CLI 側で CFG-7 にするのは internal/app）。

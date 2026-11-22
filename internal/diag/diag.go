@@ -9,7 +9,7 @@ import (
 type Severity int
 
 const (
-	// Error は誤り。一つでもあれば hozoc check は失敗する（docs/diagnostics.md「終了コード」）。
+	// Error は誤り。一つでもあれば hozoc build --no-emit は失敗する（docs/diagnostics.md「終了コード」）。
 	Error Severity = iota
 	// Warning は警告。
 	Warning

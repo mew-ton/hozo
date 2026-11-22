@@ -100,7 +100,7 @@ func (s configState) IsEmpty(ctx context.Context) (bool, error) {
 	return file == nil, err
 }
 
-// Outputs は、状態 outputs（生成したファイル）の単位の実装: 出力先ごとの記録（.hozoc-outputs.json。docs/cli.md「emit」の 5 と 7）に
+// Outputs は、状態 outputs（生成したファイル）の単位の実装: 出力先ごとの記録（.hozoc-outputs.json。docs/cli.md「書き出し」の 5 と 7）に
 // 載っているファイルと、それに触れる read outputChanges。hozoc.New の引数 outputs に渡す（[App.Ops]）。
 func (a *App) Outputs() hozoc.OutputsState { return outputsState{a} }
 
@@ -152,7 +152,7 @@ func (s outputsState) IsEmpty(ctx context.Context) (bool, error) {
 	return len(files) == 0, err
 }
 
-// OutputChanges は cli.hozo の read outputChanges（on outputs。docs/cli.md「emit」の 4〜7 の、書くファイルと消すファイルを決める
+// OutputChanges は cli.hozo の read outputChanges（on outputs。docs/cli.md「書き出し」の 4〜7 の、書くファイルと消すファイルを決める
 // ところ）: 書き出す予定 plan を、今の生成したファイルと比べる。読むだけで、何も変えない（書き出すのは、効果 syncOutputs。
 // [outputsSync.SyncOutputs]）。配線 writeOutputs が、collectOutputs の後、syncOutputs の前に呼び、その結果を返す。plan は、
 // 直前の CollectOutputs が返したもの（置き場は [App.plannedFor] から取る）。
@@ -161,15 +161,19 @@ func (s outputsState) IsEmpty(ctx context.Context) (bool, error) {
 //   - Written は、書く予定のファイル（パスの辞書順）。内容が同じで書き直さないものも入れる（同 6）。
 //   - Removed は、消すファイル: 対象の各出力の記録にあって、今回は書かないパスのうち、ディスクにあるもの（[outputPlan.stale]）。
 //     パスの辞書順。plan が dryRun なら、決めずに空（同 4: 書く予定のパスだけを返す）。
-func (s outputsState) OutputChanges(ctx context.Context, plan hozoc.EmitPlan) (hozoc.EmitResult, error) {
+//   - plan が noEmit（hozoc build --no-emit）なら、Written も Removed も空（同 4）。
+func (s outputsState) OutputChanges(ctx context.Context, plan hozoc.EmitPlan) (hozoc.BuildResult, error) {
 	if err := ctx.Err(); err != nil {
-		return hozoc.EmitResult{}, err
+		return hozoc.BuildResult{}, err
 	}
 	pl, err := s.a.plannedFor(plan)
 	if err != nil {
-		return hozoc.EmitResult{}, err
+		return hozoc.BuildResult{}, err
 	}
-	result := hozoc.EmitResult{Warnings: plan.Warnings, Written: make([]hozoc.Path, 0, len(plan.Files)), Removed: []hozoc.Path{}}
+	result := hozoc.BuildResult{Warnings: plan.Warnings, Written: make([]hozoc.Path, 0, len(plan.Files)), Removed: []hozoc.Path{}}
+	if noEmit(plan) {
+		return result, nil // 検査だけ: 書くものも、消すものも、ない（置き場は、読まない）
+	}
 	for _, f := range plan.Files {
 		result.Written = append(result.Written, f.Path)
 	}
@@ -178,7 +182,7 @@ func (s outputsState) OutputChanges(ctx context.Context, plan hozoc.EmitPlan) (h
 	}
 	stale, err := pl.stale()
 	if err != nil {
-		return hozoc.EmitResult{}, err
+		return hozoc.BuildResult{}, err
 	}
 	for _, f := range stale {
 		result.Removed = append(result.Removed, hozoc.Path(f.path))

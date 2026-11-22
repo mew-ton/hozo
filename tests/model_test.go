@@ -198,7 +198,7 @@ func TestModelCorpus(t *testing.T) {
 		// shop は単位の対象（出力する名前空間）だが、その単位のトランスパイラ none はファイルを返さない。hozoc 本体は
 		// コードを出力しない（docs/plugin-protocol.md「この文書が決めること」）ので、emit は何も書かない。印のデコレータ
 		// （@marks.*）も何も生成しない。前回の出力（.hozoc-outputs.json にあるもの）は古いファイルとして消え、記録も残らない
-		// （docs/cli.md「emit」の 5 と 7）。
+		// （docs/cli.md「書き出し」の 5 と 7）。
 		requireSh(t)
 		dir := t.TempDir()
 		copyHozo(t, modelCorpus, dir)
@@ -227,8 +227,8 @@ func TestModelCorpus(t *testing.T) {
 			}
 		}
 		var stdout, stderr bytes.Buffer
-		if code := hozocMainIn(dir, []string{"emit"}, &stdout, &stderr); code != 0 || stdout.String() != "removed: gen/shop/ops.go\n" || stderr.String() != "" {
-			t.Fatalf("hozoc emit: code=%d stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+		if code := hozocMainIn(dir, []string{"build"}, &stdout, &stderr); code != 0 || stdout.String() != "removed: gen/shop/ops.go\n" || stderr.String() != "" {
+			t.Fatalf("hozoc build: code=%d stdout=%q stderr=%q", code, stdout.String(), stderr.String())
 		}
 		var left []string
 		for p := range readTree(t, filepath.Join(dir, "gen")) {
@@ -237,8 +237,8 @@ func TestModelCorpus(t *testing.T) {
 		expect(t, "gen に残るファイル", left, []string{"shop/hand.go"})
 		// 二度目は何も書かず、何も消さない
 		stdout.Reset()
-		if code := hozocMainIn(dir, []string{"emit"}, &stdout, &stderr); code != 0 || stdout.String() != "" {
-			t.Errorf("二度目の hozoc emit: code=%d stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+		if code := hozocMainIn(dir, []string{"build"}, &stdout, &stderr); code != 0 || stdout.String() != "" {
+			t.Errorf("二度目の hozoc build: code=%d stdout=%q stderr=%q", code, stdout.String(), stderr.String())
 		}
 	})
 
@@ -254,13 +254,13 @@ func TestModelCorpus(t *testing.T) {
 		expect(t, "buy の Signature.effects", effectStrings(q.Sema.Program.Lookup("customer.buy").(*ir.Op).Signature.Effects),
 			[]string{"customer.forget", "shop.addLine", "shop.createOrder", "carrier.accept"})
 		var stdout, stderr bytes.Buffer
-		if code := hozocMainIn(dir, []string{"check"}, &stdout, &stderr); code != 0 || stdout.String() != "0 errors, 0 warnings\n" {
-			t.Errorf("hozoc check（設定なし）: code=%d stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+		if code := hozocMainIn(dir, []string{"build", "--no-emit"}, &stdout, &stderr); code != 0 || stdout.String() != "0 errors, 0 warnings\n" {
+			t.Errorf("hozoc build --no-emit（設定なし）: code=%d stdout=%q stderr=%q", code, stdout.String(), stderr.String())
 		}
 		stdout.Reset()
 		stderr.Reset()
-		if code := hozocMainIn(dir, []string{"emit"}, &stdout, &stderr); code != 2 || !strings.Contains(stderr.String(), "error[CFG-7]") {
-			t.Errorf("hozoc emit（設定なし）: code=%d stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+		if code := hozocMainIn(dir, []string{"build"}, &stdout, &stderr); code != 2 || !strings.Contains(stderr.String(), "error[CFG-7]") {
+			t.Errorf("hozoc build（設定なし）: code=%d stdout=%q stderr=%q", code, stdout.String(), stderr.String())
 		}
 	})
 }

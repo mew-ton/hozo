@@ -127,8 +127,8 @@ type CheckResult struct {
 	Warnings []Diagnostic `json:"warnings"`
 }
 
-// EmitResult は書き出しの結果
-type EmitResult struct {
+// BuildResult は build の結果。--no-emit なら、written も removed も空
+type BuildResult struct {
 	Warnings []Diagnostic `json:"warnings"`
 	// 書いたファイル（新規と更新）
 	Written []Path `json:"written"`
@@ -143,7 +143,7 @@ type TestsResult struct {
 	Ran []string `json:"ran"`
 }
 
-// CheckInput は check の入力
+// CheckInput は検査（check）の入力。コマンドの入力（BuildInput、TestsInput）から、配線が作る
 type CheckInput struct {
 	// 設定ファイルの場所
 	Config *Path `json:"config,omitempty"`
@@ -153,14 +153,16 @@ type CheckInput struct {
 	PluginPath *string `json:"pluginPath,omitempty"`
 }
 
-// EmitInput は emit の入力
-type EmitInput struct {
+// BuildInput は build の入力
+type BuildInput struct {
 	// 設定ファイルの場所
 	Config *Path `json:"config,omitempty"`
 	// 表示の形式
 	Format *OutputFormat `json:"format,omitempty"`
 	// 生成する名前空間（一つもなければすべて）。その名前空間と子孫を出力する単位の分を書き出す
 	Namespaces []string `json:"namespaces"`
+	// 検査だけを行い、ファイルを書き出さない
+	NoEmit *bool `json:"noEmit,omitempty"`
 	// 書き出さずに、書き出す予定のファイルだけを表示する
 	DryRun *bool `json:"dryRun,omitempty"`
 	// プラグインを探すディレクトリ（OS のパス区切りで複数）
@@ -195,6 +197,8 @@ type EmitPlan struct {
 	Files    []OutputFile `json:"files"`
 	// 書き出さずに、書き出す予定だけを返す
 	DryRun *bool `json:"dryRun,omitempty"`
+	// 検査だけ: 書き出さず、書き出す予定も返さない
+	NoEmit *bool `json:"noEmit,omitempty"`
 }
 
 // EffectSyncOutputs は生成したファイルを今の仕様と設定に合わせる（足りないものを書き、古いものを書き換え、余分なものを消す）。

@@ -12,7 +12,7 @@
 
 `docs/testing.md`「コーパス」は一覧の置き場を `tests/corpus/README.md` としているが、コーパスごとに分けるためこのディレクトリに置いた。
 
-ゴールデン（`docs/testing.md`「コーパス」、`tests/corpus_emit_test.go`）は `testdata/expected/` の下（Go のツールが `.go` を拾わないように `testdata`）: `check.txt` は `hozoc check` の text 出力、`emit/` は `hozoc emit` が書き出すファイルの木。更新は `go test ./tests -update`。
+ゴールデン（`docs/testing.md`「コーパス」、`tests/corpus_emit_test.go`）は `testdata/expected/` の下（Go のツールが `.go` を拾わないように `testdata`）: `check.txt` は `hozoc build --no-emit` の text 出力、`emit/` は `hozoc build` が書き出すファイルの木。更新は `go test ./tests -update`。
 
 ## 設計書から変えた箇所
 
@@ -93,4 +93,4 @@
 | §10.2 `@page.interaction(page: openProduct, when: ProductPage.Ready)`、§11.2 `orders: OrderRow[]`、§7.3 の `CancelInput` / `Order` / `refund` など | 宣言がないので RES-1 | 「追加した宣言」で補った |
 | §11.1 `fetchMe` の `@redirectToLogin`（`catches server.Unauthorized halts transitionToLogin`） | `server.getMe` が `server.Unauthorized` を投げること（`@requiresAuth`）を前提にしているが、`getMe` の宣言は設計書にない | 表の 9 |
 
-このコーパスで `hozoc check` に error も warning も出ない想定（`docs/check.md` の各規則を手で追った結果。REL-4 は、関係の節を書いた配線（表の 20）の本体と照合し（節と、計算した分の、過不足を見る THROWS-1 と EFF-2 は、欠番になった: `docs/decisions.md`「決めたこと」381）、STATE-5 は葉の op が `reads` / `effects` を書いていないこと、MATCH-2 は `WarrantyKind` の三つのケースと `WarrantyAvailable` の `default`、BIND-4 は `server.*` への呼び出し六つ（`logout` `getMe` `getOrders` `getItem` `addToCart` `attachWarranty`）の必須の入力を確かめた）。
+このコーパスで `hozoc build --no-emit` に error も warning も出ない想定（`docs/check.md` の各規則を手で追った結果。REL-4 は、関係の節を書いた配線（表の 20）の本体と照合し（節と、計算した分の、過不足を見る THROWS-1 と EFF-2 は、欠番になった: `docs/decisions.md`「決めたこと」381）、STATE-5 は葉の op が `reads` / `effects` を書いていないこと、MATCH-2 は `WarrantyKind` の三つのケースと `WarrantyAvailable` の `default`、BIND-4 は `server.*` への呼び出し六つ（`logout` `getMe` `getOrders` `getItem` `addToCart` `attachWarranty`）の必須の入力を確かめた）。

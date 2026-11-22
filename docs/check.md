@@ -2,7 +2,7 @@
 
 ## この文書が決めること
 
-`hozoc check` と `hozoc lsp` が IR（`docs/ir.md`）の上で行う計算と、規則ごとの検査の手続き・診断を決める。規則の ID と、短く言った意味は `docs/requirements.md`「検査の規則の一覧」にあり、ここでは、その手続きを書く。その一覧にない規則は、この文書の「診断」の各表が持ち主。名前の解決（`RES-*`）と型（`TYPE-*`、`LIT-1`）はそれぞれ `docs/resolve.md`「診断」、`docs/types.md`「診断」。
+`hozoc build --no-emit` と `hozoc lsp` が IR（`docs/ir.md`）の上で行う計算と、規則ごとの検査の手続き・診断を決める。規則の ID と、短く言った意味は `docs/requirements.md`「検査の規則の一覧」にあり、ここでは、その手続きを書く。その一覧にない規則は、この文書の「診断」の各表が持ち主。名前の解決（`RES-*`）と型（`TYPE-*`、`LIT-1`）はそれぞれ `docs/resolve.md`「診断」、`docs/types.md`「診断」。
 
 検査は IR が作れた後に行う。IR を作る途中（解析、解決、正規化）の誤りがあるファイルでも、作れた部分には検査を行う（`docs/requirements.md`「言語サーバー」）。一つの検査で見つかる誤りはすべて報告する。
 

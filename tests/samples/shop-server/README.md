@@ -2,7 +2,7 @@
 
 小さな店のサーバー（ログイン、自分の情報、注文）を、サンプルを書きながら決めたこと（`docs/decisions.md`「サンプルを書きながら決めたこと（P の番号との対応）」の P1〜P39）を**当てはめた後の形**で書いたもの。サンプルとは何か、置き方、テストの使い方は [`../README.md`](../README.md)。
 
-P1〜P39 の言語の変更（`reads`、`as`、`throw`、`never`、`override`、`export`）と、ここに出てくる五つのトランスパイラ（`go`、`go-valid`、`go-sqlite`、`go-http` と、サンプルの中のプラグインの `go-ratelimit`。設計文書がある。`go-ratelimit` は、この README）は、実装が済んでいる。**その後の決定（`docs/decisions.md`「決めたこと」91〜122 と「設計書から離れた決定」S24: デコレータが出すコードは型に依らず、`store` の読み書きと、表と、列のしまい方は `db` の語彙のデコレータで、要求のどこから読むかと、項目がないときの扱いは `http` の語彙のデコレータで言う。フィールドの既定値は、言語にない）は、このサンプルと設計文書を先に書き、その後に実装した**（「まだないもの」に、書いたときになかったものと、今の状態）。**さらにその後の決定（同 124、132〜143 と S25〜S28: 節の区切りは `,` 一つ。状態に触れるのは、引数を持つ `read` と効果だけで、その中身は `db` の語彙のデコレータが宣言から作る。op は、それを呼ぶ配線か、状態に触れない葉。op のデコレータは、包むだけ）も、このサンプルと設計文書を先に書き、その後に実装を入れた**（書いたときになかったものと、今の状態は、同じ節の「R4 で、まだないもの」）。単位の `out`（`gen/`）の下のファイルはすべて、「`hozoc emit` がこう出す」内容を人が書いたもので、トランスパイラを実装するときのブラックボックスのテストの仕様になる。コードはコンパイルでき、人が書いた部分（`app/`）と合わせて動く。 その後に足した、六つ目のトランスパイラ `go-design`（設計文書がある。テストを受け取る口だけを出す）は、「R6 のプラグインの部分で足したこと」。
+P1〜P39 の言語の変更（`reads`、`as`、`throw`、`never`、`override`、`export`）と、ここに出てくる五つのトランスパイラ（`go`、`go-valid`、`go-sqlite`、`go-http` と、サンプルの中のプラグインの `go-ratelimit`。設計文書がある。`go-ratelimit` は、この README）は、実装が済んでいる。**その後の決定（`docs/decisions.md`「決めたこと」91〜122 と「設計書から離れた決定」S24: デコレータが出すコードは型に依らず、`store` の読み書きと、表と、列のしまい方は `db` の語彙のデコレータで、要求のどこから読むかと、項目がないときの扱いは `http` の語彙のデコレータで言う。フィールドの既定値は、言語にない）は、このサンプルと設計文書を先に書き、その後に実装した**（「まだないもの」に、書いたときになかったものと、今の状態）。**さらにその後の決定（同 124、132〜143 と S25〜S28: 節の区切りは `,` 一つ。状態に触れるのは、引数を持つ `read` と効果だけで、その中身は `db` の語彙のデコレータが宣言から作る。op は、それを呼ぶ配線か、状態に触れない葉。op のデコレータは、包むだけ）も、このサンプルと設計文書を先に書き、その後に実装を入れた**（書いたときになかったものと、今の状態は、同じ節の「R4 で、まだないもの」）。単位の `out`（`gen/`）の下のファイルはすべて、「`hozoc build` がこう出す」内容を人が書いたもので、トランスパイラを実装するときのブラックボックスのテストの仕様になる。コードはコンパイルでき、人が書いた部分（`app/`）と合わせて動く。 その後に足した、六つ目のトランスパイラ `go-design`（設計文書がある。テストを受け取る口だけを出す）は、「R6 のプラグインの部分で足したこと」。
 
 **生成するコードの規則の持ち主は、トランスパイラごとの設計文書**（「各トランスパイラの規則」）。この文書が持つのは、ファイルの出どころ、この仕様に固有の事実、サンプルの中のプラグイン `go-ratelimit` の規則、書いて分かったこと。期待する出力（`gen/`）は、設計文書の形のとおりに書いてある（文書と違うところは、残していない）。
 
@@ -26,7 +26,7 @@ P1〜P33 を当てはめる前の形（一つの名前空間 `server` を三つ�
 
 **この表のどれにも、実装がある**（版 0.5 の hozoc。`docs/requirements.md`「作り直しの段階」の R3）。`TestSamples` のサブテストは、最後の形で書いてあり、足りないものがあれば、名指しして飛ばす（`../README.md`「飛ばす条件」「移行の間」）。R4 の書き方を入れる前のこのサンプルでは、`check`、`files`、`go`（このモジュールの `go vet` と `go test`）と、六つの `transpilers/*` が、飛ばしも、代役もなく、すべて通っていた。今の状態は、この節の「R4 で、まだないもの」。`sample.json` に、保留を書くところはない。
 
-この段落の確かめは、R3 を書いたときのもの。`gen/type`、`gen/rate` と、`gen/server` の基底と `go-valid` と `go-ratelimit` のファイル（`http.go` のほかのすべて）は、そのときの hozoc でも確かめてある: 仕様の写しを、今の hozoc が読める書き方に直して（`store.hozo` は、同じ op を、`reads` と `effects` を op に書く形で。`placeOrder` の効果は一つだけ。しまい方のデコレータを外し、`@db.table(…)` を `@db` に、`@http.bodyObj` を `@http.body` に）`hozoc emit` を掛けると、それらのファイルは、`placeOrder` の `Effects:` のコメント（効果が一つになる）のほかは、期待する出力とバイト単位で同じ。`gen/server/http.go`、`gen/store` と `gen/storemem` の `SharedState`、デコレータで決まる `db.go` は、文書のとおりに手で書いた。**この確かめは、決定 114〜122 を入れる前のもの。** その後、`gen/server/inner/types.go` と `gen/server/types.go` から、`NewGetOrdersInput`（既定値を入れる関数）を、手で外した。外した後の二つのファイルは、道具では確かめていない（「分かったこと」N110）。
+この段落の確かめは、R3 を書いたときのもの。`gen/type`、`gen/rate` と、`gen/server` の基底と `go-valid` と `go-ratelimit` のファイル（`http.go` のほかのすべて）は、そのときの hozoc でも確かめてある: 仕様の写しを、今の hozoc が読める書き方に直して（`store.hozo` は、同じ op を、`reads` と `effects` を op に書く形で。`placeOrder` の効果は一つだけ。しまい方のデコレータを外し、`@db.table(…)` を `@db` に、`@http.bodyObj` を `@http.body` に）`hozoc build` を掛けると、それらのファイルは、`placeOrder` の `Effects:` のコメント（効果が一つになる）のほかは、期待する出力とバイト単位で同じ。`gen/server/http.go`、`gen/store` と `gen/storemem` の `SharedState`、デコレータで決まる `db.go` は、文書のとおりに手で書いた。**この確かめは、決定 114〜122 を入れる前のもの。** その後、`gen/server/inner/types.go` と `gen/server/types.go` から、`NewGetOrdersInput`（既定値を入れる関数）を、手で外した。外した後の二つのファイルは、道具では確かめていない（「分かったこと」N110）。
 
 ### R4 で、まだないもの
 
@@ -43,9 +43,9 @@ P1〜P33 を当てはめる前の形（一つの名前空間 `server` を三つ�
 | 文書の版（`docs/ir.md`「版」） | `plugins/go-ratelimit/hozo-plugin.toml` の `protocol`。hozoc と、リポジトリのプラグインのマニフェストと、一緒に上げる | `docs/ir.md`「版」 |
 
 - **表のどの行にも、このサンプルが使う分の実装が入った**（版 0.6 の hozoc と、基底 `go`、`go-valid`、`go-sqlite`、`go-http`、サンプルの中の `go-ratelimit`）。このサンプルの `TestSamples` は、`check`、`files`、`go` と、六つの `transpilers/*` が、飛ばしも、代役もなく通る。実装が入るまでの間に、どのサブテストが通らなかったかの記録と、段階の全体の持ち主は、`../README.md`「移行の間」と、`docs/requirements.md`「作り直しの段階」の R4 の行。
-- **表のうち、基底 `go` の行は、実装が入った。** 基底のファイル（`sample.json` の `go` の 21 個）は、`hozoc emit` の出力と、バイト単位で同じ（手で書いた期待する出力に、直すところはなかった）。確かめたのは、相乗りを代役（ファイルを返さないトランスパイラ。`../README.md`「飛ばす条件」）に置き換えた形で、`go-sqlite` の代役のマニフェストには、文書のとおり `seams = ["db.transaction"]` を足した。本物の `go-sqlite` のマニフェストが `seams` を宣言するまで、`gen/store` の `ops.go` と `wiring.go` は、継ぎ目のない形（`gen/storemem` と同じ形）で出る。
+- **表のうち、基底 `go` の行は、実装が入った。** 基底のファイル（`sample.json` の `go` の 21 個）は、`hozoc build` の出力と、バイト単位で同じ（手で書いた期待する出力に、直すところはなかった）。確かめたのは、相乗りを代役（ファイルを返さないトランスパイラ。`../README.md`「飛ばす条件」）に置き換えた形で、`go-sqlite` の代役のマニフェストには、文書のとおり `seams = ["db.transaction"]` を足した。本物の `go-sqlite` のマニフェストが `seams` を宣言するまで、`gen/store` の `ops.go` と `wiring.go` は、継ぎ目のない形（`gen/storemem` と同じ形）で出る。
 - **`plugins/go-ratelimit/testdata/` は、先に、入力の仕様だけを直してあった**（`seams/app.hozo` の、状態に触れる二つの op を、`read` と効果を呼ぶ配線に）。R4 の実装と一緒に、`views.json`（hozoc が置く `View`）を置き直し、`seams/behavior_test.go` の、状態の単位の見立てを、`read` と効果のメソッド（`ItemById`、`AddItem`）に直した（「サンプルの中のプラグイン」の「実装」）。`go-ratelimit` のコード（`emit.go`）と、その出力（ゴールデン `expected/` と、`gen/server/ratelimit.go`）は、変えていない: 継ぎ目のメソッドは、op の形が同じなので変わらない。
-- この段階の期待する出力を書いたときは、どの hozoc でも確かめていなかった（「分かったこと」N121）。今は、`TestSamples` の `transpilers/*` が、`hozoc emit` の出力とバイト単位で比べている。
+- この段階の期待する出力を書いたときは、どの hozoc でも確かめていなかった（「分かったこと」N121）。今は、`TestSamples` の `transpilers/*` が、`hozoc build` の出力とバイト単位で比べている。
 
 ### R5 で変えたこと
 
@@ -60,7 +60,7 @@ P1〜P33 を当てはめる前の形（一つの名前空間 `server` を三つ�
 
 - `gen/` のほかのファイル（`gen/type`、`gen/rate`、`gen/store`、`gen/storemem` と、`gen/server` の `http.go`、`ratelimit.go`、`validate.go`、`types.go`、`doc.go`）は、変わらない: `store` の op と、相乗りが呼ぶ op は、前から `ctx` を取り、`error` を返していた。
 - 「分かったこと」の N8〜N13 と N60 は、前の形（純粋さで形を分ける）の記録。その後は、同じ節の「op の中身に立ち入らない（決定 145〜148）」。
-- **実装も入った**（基底 `go` と `plugin/golang`）。`TestSamples` は、`check`、`files`、`go` と、六つの `transpilers/*` が、飛ばしも、代役もなく通る: 上の表の三つのファイルは、`hozoc emit` の出力と、バイト単位で同じ（手で書いた期待する出力に、直すところはなかった）。
+- **実装も入った**（基底 `go` と `plugin/golang`）。`TestSamples` は、`check`、`files`、`go` と、六つの `transpilers/*` が、飛ばしも、代役もなく通る: 上の表の三つのファイルは、`hozoc build` の出力と、バイト単位で同じ（手で書いた期待する出力に、直すところはなかった）。
 
 ### 残りのケースで変えたこと
 
@@ -76,7 +76,7 @@ P1〜P33 を当てはめる前の形（一つの名前空間 `server` を三つ�
 
 - この仕様の `default;` は、なくなった: 四つの残りは、どれも意味のある状態（未登録、その識別子のユーザーがいない、ログインしていない、トークンがない）だった。
 - `gen/` のほかのファイルは、変わらない: 型で決まる分類について、基底は何も出さず（残りのケースを持っていても同じ）、分類とケースの名前は、配線のコメントにだけ残る。動きも変わらないので、`app/` のテストは、コメントのほかは変えていない。
-- **実装も入った**（言語、IR の版 0.7、基底 `go`）。`TestSamples` は、`check`、`files`、`go` と、六つの `transpilers/*` が、飛ばしも、代役もなく通る: `gen/server/inner/wiring.go` は、`hozoc emit` の出力と、バイト単位で同じ（手で書いた期待する出力に、直すところはなかった）。
+- **実装も入った**（言語、IR の版 0.7、基底 `go`）。`TestSamples` は、`check`、`files`、`go` と、六つの `transpilers/*` が、飛ばしも、代役もなく通る: `gen/server/inner/wiring.go` は、`hozoc build` の出力と、バイト単位で同じ（手で書いた期待する出力に、直すところはなかった）。
 
 ### 分類を閉じたときに変えたこと
 
@@ -88,7 +88,7 @@ P1〜P33 を当てはめる前の形（一つの名前空間 `server` を三つ�
 
 - 仕様（`.hozo`）は、変えていない: 四つの分類は、どれも、残りのケースを持つ、型で決まる分類で、なくした書き方（`default;`、`condition`、`default =>`、アームの `|`）を使っていなかった。
 - 期待する出力（`gen/**`）と、人が書いたもの（`app/**`）も、変えていない: `docs/plugin-go.md`「match」「分類」で変わったのは、述語で決まる分類の列挙と判定関数、型の `switch`、残りのケースを書かない分類の `match` で、このサンプルは、どれも持たない。その形の期待する出力は、基底 `go` の単体テストの入力（`plugins/go/internal/gobase/testdata/` の `matchswitch`、`matchclosed`）が持つ。
-- `TestSamples` は、`check`、`files`、`go` と、六つの `transpilers/*` が、飛ばしも、代役もなく通る: `gen/**` は、`hozoc emit` の出力と、バイト単位で同じ。
+- `TestSamples` は、`check`、`files`、`go` と、六つの `transpilers/*` が、飛ばしも、代役もなく通る: `gen/**` は、`hozoc build` の出力と、バイト単位で同じ。
 
 ### 行の遷移で変えたこと
 
@@ -100,7 +100,7 @@ P1〜P33 を当てはめる前の形（一つの名前空間 `server` を三つ�
 
 - 仕様（`.hozo`）は、変えていない: このサンプルには、表の一行が進む段階（注文や支払いの状態）がなく、効果は、どれも `as` を書かない `post` / `put` / `delete`。
 - 期待する出力（`gen/**`）と、人が書いたもの（`app/**`）も、変えていない: `docs/plugin-go.md` と `docs/plugin-go-sqlite.md` で変わったのは、行の遷移を持つ効果のコメントと、ない側のケースを持つ、述語で決まる分類の判定関数で、このサンプルは、どちらも持たない（四つの分類は、どれも型で決まり、基底は何も出さない。その値がない側の `as else` のケースは、IR では `absent` に入るが、出力は変わらない）。
-- `TestSamples` は、`check`、`files`、`go` と、六つの `transpilers/*` が、飛ばしも、代役もなく通る: `gen/**` は、`hozoc emit` の出力と、バイト単位で同じ。
+- `TestSamples` は、`check`、`files`、`go` と、六つの `transpilers/*` が、飛ばしも、代役もなく通る: `gen/**` は、`hozoc build` の出力と、バイト単位で同じ。
 
 ### R6 で変えたこと
 
@@ -238,7 +238,7 @@ R6 の、プラグインの部分の、段 4（`docs/requirements.md`「R6 の�
 | `gen/flows/flowstest/design.go` | `RunRequirements` が、要求の入れ物を、その場の関数で包んで呼ぶ形にした（`t.Run("design.Requirement.PRD_001", func(t *testing.T) { c.PRD_001(t) })`。行は、三つに分かれる）。`RunRequirements` の中に、要求ごとの行を持つため | `docs/plugin-go-design.md`「要求の、テストの入れ物の口」の「口の形」 |
 | `gen/server/.hozoc-outputs.json`、`gen/flows/.hozoc-outputs.json`、`sample.json` | 三つの対応表を、出力先ごとの記録と、トランスパイラの `files` に足した。`sample.json` に、`tests`（`skip` と `missing`）を足した | `../README.md`「sample.json」 |
 
-- **対応表は、手で書いた**（ほかの期待する出力と同じ）: 置いてある `leaves.go`、`http.go`、`design.go` の字面から、いちばん内側の `t.Run` の、`{` の次の行と、`})` の前の行を、数えた。`hozoc emit` の出力と、バイト単位で同じことは、`transpilers/<名前>` が確かめる。
+- **対応表は、手で書いた**（ほかの期待する出力と同じ）: 置いてある `leaves.go`、`http.go`、`design.go` の字面から、いちばん内側の `t.Run` の、`{` の次の行と、`})` の前の行を、数えた。`hozoc build` の出力と、バイト単位で同じことは、`transpilers/<名前>` が確かめる。
 - **走ったと分かること**は、サブテスト `tests` が確かめる（`../README.md`「テスト」）。手で確かめるなら、このディレクトリで:
 
 ```bash
@@ -555,7 +555,7 @@ func (s RateSeams) <Op>RateLimited(<op の形の引数>, body func(<op の形の
 | `gen/flows/doc.go` `types.go` `ops.go` `wiring.go` | `go` |
 | `gen/flows/flowstest/doc.go` `fakes.go` | `go`（テストのパッケージ: `Fakes` と `NewOps`。`client` の出力を、本物で通す） |
 | `gen/flows/flowstest/design.go` `hozo-tests.go-design.json` | `go-design`（テストのパッケージ: フローの E2E テストの口と、要求ごとの、テストの入れ物の口と、その、テストの対応表。`docs/plugin-go-design.md`。基底が、同じパッケージに出すのは、`doc.go` と `fakes.go`） |
-| `gen/*/.hozoc-outputs.json` | hozoc の記録（`docs/cli.md`「emit」）。その出力のすべてのファイルのパス（`gen/server` の記録は、`inner/` の下のファイルも持つ） |
+| `gen/*/.hozoc-outputs.json` | hozoc の記録（`docs/cli.md`「書き出し」）。その出力のすべてのファイルのパス（`gen/server` の記録は、`inner/` の下のファイルも持つ） |
 | `app/leaves.go`、`app/mailer.go`、`app/limiter.go` | 人が書く: `server` の葉の op 十の本体（`server.Leaves` を満たす型）、`mailer.send` の実装（`server.MailerOps` を満たす型）、`@rate.limited` の数え方（`server.RateLimiter` を満たす型）。保存先を知らない |
 | `app/onsqlite/compose.go` | 人が書く: 組み立て（`server` を `gen/store` の上に）。`NewFlows` は、その上に、`client` と `flows` を重ねる |
 | `app/cmd/shop-sqlite/main.go` | 人が書く: その組み立てで待ち受ける main |
@@ -919,7 +919,7 @@ N1〜N96 のうち、解決は 16: N3（仕様の直し）、N11（直した P30
 - **N66 `export` を付ける理由になる「外の呼び手」は、三種類あった**。P33 の言い方は「別の名前空間から呼べる op」だが、この仕様で `export` を付けた十五のうち、仕様の別の名前空間が呼ぶのは九つ（`store` の八つと `mailer.send`）だけ。`server` の五つを呼ぶのは `go-http` のハンドラ（プラグインの出力）、`store.addUser` を呼ぶのは人が書くコード（main とテスト）で、どちらも仕様には現れない。基底の形では、`export` は「`Ops` に載る」と同じ意味になり、`Ops` を受け取る者は、みな外の呼び手。→ `addUser` は `export` にした（「`export` を付けた op」）。帰結:
   - **「`export` を付けたのに、どの名前空間も呼ばない」を、検査は言えない**。呼び手が仕様の外にいるかどうかは、仕様から分からない。六つ（`server` の五つと `addUser`）がそうなっている。
   - **人のコードのためだけに `export` を付けると、仕様の別の名前空間からも呼べるようになる**。「人のコードには見せるが、仕様の配線からは呼ばせない」は書けない。`addUser` は、`server` の配線からも呼べる。
-- **N67 HTTP の入口には、`@http.*` と `export` の二つを書く**。五つの入口は、どれも `@http.post` / `@http.get` と `export` を並べて持つ（`server.hozo:41-43` など）。デコレータは「どう呼ばれるか」、`export` は「外から呼べるか」で、言っていることは別だが、`@http.*` を付けて `export` を付けない op に意味はない。→ `go-http` の規則にした: `export` のない op に `@http.get` / `@http.post` が付いていれば、プラグインが error を報告する（「`go-http` が従う規則」）。考えた別の形は二つ。(a) 黙って飛ばす: 仕様に書いた経路が、エラーなしにサーバーから消えるので取らなかった。(b) `@http.*` が付いていれば `export` と見なす: 語彙のデコレータが、本体の検査（別の名前空間から呼べるか）の結果を変えることになるので取らなかった。残ること: 付け忘れが分かるのは、`go-http` を並べた単位を emit したとき（または、そのプラグインの `check`）。`hozoc check` の本体の規則ではないので、`go-http` を使わない設定では、何も言われない。
+- **N67 HTTP の入口には、`@http.*` と `export` の二つを書く**。五つの入口は、どれも `@http.post` / `@http.get` と `export` を並べて持つ（`server.hozo:41-43` など）。デコレータは「どう呼ばれるか」、`export` は「外から呼べるか」で、言っていることは別だが、`@http.*` を付けて `export` を付けない op に意味はない。→ `go-http` の規則にした: `export` のない op に `@http.get` / `@http.post` が付いていれば、プラグインが error を報告する（「`go-http` が従う規則」）。考えた別の形は二つ。(a) 黙って飛ばす: 仕様に書いた経路が、エラーなしにサーバーから消えるので取らなかった。(b) `@http.*` が付いていれば `export` と見なす: 語彙のデコレータが、本体の検査（別の名前空間から呼べるか）の結果を変えることになるので取らなかった。残ること: 付け忘れが分かるのは、`go-http` を並べた単位を emit したとき（または、そのプラグインの `check`）。`hozoc build --no-emit` の本体の規則ではないので、`go-http` を使わない設定では、何も言われない。
 - **N68（P35 で変わった）内部の op の名前は、ここで決めた**。P33 が言うのは「`Ops` には `export` の付いた op だけが並ぶ」までで、内部の op を Go でどう持つかは言っていない。→ 構造体 `ops` の非公開のメソッドにし、名前は op の名前の先頭を小文字にしたもの（規則は「基底 `go` が従う規則」の「内部の op」）。分かったこと:
   - **非公開のメソッドにしたので、パッケージの外からは、どうやっても呼べない**。考えた別の形は、「公開のメソッドのまま、`Ops` から外すだけ」（`o.Authenticate`）。配線の書き方は P33 の前と変わらないが、`New` の戻り値を、外で宣言したインターフェースに型アサーションすれば呼べる（`ops.(interface{ Authenticate(…) … })`）。非公開のメソッドなら、それも通らない（そのときの `app/both_test.go` が確かめていた）。
   - **`export` を付け外しすると、メソッドの名前が変わる**（`Notify` と `notify`）。`Ops` を呼ぶ人のコードは、外した op を呼んでいればコンパイルできなくなる（気づける）。その op を呼ぶ別の名前空間は、検査でエラーになる。生成したコードの中では、その op を呼ぶすべての配線の行が変わる。
@@ -996,7 +996,7 @@ N1〜N96 のうち、解決は 16: N3（仕様の直し）、N11（直した P30
 - **N107 `lines` のない注文が、400 になった**。前の `http.go` は、本文の項目がなくても誤りにしなかったので、`{}` の `POST /orders` は、空の注文を作って 200 を返していた（サブテスト `names` が、それを確かめていた）。`lines` は省略可能でも既定値持ちでもなかったが、「なければ誤り」は、ヘッダとクエリにしか掛かっていなかった。`@http.required` を付けたので、400 `body lines: missing`（「下書きから変えたこと」の 16）。キーがあって空の配列（`{"lines":[]}`）は、今も、空の注文を作る: 「一行は要る」は、`@valid` の制約で言うことで、この仕様は言っていない。
 - **N108 既定値を入れる者が、型から、ハンドラに移った**。`page` の 1 を入れるのは、`req.query("page", &in.Page, httpDefault(1))` で、`server.GetOrdersInput{}` を自分で作る者（op を直に呼ぶテスト、別の入口）には、入らない（`Page` は 0）。`app/server_test.go` の `TestMissingItems` は、ハンドラを通した入力で 1 を確かめる。葉 `pageOf` に 0 が渡ったときの振る舞いは、仕様が言っていない。
 - **N109 `httpDefault` の値は、`any` で渡る**。`httpDefault(1)` の 1 は Go の `int` で、補助が、実行時に、読む先の型（`int64`。scalar なら、その名前付きの型）に `reflect` で変える。フィールドの型への変換を行に書かないのは、型で形を変えないため（N100 と同じ事情）。型に合わないリテラル（`int` のフィールドに `"x"`）は、コンパイルエラーにならず、防ぐのは GOHTTP-18。
-- **N110（解決: 基底 `go` の R3 の実装）基底のファイルの一部は、手で直した後、道具で確かめていなかった**。`gen/server/inner/types.go` と `gen/server/types.go` から `NewGetOrdersInput` を外したのは、手。この直しのときは、リポジトリが言語の実装の途中でビルドできず、`hozoc emit` を掛けていなかった。→ `New<Model>` を出さない基底 `go`（`docs/plugin-go.md`「model」）で、この仕様のまま `hozoc emit` を掛けると、二つのファイルを含む基底の十九のファイルは、どれも、期待する出力とバイト単位で同じ。手の直しに、食い違いはなかった。
+- **N110（解決: 基底 `go` の R3 の実装）基底のファイルの一部は、手で直した後、道具で確かめていなかった**。`gen/server/inner/types.go` と `gen/server/types.go` から `NewGetOrdersInput` を外したのは、手。この直しのときは、リポジトリが言語の実装の途中でビルドできず、`hozoc build` を掛けていなかった。→ `New<Model>` を出さない基底 `go`（`docs/plugin-go.md`「model」）で、この仕様のまま `hozoc build` を掛けると、二つのファイルを含む基底の十九のファイルは、どれも、期待する出力とバイト単位で同じ。手の直しに、食い違いはなかった。
 - **N111 この仕様には、`@db.nullable` の列がない**。表の model のフィールドは、どれも省略可能でない。`gen/store/db.go` に現れるのは、補助が `dbNullable` を受け取れる形（`dbOption`、しまい方の補助の `opts`、`dbCol` の `Value` と `Scan`）だけで、`dbNullable` を渡す行も、`NOT NULL` のない列も、期待する出力にない（`go-sqlite` の単体テストが、小さな入力で確かめることになる。`docs/testing.md`「単体テスト」）。先の決まらない `@db.ref`（GOSQL-20）も、この仕様では起きない。
 - **N112 `default` の値を、制約で確かめる者がいない**。`@http.default(1)` の 1 が、フィールドの制約（`@valid.*`）に合うかは、生成するときには確かめられない（前は、`go-valid` が、既定値を GOVALID-2 で確かめていた）。`validate = true` のこの単位では、入れた値も、実行時に `httpValidate` を通る。`page` に制約はないので、この仕様では起きない。その後、生成するときに確かめると決めた（`docs/plugin-go-http.md`「補う値と制約」。GOHTTP-19）。
 - **N113 `@cli.required` と `@cli.default` の、期待する出力は、ここにない**。この仕様に CLI はない。`go-cli` の形（`line.required(&in.<F>)`、`line.orDefault(&in.<F>, <リテラル>)`）を固定するのは、`go-cli` の単体テストのゴールデンと、hozoc 自身の生成物（`docs/plugin-go-cli.md`「コマンドごとの関数」）で、hozoc 自身の `cli.hozo` も、この二つを使わない。

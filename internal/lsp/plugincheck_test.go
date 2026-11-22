@@ -157,7 +157,7 @@ func (c *testClient) waitNoPlugin(uri string) []protocol.Diagnostic {
 }
 
 // TestPluginDiagnosticsOnOpen は、文書を開いたときに、hozoc 自身の診断が、先に出て、プラグインの check が、裏で走り、終わったら、
-// プラグインの診断が、足されて出ること。足した後の診断は、hozoc check（project.LoadWith）と同じ。initialized では、走らせない。
+// プラグインの診断が、足されて出ること。足した後の診断は、hozoc build --no-emit（project.LoadWith）と同じ。initialized では、走らせない。
 func TestPluginDiagnosticsOnOpen(t *testing.T) {
 	p := newPluginProject(t, pluginSpec)
 	p.gate()
@@ -189,7 +189,7 @@ func TestPluginDiagnosticsOnOpen(t *testing.T) {
 		t.Errorf("裏の check を始めた回数 = %d（期待は 1）", n)
 	}
 
-	// hozoc check と同じ診断（プラグインの check の分を含む）
+	// hozoc build --no-emit と同じ診断（プラグインの check の分を含む）
 	want := project.LoadWith(project.Options{Root: p.root})
 	if want.RunErr != nil {
 		t.Fatal(want.RunErr)
@@ -213,7 +213,7 @@ func TestPluginDiagnosticsOnOpen(t *testing.T) {
 		gotCodes = append(gotCodes, sev+" "+d.Code)
 	}
 	if strings.Join(gotCodes, ",") != strings.Join(wantCodes, ",") {
-		t.Errorf("言語サーバーの診断 = %v、hozoc check の診断 = %v", gotCodes, wantCodes)
+		t.Errorf("言語サーバーの診断 = %v、hozoc build --no-emit の診断 = %v", gotCodes, wantCodes)
 	}
 	c.shutdown()
 }

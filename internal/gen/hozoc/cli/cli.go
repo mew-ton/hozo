@@ -96,10 +96,8 @@ func Main(ctx context.Context, ops hozoc.Ops, p Presenter, args []string, env fu
 		return 0
 	}
 	switch args[0] {
-	case "check":
-		return runCheck(ctx, ops, p, prog, args[1:], env, stdout, stderr)
-	case "emit":
-		return runEmit(ctx, ops, p, prog, args[1:], env, stdout, stderr)
+	case "build":
+		return runBuild(ctx, ops, p, prog, args[1:], env, stdout, stderr)
 	case "tests":
 		return runTests(ctx, ops, p, prog, args[1:], env, stdout, stderr)
 	case "lsp":
@@ -110,89 +108,39 @@ func Main(ctx context.Context, ops hozoc.Ops, p Presenter, args []string, env fu
 
 // cliUsage は全体の使い方。
 func cliUsage(prog string) string {
-	return "usage: " + prog + " <command> [flags]\n\ncommands:\n  check   仕様を検査する。使うプラグインに、展開を頼み、その診断も集める。ファイルは書き出さない\n  emit    仕様を検査し、プラグインから受け取ったファイルを書き出す\n  tests   仕様を検査し、求めるテストが走ったかを、カバレッジと突き合わせて確かめる。テストは走らせない\n  lsp     言語サーバーとして標準入出力で動く（docs/lsp.md）。クライアントが exit を送るまで戻らない\n"
+	return "usage: " + prog + " <command> [flags]\n\ncommands:\n  build   仕様を検査し、プラグインから受け取ったファイルを書き出す。--no-emit なら、検査だけを行い、ファイルを書き出さない\n  tests   仕様を検査し、求めるテストが走ったかを、カバレッジと突き合わせて確かめる。テストは走らせない\n  lsp     言語サーバーとして標準入出力で動く（docs/lsp.md）。クライアントが exit を送るまで戻らない\n"
 }
 
-// runCheck はサブコマンド check（op hozoc.check）。
-func runCheck(ctx context.Context, ops hozoc.Ops, p Presenter, prog string, args []string, env func(string) string, stdout, stderr io.Writer) int {
-	var in hozoc.CheckInput
-	line := cliLine{args: args, getenv: env}
-	line.flag("config", &in.Config)
-	line.env("HOZO_CONFIG", &in.Config)
-	line.flag("format", &in.Format)
-	line.env("HOZO_PLUGIN_PATH", &in.PluginPath)
-	if code, done := line.read(prog, usageCheck(), stdout, stderr); done {
-		return code
-	}
-	if !cliValidate(stderr, prog, in) {
-		return 64
-	}
-	result, err := ops.Check(ctx, in)
-	if err != nil {
-		return failCheck(p, prog, in, err, stderr)
-	}
-	if err := p.Present(stdout, "check", in, result); err != nil {
-		fmt.Fprintf(stderr, "%s: %v\n", prog, err)
-		return 70
-	}
-	return 0
-}
-
-// failCheck は check の例外を、宣言の順に値の型で見分けて Failure を作り、終了コードを決めて p で表示する。
-func failCheck(p Presenter, prog string, input any, err error, stderr io.Writer) int {
-	f, code := Failure{Err: err}, 70
-	switch {
-	case cliThrown[hozoc.CheckFailed](err, 1, &f, &code):
-	case cliThrown[hozoc.ConfigInvalid](err, 2, &f, &code):
-	case cliThrown[hozoc.LanguageMismatch](err, 2, &f, &code):
-	case cliThrown[proc.Crashed](err, 70, &f, &code):
-	case cliThrown[proc.MalformedOutput](err, 70, &f, &code):
-	}
-	if err := p.PresentError(stderr, "check", input, f); err != nil {
-		fmt.Fprintf(stderr, "%s: %v\n", prog, err)
-		return 70
-	}
-	return code
-}
-
-// usageCheck は check の使い方に出す説明: コマンドの名前と一行の説明と、入力のフィールドの順に、フィールドの名前と一行の説明。
-func usageCheck() cliHelp {
-	return cliHelp{command: "check", summary: "仕様を検査する。使うプラグインに、展開を頼み、その診断も集める。ファイルは書き出さない", fields: [][2]string{
-		{"config", "設定ファイルの場所"},
-		{"format", "表示の形式"},
-		{"pluginPath", "プラグインを探すディレクトリ（OS のパス区切りで複数）"},
-	}}
-}
-
-// runEmit はサブコマンド emit（op hozoc.emit）。
-func runEmit(ctx context.Context, ops hozoc.Ops, p Presenter, prog string, args []string, env func(string) string, stdout, stderr io.Writer) int {
-	var in hozoc.EmitInput
+// runBuild はサブコマンド build（op hozoc.build）。
+func runBuild(ctx context.Context, ops hozoc.Ops, p Presenter, prog string, args []string, env func(string) string, stdout, stderr io.Writer) int {
+	var in hozoc.BuildInput
 	line := cliLine{args: args, getenv: env}
 	line.flag("config", &in.Config)
 	line.env("HOZO_CONFIG", &in.Config)
 	line.flag("format", &in.Format)
 	line.arg(1, &in.Namespaces)
+	line.flag("no-emit", &in.NoEmit)
 	line.flag("dry-run", &in.DryRun)
 	line.env("HOZO_PLUGIN_PATH", &in.PluginPath)
-	if code, done := line.read(prog, usageEmit(), stdout, stderr); done {
+	if code, done := line.read(prog, usageBuild(), stdout, stderr); done {
 		return code
 	}
 	if !cliValidate(stderr, prog, in) {
 		return 64
 	}
-	result, err := ops.Emit(ctx, in)
+	result, err := ops.Build(ctx, in)
 	if err != nil {
-		return failEmit(p, prog, in, err, stderr)
+		return failBuild(p, prog, in, err, stderr)
 	}
-	if err := p.Present(stdout, "emit", in, result); err != nil {
+	if err := p.Present(stdout, "build", in, result); err != nil {
 		fmt.Fprintf(stderr, "%s: %v\n", prog, err)
 		return 70
 	}
 	return 0
 }
 
-// failEmit は emit の例外を、宣言の順に値の型で見分けて Failure を作り、終了コードを決めて p で表示する。
-func failEmit(p Presenter, prog string, input any, err error, stderr io.Writer) int {
+// failBuild は build の例外を、宣言の順に値の型で見分けて Failure を作り、終了コードを決めて p で表示する。
+func failBuild(p Presenter, prog string, input any, err error, stderr io.Writer) int {
 	f, code := Failure{Err: err}, 70
 	switch {
 	case cliThrown[hozoc.CheckFailed](err, 1, &f, &code):
@@ -203,19 +151,20 @@ func failEmit(p Presenter, prog string, input any, err error, stderr io.Writer) 
 	case cliThrown[hozoc.OutputConflict](err, 3, &f, &code):
 	case cliThrown[hozoc.UnknownNamespace](err, 64, &f, &code):
 	}
-	if err := p.PresentError(stderr, "emit", input, f); err != nil {
+	if err := p.PresentError(stderr, "build", input, f); err != nil {
 		fmt.Fprintf(stderr, "%s: %v\n", prog, err)
 		return 70
 	}
 	return code
 }
 
-// usageEmit は emit の使い方に出す説明: コマンドの名前と一行の説明と、入力のフィールドの順に、フィールドの名前と一行の説明。
-func usageEmit() cliHelp {
-	return cliHelp{command: "emit", summary: "仕様を検査し、プラグインから受け取ったファイルを書き出す", fields: [][2]string{
+// usageBuild は build の使い方に出す説明: コマンドの名前と一行の説明と、入力のフィールドの順に、フィールドの名前と一行の説明。
+func usageBuild() cliHelp {
+	return cliHelp{command: "build", summary: "仕様を検査し、プラグインから受け取ったファイルを書き出す。--no-emit なら、検査だけを行い、ファイルを書き出さない", fields: [][2]string{
 		{"config", "設定ファイルの場所"},
 		{"format", "表示の形式"},
 		{"namespaces", "生成する名前空間（一つもなければすべて）。その名前空間と子孫を出力する単位の分を書き出す"},
+		{"noEmit", "検査だけを行い、ファイルを書き出さない"},
 		{"dryRun", "書き出さずに、書き出す予定のファイルだけを表示する"},
 		{"pluginPath", "プラグインを探すディレクトリ（OS のパス区切りで複数）"},
 	}}

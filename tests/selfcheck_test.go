@@ -27,15 +27,15 @@ func hozocMainIn(dir string, args []string, stdout, stderr io.Writer) int {
 	return cli.Main(context.Background(), a.Ops(), app.Presenter{}, args, func(string) string { return "" }, stdout, stderr)
 }
 
-// TestSelfCheck は hozoc 自身（リポジトリ直下の cli.hozo と hozo.toml）が hozoc check を error なしで通ること
+// TestSelfCheck は hozoc 自身（リポジトリ直下の cli.hozo と hozo.toml）が hozoc build --no-emit を error なしで通ること
 // （docs/testing.md「コーパス」の最後の段落、docs/requirements.md「段階」の 2）。warning は許し、表示する。
 func TestSelfCheck(t *testing.T) {
 	var stdout, stderr bytes.Buffer
-	code := hozocMain([]string{"check"}, &stdout, &stderr)
+	code := hozocMain([]string{"build", "--no-emit"}, &stdout, &stderr)
 	if code != 0 {
-		t.Fatalf("hozoc check の終了コード %d\n%s%s", code, stdout.String(), stderr.String())
+		t.Fatalf("hozoc build --no-emit の終了コード %d\n%s%s", code, stdout.String(), stderr.String())
 	}
-	t.Logf("hozoc check:\n%s", stdout.String())
+	t.Logf("hozoc build --no-emit:\n%s", stdout.String())
 }
 
 // TestSelfEmitDryRun は hozoc 自身への emit --dry-run が、コミット済みの生成物（二つの単位の出力: 基底 go と go-valid と go-cli の
@@ -53,9 +53,9 @@ func TestSelfEmitDryRun(t *testing.T) {
 		}
 	}
 	var stdout, stderr bytes.Buffer
-	code := hozocMain([]string{"emit", "--dry-run"}, &stdout, &stderr)
+	code := hozocMain([]string{"build", "--dry-run"}, &stdout, &stderr)
 	if code != 0 {
-		t.Fatalf("hozoc emit --dry-run の終了コード %d\n%s%s", code, stdout.String(), stderr.String())
+		t.Fatalf("hozoc build --dry-run の終了コード %d\n%s%s", code, stdout.String(), stderr.String())
 	}
 	var written []string
 	for _, l := range strings.Split(strings.TrimSpace(stdout.String()), "\n") {
@@ -88,5 +88,5 @@ func TestSelfEmitDryRun(t *testing.T) {
 			}
 		}
 	}
-	t.Logf("hozoc emit --dry-run:\n%s", stdout.String())
+	t.Logf("hozoc build --dry-run:\n%s", stdout.String())
 }

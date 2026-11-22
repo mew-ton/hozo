@@ -18,7 +18,6 @@ import (
 	"github.com/mew-ton/hozo/internal/app"
 	"github.com/mew-ton/hozo/internal/config"
 	"github.com/mew-ton/hozo/internal/diag"
-	"github.com/mew-ton/hozo/internal/gen/hozoc/cli"
 	hostplugin "github.com/mew-ton/hozo/internal/plugin"
 	sdk "github.com/mew-ton/hozo/plugin"
 )
@@ -49,7 +48,7 @@ const sampleManifestFile = "sample.json"
 // repoPluginsDir は、リポジトリのプラグインの置き場（tests/ からの相対パス）。hozoc には HOZO_PLUGIN_PATH として渡す。
 var repoPluginsDir = filepath.Join("..", "plugins")
 
-// transpilersAll は、hozoc emit の出力の全体を比べるサブテストの名前（transpilers/all）。トランスパイラの名前には使えない。
+// transpilersAll は、hozoc build の出力の全体を比べるサブテストの名前（transpilers/all）。トランスパイラの名前には使えない。
 const transpilersAll = "all"
 
 // sampleProject はサンプル一つ。
@@ -79,7 +78,7 @@ type sampleProject struct {
 	// standIns は、absent のトランスパイラを、ファイルを返さない代役に置き換える手順（tests/samples/README.md「飛ばす条件」）。
 	// copyInputs の後で、写したプロジェクトに当てる。
 	standIns []standIn
-	// blocked は、このサンプルに、本物の hozo.toml で hozoc check / emit を掛けられない理由: unreadable と、代役を置けない
+	// blocked は、このサンプルに、本物の hozo.toml で hozoc build --no-emit / emit を掛けられない理由: unreadable と、代役を置けない
 	// トランスパイラ（その単位に、動かせる基底がない）。空なら、hozoc を本物の hozo.toml で走らせるサブテストが走る。
 	blocked []string
 	// ahead は、設計文書の版が、今の hozoc の版より先にあるときの、その理由（docsAhead）。空でなければ、hozoc を走らせる
@@ -572,7 +571,7 @@ func pluginPathEnv(dir string) func(string) string {
 // hozocMainEnv は hozocMainIn と同じ組み立てで、環境変数を env から読む（プロセスの環境は読まない）。
 func hozocMainEnv(dir string, env func(string) string, args []string, stdout, stderr io.Writer) int {
 	a := &app.App{Dir: dir, Stderr: stderr}
-	return cli.Main(context.Background(), a.Ops(), app.Presenter{}, args, env, stdout, stderr)
+	return app.Main(context.Background(), a, args, env, stdout, stderr)
 }
 
 // project は、サンプルの入力を一時ディレクトリに写し、そのルートと、hozoc に渡す環境（リポジトリの plugins/ を
@@ -600,11 +599,11 @@ func (s *sampleProject) project(t *testing.T) (string, func(string) string) {
 
 // TestSamples は tests/samples/ の各サンプルについて、次を確かめる（tests/samples/README.md「テスト」）。
 //
-//   - check: サンプルの仕様と設定が、本物の hozo.toml とプラグインで、hozoc check を error なしで通る。
+//   - check: サンプルの仕様と設定が、本物の hozo.toml とプラグインで、hozoc build --no-emit を error なしで通る。
 //   - files: 期待する出力のファイル、sample.json、hozo.toml、出力先ごとの記録が合っている（hozoc を動かさない）。
 //   - go: 期待する出力と人が書いたコードが、サンプルのモジュールで go vet と go test を通る。
-//   - transpilers/<名前>: hozoc emit の出力のうち、そのトランスパイラのファイルが、期待する出力とバイト単位で同じ。
-//   - transpilers/all: hozoc emit の出力の全体が、期待する出力と同じ（余分なファイルがなく、記録が同じ）。
+//   - transpilers/<名前>: hozoc build の出力のうち、そのトランスパイラのファイルが、期待する出力とバイト単位で同じ。
+//   - transpilers/all: hozoc build の出力の全体が、期待する出力と同じ（余分なファイルがなく、記録が同じ）。
 //
 // go は飛ばさない。設計文書の版が今の hozoc より先にある間は、check と transpilers/* を、版を名指しして飛ばす（docsAhead）。
 // まだないトランスパイラは、ファイルを返さない代役に置き換えて、check と、あるトランスパイラの
@@ -641,16 +640,16 @@ func TestSamples(t *testing.T) {
 	}
 }
 
-// testCheck は、サンプルの仕様と設定が hozoc check を error なしで通ること。サンプルの入力を一時ディレクトリに写し、
+// testCheck は、サンプルの仕様と設定が hozoc build --no-emit を error なしで通ること。サンプルの入力を一時ディレクトリに写し、
 // 本物の hozo.toml のまま、サンプルの中のプラグインと、リポジトリの plugins/ のプラグインで確かめる。warning は許し、表示する。
 // まだないトランスパイラは、代役に置き換える（project）。代役は、マニフェストだけが要る（check はトランスパイラを起動しない）。
 //
 // 本物の hozo.toml を今の hozoc が読めない（blocked）間は、**言語の検査だけ**に落とす: すべての .hozo（サンプルの中の
-// プラグインの語彙を含む）だけを写し、設定なしで hozoc check を通す（hozo.toml がなければ、hozoc は設定の検査 CFG-* を
+// プラグインの語彙を含む）だけを写し、設定なしで hozoc build --no-emit を通す（hozo.toml がなければ、hozoc は設定の検査 CFG-* を
 // しない。docs/config.md「置き場と探し方」）。落としたことと、足りないものは、ログに書く。足りないものがそろえば、本物の設定での
 // 検査に戻る。
 func (s *sampleProject) testCheck(t *testing.T) {
-	s.skipIfAhead(t, "hozoc check を、このサンプルに掛けられない")
+	s.skipIfAhead(t, "hozoc build --no-emit を、このサンプルに掛けられない")
 	root, env := "", func(string) string { return "" }
 	if len(s.blocked) > 0 {
 		t.Logf("言語の検査だけに落とした（設定 %s と、プラグインの検査は、まだ確かめていない）。足りないもの:\n  - %s\nそろえば、本物の hozo.toml で走る",
@@ -664,10 +663,10 @@ func (s *sampleProject) testCheck(t *testing.T) {
 		}
 	}
 	var stdout, stderr bytes.Buffer
-	if code := hozocMainEnv(root, env, []string{"check"}, &stdout, &stderr); code != 0 {
-		t.Fatalf("hozoc check の終了コード %d\n%s%s", code, stdout.String(), stderr.String())
+	if code := hozocMainEnv(root, env, []string{"build", "--no-emit"}, &stdout, &stderr); code != 0 {
+		t.Fatalf("hozoc build --no-emit の終了コード %d\n%s%s", code, stdout.String(), stderr.String())
 	}
-	t.Logf("hozoc check:\n%s", stdout.String())
+	t.Logf("hozoc build --no-emit:\n%s", stdout.String())
 }
 
 // testFiles は、hozoc を動かさずに確かめられること: 期待する出力のファイルと、sample.json と、hozo.toml と、
@@ -678,7 +677,7 @@ func (s *sampleProject) testCheck(t *testing.T) {
 //   - 単位の out の下のファイルは、記録を除いて、どれも sample.json のどれかのトランスパイラのファイル
 //     （hozoc 本体はコードを出力しない。出どころのないファイルを置かせない）。
 //   - 記録は、そのディレクトリの下のファイル（もっと深い記録のあるディレクトリの下のものを除く）のパスを、
-//     辞書順に並べた JSON の配列（docs/cli.md「emit」の 6）。記録の下にないファイルはない。
+//     辞書順に並べた JSON の配列（docs/cli.md「書き出し」の 6）。記録の下にないファイルはない。
 //
 // 単位（out と transpilers）は、今の hozoc が読んだ hozo.toml から取る。読めなければ、単位が欠けるので、理由を示して飛ばす。
 func (s *sampleProject) testFiles(t *testing.T) {
@@ -910,7 +909,7 @@ func (s *sampleProject) testTests(t *testing.T) {
 
 // testTranspilers は、トランスパイラのブラックボックスのテスト（docs/testing.md「トランスパイラのテスト」）:
 // サンプルの入力を一時ディレクトリに写し、本物の hozo.toml のまま、サンプルの中のプラグインと、リポジトリの plugins/ の
-// プラグインのトランスパイラで、hozoc emit を一度だけ走らせる。書き出されたファイルを、サブテストが分けて、
+// プラグインのトランスパイラで、hozoc build を一度だけ走らせる。書き出されたファイルを、サブテストが分けて、
 // サンプルの期待する出力とバイト単位で比べる。
 //
 //   - transpilers/<名前>: sample.json の、そのトランスパイラの files が、どれも書き出され、期待する出力と同じ。
@@ -918,7 +917,7 @@ func (s *sampleProject) testTests(t *testing.T) {
 //   - transpilers/all: 出力の全体が同じ。どのトランスパイラの files にもないファイルが書かれていない。期待する出力の
 //     ファイルが、すべて書かれている。出力先ごとの記録が同じ。
 //
-// まだないトランスパイラ（absent）は、ファイルを返さない代役に置き換えて、hozoc emit を走らせる（どのトランスパイラも、自分の
+// まだないトランスパイラ（absent）は、ファイルを返さない代役に置き換えて、hozoc build を走らせる（どのトランスパイラも、自分の
 // 出力の View だけから応答を作るので、あるトランスパイラの出力は、代役がいても変わらない。docs/plugin-protocol.md「起動」）。
 // その transpilers/<名前> と、transpilers/all は、足りないものを名指しして飛ばす。本物の hozo.toml で走らせられない（blocked）か、
 // 動かせるトランスパイラが一つもなければ、どのサブテストも飛ばす。期待する出力が仕様なので、-update では書き直さない。
@@ -930,8 +929,8 @@ func (s *sampleProject) testTranspilers(t *testing.T) {
 	}
 	for _, name := range s.names() {
 		t.Run(name, func(t *testing.T) {
-			s.skipIfAhead(t, "hozoc emit を、このサンプルに掛けられない")
-			s.skipIfBlocked(t, "hozoc emit を、このサンプルに掛けられない")
+			s.skipIfAhead(t, "hozoc build を、このサンプルに掛けられない")
+			s.skipIfBlocked(t, "hozoc build を、このサンプルに掛けられない")
 			if why, absent := s.absent[name]; absent {
 				t.Skipf("飛ばす（トランスパイラ %s を動かせない）。足りないもの:\n  - %s\nそろえば、何も変えずに走る", name, why)
 			}
@@ -962,8 +961,8 @@ func (s *sampleProject) testTranspilers(t *testing.T) {
 		})
 	}
 	t.Run(transpilersAll, func(t *testing.T) {
-		s.skipIfAhead(t, "hozoc emit を、このサンプルに掛けられない")
-		s.skipIfBlocked(t, "hozoc emit を、このサンプルに掛けられない")
+		s.skipIfAhead(t, "hozoc build を、このサンプルに掛けられない")
+		s.skipIfBlocked(t, "hozoc build を、このサンプルに掛けられない")
 		if len(s.absent) > 0 {
 			t.Skipf("飛ばす（出力の全体は、すべてのトランスパイラがそろってから比べる）。足りないもの:\n  - %s\nそろえば、何も変えずに走る",
 				strings.Join(s.absentReasons(), "\n  - "))
@@ -987,15 +986,15 @@ func (s *sampleProject) testTranspilers(t *testing.T) {
 	})
 }
 
-// emit は、サンプルの入力を一時ディレクトリに写して hozoc emit を走らせ、書き出されたファイル（入力になかったもの）を、
+// emit は、サンプルの入力を一時ディレクトリに写して hozoc build を走らせ、書き出されたファイル（入力になかったもの）を、
 // サンプルのルートからの相対パス → 内容で返す。
 func (s *sampleProject) emit(t *testing.T) map[string][]byte {
 	t.Helper()
 	root, env := s.project(t)
 	before := readTree(t, root)
 	var stdout, stderr bytes.Buffer
-	if code := hozocMainEnv(root, env, []string{"emit"}, &stdout, &stderr); code != 0 {
-		t.Fatalf("hozoc emit の終了コード %d\n%s%s", code, stdout.String(), stderr.String())
+	if code := hozocMainEnv(root, env, []string{"build"}, &stdout, &stderr); code != 0 {
+		t.Fatalf("hozoc build の終了コード %d\n%s%s", code, stdout.String(), stderr.String())
 	}
 	got := readTree(t, root)
 	for p := range before {

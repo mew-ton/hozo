@@ -348,7 +348,7 @@ func baseFiles(t *testing.T, root string, views []*ir.View) map[string]string {
 	return files
 }
 
-// compose は、root に、基底 go の出力と、go-valid の出力 files を書く（hozoc emit が書き出すものと同じ木）。
+// compose は、root に、基底 go の出力と、go-valid の出力 files を書く（hozoc build が書き出すものと同じ木）。
 func compose(t *testing.T, root string, views []*ir.View, files map[string]string) {
 	t.Helper()
 	base := baseFiles(t, root, views)

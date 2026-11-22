@@ -35,8 +35,8 @@ func (m CheckInput) Validate() error {
 	return &runtime.ValidationError{Violations: violations}
 }
 
-// Validate は hozoc.EmitInput の各フィールドの制約を確かめる。違反の Path はフィールド名を . でつないだもの。
-func (m EmitInput) Validate() error {
+// Validate は hozoc.BuildInput の各フィールドの制約を確かめる。違反の Path はフィールド名を . でつないだもの。
+func (m BuildInput) Validate() error {
 	var violations []runtime.Violation
 	if m.Format != nil {
 		violations = validAppend(violations, "format", (*m.Format).Validate())

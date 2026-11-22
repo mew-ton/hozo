@@ -142,7 +142,7 @@ func CheckFormat(name, v string) bool                   // "email" / "uri" / "uu
 
 ## 診断
 
-`emit` の応答の `errors` で返す。検査だけの実行（`hozoc check`）も、同じ応答の診断を使う（`docs/plugin-protocol.md`「起動」「emit」）。
+`emit` の応答の `errors` で返す。検査だけの実行（`hozoc build --no-emit`）も、同じ応答の診断を使う（`docs/plugin-protocol.md`「起動」「emit」）。
 
 | ID | 重さ | 意味 |
 |---|---|---|
