@@ -1,6 +1,7 @@
 // STATE-5（docs/check.md「葉の op」「節に書く要素」）: 節を書けないのは、葉の op。配線の op の reads / effects の節は、その関数が、
-// 自分で足す分で、本体と照合しない: 本体が読む状態、行き着く効果、デコレータが運ぶものを、書いていなくてよく（partial）、
-// 本体にないものを書いていてもよい（extra。計算した分に、足される）。それを呼ぶ op（caller）も、同じ
+// 自分で足す分で、本体と照合して、エラーにすることは、しない: 本体が読む状態、行き着く効果、デコレータが運ぶものを、
+// 書いていなくてよい（partial）。デコレータが運ぶものを、書いてもよい（carried）。それを呼ぶ op（caller）も、同じ。
+// 本体にないものを書いたときの warning は、EFF-4 と READS-3 の例が持つ
 namespace a {
   model M { id: string; }
   state rows: list<M>;
@@ -19,15 +20,11 @@ namespace a {
     val last = lastSeen();
     return pick(found, last);
   }
-  fn extra(m: M): reads seen effects log, logs.post {
-    add(m);
-  }
   @audited
-  fn carried(m: M): reads rows effects add {
+  fn carried(m: M): reads seen effects add, logs.post {
     add(m);
   }
   fn caller(m: M): effects add {
     carried(m);
-    extra(m);
   }
 }

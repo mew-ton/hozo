@@ -50,10 +50,10 @@
 
 | 位置 | 受け付けるもの |
 |---|---|
-| `classify C of ...` の対象 | `never` なら、対象のない分類（予約語で、解決しない。`docs/check.md`「分類」の「対象のない分類」）。一つで型を指せば値の分類（下の「型」と同じ）。一つで `op` を指せば op の分類（どの名前空間の op でも。`export` は要らない。値を返さない op は CLS-4）。すべてが現在の名前空間の `state`（基底の状態）なら状態の分類。型や op と状態の混在、状態でないものを含む並びなどは CLS-3（`docs/check.md`「classify / match」）。対象が一つで、型でも op でも状態でもなければ RES-4。対象が形の語か `?` / `[]` を持つ型（`nullable<User>`、`User?`）なら、型として読む |
+| `classify C of ...` の対象 | `never` なら、対象のない分類（型の位置の語で、解決しない: `docs/grammar.md`「型」。`docs/check.md`「分類」の「対象のない分類」）。一つで型を指せば値の分類（下の「型」と同じ）。一つで `op` を指せば op の分類（どの名前空間の op でも。`export` は要らない。値を返さない op は CLS-4）。すべてが現在の名前空間の `state`（基底の状態）なら状態の分類。型や op と状態の混在、状態でないものを含む並びなどは CLS-3（`docs/check.md`「classify / match」）。対象が一つで、型でも op でも状態でもなければ RES-4。対象が形の語か `?` / `[]` を持つ型（`nullable<User>`、`User?`）なら、型として読む |
 | ケースの `X as T` の `X` | その分類の対象と同じもの: 値の分類なら型（`subject` の型と等しいこと）、op の分類ならその `op`、状態の分類なら対象の `state` のどれか。解決は対象と同じ規則で行い、対象でなければ CLS-5（`docs/check.md`「classify / match」） |
 | ケースの `X as T` の `T` | 下の「型」と同じ。絞り込める型かどうかは CLS-6。残りのケースの `X as else` の `else` と、ない側のケースの `X as none` の `none` は予約語で、解決しない（`X` は上の行と同じ） |
-| 型（フィールド、引数、戻り値、`scalar extends`、`state` の型、`as` の後ろ） | `model`、`scalar`、`union`（`arms`）、核の型と形の語は予約語なので解決しない。`classify` と、そのケースは、型にならない（RES-4）: 絞り込んだ型は、`T on C.K` と書く（下の行） |
+| 型（フィールド、引数、戻り値、`scalar extends`、`state` の型、`as` の後ろ） | `model`、`scalar`、`union`（`arms`）。要素が一つの名前が、核の型と形の名前（`docs/grammar.md`「予約語」の 13 語）なら、解決しない: 型の位置では、いつも、はじめから宣言されている、その型（同「型」）。`classify` と、そのケースは、型にならない（RES-4）: 絞り込んだ型は、`T on C.K` と書く（下の行） |
 | 絞り込んだ型のケース `C.K`（`T on C.K`。`docs/grammar.md`「型」の `OnType`） | 最後の要素 `K` を除いた名前 `C` を、`classify` として解決する（どの名前空間のものでもよく、別の名前空間のものは修飾して書く）。`classify` でなければ RES-4。`C` は値の分類か op の分類で、状態の分類と、対象のない分類なら RES-4。`K` が `C` のケースでなければ RES-3。並べたケースが一つの分類のものか、同じケースが二度ないか、`T` が対象の型に渡せるかは TYPE-12（`docs/types.md`「型の種類」の「絞り込んだ型」） |
 | ユニオンのメンバー `X;` | `exception`、`effect`、`union`（`set`） |
 | `exception`、`effect`、`read` の引数の型、`read` の結果の型 | 上の「型」と同じ |
@@ -68,12 +68,12 @@
 | `halts e` の `e` | `effect`、デコレータの宣言の中なら `any effect` の引数 |
 | `effects` の要素 | 名前で書いた要素: `effect`、`union`（`set` で要素が効果）。直に書いた要素: `state`（基底の状態。どの名前空間のものでも解決する）から辿った `post` / `put` / `delete`（下の「`effects` の要素の読み分け」）。デコレータの宣言の中なら `any effect` の引数（残りの引数でもよい）も。操作を付けない `state` と `classify` は RES-4（分類の遷移は直に書けない）。操作が状態の形になければ STATE-1、葉の op が節を書けば STATE-5。配線の op に書いたものは、計算した効果に足される（`docs/check.md`「状態に触れるもの」の「節に書く要素」） |
 | `reads` の要素 | 名前で書いた要素: `read`。直に書いた要素: `state`（基底の状態）。どちらも、どの名前空間のものでも解決する。デコレータの宣言の中なら `any state` の引数（残りの引数でもよい）も。どれでもなければ RES-4（状態の分類も書けない）。同じ名前空間に同じ名前の `read` と `state` は宣言できない（RES-6）ので、名前がどちらを指すかは一つに決まる。葉の op が節を書けば STATE-5。配線の op に書いたものは、計算した読む状態に足される（`docs/check.md`「状態に触れるもの」の「節に書く要素」） |
-| `@name`（核の印 `@repeatable`、`@entry`、`@hint` を除く。`docs/grammar.md`「予約語」） | `decorator`。名前の最後の要素は予約語でもよい（`@db.list`。`docs/grammar.md`「識別子」の `DecoratorRef`）。付ける先の種類との照合は DEC-1 |
+| `@name`（核の印 `@repeatable`、`@entry`、`@hint` を除く。`docs/grammar.md`「予約語」） | `decorator`。名前の最後の要素は予約語でもよい（`@http.default`。`docs/grammar.md`「識別子」の `DecoratorRef`）。付ける先の種類との照合は DEC-1 |
 | デコレータの引数の値 | `Param.type` による（`docs/types.md`「デコレータの引数」）。分類のケースを受け取る引数（`any case`、`any case of never`、`any case of Actor`）には、分類のケース（`Actor.Customer`。どの名前空間の分類でもよく、別の名前空間のものは、修飾して書く）。`any op` の引数に渡した op が、デコレータを付けた宣言とは別の名前空間の、`export` のない op なら NS-5 |
 | デコレータの宣言の、分類のケース（`case of 名前`。`docs/grammar.md`「decorator の宣言」の `CaseKind`）の、`of` の後ろの名前 | 型（上の「型」と同じ）か、`classify`（どの名前空間のものでもよく、別の名前空間のものは、修飾して書く）。`classify` なら、その分類のケース。型なら、対象が、その型の分類のケース。どちらでもなければ（op、状態など）RES-4 |
 | `match (x by C)` の `C` | `classify`（値の分類、op の分類、状態の分類。対象のない分類なら MATCH-7）。どの名前空間のものでもよく、別の名前空間のものは修飾して書く。対象の有無と分類の種類の照合は MATCH-7 |
 | `match (by C)` の `C` | 同上。状態の分類が別の名前空間のものなら `RES-5` |
-| `match (x by list)` / `(x by nullable)` の `list` / `nullable` | 解決しない（標準の分類の名前。予約語） |
+| `match (x by list)` / `(x by nullable)` の `list` / `nullable` | 解決しない（標準の分類の名前。要素が一つの `list` / `nullable` は、この位置で、いつも、標準の分類: `docs/grammar.md`「型」） |
 | `match` のアームのケース名 | その分類のケース。標準の分類なら、`docs/check.md`「分類」の「標準の分類」の表のケース |
 | 配線の呼び出しの名前（`Call` の `QualifiedName`） | `op`、`read`、`effect`、現在の名前空間の `state`（基底の状態）から辿った `post` / `put` / `delete`（下の「呼び出しの読み分け」）。別の名前空間の、`export` のない op なら NS-5、別の名前空間の `read` か `effect` なら NS-6（`docs/check.md`「名前空間」）、別の名前空間の状態の操作なら RES-5。効果の `union`、操作を付けない `state`、`classify` は RES-4 |
 | 配線の値の位置の `Path`（呼び出しの引数、レコードリテラルの値、`val`・`=`・`collect`・`return` の値、`match` の対象、アームの本体の値、`for` の頭の並び） | `val`、`for` の変数、引数、現在の名前空間の `state`（基底の状態。修飾して書いても同じ）と、そのフィールドのパス。`val`、`for` の変数、引数は `Atom.name`、状態は `Atom.state` になる（`docs/ir.md`「配線」）。別の名前空間（かグローバル）の `state` に解決できたら `RES-5`。それ以外の宣言なら RES-4 |
@@ -123,6 +123,7 @@
 - グローバルに同じ名前の宣言が二つあれば `RES-6`。語彙どうし、または語彙とユーザーの宣言の衝突も同じ。両方が語彙なら NS-3（`docs/check.md`）として報告する。
 - 名前空間の名前と、グローバルの宣言の名前は別の空間（§3.2 の例は、グローバルのデコレータ `db` と、名前空間 `db` の `db.key`）。衝突にしない。
 - 現在の名前空間の宣言がグローバルの宣言を隠す（手続きの 5 が 6 より先）。隠すこと自体は診断しない。
+- **核の型と形の名前（`docs/grammar.md`「予約語」の 13 語）は、どの名前空間でも、型と分類の宣言（`model`、`scalar`、`union`、`exception`、`classify`）の名前にできない**（`RES-7`）。型の位置と、`match` の `by` の位置は、この名前を、解決せずに読む（同「型」）ので、同じ名前の宣言は、書いても、名前だけでは指せない。ほかの宣言（関数、`state`、デコレータ）と、名前空間、引数、`val` の名前には、書ける。
 
 語彙の `.hozo` の読み込み方は `docs/vocab.md`「読み込み」。解決では、ユーザーのファイルと同じ規則で扱う。
 
@@ -136,3 +137,4 @@
 | RES-4 | error | その位置で受け付けない種類のものを指している | その名前 |
 | RES-5 | error | 現在の名前空間の状態（か状態の分類）しか書けない位置が、別の名前空間のものを指している: `effect ... on`、`read ... on`、配線の値の位置の状態の名前、配線で直に呼ぶ `状態.操作(…)` の状態、`match by C` の状態の分類。値の位置と呼び出しなら、その名前空間の op を通すことをメッセージに示す | その名前 |
 | RES-6 | error | 同じスコープに同じ名前の宣言が二つある。相手の位置を `Related` に示す | ユーザーのファイルの側。両方ユーザーのファイルなら `docs/ir.md`「原則」の順で後の方 |
+| RES-7 | error | `model`、`scalar`、`union`、`exception`、`classify` の名前が、核の型と形の名前（`string`、`boolean`、`int`、`float`、`datetime`、`date`、`time`、`duration`、`void`、`never`、`list`、`nullable`、`single`）と同じ（「名前空間の併合と重複」）。メッセージに、その語が、はじめから宣言されている型の名前であることを示す | 宣言の名前 |

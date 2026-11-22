@@ -95,7 +95,6 @@ func KeywordGroups() []KeywordGroup {
 		{Key: "declaration", Scope: "keyword.declaration.hozo"},
 		{Key: "modifier", Scope: "storage.modifier.hozo"},
 		{Key: "control", Scope: "keyword.control.hozo"},
-		{Key: "type", Scope: "support.type.primitive.hozo"},
 		{Key: "constant", Scope: "constant.language.hozo"},
 	}
 	type kw struct {
@@ -118,10 +117,11 @@ func KeywordGroups() []KeywordGroup {
 }
 
 // caseOfRule は、デコレータの宣言の、分類のケースの絞り（docs/grammar.md「decorator の宣言」の CaseKind: case of …）。
-// of の後ろの any は節の語、never は核の型、大文字で始まる名前（型か、分類の名前）は型の位置の名前。for の対象の並びの中と、
-// any の後ろの、どちらにも置く（extends / of の後ろの規則は、; か { まで続くので、ここでは使わない）。
+// of の後ろの any は節の語、核の型と形の名前（never、string など。予約語ではないので、ここで拾う）は核の型、大文字で始まる名前
+// （型か、分類の名前）は型の位置の名前。for の対象の並びの中と、any の後ろの、どちらにも置く（extends / of の後ろの規則は、
+// ; か { まで続くので、ここでは使わない）。
 var caseOfRule = Rule{
-	Match: `\b(case)\s+(of)\s+(?:(any)|(never)|(` + typeName + `))`,
+	Match: `\b(case)\s+(of)\s+(?:(any)\b|(` + strings.Join(token.TypeNames(), "|") + `)\b|(` + typeName + `))`,
 	Captures: Captures{
 		"1": {Name: "keyword.control.hozo"},
 		"2": {Name: "keyword.control.hozo"},
@@ -158,14 +158,16 @@ func groupOf(k token.Kind) int {
 	case k >= token.Extends && k <= token.Case: // 節の頭
 		return 2
 	case k == token.None, k == token.True, k == token.False: // true / false / none
-		return 4
+		return 3
 	case k >= token.Val && k <= token.Catch: // 文の頭（none は上で拾っている）
 		return 2
-	case k >= token.StringType && k <= token.Single: // 核の型と形
-		return 3
 	}
 	panic("tmgrammar: 予約語でない Kind: " + k.String())
 }
+
+// coreTypesKey は、核の型と形の名前（docs/grammar.md「予約語」: 予約語ではない）のパターンの repository のキー。
+// 型の位置の規則（#type）の中でだけ使う: 名前の位置（引数、val、関数の名前）の同じ語は、塗らない。
+const coreTypesKey = "core-types"
 
 // wordsPattern は語の選択を \b(a|b|c)\b の形にする。
 func wordsPattern(words []string) string {
@@ -220,7 +222,7 @@ func Build() Grammar {
 		}},
 
 		{Key: "override-name", Rule: Rule{
-			Comment: "override の後ろの一語もフィールド名の位置（docs/grammar.md「model」の Override）。予約語（核の型を含む）は予約語として塗らない。override そのものは修飾の予約語。予約語でないフィールド名には scope を付けない",
+			Comment: "override の後ろの一語もフィールド名の位置（docs/grammar.md「model」の Override）。予約語は予約語として塗らない。override そのものは修飾の予約語。予約語でないフィールド名には scope を付けない",
 			Match:   `\b(override)\s+(` + anyKeyword + `)\b`,
 			Captures: Captures{
 				"1": {Name: "storage.modifier.hozo"},
@@ -302,7 +304,7 @@ func Build() Grammar {
 			Match:   `@(?:repeatable|entry|hint)\b`,
 		}},
 		{Key: "decorator", Rule: Rule{
-			Comment: "@ から DecoratorRef まで。最後の要素は予約語でもよい（@db.list、@effects。docs/grammar.md「識別子」）。予約語のパターンより先に拾い、予約語として塗らない",
+			Comment: "@ から DecoratorRef まで。最後の要素は予約語でもよい（@http.default、@effects。docs/grammar.md「識別子」）。予約語のパターンより先に拾い、予約語として塗らない",
 			Name:    "entity.name.function.decorator.hozo",
 			Match:   `@` + qualifiedName,
 		}},
@@ -317,7 +319,7 @@ func Build() Grammar {
 				},
 			},
 			{
-				Comment: "デコレータの宣言の名前は DecoratorName で、予約語でもよい（decorator fn list(…)。docs/grammar.md「識別子」）。decorator の直後の fn は、関数に付けるデコレータの頭（同「decorator の宣言」）。名前付きのデコレータの = の後ろ（DecoratorRef）は、適用と同じくデコレータの名前",
+				Comment: "デコレータの宣言の名前は DecoratorName で、予約語でもよい（decorator default(…)。docs/grammar.md「識別子」）。decorator の直後の fn は、関数に付けるデコレータの頭（同「decorator の宣言」）。名前付きのデコレータの = の後ろ（DecoratorRef）は、適用と同じくデコレータの名前",
 				Match:   `\b(decorator)\s+(?:(fn)\s+)?(` + ident + `)(?:\s*=\s*(` + qualifiedName + `))?`,
 				Captures: Captures{
 					"1": {Name: "keyword.declaration.hozo"},
@@ -405,11 +407,16 @@ func Build() Grammar {
 			Comment: "型の位置に現れるもの。核の型、< > の中、大文字で始まる名前、絞り込んだ型の on（docs/grammar.md「型」の OnType: T on C.K | C.K2。on の後ろのケースは、大文字で始まる名前の規則が拾い、| には scope を付けない）",
 			Patterns: []Rule{
 				{Include: "#comments"},
-				{Include: "#keywords.type"},
+				{Include: "#" + coreTypesKey},
 				{Include: "#generic"},
 				{Name: "keyword.control.hozo", Match: `\bon\b`},
 				{Name: "entity.name.type.hozo", Match: `\b` + typeName + `\b`},
 			},
+		}},
+		{Key: coreTypesKey, Rule: Rule{
+			Comment: "核の型と形の名前（docs/grammar.md「予約語」「型」の 13 語）。予約語ではないので、型の位置の規則（#type）の中でだけ塗る。token.TypeNames から生成",
+			Name:    "support.type.primitive.hozo",
+			Match:   wordsPattern(token.TypeNames()),
 		}},
 		{Key: "generic", Rule: Rule{
 			Begin:    `<`,

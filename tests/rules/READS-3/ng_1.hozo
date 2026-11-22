@@ -1,0 +1,21 @@
+// READS-3（docs/check.md「状態と効果」「節に書く要素」。warning）: 配線の op が、reads の節に、計算した分にない状態を書いた。
+// 作られる本体は、節に書いただけの状態を、読まない。状態ごとに一つ。位置は op
+namespace a {
+  model User { id: string; }
+  state users: list<User>;
+  state current: nullable<User>;
+  read fn byId(id: string): User? reads users;
+  fn fallback(): User;
+  // 本体は、users を読んでいない（直に書いた状態）
+  fn pick(): User reads users {                        // WARN: READS-3
+    return fallback();
+  }
+  // read の宣言の名前で書いても、数えるのは、その宛先の状態
+  fn named(): User reads byId {                        // WARN: READS-3
+    return fallback();
+  }
+  // 二つ書いて、一つだけ、本体にない
+  fn both(id: string): User? reads users, current {    // WARN: READS-3
+    return byId(id);
+  }
+}

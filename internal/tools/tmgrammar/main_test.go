@@ -86,8 +86,8 @@ func TestKeywordsCovered(t *testing.T) {
 			scopes[w] = rule.Name
 		}
 	}
-	if groups != 5 {
-		t.Errorf("予約語のパターンは docs/editors.md の表の 5 行のはずが %d", groups)
+	if groups != 4 {
+		t.Errorf("予約語のパターンは docs/editors.md の表の 4 行のはずが %d", groups)
 	}
 	for w := range token.Keywords {
 		want := 1
@@ -123,11 +123,6 @@ func TestKeywordsCovered(t *testing.T) {
 		"case":      "keyword.control.hozo",
 		"else":      "keyword.control.hozo",
 		"throw":     "keyword.control.hozo",
-		"string":    "support.type.primitive.hozo",
-		"never":     "support.type.primitive.hozo",
-		"list":      "support.type.primitive.hozo",
-		"nullable":  "support.type.primitive.hozo",
-		"single":    "support.type.primitive.hozo",
 		"true":      "constant.language.hozo",
 		"false":     "constant.language.hozo",
 		"none":      "constant.language.hozo",
@@ -136,6 +131,39 @@ func TestKeywordsCovered(t *testing.T) {
 		if scopes[w] != s {
 			t.Errorf("%q の scope は %s のはずが %s", w, s, scopes[w])
 		}
+	}
+}
+
+// TestCoreTypesOnlyInTypePositions は、核の型と形の名前（docs/grammar.md「予約語」の 13 語。予約語ではない）が、
+// 予約語のパターンに入らず、型の位置の規則（#type）からだけ引かれる、専用のパターンにあることを確かめる
+// （docs/editors.md「TextMate の文法」）。
+func TestCoreTypesOnlyInTypePositions(t *testing.T) {
+	for _, g := range KeywordGroups() {
+		for _, w := range g.Words {
+			if token.IsTypeName(w) {
+				t.Errorf("核の型と形の名前 %q が予約語のパターン %s にある", w, g.Key)
+			}
+		}
+	}
+	data, err := Generate()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var g struct {
+		Repository map[string]struct {
+			Name  string `json:"name"`
+			Match string `json:"match"`
+		} `json:"repository"`
+	}
+	if err := json.Unmarshal(data, &g); err != nil {
+		t.Fatal(err)
+	}
+	rule := g.Repository[coreTypesKey]
+	if rule.Name != "support.type.primitive.hozo" || rule.Match != wordsPattern(token.TypeNames()) {
+		t.Errorf("%s = %+v", coreTypesKey, rule)
+	}
+	if n := strings.Count(string(data), `"#`+coreTypesKey+`"`); n != 1 {
+		t.Errorf("#%s を引く規則は、型の位置の規則（#type）一つのはずが %d", coreTypesKey, n)
 	}
 }
 

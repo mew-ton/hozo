@@ -1,0 +1,12 @@
+// RES-7（docs/resolve.md「名前空間の併合と重複」）: グローバルでも、ほかの名前空間でも、同じ。型の位置の string は、
+// いつも、核の型なので、宣言した model は、名前だけでは指せない（下の Wrap.s は、核の型 string）
+model string { text: int; }                            // ERROR: RES-7 // WARN: NAME-1
+namespace a {
+  scalar int extends float;                            // ERROR: RES-7 // WARN: NAME-1
+  model Wrap { s: string; n: int; }
+  fn f(): Wrap;
+  fn g(): Wrap {
+    val w = f();
+    return { s: "x", n: w.n };
+  }
+}

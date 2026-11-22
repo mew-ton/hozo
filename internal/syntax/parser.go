@@ -68,6 +68,19 @@ func (p *parser) atName() bool { return p.at(token.Ident) || p.at(token.Qualifie
 // atContextual は tok が指定の文脈キーワードかを返す。
 func (p *parser) atContextual(word string) bool { return p.at(token.Ident) && p.tok().Text == word }
 
+// atTypeWord は tok が、型の位置の語 word（核の型と形の名前。docs/grammar.md「予約語」「型」）かを返す。
+// 字句としては Ident で、型の位置でだけ、この読み方をする。
+func (p *parser) atTypeWord(word string) bool { return p.at(token.Ident) && p.tok().Text == word }
+
+// gotTypeWord は、型の位置の語 word があれば読んで true。
+func (p *parser) gotTypeWord(word string) bool {
+	if p.atTypeWord(word) {
+		p.advance()
+		return true
+	}
+	return false
+}
+
 func (p *parser) advance() token.Token {
 	t := p.toks[p.pos]
 	if p.pos < len(p.toks)-1 {
@@ -664,7 +677,7 @@ func (p *parser) parseMember() (*ast.Field, *ast.Override, *ast.Index) {
 		p.advance()
 		o := &ast.Override{Doc: doc, Decorators: decorators, Name: p.parseFieldName()}
 		if p.got(token.Colon) {
-			if p.at(token.Never) {
+			if p.atTypeWord(token.NeverName) {
 				o.Never, o.NeverSpan = true, p.advance().Span
 			} else {
 				o.Type = p.parseType()
@@ -1061,7 +1074,7 @@ func (p *parser) parseClassify(start source.Offset, doc *ast.DocComment, decorat
 	p.expect(token.Classify)
 	c := &ast.ClassifyDecl{Doc: doc, Decorators: decorators, Name: p.parseIdent(), Cases: []*ast.ClassifyCase{}}
 	p.expect(token.Of)
-	if p.at(token.Never) {
+	if p.atTypeWord(token.NeverName) {
 		c.Never, c.NeverSpan = true, p.advance().Span
 		if p.at(token.Comma) {
 			p.fail(p.tok().Span, "never は、ほかの対象と並べられない（対象のない分類は of never だけ。docs/grammar.md「classify」）")
@@ -1174,7 +1187,7 @@ func (p *parser) parseClassifySubject() []ast.Type {
 //	DecoratorClause = ThrowsClause | CatchesClause | DecoReadsClause | DecoEffectsClause ;
 //	ThrowsClause    = [ "outer" ] "throws" ExcRef { "," ExcRef } { Relation } ;
 //
-// デコレータの名前は DecoratorName なので予約語も書ける（`decorator list(…)`。docs/grammar.md「識別子」）。
+// デコレータの名前は DecoratorName なので予約語も書ける（`decorator default(…)`。docs/grammar.md「識別子」）。
 // reads / effects の節は op の節と同じ形で、同じ構文木（ReadsClause / EffectsClause）にする。
 func (p *parser) parseDecoratorDecl(start source.Offset, doc *ast.DocComment, decorators []*ast.Decorator, marks coreMarks) *ast.DecoratorDecl {
 	p.expect(token.Decorator)
@@ -1549,7 +1562,7 @@ func (p *parser) parseCaseKind(param bool) *ast.CaseKind {
 	if p.got(token.Of) {
 		switch {
 		case p.got(token.Any):
-		case p.got(token.Never):
+		case p.gotTypeWord(token.NeverName):
 			k.Never = true
 		default:
 			k.Of = p.parseType()
@@ -1738,10 +1751,10 @@ func (p *parser) parseOpParams() []*ast.OpParam {
 
 // parseReturnType は ReturnType = Type | "void" | "never" を読む。
 func (p *parser) parseReturnType() *ast.ReturnType {
-	if p.at(token.Void) {
+	if p.atTypeWord(token.VoidName) {
 		return &ast.ReturnType{Span: p.advance().Span, Void: true}
 	}
-	if p.at(token.Never) {
+	if p.atTypeWord(token.NeverName) {
 		return &ast.ReturnType{Span: p.advance().Span, Never: true}
 	}
 	t := p.parseType()
@@ -1755,11 +1768,27 @@ func (p *parser) parseReturnType() *ast.ReturnType {
 func (p *parser) parseType() ast.Type {
 	start := p.tok().Span.Start
 	var t ast.Type
-	switch p.tok().Kind {
-	case token.StringType, token.BooleanType, token.IntType, token.FloatType, token.DatetimeType, token.DateType, token.TimeType, token.DurationType:
+	// 型の位置では、要素が一つの名前が、核の型と形の名前なら、いつも、その型（名前の解決を通らない。docs/grammar.md「型」）
+	word := ""
+	if p.at(token.Ident) && token.IsTypeName(p.tok().Text) {
+		word = p.tok().Text
+	}
+	switch {
+	case token.IsCoreTypeName(word):
 		tok := p.advance()
 		t = &ast.CoreType{Span: tok.Span, Name: tok.Text}
-	case token.Ident, token.QualifiedName:
+	case token.IsShapeName(word):
+		shape := p.advance()
+		p.expect(token.Less)
+		st := &ast.ShapeType{Shape: shape.Text, ShapeSpan: shape.Span, Elem: p.parseType()}
+		p.expect(token.Greater)
+		st.Span = p.spanFrom(start)
+		t = st
+	case word == token.VoidName:
+		p.fail(p.tok().Span, "void は op の戻り値の型にだけ書ける（docs/grammar.md「型」）")
+	case word == token.NeverName:
+		p.fail(p.tok().Span, "never は op の戻り値の型と、override のなくす印にだけ書ける（docs/grammar.md「型」）")
+	case p.at(token.Ident), p.at(token.QualifiedName):
 		if p.tok().Kind == token.Ident && p.tok().Text == "Record" && p.peek(1).Kind == token.Less {
 			// なくした書き方（docs/grammar.md「model」「決めたこと」）
 			p.fail(p.tok().Span, "Record<K, V> という書き方はなくなった。キーが決まっていない構造は、インデックスの model を宣言して、その名前を書く（model 名前 { [キーの名前: K]: V; }。docs/grammar.md「model」）")
@@ -1771,20 +1800,9 @@ func (p *parser) parseType() ast.Type {
 		}
 		n.Span = p.spanFrom(start)
 		t = n
-	case token.List, token.Nullable, token.Single:
-		shape := p.advance()
-		p.expect(token.Less)
-		st := &ast.ShapeType{Shape: shape.Text, ShapeSpan: shape.Span, Elem: p.parseType()}
-		p.expect(token.Greater)
-		st.Span = p.spanFrom(start)
-		t = st
-	case token.Void:
-		p.fail(p.tok().Span, "void は op の戻り値の型にだけ書ける（docs/grammar.md「型」）")
-	case token.Never:
-		p.fail(p.tok().Span, "never は op の戻り値の型と、override のなくす印にだけ書ける（docs/grammar.md「型」）")
-	case token.LBrace:
+	case p.at(token.LBrace):
 		p.fail(p.tok().Span, "その場で書く model はユニオンのアームと例外の値にだけ置ける（docs/grammar.md「決めたこと」）")
-	case token.Fn:
+	case p.at(token.Fn):
 		p.fail(p.tok().Span, "fn は、型ではない（関数を、値として渡す書き方は、ない）。型の位置に書けるのは、decorator fn の、最初の引数（包んだ関数の引数）だけ（docs/grammar.md「デコレータの本体」）")
 	default:
 		p.failExpected("型")
@@ -2148,12 +2166,13 @@ func (p *parser) parseMatch() *ast.Match {
 		m.Subject = p.parseAtom()
 	}
 	p.expect(token.By)
-	switch p.tok().Kind {
-	case token.List, token.Nullable:
+	// by の後ろの、要素が一つの list / nullable は、いつも、標準の分類（その名前の分類は、宣言できない。docs/grammar.md「型」）
+	switch {
+	case p.atTypeWord("list"), p.atTypeWord("nullable"):
 		t := p.advance()
 		m.Classifier = ast.QualifiedName{Span: t.Span, Segments: []ast.Ident{{Span: t.Span, Name: t.Text}}}
 		m.Builtin = true
-	case token.Single:
+	case p.atTypeWord("single"):
 		p.fail(p.tok().Span, "single は標準の分類ではないので、match の by には書けない（標準の分類は list と nullable。docs/check.md「標準の分類」）")
 	default:
 		m.Classifier = p.parseQualifiedName()
@@ -2225,7 +2244,7 @@ func (p *parser) parseTry() ast.Stmt {
 	p.expect(token.LParen)
 	s.Name = p.parseIdent()
 	if p.got(token.By) {
-		if p.at(token.List) || p.at(token.Nullable) {
+		if p.atTypeWord("list") || p.atTypeWord("nullable") {
 			p.fail(p.tok().Span, "catch (e by …) の分類は、例外の分類（classify … of any exception）。標準の分類は書けない（docs/grammar.md「配線」）")
 		}
 		name := p.parseQualifiedName()

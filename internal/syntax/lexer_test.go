@@ -57,8 +57,9 @@ func TestLexTokens(t *testing.T) {
 	}{
 		{"empty", "", []token.Kind{token.EOF}},
 		{"keywords", "namespace model op throws", []token.Kind{token.Namespace, token.Model, token.Op, token.Throws, token.EOF}},
-		{"core types and state shapes", "string boolean int float datetime date time duration void list nullable single",
-			[]token.Kind{token.StringType, token.BooleanType, token.IntType, token.FloatType, token.DatetimeType, token.DateType, token.TimeType, token.DurationType, token.Void, token.List, token.Nullable, token.Single, token.EOF}},
+		// 核の型と形の名前は、予約語ではない: 字句としては Ident（docs/grammar.md「予約語」「型」）
+		{"core types and state shapes are idents", "string boolean int float datetime date time duration void never list nullable single",
+			[]token.Kind{token.Ident, token.Ident, token.Ident, token.Ident, token.Ident, token.Ident, token.Ident, token.Ident, token.Ident, token.Ident, token.Ident, token.Ident, token.Ident, token.EOF}},
 		{"bool literals", "true false", []token.Kind{token.True, token.False, token.EOF}},
 		{"ident", "foo _bar baz9", []token.Kind{token.Ident, token.Ident, token.Ident, token.EOF}},
 		{"contextual words are idents", "field variant post put delete", []token.Kind{token.Ident, token.Ident, token.Ident, token.Ident, token.Ident, token.EOF}},
@@ -70,12 +71,13 @@ func TestLexTokens(t *testing.T) {
 		{"name then keyword", "a.string", []token.Kind{token.QualifiedName, token.EOF}},
 		{"path with keywords", "res.op.state.x res.match", []token.Kind{token.QualifiedName, token.QualifiedName, token.EOF}},
 		{"path then keyword", "x.by by", []token.Kind{token.QualifiedName, token.By, token.EOF}},
-		{"keyword then dot", "string.a", []token.Kind{token.StringType, token.Dot, token.Ident, token.EOF}},
+		// 先頭が、核の型の名前でも、つなげる（予約語ではない。time.Slot は、名前空間 time の Slot）
+		{"type name then dot", "string.a time.Slot", []token.Kind{token.QualifiedName, token.QualifiedName, token.EOF}},
 		{"keyword then dot keyword", "op.state", []token.Kind{token.Op, token.Dot, token.State, token.EOF}},
 		{"symbols", "{ } ( ) [ ] < > : ; , . = ? | @ * ** => ->",
 			[]token.Kind{token.LBrace, token.RBrace, token.LParen, token.RParen, token.LBracket, token.RBracket, token.Less, token.Greater,
 				token.Colon, token.Semicolon, token.Comma, token.Dot, token.Assign, token.Question, token.Pipe, token.At, token.Star, token.StarStar, token.Arrow, token.ThinArrow, token.EOF}},
-		{"no >> token", "list<list<string[]>>", []token.Kind{token.List, token.Less, token.List, token.Less, token.StringType, token.LBracket, token.RBracket, token.Greater, token.Greater, token.EOF}},
+		{"no >> token", "list<list<string[]>>", []token.Kind{token.Ident, token.Less, token.Ident, token.Less, token.Ident, token.LBracket, token.RBracket, token.Greater, token.Greater, token.EOF}},
 		{"Record is an identifier", "Record", []token.Kind{token.Ident, token.EOF}},
 		{"int", "0 42 -7", []token.Kind{token.Int, token.Int, token.Int, token.EOF}},
 		{"float", "1.5 -0.25", []token.Kind{token.Float, token.Float, token.EOF}},
@@ -93,7 +95,7 @@ func TestLexTokens(t *testing.T) {
 		{"at ident", "@db @http.status", []token.Kind{token.At, token.Ident, token.At, token.QualifiedName, token.EOF}},
 		// デコレータの名前の予約語（docs/grammar.md「識別子」の DecoratorRef）: 修飾していれば一つの QualifiedName、
 		// していなければ予約語の字句そのもの
-		{"at keyword", "@db.list @db.effects @effects @int", []token.Kind{token.At, token.QualifiedName, token.At, token.QualifiedName, token.At, token.Effects, token.At, token.IntType, token.EOF}},
+		{"at keyword", "@db.list @db.effects @effects @default", []token.Kind{token.At, token.QualifiedName, token.At, token.QualifiedName, token.At, token.Effects, token.At, token.Default, token.EOF}},
 		// "..." は残りの引数の記号（docs/grammar.md「記号」）。二つの "." は一つずつ
 		{"ellipsis", "(...targets: any effect) ...x .. . a.b", []token.Kind{token.LParen, token.Ellipsis, token.Ident, token.Colon, token.Any, token.Effect, token.RParen,
 			token.Ellipsis, token.Ident, token.Dot, token.Dot, token.Dot, token.QualifiedName, token.EOF}},

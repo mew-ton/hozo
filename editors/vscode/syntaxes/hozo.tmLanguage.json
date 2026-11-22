@@ -59,17 +59,17 @@
       "patterns": [
         {
           "name": "variable.other.property.hozo",
-          "match": "\\b(?:namespace|model|scalar|union|state|fn|op|exception|effect|read|classify|decorator|bind|export|override|extends|of|on|to|by|for|as|effects|reads|throws|prevents|keeps|catches|recovers|halts|ignores|any|case|val|return|match|disjoint|collect|else|throw|try|catch|string|boolean|int|float|datetime|date|time|duration|void|never|list|nullable|single|none|true|false|default)\\b(?=\\s*:)"
+          "match": "\\b(?:namespace|model|scalar|union|state|fn|op|exception|effect|read|classify|decorator|bind|export|override|extends|of|on|to|by|for|as|effects|reads|throws|prevents|keeps|catches|recovers|halts|ignores|any|case|val|return|match|disjoint|collect|else|throw|try|catch|none|true|false|default)\\b(?=\\s*:)"
         },
         {
           "name": "variable.other.property.hozo",
-          "match": "(?\u003c=\\.)(?:namespace|model|scalar|union|state|fn|op|exception|effect|read|classify|decorator|bind|export|override|extends|of|on|to|by|for|as|effects|reads|throws|prevents|keeps|catches|recovers|halts|ignores|any|case|val|return|match|disjoint|collect|else|throw|try|catch|string|boolean|int|float|datetime|date|time|duration|void|never|list|nullable|single|none|true|false|default)\\b"
+          "match": "(?\u003c=\\.)(?:namespace|model|scalar|union|state|fn|op|exception|effect|read|classify|decorator|bind|export|override|extends|of|on|to|by|for|as|effects|reads|throws|prevents|keeps|catches|recovers|halts|ignores|any|case|val|return|match|disjoint|collect|else|throw|try|catch|none|true|false|default)\\b"
         }
       ]
     },
     "override-name": {
-      "comment": "override の後ろの一語もフィールド名の位置（docs/grammar.md「model」の Override）。予約語（核の型を含む）は予約語として塗らない。override そのものは修飾の予約語。予約語でないフィールド名には scope を付けない",
-      "match": "\\b(override)\\s+((?:namespace|model|scalar|union|state|fn|op|exception|effect|read|classify|decorator|bind|export|override|extends|of|on|to|by|for|as|effects|reads|throws|prevents|keeps|catches|recovers|halts|ignores|any|case|val|return|match|disjoint|collect|else|throw|try|catch|string|boolean|int|float|datetime|date|time|duration|void|never|list|nullable|single|none|true|false|default))\\b",
+      "comment": "override の後ろの一語もフィールド名の位置（docs/grammar.md「model」の Override）。予約語は予約語として塗らない。override そのものは修飾の予約語。予約語でないフィールド名には scope を付けない",
+      "match": "\\b(override)\\s+((?:namespace|model|scalar|union|state|fn|op|exception|effect|read|classify|decorator|bind|export|override|extends|of|on|to|by|for|as|effects|reads|throws|prevents|keeps|catches|recovers|halts|ignores|any|case|val|return|match|disjoint|collect|else|throw|try|catch|none|true|false|default))\\b",
       "captures": {
         "1": {
           "name": "storage.modifier.hozo"
@@ -163,7 +163,7 @@
       "match": "@(?:repeatable|entry|hint)\\b"
     },
     "decorator": {
-      "comment": "@ から DecoratorRef まで。最後の要素は予約語でもよい（@db.list、@effects。docs/grammar.md「識別子」）。予約語のパターンより先に拾い、予約語として塗らない",
+      "comment": "@ から DecoratorRef まで。最後の要素は予約語でもよい（@http.default、@effects。docs/grammar.md「識別子」）。予約語のパターンより先に拾い、予約語として塗らない",
       "name": "entity.name.function.decorator.hozo",
       "match": "@[A-Za-z_][A-Za-z0-9_]*(?:\\.[A-Za-z_][A-Za-z0-9_]*)*"
     },
@@ -181,7 +181,7 @@
           }
         },
         {
-          "comment": "デコレータの宣言の名前は DecoratorName で、予約語でもよい（decorator fn list(…)。docs/grammar.md「識別子」）。decorator の直後の fn は、関数に付けるデコレータの頭（同「decorator の宣言」）。名前付きのデコレータの = の後ろ（DecoratorRef）は、適用と同じくデコレータの名前",
+          "comment": "デコレータの宣言の名前は DecoratorName で、予約語でもよい（decorator default(…)。docs/grammar.md「識別子」）。decorator の直後の fn は、関数に付けるデコレータの頭（同「decorator の宣言」）。名前付きのデコレータの = の後ろ（DecoratorRef）は、適用と同じくデコレータの名前",
           "match": "\\b(decorator)\\s+(?:(fn)\\s+)?([A-Za-z_][A-Za-z0-9_]*)(?:\\s*=\\s*([A-Za-z_][A-Za-z0-9_]*(?:\\.[A-Za-z_][A-Za-z0-9_]*)*))?",
           "captures": {
             "1": {
@@ -240,7 +240,7 @@
               "match": "\\bfield\\b"
             },
             {
-              "match": "\\b(case)\\s+(of)\\s+(?:(any)|(never)|((?:[A-Za-z_][A-Za-z0-9_]*\\.)*[A-Z][A-Za-z0-9_]*))",
+              "match": "\\b(case)\\s+(of)\\s+(?:(any)\\b|(string|boolean|int|float|datetime|date|time|duration|void|never|list|nullable|single)\\b|((?:[A-Za-z_][A-Za-z0-9_]*\\.)*[A-Z][A-Za-z0-9_]*))",
               "captures": {
                 "1": {
                   "name": "keyword.control.hozo"
@@ -265,7 +265,7 @@
           ]
         },
         {
-          "match": "\\b(case)\\s+(of)\\s+(?:(any)|(never)|((?:[A-Za-z_][A-Za-z0-9_]*\\.)*[A-Z][A-Za-z0-9_]*))",
+          "match": "\\b(case)\\s+(of)\\s+(?:(any)\\b|(string|boolean|int|float|datetime|date|time|duration|void|never|list|nullable|single)\\b|((?:[A-Za-z_][A-Za-z0-9_]*\\.)*[A-Z][A-Za-z0-9_]*))",
           "captures": {
             "1": {
               "name": "keyword.control.hozo"
@@ -367,7 +367,7 @@
           "include": "#comments"
         },
         {
-          "include": "#keywords.type"
+          "include": "#core-types"
         },
         {
           "include": "#generic"
@@ -381,6 +381,11 @@
           "match": "\\b(?:[A-Za-z_][A-Za-z0-9_]*\\.)*[A-Z][A-Za-z0-9_]*\\b"
         }
       ]
+    },
+    "core-types": {
+      "comment": "核の型と形の名前（docs/grammar.md「予約語」「型」の 13 語）。予約語ではないので、型の位置の規則（#type）の中でだけ塗る。token.TypeNames から生成",
+      "name": "support.type.primitive.hozo",
+      "match": "\\b(?:string|boolean|int|float|datetime|date|time|duration|void|never|list|nullable|single)\\b"
     },
     "generic": {
       "begin": "\u003c",
@@ -502,9 +507,6 @@
           "include": "#keywords.control"
         },
         {
-          "include": "#keywords.type"
-        },
-        {
           "include": "#keywords.constant"
         }
       ]
@@ -520,10 +522,6 @@
     "keywords.control": {
       "name": "keyword.control.hozo",
       "match": "\\b(?:extends|of|on|to|by|for|as|effects|reads|throws|prevents|keeps|catches|recovers|halts|ignores|any|case|val|return|match|disjoint|collect|else|throw|try|catch)\\b"
-    },
-    "keywords.type": {
-      "name": "support.type.primitive.hozo",
-      "match": "\\b(?:string|boolean|int|float|datetime|date|time|duration|void|never|list|nullable|single)\\b"
     },
     "keywords.constant": {
       "name": "constant.language.hozo",

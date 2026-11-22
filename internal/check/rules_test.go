@@ -123,6 +123,8 @@ func TestRel4(t *testing.T) {
 // TestWrittenEffects は、配線の op に書いた effects の節（docs/check.md「Sig(O, v)」の手順 0 の「節に書いた効果」）: 本体が行き着く
 // 効果を、書いていなくてよく、本体が行き着かない効果を書けば、F の末尾に足される。足した効果の rel は、葉と同じに、
 // throws の relations から決まり、succ は kept。本体が、もう行き着いている効果を書いても、何も変わらない。
+// 本体も、呼ぶ先も、デコレータも行わない効果を書けば、EFF-4（warning。docs/check.md「状態と効果」）: 行き着いている効果と、
+// halts の効果を書いても、出ない。
 func TestWrittenEffects(t *testing.T) {
 	a := leaf("server.a", nil)
 	a.Effects = ir.NamedEffects("server.e1", "server.e2")
@@ -130,7 +132,11 @@ func TestWrittenEffects(t *testing.T) {
 	w := wire("server.w", nil, nil, cs(call("server.a")))
 	w.Effects = ir.NamedEffects("server.e2", "server.e3")
 	p := serverWith(a, w)
-	wantCodes(t, Check(p, cfgFor("server")))
+	// 書いた e2 は、本体が行き着く。e3 は、どこも行わないので、EFF-4 が、e3 に一つ
+	if d := wantOneCode(t, Check(p, cfgFor("server")), "EFF-4"); d.Severity != diag.Warning || !strings.Contains(d.Message, "server.e3") || strings.Contains(d.Message, "server.e2") {
+		t.Errorf("EFF-4 = %s %q", d.Severity, d.Message)
+	}
+	wantCodes(t, Check(p, cfgFor("server")), "EFF-4")
 	sig := sigOf(t, p, "server.w")
 	wantStrings(t, "F（本体の e1、e2 の後ろに、書いた e3）", effectNames(sig.Effects), []string{"server.e1", "server.e2", "server.e3"})
 	// 本体が行き着く e2 は、書いても、本体から決めた状態のまま。足した e3 は、関係を書いていないので unknown
@@ -145,14 +151,17 @@ func TestWrittenEffects(t *testing.T) {
 	// 関係を付けて書けば、足した効果の rel は、書いたとおり（REL-4 にも当たらない: 本体の e1、e2 も prevented）
 	w.Throws = []ir.ThrowsClause{throws([]string{"server.X"}, prevents())}
 	p = serverWith(a, w)
-	wantCodes(t, Check(p, cfgFor("server")))
+	wantCodes(t, Check(p, cfgFor("server")), "EFF-4")
 	if got := relOf(t, sigOf(t, p, "server.w"), "server.X", "server.e3"); got != ir.Prevented {
 		t.Errorf("rel(X, e3) = %s, want prevented（書いた prevents）", got)
 	}
-	// 呼び出し元へも、伝わる
+	// 呼び出し元へも、伝わる。呼び出し元が、それを書いても、呼ぶ先のものなので、EFF-4 は、書いた w にだけ
 	outer := wire("server.outer", nil, nil, cs(call("server.w")))
+	outer.Effects = ir.NamedEffects("server.e3")
 	p = serverWith(a, w, outer)
-	wantCodes(t, Check(p, cfgFor("server")))
+	if d := wantOneCode(t, Check(p, cfgFor("server")), "EFF-4"); !strings.Contains(d.Message, "server.w ") {
+		t.Errorf("EFF-4 は、書いた op に出る: %q", d.Message)
+	}
 	wantStrings(t, "outer.F", effectNames(sigOf(t, p, "server.outer").Effects), []string{"server.e1", "server.e2", "server.e3"})
 	// 節を書かなければ、本体の分だけ
 	w.Effects, w.Throws = nil, nil

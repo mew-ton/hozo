@@ -12,7 +12,7 @@
 - テストはディレクトリごとに `hozo.toml`（なければ `tests/rules/hozo.toml` を使う）で `Project` を作り、診断の集合を「ファイル、行、重さ、ID」の組で比べる。期待にない診断、出なかった期待はどちらも失敗。
 - `hozo.toml` の単位はトランスパイラを要る（`docs/config.md`「単位」）ので、起動しないプラグインの fixture を置く: 既定のもの `tests/rules/plugins/std`（基底 `go` / `go-b` / `ts` と、`go` に相乗りする `go-x`、`go` と `go-x` に相乗りする `go-y`）と、規則のディレクトリの `plugins/`（その規則のためのもの）。どちらも各例のプロジェクトの `plugins/` に写す。既定の `tests/rules/hozo.toml` は、名前空間 `a` をトランスパイラ `go` で出力する単位一つ。規則のテストは `check` だけで、プラグインを起動しない。
 - **既定の fixture の `go` は、ほかの規則の例が付ける、本体のないデコレータを、`interprets` に並べる**（`tests/rules/plugins/std/hozo-plugin.toml`）。並べないと、単位の対象の宣言にデコレータを付けたどの例にも、CFG-26（`docs/config.md`「解釈するトランスパイラ」）が出て、その例が確かめたい診断に、混ざる。例に、新しい名前の、本体のないデコレータを足したら、そこに足す（足し忘れは、期待にない CFG-26 として、テストが落ちて分かる）。CFG-26 そのものの例は、何も解釈しない基底を持つ、自分の fixture（`tests/rules/CFG-26/plugins/interp`）を使う。
-- 欠番にした規則（CFG-8、CFG-11、TYPE-13、EFF-3、MATCH-8、DEC-17、DEC-18、STATE-9、THROWS-1、READS-2、EFF-2）のディレクトリは消す。配線の op の節が、照合されないこと（`docs/check.md`「状態に触れるもの」の「節に書く要素」）は、REL-4 の `ok_4`（`throws`）と、STATE-5 の `ok_2`（`reads`、`effects`）が確かめ、上書きは、REL-4 の `ng_4`、`ng_5`、`ok_3` が確かめる。足した規則（CFG-19〜CFG-23、NS-6、STATE-5〜STATE-8、MATCH-9、CLS-8）のディレクトリを足す（CFG-23 は、同じデコレータを `seams` に書いた二つのトランスパイラを、規則のディレクトリの `plugins/` に置く）。
+- 欠番にした規則（CFG-8、CFG-11、TYPE-13、EFF-3、MATCH-8、DEC-17、DEC-18、STATE-9、THROWS-1、READS-2、EFF-2）のディレクトリは消す。配線の op の節が、照合されて、エラーにならないこと（`docs/check.md`「状態に触れるもの」の「節に書く要素」）は、REL-4 の `ok_4`（`throws`）と、STATE-5 の `ok_2`（`reads`、`effects`: 計算した分を、書いていない場合）が確かめ、計算した分にない効果と状態を書いたときに、warning だけが出ることは、EFF-4 と READS-3 の `ng_1` が確かめる。上書きは、REL-4 の `ng_4`、`ng_5`、`ok_3` が確かめる。足した規則（CFG-19〜CFG-23、NS-6、STATE-5〜STATE-8、MATCH-9、CLS-8）のディレクトリを足す（CFG-23 は、同じデコレータを `seams` に書いた二つのトランスパイラを、規則のディレクトリの `plugins/` に置く）。
 - メッセージの文言は比べない（変えやすくするため）。文言はゴールデン（下）で確かめる。
 - 文法で閉じている規則（`—` のもの）は、構文エラーになる例を `ng_*.hozo` に置き、`// ERROR: SYNTAX` で確かめる。
 - なくした書き方（`docs/grammar.md` の、新しい書き方をメッセージで示して SYNTAX にするもの: `throws A | B`、`exception X: T`、引数の括弧のない `effect fn e: effects s.post`、`exception X()`、`throw X()`、`model A is B`、フィールドの既定値、分類の `default;`、`condition`、`default =>` のアーム、ケースの並びの `|`、配線の `const`、丸括弧のない `match` の頭、デコレータの宣言の `classify … case`、頭に `fn` のない関数の宣言、`op fn`、節の前に `:` のない関数の型（`fn f() throws E`）、`:` の後ろに何もない関数の型、`read fn` と `effect fn` の `on`、状態の遷移の、宛先の後ろの `:`、デコレータの宣言の、付ける先の並びの `|`、`Record<K, V>`、絞り込んだ型の `C.K<T>`、行の遷移の矢印（`as 前 -> 後`）と `any` とケースの並び）は、`tests/rules/SYNTAX/` に `ng_*.hozo` を一つずつ置く。メッセージの文言は、`internal/syntax` の単体テストが確かめる。
@@ -76,7 +76,7 @@ CI で `go generate ./...` と `make generate`（`cli.hozo` からの自己生�
 
 ## 予約語の一致
 
-`token.Keywords` と `docs/grammar.md`「予約語」の表が同じ集合であることを、文法の文書を読んで確かめるテスト（表の行を正規表現で拾う）。TextMate の文法は `token.Keywords` から生成するので、生成物の一致で足りる。
+`token.Keywords` と `docs/grammar.md`「予約語」の表が同じ集合であることを、文法の文書を読んで確かめるテスト（表の行を正規表現で拾う）。TextMate の文法は `token.Keywords` から生成するので、生成物の一致で足りる。核の型と形の名前（同「予約語」の 13 語。予約語ではない）は、`token.TypeNames` が、同じ段落の並びと一致することと、予約語にも、文脈キーワードにも入っていないことを、同じパッケージのテストが確かめる。
 
 ## プラグインのプロトコル
 

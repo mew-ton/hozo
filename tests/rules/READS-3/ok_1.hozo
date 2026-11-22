@@ -1,0 +1,38 @@
+// READS-3 に当たらない（docs/check.md「状態と効果」「節に書く要素」）: 計算した分にある状態を、節に書いた（何も変わらない）。
+// 読む状態は、書き方によらない: read を呼んでも（viaRead）、状態を名前で読んでも（viaName）、同じ状態。呼ぶ先が読む
+// （viaCallee）、デコレータが運ぶ（viaDecorator）、本体のあるデコレータが読む（viaBodiedDecorator）。節を書かない op（plain）にも、出ない
+namespace a {
+  model User { id: string; }
+  state users: list<User>;
+  state current: nullable<User>;
+  read fn byId(id: string): User? reads users;
+  decorator fn reading(): reads current;
+  fn fallback(): User;
+  fn first(all: User[]): User?;
+  fn viaRead(id: string): User? reads users {
+    return byId(id);
+  }
+  fn viaName(): User? reads byId {
+    return first(users);
+  }
+  fn viaCallee(id: string): User? reads users {
+    return viaRead(id);
+  }
+  @reading
+  fn viaDecorator(): User reads current {
+    return fallback();
+  }
+  // 本体のあるデコレータの本体が読む状態も、計算した分
+  fn count(all: User[]);
+  decorator fn counting(next: fn) {
+    count(users);
+    next();
+  }
+  @counting
+  fn viaBodiedDecorator(): User reads users {
+    return fallback();
+  }
+  fn plain(id: string): User? {
+    return byId(id);
+  }
+}

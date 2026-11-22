@@ -793,6 +793,23 @@ func (c *computer) blockStep(body *ir.Wiring, ns string, s *sigState, written []
 	return info
 }
 
+// effectsWithoutClause は、配線の op O が、effects の節を書かなかったものとして計算した、Sig(O, ns(O)) の F
+// （docs/check.md「状態と効果」の EFF-4 の「計算した分」）。メモ（memo、bodies）は、変えない。
+func (c *computer) effectsWithoutClause(o *ir.Op, ns string) []ir.EffectRef {
+	bare := *o
+	bare.Effects = nil
+	saved, had := c.bodies[o.Name]
+	s := newSigState()
+	c.wiringStep0(&bare, ns, s, false)
+	if had {
+		c.bodies[o.Name] = saved
+	} else {
+		delete(c.bodies, o.Name)
+	}
+	c.decoratorSteps(&bare, ns, ns, s, false)
+	return s.F
+}
+
 // addWritten は手順 0（配線の op）の「節に書いた効果」（docs/check.md「Sig(O, v)」）: Op.effects の効果 e のうち、本体が
 // 行き着いていないものを、F の末尾に足す。rel と succ は、葉の op と同じ値（rel は Op.throws の relations から、succ は kept）:
 // 本体は e を行わないので、行の順からは決まらない。本体が、もう行き着いている e は、何も変えない（節に書くのは、その関数が、
@@ -1167,6 +1184,25 @@ func (c *computer) readsOf(o *ir.Op) []string {
 	add(c.ix.readStates(o.Reads)...) // 節に書いた状態は、計算した分に足す（docs/check.md「reads」）
 	add(c.ix.readStates(o.Carried.Reads)...)
 	c.reads[o.Name] = out
+	return out
+}
+
+// readsWithoutClause は、配線の op O が、reads の節を書かなかったものとして計算した R（docs/check.md「状態と効果」の
+// READS-3 の「計算した分」）: 本体が読む状態、本体のあるデコレータが読む状態、運ばれた状態。
+func (c *computer) readsWithoutClause(o *ir.Op) []string {
+	var out []string
+	add := func(states ...string) {
+		for _, s := range states {
+			if s != "" {
+				out = appendUnique(out, s)
+			}
+		}
+	}
+	add(c.stmtReads(o.Body.Statements)...)
+	for _, d := range c.ix.bodiedDecorators(o) {
+		add(c.stmtReads(d.Body.Statements)...)
+	}
+	add(c.ix.readStates(o.Carried.Reads)...)
 	return out
 }
 

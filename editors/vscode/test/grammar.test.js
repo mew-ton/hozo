@@ -21,7 +21,7 @@ const files = {
   // export、reads、extends / override、op の分類とケースの as、throw、read の宣言、直に呼ぶ組み込みの効果（docs/grammar.md「model」「exception / effect / read」「classify」「op」「配線」）と、
   // 版 0.5 の構文（効果の宣言に付けたデコレータ、reads / effects の節、残りの引数、予約語のデコレータ名）
   api: path.join(root, 'tests', 'corpus', 'view', 'api.hozo'),
-  // 予約語のデコレータ名の宣言（decorator list / int / delete）と、対象 effect / read、核の印 @repeatable
+  // 予約語のデコレータ名の宣言（decorator list / int: 核の型と形の名前。delete: 文脈キーワード）と、対象 effect / read、核の印 @repeatable
   db: path.join(root, 'vocab', 'db.hozo'),
 };
 
@@ -170,9 +170,13 @@ test('フィールド名の位置の予約語は予約語として塗らない',
   // 型の位置の核の型と、宣言の頭はそのまま
   assertScope(m, 'model Wrap', 'model', 'keyword.declaration.hozo');
   assertScope(m, 'model Wrap', 'string', 'support.type.primitive.hozo');
+  // 核の型と形の名前は、予約語ではない（docs/grammar.md「予約語」）: フィールド名の位置では、ふつうの名前で、scope を付けない。
+  // 型の位置（: の後ろ）でだけ、核の型として塗る
   const f = tokensOf('  string: string;');
-  assertScope(f, 'string: string;', 'string', prop, 0);
-  assertScope(f, 'string: string;', 'string', 'support.type.primitive.hozo', 1);
+  const strings = f[0].tokens.filter((t) => t.text.trim() === 'string');
+  assert.strictEqual(strings.length, 2);
+  assert.ok(!strings[0].scopes.includes('support.type.primitive.hozo') && !strings[0].scopes.includes(prop), `フィールド名の string の scope: ${strings[0].scopes}`);
+  assert.ok(strings[1].scopes.includes('support.type.primitive.hozo'), `型の位置の string の scope: ${strings[1].scopes}`);
   // レコードリテラルのキーと値のパス
   const r = tokensOf('val saved = store({ op: res.op, state: res.state, match: res.match });');
   for (const w of ['op', 'state', 'match']) {
@@ -184,7 +188,9 @@ test('フィールド名の位置の予約語は予約語として塗らない',
   assertScope(c, 'const name', 'op', prop);
   // override の後ろの名前（docs/grammar.md「model」の Override）もフィールド名の位置。核の型も、宣言の頭も、節の頭も塗らない
   const o = tokensOf('model Slim extends server.Wrap { override op; override to: never; @db.key override string; override model: Wide; override default: never; override hash: never; }');
-  for (const w of ['op', 'to', 'string', 'model', 'default']) {
+  // override の後ろの string は、予約語ではないので、ふつうのフィールド名（scope を付けない。核の型としても塗らない）
+  assert.ok(!o[0].tokens.some((t) => t.text.trim() === 'string' && (t.scopes.includes('support.type.primitive.hozo') || t.scopes.includes(prop))));
+  for (const w of ['op', 'to', 'model', 'default']) {
     assertScope(o, 'model Slim', w, prop, w === 'model' ? 1 : 0);
     for (const kw of ['keyword.declaration.hozo', 'keyword.control.hozo', 'support.type.primitive.hozo']) {
       assert.ok(!scopesAt(o, 'model Slim', w, w === 'model' ? 1 : 0).includes(kw), `override の後ろの ${w} が ${kw}`);
@@ -666,6 +672,34 @@ test('read の宣言、@repeatable、引数を持つ例外、直に呼ぶ組み�
   assertScope(clause, 'fn signOut', 'reads', 'keyword.control.hozo');
   assertScope(clause, 'fn signOut', 'delete', 'keyword.other.hozo', 1);
   assert.ok(!clause[0].tokens.some((tk) => /dropAll|users/.test(tk.text) && tk.scopes.length > 1), '節の名前に scope が付いている');
+});
+
+test('核の型と形の名前は、型の位置でだけ塗る（docs/grammar.md「予約語」「型」）', () => {
+  const prim = 'support.type.primitive.hozo';
+  const primCount = (line, word) => line.tokens.filter((t) => t.text.trim() === word && t.scopes.includes(prim)).length;
+  // 関数、引数の名前は、ふつうの名前。型の位置（: の後ろ）は、核の型
+  const fn = tokensOf('fn list(date: date, time: time, items: list<string>): void;');
+  assertScope(fn, 'fn list', 'list', 'entity.name.function.hozo', 0);
+  assert.strictEqual(primCount(fn[0], 'date'), 1);
+  assert.strictEqual(primCount(fn[0], 'time'), 1);
+  assert.strictEqual(primCount(fn[0], 'list'), 1);
+  assert.strictEqual(primCount(fn[0], 'string'), 1);
+  assert.strictEqual(primCount(fn[0], 'void'), 1);
+  // 配線の val と、値の位置は、塗らない
+  const body = tokensOf(['fn f(): string {', '  val time = at(date);', '  val string = show(time, list);', '  return string;', '}'].join('\n'));
+  for (const line of body.slice(1)) {
+    for (const w of ['time', 'date', 'string', 'list']) assert.strictEqual(primCount(line, w), 0, `${line.line}: ${w}`);
+  }
+  // match の by の後ろの list / nullable は、標準の分類（形の語として塗る）。対象の値は、塗らない
+  const m = tokensOf('  val n = match (list by list) {');
+  assert.strictEqual(primCount(m[0], 'list'), 1);
+  // 付ける先の case of の後ろの、核の型
+  const c = tokensOf('decorator marked for case of string, case of never;');
+  assert.strictEqual(primCount(c[0], 'string'), 1);
+  assert.strictEqual(primCount(c[0], 'never'), 1);
+  // 名前空間の要素
+  const ns = tokensOf('namespace a.time {');
+  assert.strictEqual(primCount(ns[0], 'time'), 0);
 });
 
 test('予約語のデコレータ名（宣言、適用、別名の先、@see）', () => {

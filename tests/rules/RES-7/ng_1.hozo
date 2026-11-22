@@ -1,0 +1,18 @@
+// RES-7（docs/resolve.md「名前空間の併合と重複」）: 核の型と形の名前（docs/grammar.md「予約語」の 13 語）は、
+// 型と分類の宣言（model、scalar、union、exception、classify）の名前にできない。小文字で始まるので、NAME-1 も出る
+namespace a {
+  model P { p: string; }
+  model Q { q: string; }
+  union U { One: P; Two: Q; }
+
+  model time { at: string; }                           // ERROR: RES-7 // WARN: NAME-1
+  scalar date extends string;                          // ERROR: RES-7 // WARN: NAME-1
+  union list { One: P; Two: Q; }                       // ERROR: RES-7 // WARN: NAME-1
+  exception void;                                      // ERROR: RES-7 // WARN: NAME-1
+  classify nullable of U {                             // ERROR: RES-7 // WARN: NAME-1
+    One: U as P;
+    Two: U as Q;
+  }
+  model never { n: string; }                           // ERROR: RES-7 // WARN: NAME-1
+  model single { s: string; }                          // ERROR: RES-7 // WARN: NAME-1
+}

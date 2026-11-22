@@ -74,7 +74,7 @@ Go のパッケージごとの、このモジュールの中で import してい
 | `internal/wasmbuild` | `internal/plugin` |
 | `internal/fakeplugin/cmd/fakeplugin` | — |
 | `internal/check` | `internal/config`、`internal/diag`、`internal/source`、`ir` |
-| `internal/sema` | `internal/diag`、`internal/source`、`internal/syntax/ast`、`ir` |
+| `internal/sema` | `internal/diag`、`internal/source`、`internal/syntax/ast`、`internal/syntax/token`、`ir` |
 | `internal/syntax` | `internal/diag`、`internal/source`、`internal/syntax/ast`、`internal/syntax/token` |
 | `internal/syntax/ast` | `internal/source` |
 | `internal/syntax/token` | `internal/source` |

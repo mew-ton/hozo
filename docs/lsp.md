@@ -118,7 +118,7 @@ capabilities: `textDocumentSync: { openClose: true, change: Full, save: { includ
 | `effects` の要素 | `effect` か効果の `union` の名前（名前で書いた要素）。直に書いた `状態.操作` は、状態の名前のセグメントが `state` の名前、操作の語（`post` / `put` / `delete`）は宣言を持たないので `null` |
 | `read fn r(…): T reads s` の `s` | `state` の名前 |
 | デコレータの宣言の `reads` / `effects` の節の名前 | op の節と同じ。デコレータの引数の名前（残りの引数を含む）なら、その `Param` |
-| 予約語のデコレータ名（`@db.list`、`@effects`、別名の `=` の後ろ） | ほかのデコレータ名と同じく、その `decorator` の名前 |
+| 予約語のデコレータ名（`@http.default`、`@effects`、別名の `=` の後ろ） | ほかのデコレータ名と同じく、その `decorator` の名前 |
 | 配線の値の位置の、状態の名前（`f(token)`、`match (token by nullable)`） | `state` の名前。同じ名前の `val`、`for` の変数、引数があれば、そちら（`docs/resolve.md`「手続き」） |
 | `match (x by ns.C)` の `C` | `classify` の名前 |
 | アームの `throw E`、`throw E(…)` の `E` | `exception` の名前。引数の値は、配線のほかの値と同じ |

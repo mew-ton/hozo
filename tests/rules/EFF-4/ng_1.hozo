@@ -1,0 +1,36 @@
+// EFF-4（docs/check.md「状態と効果」「節に書く要素」。warning）: 配線の op が、effects の節に、計算した分にない効果を書いた。
+// 作られる本体は、節に書いただけの効果を、行わない。効果ごとに一つ。位置は op
+namespace a {
+  model Mail { to: string; }
+  state mails: list<Mail>;
+  state logs: list<Mail>;
+  effect fn sendMail(mail: Mail): effects mails.post;
+  effect fn logMail(mail: Mail): effects logs.post;
+  fn compose(): Mail;
+  // 本体は、sendMail を呼んでいない
+  fn register(): Mail effects sendMail {               // WARN: EFF-4
+    val mail = compose();
+    return mail;
+  }
+  // 二つ書いて、一つだけ、本体にない
+  fn both(): effects sendMail, logMail {               // WARN: EFF-4
+    val mail = compose();
+    sendMail(mail);
+  }
+  // 直に書いた効果と、宣言した効果は、別のもの（同「節に書く要素」）: 本体が呼ぶのは sendMail で、節は mails.post
+  fn direct(): effects mails.post {                    // WARN: EFF-4
+    val mail = compose();
+    sendMail(mail);
+  }
+  // デコレータが運ぶ効果（logs.post）のほかを書けば、出る。位置は op（デコレータの行から）
+  decorator fn audited(): effects logs.post;
+  @audited                                             // WARN: EFF-4
+  fn decorated(): effects logs.post, logMail {
+    val mail = compose();
+    sendMail(mail);
+  }
+  // 足した効果は、呼び元に伝わる。呼び元が、それを書いても、呼ぶ先のものなので、呼び元には、出ない
+  fn caller(): Mail effects sendMail {
+    return register();
+  }
+}

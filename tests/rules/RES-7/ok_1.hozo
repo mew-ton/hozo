@@ -1,0 +1,41 @@
+// RES-7 に当たらない（docs/grammar.md「予約語」「型」）: 核の型と形の名前は、予約語ではない。関数、read、効果、状態、
+// 引数、val、名前空間の要素の名前に、書ける。型の位置では、型として読む（fn at(date: date) の、前は引数の名前、後ろは核の型）
+namespace a {
+  model Slot { date: date; time: time; }
+  model Item { id: string; }
+  state single: single<Slot>;
+  state items: list<Item>;
+  read fn list(): Item[] reads items;
+  fn at(date: date, time: time): Slot;
+  fn string(int: int): string;
+  fn void(): void;
+  fn echo(boolean: string, text: string);
+  exception Gone;
+  fn never(): never throws Gone;
+  fn f(datetime: datetime, duration: duration, nullable: Item?): Slot {
+    val time = at(single.date, single.time);
+    val list = string(1);
+    val boolean = match (nullable by nullable) {
+      None => list;
+      Some => nullable.id;
+    };
+    void();
+    val int = count(items);
+    val text = string(int);
+    echo(boolean, text);
+    return { date: time.date, time: time.time };
+  }
+  fn count(list: Item[]): int {
+    val float = match (list by list) {
+      Empty => 0;
+      HasItems => 1;
+    };
+    return float;
+  }
+}
+namespace a.time {
+  model Slot { at: datetime; }
+}
+namespace b {
+  fn g(slot: a.time.Slot): a.time.Slot;
+}

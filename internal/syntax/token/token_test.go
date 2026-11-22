@@ -98,7 +98,7 @@ func TestKindString(t *testing.T) {
 		{StarStar, "**"},
 		{Arrow, "=>"},
 		{ThinArrow, "->"},
-		{Nullable, "nullable"},
+		{Catch, "catch"},
 		{Ident, "識別子"},
 		{EOF, "ファイルの終わり"},
 		{Kind(9999), "不明な字句"},
@@ -124,5 +124,33 @@ func TestKindPredicates(t *testing.T) {
 	}
 	if !IsContextual("post") || IsContextual("op") {
 		t.Error("IsContextual")
+	}
+}
+
+// TestTypeNames は、核の型と形の名前（docs/grammar.md「予約語」の 13 語）が、予約語でも、文脈キーワードでもなく、
+// 文書の段落に並ぶ語と、同じ集合であることを確かめる。
+func TestTypeNames(t *testing.T) {
+	names := TypeNames()
+	if len(names) != 13 {
+		t.Fatalf("TypeNames は 13 語のはずが %d: %v", len(names), names)
+	}
+	for _, w := range names {
+		if _, reserved := Keywords[w]; reserved || IsContextual(w) {
+			t.Errorf("%q は、予約語でも文脈キーワードでもないはず", w)
+		}
+		if !IsTypeName(w) {
+			t.Errorf("IsTypeName(%q) = false", w)
+		}
+	}
+	if IsTypeName("fn") || IsTypeName("Time") || !IsCoreTypeName("time") || IsCoreTypeName("list") || !IsShapeName("single") || IsShapeName("never") {
+		t.Error("IsTypeName / IsCoreTypeName / IsShapeName")
+	}
+	data, err := os.ReadFile("../../../docs/grammar.md")
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := "`" + strings.Join(names, "` `") + "` の 13 語は"
+	if !strings.Contains(string(data), want) {
+		t.Errorf("docs/grammar.md「予約語」に、TypeNames の並びがない: %s", want)
 	}
 }

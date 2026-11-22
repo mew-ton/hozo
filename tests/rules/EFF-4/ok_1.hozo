@@ -1,0 +1,47 @@
+// EFF-4 に当たらない（docs/check.md「状態と効果」「節に書く要素」）: 計算した分にある効果を、節に書いた（何も変わらない）。
+// 本体が呼ぶ（viaBody）、呼ぶ先が行う（viaCallee）、デコレータが運ぶ（viaDecorator）、本体のあるデコレータが行う（viaBodiedDecorator）、直に呼んで、直に書く（viaDirect）。
+// throws に、本体にない例外を書いても、何も出ない（extraThrows: 外への約束の幅）。節を書かない op（plain）にも、出ない
+namespace a {
+  model Mail { to: string; }
+  state mails: list<Mail>;
+  state logs: list<Mail>;
+  effect fn sendMail(mail: Mail): effects mails.post;
+  effect fn logMail(mail: Mail): effects logs.post;
+  exception Failed;
+  decorator fn posting(): effects logMail;
+  fn compose(): Mail;
+  fn viaBody(): effects sendMail {
+    val mail = compose();
+    sendMail(mail);
+  }
+  fn viaCallee(): effects sendMail {
+    viaBody();
+  }
+  @posting
+  fn viaDecorator(): effects logMail, sendMail {
+    val mail = compose();
+    sendMail(mail);
+  }
+  fn viaDirect(): effects mails.post {
+    val mail = compose();
+    mails.post(mail);
+  }
+  // 本体のあるデコレータの本体が行う効果も、計算した分
+  decorator fn logging(next: fn) {
+    next();
+    val mail = compose();
+    logMail(mail);
+  }
+  @logging
+  fn viaBodiedDecorator(): effects logMail {
+    val mail = compose();
+    sendMail(mail);
+  }
+  fn extraThrows(): Mail throws Failed {
+    return compose();
+  }
+  fn plain() {
+    val mail = compose();
+    sendMail(mail);
+  }
+}

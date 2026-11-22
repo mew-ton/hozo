@@ -80,21 +80,6 @@ const (
 	Try
 	Catch
 
-	// 核の型と形。
-	StringType
-	BooleanType
-	IntType
-	FloatType
-	DatetimeType
-	DateType
-	TimeType
-	DurationType
-	Void
-	Never
-	List
-	Nullable
-	Single
-
 	// リテラル。
 	True
 	False
@@ -174,22 +159,50 @@ var Keywords = map[string]Kind{
 	"try":      Try,
 	"catch":    Catch,
 
-	"string":   StringType,
-	"boolean":  BooleanType,
-	"int":      IntType,
-	"float":    FloatType,
-	"datetime": DatetimeType,
-	"date":     DateType,
-	"time":     TimeType,
-	"duration": DurationType,
-	"void":     Void,
-	"never":    Never,
-	"list":     List,
-	"nullable": Nullable,
-	"single":   Single,
-
 	"true":  True,
 	"false": False,
+}
+
+// 核の型と形の名前（docs/grammar.md「予約語」「型」）。予約語ではなく、はじめから宣言されている、型の名前で、字句としては Ident。
+// 型の位置でだけ、その型になる。同じ名前の型と分類は、宣言できない（docs/resolve.md「診断」の RES-7）。
+const (
+	// VoidName は、値を返さない op の、戻り値の位置の語。
+	VoidName = "void"
+	// NeverName は、値が一つもない型の語。
+	NeverName = "never"
+)
+
+// CoreTypeNames は、核の型の名前（docs/grammar.md「型」の CoreType）。
+var CoreTypeNames = []string{"string", "boolean", "int", "float", "datetime", "date", "time", "duration"}
+
+// ShapeNames は、形の語（docs/grammar.md「型」の TypePrefix: list<T>、nullable<T>、single<T>）。
+var ShapeNames = []string{"list", "nullable", "single"}
+
+// TypeNames は、核の型と形の名前の 13 語を、docs/grammar.md「予約語」の順に返す。
+func TypeNames() []string {
+	names := append([]string(nil), CoreTypeNames...)
+	names = append(names, VoidName, NeverName)
+	return append(names, ShapeNames...)
+}
+
+// IsCoreTypeName は s が核の型の名前かを返す。
+func IsCoreTypeName(s string) bool { return contains(CoreTypeNames, s) }
+
+// IsShapeName は s が形の語かを返す。
+func IsShapeName(s string) bool { return contains(ShapeNames, s) }
+
+// IsTypeName は s が核の型と形の名前（13 語のどれか）かを返す。
+func IsTypeName(s string) bool {
+	return s == VoidName || s == NeverName || IsCoreTypeName(s) || IsShapeName(s)
+}
+
+func contains(words []string, s string) bool {
+	for _, w := range words {
+		if w == s {
+			return true
+		}
+	}
+	return false
 }
 
 // Contextual は文脈キーワード（docs/grammar.md「予約語」の二つ目の表）。
@@ -197,14 +210,7 @@ var Keywords = map[string]Kind{
 var Contextual = []string{"outer", "field", "variant", "post", "put", "delete"}
 
 // IsContextual は s が文脈キーワードかを返す。
-func IsContextual(s string) bool {
-	for _, c := range Contextual {
-		if c == s {
-			return true
-		}
-	}
-	return false
-}
+func IsContextual(s string) bool { return contains(Contextual, s) }
 
 var symbols = map[Kind]string{
 	LBrace: "{", RBrace: "}", LParen: "(", RParen: ")", LBracket: "[", RBracket: "]",

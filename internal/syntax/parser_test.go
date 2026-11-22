@@ -224,7 +224,7 @@ func TestDecoratorApplicationReject(t *testing.T) {
 		// 予約語はデコレータの名前に書ける（DecoratorRef）ので、`@model` はデコレータ model の適用で、宣言が続かない
 		{"keyword is the name", `@ model M {}`, "宣言が必要だが識別子 Mがある"},
 		{"keyword in the middle", `@a.op.b model M {}`, "op は予約語で、名前には使えない"},
-		{"keyword head", `@list.x model M {}`, "宣言が必要だが「.」がある"},
+		{"keyword head", `@match.x model M {}`, "宣言が必要だが「.」がある"},
 		{"unclosed list", `@a([1) model M {}`, "「]」が必要"},
 	}
 	for _, tt := range tests {
@@ -385,7 +385,8 @@ func TestModelIndex(t *testing.T) {
 		{"doc on index", "model A { /** x */ [k: string]: int; }", "インデックスには、デコレータも、説明も、付けられない"},
 		{"index with extends", "model A extends B { [k: string]: int; }", "extends を持つ model に、インデックスは書けない"},
 		{"index in inline model", "union U { A: { [k: string]: int; }; }", "その場で書く model に、インデックスは書けない"},
-		{"missing key name", "model A { [string]: int; }", "string は予約語で、識別子には使えない"},
+		// string は、予約語ではない（docs/grammar.md「予約語」）ので、キーの名前として読まれ、型がない
+		{"missing key name", "model A { [string]: int; }", "「:」が必要だが「]」がある"},
 		{"missing key type", "model A { [k]: int; }", "「:」が必要だが「]」がある"},
 		{"missing value type", "model A { [k: string]; }", "「:」が必要だが「;」がある"},
 		{"missing semicolon", "model A { [k: string]: int }", "「;」が必要だが「}」がある"},
@@ -1891,7 +1892,7 @@ func TestBlockReject(t *testing.T) {
 		{"return missing semicolon", "fn a() { return x }", "「;」が必要だが「}」がある"},
 		{"match by single", "fn a() { match (s by single) { A => f(); }; }", "single は標準の分類ではない"},
 		{"match by reserved segment", "fn a() { match (x by a.op) { A => f(); }; }", "op は予約語で、名前には使えない"},
-		{"match by core type", "fn a() { match (s by string) { A => f(); }; }", "string は予約語"},
+		{"match by keyword", "fn a() { match (s by model) { A => f(); }; }", "model は予約語"},
 		{"match without by", "fn a() { match (x) { A => f(); }; }", "「by」が必要"},
 		{"match two subjects", "fn a() { match (x, y by K) { A => f(); }; }", "「by」が必要"},
 		{"match by nullable with type argument", "fn a() { match (s by nullable<T>) { None => f(); }; }", "「)」が必要"},
@@ -1956,9 +1957,17 @@ func TestIdentAndQualifiedName(t *testing.T) {
 	if segs[0].Span.Start != start || segs[0].Span.End != start+1 || segs[1].Span.Start != start+2 || segs[1].Span.End != start+3 {
 		t.Errorf("Segment Spans = %+v %+v", segs[0].Span, segs[1].Span)
 	}
-	mustFail(t, "model string {}", "string は予約語で、識別子には使えない")
 	mustFail(t, "model to {}", "to は予約語")
-	mustFail(t, "scalar A extends a.string;", "string は予約語で、名前には使えない")
+	mustFail(t, "scalar A extends a.to;", "to は予約語で、名前には使えない")
+	// 核の型と形の名前は、予約語ではない（docs/grammar.md「予約語」）: 宣言の名前としても、構文は通る（断るのは、名前の解決の RES-7）。
+	// 修飾した名前の要素にも書ける（a.string は、名前空間 a の string）
+	if m := firstDecl[*ast.ModelDecl](t, "model string {}"); m.Name.Name != "string" {
+		t.Errorf("model string の名前 = %+v", m.Name)
+	}
+	sc := firstDecl[*ast.ScalarDecl](t, "scalar A extends a.string;")
+	if n, ok := sc.Base.(*ast.NamedType); !ok || n.Name.String() != "a.string" {
+		t.Errorf("scalar A extends a.string の元の型 = %#v", sc.Base)
+	}
 }
 
 // TestFieldName は FieldName = Ident | 予約語（docs/grammar.md「識別子」）: フィールド名を書く位置
@@ -2099,7 +2108,7 @@ func TestReservedWordReject(t *testing.T) {
 		{"export as name", "fn export();", "export は予約語で、識別子には使えない"},
 		{"reads as param", "fn f(reads: string);", "reads は予約語で、識別子には使えない"},
 		{"as as const", "fn f() { val as = g(); }", "as は予約語で、識別子には使えない"},
-		{"never as type name", "model A { x: a.never; }", "never は予約語で、名前には使えない"},
+		{"keyword as type name", "model A { x: a.match; }", "match は予約語で、名前には使えない"},
 		{"throw as callee", "fn f() { throw(); }", "throw を書けるのは、match のアームの本体と、catch のブロックの最後の文だけ"},
 		{"external on reserved field", "model A { @external decorator: string; }", "@external はデコレータの宣言の直前にだけ書ける"},
 		{"member not a field", "model A { fn f(); }", "「:」が必要だが識別子 fがある"},
@@ -2201,9 +2210,9 @@ func TestDocCommentReject(t *testing.T) {
 		{"param qualified", "/** @param a.b x */ model A {}", "@param の名前の形が正しくない"},
 		{"see with text", "/** @see a b */ model A {}", "@see は名前だけを書く"},
 		{"throws bad name", "/** @throws 1x */ model A {}", "@throws の名前の形が正しくない"},
-		{"see keyword not last", "/** @see string.x */ model A {}", "@see の名前の形が正しくない"},
-		{"throws keyword", "/** @throws db.list */ model A {}", "@throws の名前の形が正しくない"},
-		{"param keyword", "/** @param list x */ model A {}", "@param の名前の形が正しくない"},
+		{"see keyword not last", "/** @see match.x */ model A {}", "@see の名前の形が正しくない"},
+		{"throws keyword", "/** @throws db.match */ model A {}", "@throws の名前の形が正しくない"},
+		{"param keyword", "/** @param match x */ model A {}", "@param の名前の形が正しくない"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -2262,7 +2271,7 @@ model G {}
 	if len(diags) != 3 {
 		t.Errorf("診断の数 = %d: %+v", len(diags), diags)
 	}
-	want := []string{"型が必要だが「;」がある", "「:」が必要だが「int」がある", "「;」が必要だが「model」がある"}
+	want := []string{"型が必要だが「;」がある", "「:」が必要だが識別子 int", "「;」が必要だが「model」がある"}
 	for i, w := range want {
 		if i < len(diags) && !strings.Contains(diags[i].Message, w) {
 			t.Errorf("diags[%d] = %q, want contains %q", i, diags[i].Message, w)
@@ -2616,10 +2625,31 @@ func TestDecoratorTargets(t *testing.T) {
 			t.Errorf("フィールド %d の型 = %q, want %q", i, got, want)
 		}
 	}
-	// 核の型の語は、予約語: 関数、引数、val の名前には、使えない。フィールドの名前には、書ける
-	mustFail(t, "fn date();", "date は予約語で、識別子には使えない")
-	mustFail(t, "fn f(time: string);", "time は予約語で、識別子には使えない")
+	// 核の型の語は、予約語ではない（docs/grammar.md「予約語」）: 関数、引数、val、フィールドの名前に、書ける。
+	// 型の位置では、型として読む（fn f(date: date) の、前は引数の名前、後ろは核の型）
+	if o := firstDecl[*ast.OpDecl](t, "fn date();"); o.Name.Name != "date" {
+		t.Errorf("fn date の名前 = %+v", o.Name)
+	}
+	o := firstDecl[*ast.OpDecl](t, "fn f(time: time, list: list<date>, never: string): void { val string = g(time); val single = list; }")
+	if len(o.Params) != 3 || o.Params[0].Name.Name != "time" || typeString(o.Params[0].Type) != "time" ||
+		o.Params[1].Name.Name != "list" || typeString(o.Params[1].Type) != "list<date>" || o.Params[2].Name.Name != "never" || !o.Return.Void {
+		t.Errorf("fn f の引数と戻り値 = %+v, %+v", o.Params, o.Return)
+	}
+	if v, ok := o.Body.Stmts[0].(*ast.ValStmt); !ok || v.Name.Name != "string" {
+		t.Errorf("val string = %#v", o.Body.Stmts[0])
+	}
 	firstDecl[*ast.ModelDecl](t, "model M { time: time; date: date; datetime: datetime; duration: duration; }")
+	// 要素が二つ以上の名前は、先頭が、核の型の名前でも、ふつうの修飾した名前（名前空間 time の Slot）
+	m = firstDecl[*ast.ModelDecl](t, "model M { slot: time.Slot; items: list.Item[]; }")
+	for i, want := range []string{"time.Slot", "list.Item[]"} {
+		if got := typeString(m.Body.Fields[i].Type); got != want {
+			t.Errorf("フィールド %d の型 = %q, want %q", i, got, want)
+		}
+	}
+	// 型の位置の void / never と、< のない形の語は、今までどおり、SYNTAX
+	mustFail(t, "model M { x: void; }", "void は op の戻り値の型にだけ書ける")
+	mustFail(t, "model M { x: never; }", "never は op の戻り値の型と")
+	mustFail(t, "model M { x: list; }", "「<」が必要")
 }
 
 // TestDecoratorFn は、関数に付けるデコレータ（docs/grammar.md「decorator の宣言」「デコレータの本体」）: decorator fn の頭、

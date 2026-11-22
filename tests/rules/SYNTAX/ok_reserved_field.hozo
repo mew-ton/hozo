@@ -12,7 +12,7 @@ namespace a {
     decorator: string;
     state: Target;
     match: int;
-    /** 型の位置の予約語と同じ名前でもよい */
+    /** 核の型と形の名前（予約語ではない。docs/grammar.md「予約語」）も、ほかの名前と同じに書ける */
     string: string;
     list: string[];
     default: boolean;
