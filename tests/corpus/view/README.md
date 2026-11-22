@@ -21,7 +21,7 @@
 
 | 文書の見出し | 構文（ファイル） | 確かめること |
 |---|---|---|
-| `docs/ir.md`「原則」 | `nullable<api.Token>`、`single<page.Route>`、`fetchUser({ id })`（`web.hozo`） | 参照はすべて FQN。名前空間の順は `""`、`api`、`t`、`web`（ファイルの辞書順）、その後に語彙 `db` `fs` `http` `page` `proc` `valid` |
+| `docs/ir.md`「原則」 | `nullable<api.Token>`、`single<page.Route>`、`fetchUser({ id })`（`web.hozo`） | 参照はすべて FQN。名前空間の順は `""`、`api`、`t`、`web`（ファイルの辞書順）、その後に語彙 `db` `fs` `http` `page` `valid` |
 | `docs/ir.md`「Program」 | `/** ... */ namespace api { }` など三つの名前空間、`page.Route` | `Namespace.description`、`Span.file` の形（ユーザーは相対パス、語彙は `hozo:vocab/<名前>.hozo`）、位置は 1 始まり、宣言の位置は最初のデコレータから |
 | `docs/ir.md`「Doc」、`docs/check.md`「名前空間」DOC-1 | `openUser` / `fetchUser` / `api.getUser` の `@param` `@throws` `@see`、フィールド・アーム・ケースの DocComment | `summary` と `body`、`@throws` と `@see` は FQN、説明のない宣言は `description` なし。`api.getUser` の `@throws Timeout` は `external` なデコレータの例外（`Signature.exceptions` にない）で、DOC-1 にならない |
 | `docs/ir.md`「型」 | `api.User`（`string??` `string[]` `Attrs`）、インデックスの model `api.Attrs`、`scalar AdminToken extends Token`、`api.PublicUser on UserKind.Admin`、`fn signOut()` | `T??` → `T?`、array / case、インデックスの model（`Model.index`）、void は `returns: null`、状態の形 `list` / `nullable` / `single`（型の最も外側から決まる。`docs/decisions.md`「設計書から離れた決定」S21） |
@@ -85,4 +85,4 @@
 | 文書 | 書きたかった構文 | 今の実装 |
 |---|---|---|
 | `docs/ir.md`「その名前空間から見た IR」の `params`（入れ子の位置） | `model Auth { token: Token?; locale: string; }`、`model GetUserInput { auth: Auth; id: UserId; }`（位置 `in.auth.token`） | 外した理由（本体に組み込んでいた Go の出力が、合成した `web.getUser$in$auth` の名前を作れなかった）は、なくなった: このコーパスは Go を出さず、基底 `go` は合成した model を出さない（`docs/plugin-go.md`「出力の対象」）。足すと `view.web.json` と `TestViewFromEntry` の期待値を書き直すことになるので、まだ足していない |
-| `docs/plugin-protocol.md`「起動」の終了コード 2 | マニフェストのとおりに起動して、`protocol` の不一致を MAN-2 にする | 外した理由（マニフェストの `go run` が、プログラムの終了コードを伝えず、`proc.Crashed` になった）は、なくなった: マニフェストの `wasm` を動かせば、終了コード 2 が、そのまま届く。`TestViewDeliveredToPlugin` の protocol のサブテストは、マニフェストの WASM を、`internal/plugin` の `Runner` で、じかに動かす |
+| `docs/plugin-protocol.md`「起動」の終了コード 2 | マニフェストのとおりに起動して、`protocol` の不一致を MAN-2 にする | 外した理由（マニフェストの `go run` が、プログラムの終了コードを伝えず、`Crashed` になった）は、なくなった: マニフェストの `wasm` を動かせば、終了コード 2 が、そのまま届く。`TestViewDeliveredToPlugin` の protocol のサブテストは、マニフェストの WASM を、`internal/plugin` の `Runner` で、じかに動かす |

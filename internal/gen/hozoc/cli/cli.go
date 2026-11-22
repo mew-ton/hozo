@@ -23,7 +23,6 @@ import (
 	"strings"
 
 	"github.com/mew-ton/hozo/internal/gen/hozoc"
-	"github.com/mew-ton/hozo/internal/gen/proc"
 	"github.com/mew-ton/hozo/runtime"
 )
 
@@ -147,8 +146,8 @@ func failBuild(p Presenter, prog string, input any, err error, stderr io.Writer)
 	case cliThrown[hozoc.CheckFailed](err, 1, &f, &code):
 	case cliThrown[hozoc.ConfigInvalid](err, 2, &f, &code):
 	case cliThrown[hozoc.LanguageMismatch](err, 2, &f, &code):
-	case cliThrown[proc.Crashed](err, 70, &f, &code):
-	case cliThrown[proc.MalformedOutput](err, 70, &f, &code):
+	case cliThrown[hozoc.Crashed](err, 70, &f, &code):
+	case cliThrown[hozoc.MalformedOutput](err, 70, &f, &code):
 	case cliThrown[hozoc.OutputConflict](err, 3, &f, &code):
 	case cliThrown[hozoc.UnknownNamespace](err, 64, &f, &code):
 	}
@@ -207,8 +206,8 @@ func failTests(p Presenter, prog string, input any, err error, stderr io.Writer)
 	case cliThrown[hozoc.CheckFailed](err, 1, &f, &code):
 	case cliThrown[hozoc.ConfigInvalid](err, 2, &f, &code):
 	case cliThrown[hozoc.LanguageMismatch](err, 2, &f, &code):
-	case cliThrown[proc.Crashed](err, 70, &f, &code):
-	case cliThrown[proc.MalformedOutput](err, 70, &f, &code):
+	case cliThrown[hozoc.Crashed](err, 70, &f, &code):
+	case cliThrown[hozoc.MalformedOutput](err, 70, &f, &code):
 	case cliThrown[hozoc.OutputConflict](err, 3, &f, &code):
 	case cliThrown[hozoc.TestsNotRun](err, 4, &f, &code):
 	case cliThrown[hozoc.CoverageUnusable](err, 5, &f, &code):

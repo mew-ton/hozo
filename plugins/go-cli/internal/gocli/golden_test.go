@@ -440,7 +440,7 @@ func TestNoModule(t *testing.T) {
 }
 
 // TestBrokenView: View が欠けている（Program がない、viewer の名前空間が Program にない）のは、利用者の仕様の誤りではないので、
-// 診断ではなく error で終わる（hozoc からは proc.Crashed）。
+// 診断ではなく error で終わる（hozoc からは hozoc.Crashed）。
 func TestBrokenView(t *testing.T) {
 	view := loadViews(t, "commands")[0]
 	for name, v := range map[string]*ir.View{

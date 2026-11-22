@@ -24,7 +24,7 @@ import (
 // 例外の選び方（docs/cli.md「検査」の 5、docs/config.md「診断」の最後の段落、docs/diagnostics.md「終了コード」）:
 // error の中に CFG-*（CFG-5 以外）か MAN-* があれば設定の誤りで、それらがすべて CFG-16 なら LanguageMismatch、
 // そうでなければ ConfigInvalid。設定の誤りがなければ CheckFailed。
-// プラグインの check が異常終了すれば proc.Crashed / proc.MalformedOutput（asProc）。
+// プラグインの check が異常終了すれば hozoc.Crashed / hozoc.MalformedOutput（asProc）。
 func (a *App) Check(ctx context.Context, in hozoc.CheckInput) (hozoc.CheckResult, error) {
 	if err := ctx.Err(); err != nil {
 		return hozoc.CheckResult{}, err

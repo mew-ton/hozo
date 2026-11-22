@@ -283,7 +283,7 @@ func TestNoModule(t *testing.T) {
 
 // TestUncheckedSpec は「診断」: 制約の使い方の誤り（VALID-*。docs/plugin-valid.md「診断」）は、語彙のプラグイン valid が、先に断る。
 // その検査を通っていない仕様（ここでは、scalar と、model のフィールドに、min も max もない @valid.length を足した View: VALID-1 か VALID-2）を
-// 受け取ったら、go-valid は、診断にせず、error で終わる（hozoc からは proc.Crashed）。
+// 受け取ったら、go-valid は、診断にせず、error で終わる（hozoc からは hozoc.Crashed）。
 func TestUncheckedSpec(t *testing.T) {
 	bare := ir.Application{Decorator: validvocab.Length}
 	for _, kind := range []string{"scalar", "field"} {
@@ -312,7 +312,7 @@ func TestUncheckedSpec(t *testing.T) {
 }
 
 // TestBrokenView: View が欠けている（Program がない、viewer の名前空間が Program にない）のは、利用者の仕様の誤りではないので、
-// 診断ではなく error で終わる（hozoc からは proc.Crashed）。
+// 診断ではなく error で終わる（hozoc からは hozoc.Crashed）。
 func TestBrokenView(t *testing.T) {
 	view := loadViews(t, "constraints")[0]
 	for name, v := range map[string]*ir.View{

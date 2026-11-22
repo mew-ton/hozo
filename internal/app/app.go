@@ -17,7 +17,7 @@
 //
 // 境界の型は生成したもの（hozoc.CheckInput、hozoc.Diagnostic、hozoc.CheckFailed など）で、中の豊かな型
 // （internal/project.Project、internal/diag.Diagnostic）は App の中にとどめる。例外は生成した exception の型を値で
-// 返す（診断を運ぶ六つの例外は、このパッケージの exceptions.go の関数で作る。proc の例外は internal/gen/proc の型）。cli.go は
+// 返す（診断を運ぶ六つの例外は、このパッケージの exceptions.go の関数で作る。Crashed と MalformedOutput も、生成した hozoc の型）。cli.go は
 // それを errors.As で見分けて @cli.exitCode の終了コードにする（docs/plugin-go-cli.md「実行と表示」）。
 package app
 
@@ -32,7 +32,6 @@ import (
 
 	"github.com/mew-ton/hozo/internal/diag"
 	"github.com/mew-ton/hozo/internal/gen/hozoc"
-	"github.com/mew-ton/hozo/internal/gen/proc"
 	"github.com/mew-ton/hozo/internal/lsp"
 	hostplugin "github.com/mew-ton/hozo/internal/plugin"
 	"github.com/mew-ton/hozo/internal/project"
@@ -188,26 +187,25 @@ func (e *unknownNamespace) Error() string {
 
 func (e *unknownNamespace) Unwrap() error { return hozoc.UnknownNamespace{} }
 
-// procError は internal/plugin の誤り（ErrCrashed / ErrMalformedOutput）を cli.hozo の proc.Crashed /
-// proc.MalformedOutput（proc の単位の出力 internal/gen/proc の型。hozoc のパッケージには複製されない。docs/config.md
-// 「型の置き場」）としても見分けられるようにしたもの。メッセージは元の誤りのまま。errors.Is / errors.As は両方を辿る。
+// procError は internal/plugin の誤り（ErrCrashed / ErrMalformedOutput）を cli.hozo の hozoc.Crashed /
+// hozoc.MalformedOutput（生成した hozoc の例外の型。docs/cli.md「手で書くもの」）としても見分けられるようにしたもの。メッセージは元の誤りのまま。errors.Is / errors.As は両方を辿る。
 type procError struct {
-	exc   error // proc.Crashed{} か proc.MalformedOutput{}
+	exc   error // hozoc.Crashed{} か hozoc.MalformedOutput{}
 	cause error
 }
 
 func (e *procError) Error() string   { return e.cause.Error() }
 func (e *procError) Unwrap() []error { return []error{e.exc, e.cause} }
 
-// asProc は err が internal/plugin の proc.Crashed / proc.MalformedOutput なら procError に包む。それ以外はそのまま。
+// asProc は err が internal/plugin の hozoc.Crashed / hozoc.MalformedOutput なら procError に包む。それ以外はそのまま。
 func asProc(err error) error {
 	switch {
 	case err == nil:
 		return nil
 	case errors.Is(err, hostplugin.ErrCrashed):
-		return &procError{exc: proc.Crashed{}, cause: err}
+		return &procError{exc: hozoc.Crashed{}, cause: err}
 	case errors.Is(err, hostplugin.ErrMalformedOutput):
-		return &procError{exc: proc.MalformedOutput{}, cause: err}
+		return &procError{exc: hozoc.MalformedOutput{}, cause: err}
 	}
 	return err
 }

@@ -231,4 +231,4 @@ warning（コードは `PLUGIN`）は二つ: フローも、要求もない（�
 
 - error が一つでもあれば、ファイルも warning も返さない。
 - 基底のオプション `module` がないとき（同じ単位の基底が GO-8 を返し、何も書き出されない。`docs/plugin-go.md`「診断」）は、ファイルを返さず、GO-8 も重ねて返さない。上の診断は、GODESIGN-7 のほかは、そのときも返す。warning も、返す。
-- 生成器の不具合（`View` が欠けている、生成したコードを `go/format` で整形できない）は、診断にせず、異常終了する（`proc.Crashed`。`docs/plugin-protocol.md`「起動」）。
+- 生成器の不具合（`View` が欠けている、生成したコードを `go/format` で整形できない）は、診断にせず、異常終了する（`Crashed`。`docs/plugin-protocol.md`「起動」）。

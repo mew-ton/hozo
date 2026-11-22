@@ -478,7 +478,7 @@ func TestPluginCheckStopsStuckPlugin(t *testing.T) {
 	}
 	c.shutdown()
 	// 止めた check は、やめさせたもの（異常終了には、しない: 誤りを、ログに残さない）
-	if log := c.logBuf.String(); !strings.Contains(log, "plugin check: canceled") || strings.Contains(log, "proc.Crashed") || strings.Contains(log, "プラグイン chk") {
+	if log := c.logBuf.String(); !strings.Contains(log, "plugin check: canceled") || strings.Contains(log, "hozoc.Crashed") || strings.Contains(log, "プラグイン chk") {
 		t.Errorf("止めた check の扱いが、ログと合わない:\n%s", log)
 	}
 }

@@ -489,9 +489,9 @@ func TestPluginAnswers(t *testing.T) {
 	fakePlugin(t, dir, "chk", "go", "", "", 3)
 	p = LoadWith(Options{Root: dir})
 	if !errors.Is(p.RunErr, hostplugin.ErrCrashed) {
-		t.Fatalf("RunErr = %v, want proc.Crashed", p.RunErr)
+		t.Fatalf("RunErr = %v, want hozoc.Crashed", p.RunErr)
 	}
-	// 応答の数が、要求と合わないのは、形の誤り（proc.MalformedOutput。docs/plugin-protocol.md「応答の形」）
+	// 応答の数が、要求と合わないのは、形の誤り（hozoc.MalformedOutput。docs/plugin-protocol.md「応答の形」）
 	fakePlugin(t, dir, "chk", "go", "", okResult, 0)
 	for raw, want := range map[string]string{
 		`{"outputs":[]}`:               "応答の outputs が 0 個（要求の outputs は 1 個）",
@@ -502,7 +502,7 @@ func TestPluginAnswers(t *testing.T) {
 		write(t, filepath.Join(dir, "plugins", "chk", "raw-response"), raw)
 		p = LoadWith(Options{Root: dir})
 		if !errors.Is(p.RunErr, hostplugin.ErrMalformedOutput) || !strings.Contains(p.RunErr.Error(), want) {
-			t.Errorf("応答 %s: RunErr = %v, want proc.MalformedOutput（%s）", raw, p.RunErr, want)
+			t.Errorf("応答 %s: RunErr = %v, want hozoc.MalformedOutput（%s）", raw, p.RunErr, want)
 		}
 	}
 	// 終了コード 2 の unsupported は MAN-5 の診断（RunErr ではない）。ほかのプラグインは、起動する

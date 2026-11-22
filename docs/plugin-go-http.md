@@ -422,7 +422,7 @@ warning（コードは `PLUGIN`）は二つ: 経路の op が一つもない。N
 
 - GOHTTP-11 と GOHTTP-16 は、書いたものの整合の検査: 書いたものが、Go の出力と食い違っていれば、出力を型に合わせて変えずに error にする（`docs/requirements.md`「出力を推論しない」）。
 - 基底のオプション `module` がないとき（同じ単位の基底が GO-8 を返し、何も書き出されない。`docs/plugin-go.md`「診断」）は、ファイルを返さず、GO-8 も重ねて返さない。上の診断は、GOHTTP-21 のほかは、そのときも返す。
-- 生成器の不具合（`View` が欠けている、`http` の語彙の検査（HTTP-*）を通っていない仕様を受け取った、生成したコードを `go/format` で整形できない）は、診断にせず、異常終了する（`proc.Crashed`。`docs/plugin-protocol.md`「起動」）。
+- 生成器の不具合（`View` が欠けている、`http` の語彙の検査（HTTP-*）を通っていない仕様を受け取った、生成したコードを `go/format` で整形できない）は、診断にせず、異常終了する（`Crashed`。`docs/plugin-protocol.md`「起動」）。
 
 ### 欠番
 

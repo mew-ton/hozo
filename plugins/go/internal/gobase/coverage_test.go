@@ -108,7 +108,7 @@ func TestCoverageHandler(t *testing.T) {
 	if code := plugin.Run(h, strings.NewReader(request("not a profile")), &out, &errOut); code != 0 || out.String() != `{"recognized":false,"files":[]}`+"\n" {
 		t.Errorf("not recognized: code = %d, response = %s", code, out.String())
 	}
-	// 壊れた行は、終了コード 1（hozoc からは proc.Crashed）
+	// 壊れた行は、終了コード 1（hozoc からは hozoc.Crashed）
 	out.Reset()
 	if code := plugin.Run(h, strings.NewReader(request("mode: set\nbroken\n")), &out, &errOut); code != 1 || out.Len() != 0 || !strings.Contains(errOut.String(), "2 行目") {
 		t.Errorf("broken: code = %d, stdout = %s, stderr = %s", code, out.String(), errOut.String())

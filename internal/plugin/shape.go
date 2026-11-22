@@ -11,7 +11,7 @@ import (
 )
 
 // 応答の形の検査（docs/plugin-protocol.md「要求と応答」の「応答の形」）。終了コード 0 の標準出力が JSON として読めても、
-// 形が違えば proc.MalformedOutput（同「起動」の表）。確かめるのは次のことだけ:
+// 形が違えば hozoc.MalformedOutput（同「起動」の表）。確かめるのは次のことだけ:
 //
 //   - 応答は JSON のオブジェクト一つ。
 //   - 必須の項目がある（null は「ない」と同じ）: emit の outputs、その要素の results、その要素（トランスパイラ一つの答え）の

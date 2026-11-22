@@ -6,14 +6,8 @@ plugin_dirs = ["plugins"]
 [options.go]
 module = "github.com/mew-ton/hozo"
 
-# 1: hozoc 自身。型と op の形は基底 go、制約の検査は go-valid、コマンドラインは go-cli
+# hozoc 自身。型と op の形は基底 go、制約の検査は go-valid、コマンドラインは go-cli
 [[emit]]
 namespace   = "hozoc"
 transpilers = ["go", "go-valid", "go-cli"]
 out         = "internal/gen/hozoc"
-
-# 2: hozoc の op が投げる proc.Crashed / proc.MalformedOutput の型の置き場（docs/config.md「型の置き場」）
-[[emit]]
-namespace   = "proc"
-transpilers = ["go"]
-out         = "internal/gen/proc"

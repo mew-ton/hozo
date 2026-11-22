@@ -260,7 +260,7 @@ func TestDiagnosedOutputsOnly(t *testing.T) {
 // TestUncheckedSpec は「診断」: db の語彙の、書いたものの整合の検査（DB-*。docs/plugin-db.md「診断」）は、語彙のプラグイン db が、
 // 先に断る。その検査を通っていない仕様（ここでは、表の状態の形を single に変えた View: DB-2。read の結果の型を変えた
 // View: DB-6）を受け取ったら、go-sqlite は、診断にせず、error で終わる
-// （hozoc からは proc.Crashed）。
+// （hozoc からは hozoc.Crashed）。
 func TestUncheckedSpec(t *testing.T) {
 	for name, breakIt := range map[string]func(ns *ir.Namespace, _ *ir.Program) bool{
 		"DB-2": func(ns *ir.Namespace, _ *ir.Program) bool {

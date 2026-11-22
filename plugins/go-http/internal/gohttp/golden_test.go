@@ -611,7 +611,7 @@ func TestNoModule(t *testing.T) {
 
 // TestUncheckedSpec は「診断」: http の語彙の使い方の誤り（HTTP-*。docs/plugin-http.md「診断」）は、語彙のプラグインが、先に断る。
 // その検査を通っていない仕様（ここでは、経路の op から export を外した View: HTTP-1）を受け取ったら、go-http は、同じ診断を
-// 重ねて返さず、error で終わる（hozoc からは proc.Crashed）。
+// 重ねて返さず、error で終わる（hozoc からは hozoc.Crashed）。
 func TestUncheckedSpec(t *testing.T) {
 	var view *ir.View
 	for _, v := range loadViews(t, "routes") {
@@ -635,7 +635,7 @@ func TestUncheckedSpec(t *testing.T) {
 }
 
 // TestBrokenView: View が欠けている（Program がない、viewer の名前空間が Program にない）のは、利用者の仕様の誤りではないので、
-// 診断ではなく error で終わる（hozoc からは proc.Crashed）。
+// 診断ではなく error で終わる（hozoc からは hozoc.Crashed）。
 func TestBrokenView(t *testing.T) {
 	view := loadViews(t, "routes")[1]
 	for name, v := range map[string]*ir.View{

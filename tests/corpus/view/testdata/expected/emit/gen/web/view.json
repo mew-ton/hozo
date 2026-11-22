@@ -25,7 +25,6 @@
     "hozo:vocab/localstorage.hozo",
     "hozo:vocab/page.hozo",
     "hozo:vocab/prd.hozo",
-    "hozo:vocab/proc.hozo",
     "hozo:vocab/usecase.hozo",
     "hozo:vocab/valid.hozo"
   ],
@@ -16592,111 +16591,6 @@
             "hint": true,
             "repeatable": false,
             "throws": [],
-            "outerThrows": [],
-            "catches": [],
-            "reads": [],
-            "effects": []
-          }
-        ]
-      },
-      {
-        "name": "proc",
-        "description": {
-          "summary": "外部プロセスの語彙（プラグインの呼び出し）",
-          "body": "外部プロセスの語彙（プラグインの呼び出し）",
-          "params": [],
-          "throws": [],
-          "see": []
-        },
-        "decls": [
-          {
-            "kind": "exception",
-            "name": "proc.Crashed",
-            "description": {
-              "summary": "プロセスが異常終了した",
-              "body": "プロセスが異常終了した",
-              "params": [],
-              "throws": [],
-              "see": []
-            },
-            "decorators": [],
-            "span": {
-              "file": "hozo:vocab/proc.hozo",
-              "start": {
-                "line": 4,
-                "col": 3
-              },
-              "end": {
-                "line": 4,
-                "col": 21
-              }
-            },
-            "params": []
-          },
-          {
-            "kind": "exception",
-            "name": "proc.MalformedOutput",
-            "description": {
-              "summary": "出力が約束した形（JSON）でなかった",
-              "body": "出力が約束した形（JSON）でなかった",
-              "params": [],
-              "throws": [],
-              "see": []
-            },
-            "decorators": [],
-            "span": {
-              "file": "hozo:vocab/proc.hozo",
-              "start": {
-                "line": 7,
-                "col": 3
-              },
-              "end": {
-                "line": 7,
-                "col": 29
-              }
-            },
-            "params": []
-          },
-          {
-            "kind": "decorator",
-            "name": "proc.stdio",
-            "description": {
-              "summary": "外部プロセスを起動し、標準入力に入力を JSON で渡し、標準出力の JSON を出力として受け取る。\n起動するコマンドは、このデコレータを付けた op の入力で渡す。",
-              "body": "外部プロセスを起動し、標準入力に入力を JSON で渡し、標準出力の JSON を出力として受け取る。\n起動するコマンドは、このデコレータを付けた op の入力で渡す。",
-              "params": [],
-              "throws": [],
-              "see": []
-            },
-            "decorators": [],
-            "span": {
-              "file": "hozo:vocab/proc.hozo",
-              "start": {
-                "line": 13,
-                "col": 3
-              },
-              "end": {
-                "line": 13,
-                "col": 57
-              }
-            },
-            "params": [],
-            "fn": true,
-            "targets": [
-              "op"
-            ],
-            "caseTargets": [],
-            "entry": false,
-            "hint": false,
-            "repeatable": false,
-            "throws": [
-              {
-                "exceptions": [
-                  "proc.Crashed",
-                  "proc.MalformedOutput"
-                ],
-                "relations": []
-              }
-            ],
             "outerThrows": [],
             "catches": [],
             "reads": [],

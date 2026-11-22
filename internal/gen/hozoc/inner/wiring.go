@@ -11,7 +11,7 @@ import "context"
 //   - in: コマンドの入力
 //   - checked: 検査の結果
 //
-// Throws: hozoc.OutputConflict, hozoc.UnknownNamespace, proc.MalformedOutput
+// Throws: hozoc.OutputConflict, hozoc.UnknownNamespace, hozoc.MalformedOutput
 // Reads: hozoc.outputs
 // Effects: hozoc.syncOutputs
 func (o *ops) WriteOutputs(ctx context.Context, in BuildInput, checked CheckResult) (BuildResult, error) {
@@ -34,7 +34,7 @@ func (o *ops) WriteOutputs(ctx context.Context, in BuildInput, checked CheckResu
 // 引数:
 //   - in: コマンドの入力
 //
-// Throws: hozoc.CheckFailed, hozoc.ConfigInvalid, hozoc.LanguageMismatch, proc.Crashed, proc.MalformedOutput, hozoc.OutputConflict, hozoc.UnknownNamespace
+// Throws: hozoc.CheckFailed, hozoc.ConfigInvalid, hozoc.LanguageMismatch, hozoc.Crashed, hozoc.MalformedOutput, hozoc.OutputConflict, hozoc.UnknownNamespace
 // Reads: hozoc.outputs
 // Effects: hozoc.syncOutputs
 func (o *ops) Build(ctx context.Context, in BuildInput) (BuildResult, error) {
@@ -50,7 +50,7 @@ func (o *ops) Build(ctx context.Context, in BuildInput) (BuildResult, error) {
 // 引数:
 //   - in: コマンドの入力
 //
-// Throws: hozoc.CheckFailed, hozoc.ConfigInvalid, hozoc.LanguageMismatch, proc.Crashed, proc.MalformedOutput, hozoc.OutputConflict, hozoc.TestsNotRun, hozoc.CoverageUnusable
+// Throws: hozoc.CheckFailed, hozoc.ConfigInvalid, hozoc.LanguageMismatch, hozoc.Crashed, hozoc.MalformedOutput, hozoc.OutputConflict, hozoc.TestsNotRun, hozoc.CoverageUnusable
 func (o *ops) Tests(ctx context.Context, in TestsInput) (TestsResult, error) {
 	checked, err := o.Check(ctx, CheckInput{Config: in.Config, Format: in.Format, PluginPath: in.PluginPath, CacheDir: in.CacheDir})
 	if err != nil {

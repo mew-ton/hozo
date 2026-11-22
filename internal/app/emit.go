@@ -47,7 +47,7 @@ type output struct {
 //  1. namespaces が空でなければ、名前空間がそのどれかと同じか子孫である出力だけを対象にする。引数とその子孫のどれも、
 //     どの単位の対象でもなければ UnknownNamespace。
 //  2. 対象の各出力について、単位の各トランスパイラの答えから、files を集める（path とテストの対応表を確かめる:
-//     PLG-1 / PLG-2 / PLG-4 は proc.MalformedOutput）。
+//     PLG-1 / PLG-2 / PLG-4 は hozoc.MalformedOutput）。
 //  3. すべての出力のファイルを集めてからパスの重複を確かめる（CFG-5 → OutputConflict）。
 //
 // 1〜3 は [App.collect]。返す予定（hozoc.EmitPlan）は、warning と、ファイル（パスの辞書順）と、入力の dryRun と noEmit。置き場を含む形は
@@ -158,7 +158,7 @@ func (pl *outputPlan) record(dir string) []byte {
 }
 
 // collect は docs/cli.md「書き出し」の 1〜3: 対象を決め、対象の出力ごとに、単位のトランスパイラの答え（p.Answers）から files を
-// 集め、パスの重複を確かめる。ファイルには触れない。誤りは cli.hozo の例外で返す（UnknownNamespace、proc.MalformedOutput、
+// 集め、パスの重複を確かめる。ファイルには触れない。誤りは cli.hozo の例外で返す（UnknownNamespace、hozoc.MalformedOutput、
 // OutputConflict）。
 //
 // hozoc 本体はコードを出力しない（docs/plugin-protocol.md「この文書が決めること」）。どのトランスパイラも、一つの出力の答えを、
@@ -167,7 +167,7 @@ func (pl *outputPlan) record(dir string) []byte {
 //
 // トランスパイラの files の path はルートからの相対パスで、その出力の Dir(U, N) の下でなければならない
 // （docs/plugin-protocol.md「emit」）。そうでないもの（`..`、絶対パス、別のディレクトリ、別の出力の Dir、Dir(U, N) そのもの）は
-// PLG-1、同じ応答の中の重複は PLG-2 で、どちらも proc.MalformedOutput。
+// PLG-1、同じ応答の中の重複は PLG-2 で、どちらも hozoc.MalformedOutput。
 func (a *App) collect(ctx context.Context, p *project.Project, namespaces []string) (*outputPlan, error) {
 	views := p.Views()
 
@@ -295,7 +295,7 @@ func (a *App) collect(ctx context.Context, p *project.Project, namespaces []stri
 // req を JSON にして送り、応答を hozoc.EmitResponse に読んで返す。hozoc.Spec と hozoc.OutputView は中身のない
 // model なので、この入口から送る要求の spec と、出力の view は空のオブジェクトになる。hozoc 自身の検査（[App.Check]）は、
 // この入口を呼ばず、internal/project が、本物の仕様を持つ要求で、同じ起動をする。
-// 起動の失敗と異常終了は proc.Crashed、応答の形の誤りは proc.MalformedOutput。
+// 起動の失敗と異常終了は hozoc.Crashed、応答の形の誤りは hozoc.MalformedOutput。
 func (a *App) RunEmit(ctx context.Context, plugin hozoc.Plugin, req hozoc.EmitRequest) (hozoc.EmitResponse, error) {
 	if err := ctx.Err(); err != nil {
 		return hozoc.EmitResponse{}, err

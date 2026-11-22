@@ -129,8 +129,8 @@ func basePlugin(p *project.Project, unit int) *hostplugin.Plugin {
 
 // readCoverage は docs/cli.md「tests」の 4: カバレッジのファイル path（相対パスの基準は作業ディレクトリ）を読み、対応表を
 // 持つ単位の基底のプラグインごとに direction "coverage" を送る（docs/plugin-protocol.md「coverage」）。戻り値の covered は、
-// プラグインの名前 → 実行された行。unusable は TESTS-3。誤りは、プラグインの異常終了など（proc.Crashed /
-// proc.MalformedOutput / ConfigInvalid）。
+// プラグインの名前 → 実行された行。unusable は TESTS-3。誤りは、プラグインの異常終了など（hozoc.Crashed /
+// hozoc.MalformedOutput / ConfigInvalid）。
 func (a *App) readCoverage(ctx context.Context, p *project.Project, pl *outputPlan, path string) (covered map[string][]sdk.CoveredFile, unusable []hozoc.Diagnostic, err error) {
 	abs := path
 	if !filepath.IsAbs(abs) {

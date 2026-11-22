@@ -83,4 +83,4 @@ Go の実装は `runtime.CheckFormat`（`docs/plugin-go-valid.md`「runtime」�
 
 - **どの診断も、書いたものの整合の検査**: 制約が言ったことと、付けた先の型が食い違っていれば、error にする。
 - **VALID-* は、`go-valid` の GOVALID-1 を、四つに分けて移したもの。** 分け方の表は `docs/plugin-go-valid.md`「診断」の「欠番」。
-- 仕様が、検査の前提を欠くとき（要求に `spec` がない）は、診断にせず、異常終了する（`proc.Crashed`。`docs/plugin-protocol.md`「起動」）。
+- 仕様が、検査の前提を欠くとき（要求に `spec` がない）は、診断にせず、異常終了する（`Crashed`。`docs/plugin-protocol.md`「起動」）。

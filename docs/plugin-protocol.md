@@ -42,7 +42,7 @@ enabled = false                 # true なら hozoc tests で direction "coverag
 
 - **`wasm`** は、プラグインの本体: WASI（preview 1）の、コマンドの形（`_start` を持つ）の WASM のファイル。hozoc は、これを、本体の中の実行環境で動かす（「起動」）。
   - マニフェストのディレクトリからの、相対パスで書く。絶対パスと、ディレクトリの外に出るパス（`..`）と、空の文字列と、文字列でない値は、MAN-4。
-  - ファイルが、あるかは、マニフェストを読むときには、確かめない（入っているだけで、使わないプラグインのために）。起動するときに、なければ、`proc.Crashed`。
+  - ファイルが、あるかは、マニフェストを読むときには、確かめない（入っているだけで、使わないプラグインのために）。起動するときに、なければ、`Crashed`。
   - **`command`（子プロセスで起動するコマンド）は、なくした**（`docs/decisions.md`「決めたこと」413、414、426）。書けば MAN-6（「診断」）: `wasm` に書き直すことを、示す。子プロセスで起動する道は、開発用としても、ない。
 - `[[transpiler]]` が一つもなければ `emit` を持たない。トランスパイラの名前はプラグインの名前と同じでも違ってもよい。一つのマニフェストの中で同じ名前を二度書けば MAN-4。
 - **`requires`** は、このトランスパイラが依存するトランスパイラの名前の一覧。空なら**基底**、空でなければ**相乗り**（二つの言葉の定義と、単位に掛かる規則の持ち主は `docs/config.md`「基底と相乗り」: 単位は基底をちょうど一つ持ち、`requires` の名前はすべて単位の `transpilers` に書く）。
@@ -136,7 +136,7 @@ enabled = false                 # true なら hozoc tests で direction "coverag
   - **プラグインは、要求の中身だけから、答えを作る**（同 425）。同じ WASM に、同じ要求を渡せば、同じ答えが返る（時計と乱数を、決まった値にしているのは、このため）。
   - 眠ること（`sleep`）を頼まれても、実行環境は、待たない。
   - 前にあった、作業ディレクトリ（プロジェクトのルート）と、環境変数 `HOZO_PROJECT_ROOT`、`HOZO_PLUGIN_DIR` は、ない。
-- **動いているプラグインを、途中で、止められる。** 言語サーバーが、検査を、やめさせるとき（`docs/lsp.md`「プラグインの診断」）は、動いている WASM を、その場で止める。止めた起動の答えは、ない: 診断にも、例外（`proc.Crashed`）にも、しない（やめさせた側が、結果を捨てる）。
+- **動いているプラグインを、途中で、止められる。** 言語サーバーが、検査を、やめさせるとき（`docs/lsp.md`「プラグインの診断」）は、動いている WASM を、その場で止める。止めた起動の答えは、ない: 診断にも、例外（`Crashed`）にも、しない（やめさせた側が、結果を捨てる）。
   - 途中で止められる形の WASM は、止まったかを見る点が入る分、遅い（下の「速さ」）。なので、その形を使うのは、言語サーバーだけ。`hozoc build` と `hozoc tests` は、速い形で動かす: 終わらないプラグインは、利用者が、コマンドごと止める。
   - hozoc は、時間の上限も、メモリの上限も、置かない。
 - **WASM を、機械の言葉に直したものを、覚える**（同 426）。直すのは、WASM のファイルごとに、はじめの一度で、一つに、一秒から数秒、掛かる（関数ごとに、並べて直す）。
@@ -184,13 +184,13 @@ enabled = false                 # true なら hozoc tests で direction "coverag
 | 終了コード | 標準出力 | hozoc の扱い |
 |---|---|---|
 | 0 | 応答の JSON | 成功 |
-| 0 | JSON として読めない、または形が違う（「応答の形」） | `proc.MalformedOutput` |
+| 0 | JSON として読めない、または形が違う（「応答の形」） | `MalformedOutput` |
 | 2 | `{ "error": { "code": "protocol", "message": "..." } }` | MAN-2 |
 | 2 | `{ "error": { "code": "unsupported", "message": "..." } }` | MAN-5 |
-| 2 | それ以外 | `proc.MalformedOutput` |
-| それ以外 | — | `proc.Crashed` |
-| （終わらずに、止まった: WASM の罠） | — | `proc.Crashed` |
-| （起動できない: `wasm` のファイルがない、読めない、WASM として読めない） | — | `proc.Crashed` |
+| 2 | それ以外 | `MalformedOutput` |
+| それ以外 | — | `Crashed` |
+| （終わらずに、止まった: WASM の罠） | — | `Crashed` |
+| （起動できない: `wasm` のファイルがない、読めない、WASM として読めない） | — | `Crashed` |
 
 ## 信頼の前提
 
@@ -222,13 +222,13 @@ enabled = false                 # true なら hozoc tests で direction "coverag
 
 ## 要求と応答
 
-すべての要求は `protocol`（`docs/ir.md` の `version` と同じ値。`view.version` とも等しい）と `direction` を持つ。プラグインは `protocol` が合わなければ `code: "protocol"`、`direction` を実装していなければ（`emit` なら、頼まれたトランスパイラの、どれかを実装していなければ）`code: "unsupported"` の `error` を返して終了コード 2 で終わる。`protocol` を先に確かめる。「合わない」の決まりは「版の合わせ方」で、`protocol` がない、`null`、文字列でない場合を含む。文字列でない `direction` は、実装していない `direction` と同じ。要求が JSON のオブジェクトとして読めなければ、応答を書かずに終了コード 1 で終わる（hozoc からは `proc.Crashed`）。SDK はこの読み方を表（`plugin/testdata/request_head.json`）でテストする。
+すべての要求は `protocol`（`docs/ir.md` の `version` と同じ値。`view.version` とも等しい）と `direction` を持つ。プラグインは `protocol` が合わなければ `code: "protocol"`、`direction` を実装していなければ（`emit` なら、頼まれたトランスパイラの、どれかを実装していなければ）`code: "unsupported"` の `error` を返して終了コード 2 で終わる。`protocol` を先に確かめる。「合わない」の決まりは「版の合わせ方」で、`protocol` がない、`null`、文字列でない場合を含む。文字列でない `direction` は、実装していない `direction` と同じ。要求が JSON のオブジェクトとして読めなければ、応答を書かずに終了コード 1 で終わる（hozoc からは `Crashed`）。SDK はこの読み方を表（`plugin/testdata/request_head.json`）でテストする。
 
 **プラグインは、要求の、知らない項目を、無視する**（`docs/decisions.md`「決めたこと」421）。要求のどの階層でも（`spec`、`program` の宣言、`outputs` の要素、`config` など）、プラグインが知らない名前の項目があってよく、読まないだけで、誤りにしない。SDK が、この読み方を持つ。hozoc も、応答の、知らない項目を、無視する（「版の合わせ方」）。
 
 ### 応答の形
 
-終了コード 0 の標準出力は、JSON の値一つで、下の各 direction の応答の形をしていなければならない。hozoc は次を確かめ、違えば `proc.MalformedOutput`（「起動」）。
+終了コード 0 の標準出力は、JSON の値一つで、下の各 direction の応答の形をしていなければならない。hozoc は次を確かめ、違えば `MalformedOutput`（「起動」）。
 
 - 応答は JSON のオブジェクト。
 - **必須の項目**がある。`null` は「ない」と同じに扱う。`emit` の応答の `outputs`、その要素の `results`、その要素（トランスパイラ一つの答え）の `files` と `warnings`、`read` の応答の `errors` と `warnings`、`coverage` の応答の `recognized` と `files`（配列は、どれも、空でも `[]` で出す）。要素では、`files` の要素の `path` と `content`、`warnings` の要素の `message`、`errors` の要素の `code` と `message`、`coverage` の応答の `files` の要素の `path` と `lines`。
@@ -291,7 +291,7 @@ enabled = false                 # true なら hozoc tests で direction "coverag
 - **SDK が、並びを回す**: プラグインの書き手は、「トランスパイラ一つが、出力一つの `View` を受け取って、答えを一つ返す」関数を書く（`docs/packages.md`「`plugin`（公開）」の `Handler.Emit`）。SDK が、要求の `outputs` と `transpilers` の順に、それを呼び、応答に並べる。
 - `transpilers` の要素は、単位の `transpilers` に書かれた名前のうち、このプラグインが提供するもの。複数のトランスパイラを提供するプラグインは、この名前で処理を分ける。
 - **オプション**は、要求の別の項目ではなく、出力の `view.config.options` にある（`docs/ir.md`「その名前空間から見た IR」）。頼まれたトランスパイラへのオプションは `config.options[<トランスパイラの名前>]` で、書かれていなければキーがない（空のテーブルと同じに読む）。SDK がこの読み方を持つ（`docs/packages.md`「`plugin`（公開）」の `Options`）。知らないキーと、型の違う値は、トランスパイラが `errors` で返す。
-- `path` は、その出力 (U, N) の出力先 Dir(U, N)（要求の、その出力の `view.config.dir`。`docs/config.md`「単位の対象」）の下のファイルでなければならない。そうでなければ PLG-1: 絶対パス、`..` でルートや Dir(U, N) の外へ出るパス、ルートの中の別のディレクトリ、別の出力の Dir、Dir(U, N) そのもの。比べるのは `./` や `..` を畳んだパス。出力先ごとの記録（`docs/cli.md`「書き出し」の `.hozoc-outputs.json`）と、出力先の持ち主を一つに決める規則（CFG-17）が、どの出力のファイルもその Dir の下にあることを前提にしているため。トランスパイラ一つの答えの中で同じ `path` が二度あれば PLG-2。どちらも `proc.MalformedOutput` として終了する。同じ出力の二つのトランスパイラが同じ `path` を返せば CFG-5（`docs/config.md`「診断」）。
+- `path` は、その出力 (U, N) の出力先 Dir(U, N)（要求の、その出力の `view.config.dir`。`docs/config.md`「単位の対象」）の下のファイルでなければならない。そうでなければ PLG-1: 絶対パス、`..` でルートや Dir(U, N) の外へ出るパス、ルートの中の別のディレクトリ、別の出力の Dir、Dir(U, N) そのもの。比べるのは `./` や `..` を畳んだパス。出力先ごとの記録（`docs/cli.md`「書き出し」の `.hozoc-outputs.json`）と、出力先の持ち主を一つに決める規則（CFG-17）が、どの出力のファイルもその Dir の下にあることを前提にしているため。トランスパイラ一つの答えの中で同じ `path` が二度あれば PLG-2。どちらも `MalformedOutput` として終了する。同じ出力の二つのトランスパイラが同じ `path` を返せば CFG-5（`docs/config.md`「診断」）。
 - `content` は UTF-8 の文字列。バイナリは出せない。
 - `outputs`、`results`、`files`、`warnings` は空でも `[]` で出す。省けるのは `errors`（「応答の形」）。
 - `warnings` は warning の診断（コード `PLUGIN`、メッセージの先頭にトランスパイラの名前）。**検査だけの実行でも、出る**（前は、書き出す実行でだけ出た）。
@@ -319,7 +319,7 @@ enabled = false                 # true なら hozoc tests で direction "coverag
 - **相手**は、単位の基底（`docs/config.md`「基底と相乗り」）を提供するプラグインのうち、`[coverage] enabled` のもの。プラグインごとに一回で、起動の順は、そのプラグインを基底に持つ単位の、設定の順。基底のプラグインが `[coverage] enabled` でない単位の分は、どのプラグインにも聞かない（その単位の対応表のテストは、TESTS-3。`docs/cli.md`「tests」）。
 - `coverage.path` は、hozoc が読んだファイルの絶対パス（メッセージに使う。プラグインは、読み直さなくてよい）。`coverage.content` は、その中身。UTF-8 の文字列でないカバレッジは、渡せない。
 - 要求の `files` は、そのプラグインを基底に持つ単位の出力の、対応表が指すファイル（プロジェクトのルートからの相対パス。重複なし、辞書順）。
-- `recognized` が `false` なら、このプラグインが読める形のファイルではなかった（誤りではない。`files` は `[]`）。中身が、読める形の頭を持つのに、途中が壊れているときは、応答を書かずに、終了コード 1 で終わる（`proc.Crashed`）。
+- `recognized` が `false` なら、このプラグインが読める形のファイルではなかった（誤りではない。`files` は `[]`）。中身が、読める形の頭を持つのに、途中が壊れているときは、応答を書かずに、終了コード 1 で終わる（`Crashed`）。
 - 応答の `files` は、要求の `files` のうち、カバレッジが測っていたファイルごとに、一つ。`lines` は、実行された所の、行の範囲（始まりの行と、終わりの行。1 始まりで、両端を含む）の列で、一度も実行されていないファイルなら `[]`。カバレッジが測っていなかったファイルは、要素を出さない（「測ったが、実行されていない」と「測っていない」を、hozoc が分けて報告する）。要求の `files` にないパスの要素は、読まれない。
 - 要求の `outputs` は、`files` を出した出力（単位と名前空間の組）の設定（`docs/ir.md`「その名前空間から見た IR」の `NamespaceConfig`。単位の設定の順、その中は名前空間の IR の順）。プラグインは、ファイルを読まないので、言語のパッケージの名前など、設定から決まるものは、ここから取る（Go なら、`options.go.module`。`docs/plugin-go.md`「カバレッジを読む」）。
 - `coverage` はトランスパイラごとではなくプラグインごとの処理で、要求は `spec` も、トランスパイラの名前も、持たない。
@@ -356,7 +356,7 @@ enabled = false                 # true なら hozoc tests で direction "coverag
 - `name` は、その対応表の中で重ならない。テストを受け取る口の文書が「テストの名前」と呼ぶもの（`<op の FQN>/<結果>` など）。
 - `file` は、同じ答え（トランスパイラ一つの `files`）の `path` の一つ。
 - テストを受け取る口を一つも出さない応答は、対応表を出さない。
-- hozoc は、`emit` の応答のファイルを集めるとき（`hozoc build`、`hozoc tests`）に、対応表の形を確かめる。次のどれかなら PLG-4（`proc.MalformedOutput`。「診断」）: 名前の `<トランスパイラの名前>` が、その答えを返したトランスパイラの名前でない。中身が、上の形の JSON でない（`tests` が配列でない、要素に `name`、`file`、`lines` のどれかがない、型が違う、`lines` が、1 以上の整数二つで、始まり ≦ 終わり、でない）。`name` が空か、重なる。`file` が、同じ答えの `files` にない。知らない項目は、読まれない（「応答の形」と同じ）。
+- hozoc は、`emit` の応答のファイルを集めるとき（`hozoc build`、`hozoc tests`）に、対応表の形を確かめる。次のどれかなら PLG-4（`MalformedOutput`。「診断」）: 名前の `<トランスパイラの名前>` が、その答えを返したトランスパイラの名前でない。中身が、上の形の JSON でない（`tests` が配列でない、要素に `name`、`file`、`lines` のどれかがない、型が違う、`lines` が、1 以上の整数二つで、始まり ≦ 終わり、でない）。`name` が空か、重なる。`file` が、同じ答えの `files` にない。知らない項目は、読まれない（「応答の形」と同じ）。
 
 ## 相乗りが基底の形を知る方法
 
@@ -418,7 +418,7 @@ enabled = false                 # true なら hozoc tests で direction "coverag
 - 番号は別の意味に使い回さない（`docs/config.md`「診断」と同じ。欠番の一覧は `docs/requirements.md`「検査の規則の一覧」）。
 - MAN-4 の「`language` が `"go"` でも `"ts"` でもない」という条件はなくした（言語の名前は基底が決める。「マニフェスト」）。
 - MAN-* は診断で、例外は `ConfigInvalid`。
-- PLG-* は診断にならない（重さが「—」）。応答そのものが信用できないので、診断の一覧に足して続けることはせず、例外 `proc.MalformedOutput` で終わる。ID は、その例外のメッセージの頭に書く（`プラグイン fake の出力が約束した形でない: PLG-1: …`）。`--format json` でも `diagnostics` には現れず、`{"error": "proc.MalformedOutput"}` になる（`docs/plugin-go-cli.md`「実行と表示」の `JSONPresenter`）。「応答の形」の誤りも同じ例外で、ID は持たない。
+- PLG-* は診断にならない（重さが「—」）。応答そのものが信用できないので、診断の一覧に足して続けることはせず、例外 `MalformedOutput` で終わる。ID は、その例外のメッセージの頭に書く（`プラグイン fake の出力が約束した形でない: PLG-1: …`）。`--format json` でも `diagnostics` には現れず、`{"error": "MalformedOutput"}` になる（`docs/plugin-go-cli.md`「実行と表示」の `JSONPresenter`）。「応答の形」の誤りも同じ例外で、ID は持たない。
 - 終了コードは `docs/diagnostics.md`「終了コード」。
 
 ## SDK

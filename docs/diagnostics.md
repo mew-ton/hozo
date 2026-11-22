@@ -93,6 +93,6 @@ hozo.toml: error[CFG-12]: 2 番目の [[emit]]（namespace = "server"）に out 
 | 4 | `TestsNotRun` | 求めるテストのうち、走ったと確かめられないものがある（TESTS-1。`docs/cli.md`「tests」） |
 | 5 | `CoverageUnusable` | カバレッジを、求めるテストと突き合わせられない（TESTS-2、TESTS-3。同） |
 | 64 | `UnknownNamespace`、使い方の誤り | 引数・フラグの解釈の失敗と、`cli.hozo` で 64 を付けた例外 |
-| 70 | `proc.Crashed` / `proc.MalformedOutput`、宣言にない例外 | プラグインの異常終了（`proc.Crashed`）、プラグインの応答の誤り（`proc.MalformedOutput`: JSON でない、形が違う、PLG-1、PLG-2。診断にはならず、例外のメッセージで示す。`docs/plugin-protocol.md`「起動」「応答の形」「診断」）、`cli.exitCode` のない例外 |
+| 70 | `Crashed` / `MalformedOutput`、宣言にない例外 | プラグインの異常終了（`Crashed`）、プラグインの応答の誤り（`MalformedOutput`: JSON でない、形が違う、PLG-1、PLG-2。診断にはならず、例外のメッセージで示す。`docs/plugin-protocol.md`「起動」「応答の形」「診断」）、`cli.exitCode` のない例外 |
 
 `hozoc build --no-emit` は、error が一つもなければ 0。warning を error に格上げするフラグは持たない（必要になったら足す）。

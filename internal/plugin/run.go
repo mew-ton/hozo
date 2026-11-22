@@ -13,15 +13,15 @@ import (
 	"github.com/mew-ton/hozo/internal/diag"
 )
 
-// ErrCrashed はプラグインの異常終了（例外 proc.Crashed。docs/plugin-protocol.md「起動」の「それ以外」の終了コード、
+// ErrCrashed はプラグインの異常終了（例外 hozoc.Crashed。docs/plugin-protocol.md「起動」の「それ以外」の終了コード、
 // WASM の罠、または起動できなかった）。*CrashedError が Unwrap する。
-var ErrCrashed = errors.New("proc.Crashed")
+var ErrCrashed = errors.New("hozoc.Crashed")
 
-// ErrMalformedOutput はプラグインの出力が約束した形（JSON）でなかった（例外 proc.MalformedOutput）。
+// ErrMalformedOutput はプラグインの出力が約束した形（JSON）でなかった（例外 hozoc.MalformedOutput）。
 // *MalformedOutputError が Unwrap する。
-var ErrMalformedOutput = errors.New("proc.MalformedOutput")
+var ErrMalformedOutput = errors.New("hozoc.MalformedOutput")
 
-// CrashedError は proc.Crashed の中身。
+// CrashedError は hozoc.Crashed の中身。
 type CrashedError struct {
 	Plugin   string
 	ExitCode int   // 起動できなかったときと、終了コードなしに止まったときは -1
@@ -37,7 +37,7 @@ func (e *CrashedError) Error() string {
 
 func (e *CrashedError) Unwrap() error { return ErrCrashed }
 
-// MalformedOutputError は proc.MalformedOutput の中身。
+// MalformedOutputError は hozoc.MalformedOutput の中身。
 type MalformedOutputError struct {
 	Plugin   string
 	ExitCode int

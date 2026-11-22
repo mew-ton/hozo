@@ -185,4 +185,4 @@ op を呼ぶ前の失敗は、`http` の語彙の例外 `http.BadRequest`（`doc
 
 - **どの診断も、書いたものの整合の検査**: デコレータが言ったことと、model と op の宣言が食い違っていれば、error にする。出し方を、型に合わせて変える言語のトランスパイラは、ない（`docs/requirements.md`「出力を推論しない」）。
 - **HTTP-* は、`go-http` の診断から移したもの。** どの GOHTTP-n が、どの HTTP-n になったかの表は `docs/plugin-go-http.md`「診断」の「欠番」。
-- 仕様が、検査の前提を欠くとき（要求に `spec` がない）は、診断にせず、異常終了する（`proc.Crashed`。`docs/plugin-protocol.md`「起動」）。
+- 仕様が、検査の前提を欠くとき（要求に `spec` がない）は、診断にせず、異常終了する（`Crashed`。`docs/plugin-protocol.md`「起動」）。

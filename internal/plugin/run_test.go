@@ -346,7 +346,7 @@ func TestRunWrongShape(t *testing.T) {
 	}
 }
 
-// docs/plugin-protocol.md「起動」: wasm のファイルがない、WASM として読めない、は proc.Crashed。
+// docs/plugin-protocol.md「起動」: wasm のファイルがない、WASM として読めない、は hozoc.Crashed。
 func TestRunCannotStart(t *testing.T) {
 	root := t.TempDir()
 	notWasm := filepath.Join(root, "not.wasm")

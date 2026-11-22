@@ -65,7 +65,7 @@ func splitUninterpreted(stdout string) (rest string, warnings []string) {
 }
 
 // TestSelfEmitDryRun は hozoc 自身への emit --dry-run が、コミット済みの生成物（二つの単位の出力: 基底 go と go-valid と go-cli の
-// internal/gen/hozoc/ と、基底 go の internal/gen/proc/）と、ちょうど同じファイルを書く予定にすること（出力先ごとの記録
+// internal/gen/hozoc/）と、ちょうど同じファイルを書く予定にすること（出力先ごとの記録
 // .hozoc-outputs.json は、トランスパイラのファイルではないので、予定には出ない）。書き出さないこと。プラグインの WASM は、
 // go でビルドするので、go がなければ飛ばす。
 func TestSelfEmitDryRun(t *testing.T) {
@@ -83,7 +83,7 @@ func TestSelfEmitDryRun(t *testing.T) {
 	if code != 0 {
 		t.Fatalf("hozoc build --dry-run の終了コード %d\n%s%s", code, stdout.String(), stderr.String())
 	}
-	// hozoc 自身の仕様の warning は、CFG-26 が三つ: @fs.files（状態 sources と config）と、@proc.stdio（runEmit）。どのトランスパイラも
+	// hozoc 自身の仕様の warning は、CFG-26 が二つ: @fs.files（状態 sources と config）。どのトランスパイラも
 	// 解釈せず、中身は、人が書いている（docs/vocab.md「解釈されなくてよいデコレータ」、docs/decisions.md「決めたこと」433）
 	rest, warnings := splitUninterpreted(stdout.String())
 	var marks []string
@@ -92,8 +92,8 @@ func TestSelfEmitDryRun(t *testing.T) {
 		mark, _, _ := strings.Cut(after, " ")
 		marks = append(marks, mark)
 	}
-	if got := strings.Join(marks, ","); got != "@fs.files,@fs.files,@proc.stdio" {
-		t.Errorf("CFG-26 の warning = %v, want [@fs.files @fs.files @proc.stdio]", marks)
+	if got := strings.Join(marks, ","); got != "@fs.files,@fs.files" {
+		t.Errorf("CFG-26 の warning = %v, want [@fs.files @fs.files]", marks)
 	}
 	var written []string
 	for _, l := range strings.Split(strings.TrimSpace(rest), "\n") {
@@ -113,7 +113,7 @@ func TestSelfEmitDryRun(t *testing.T) {
 	if len(committed) == 0 || strings.Join(written, "\n") != strings.Join(committed, "\n") {
 		t.Errorf("書く予定のファイルが、コミット済みの生成物と違う:\n予定:\n  %s\nコミット済み:\n  %s", strings.Join(written, "\n  "), strings.Join(committed, "\n  "))
 	}
-	for _, want := range []string{"internal/gen/hozoc/cli/cli.go", "internal/gen/hozoc/types/validate.go", "internal/gen/hozoc/ops.go", "internal/gen/proc/types.go"} {
+	for _, want := range []string{"internal/gen/hozoc/cli/cli.go", "internal/gen/hozoc/types/validate.go", "internal/gen/hozoc/ops.go", "internal/gen/hozoc/types/types.go"} {
 		if _, ok := before[want]; !ok {
 			t.Errorf("%s がコミットされていない", want)
 		}

@@ -15,7 +15,7 @@ type Ops interface {
 	// 引数:
 	//   - in: コマンドの入力
 	//
-	// Throws: hozoc.CheckFailed, hozoc.ConfigInvalid, hozoc.LanguageMismatch, proc.Crashed, proc.MalformedOutput, hozoc.OutputConflict, hozoc.UnknownNamespace
+	// Throws: hozoc.CheckFailed, hozoc.ConfigInvalid, hozoc.LanguageMismatch, hozoc.Crashed, hozoc.MalformedOutput, hozoc.OutputConflict, hozoc.UnknownNamespace
 	// Reads: hozoc.outputs
 	// Effects: hozoc.syncOutputs
 	Build(ctx context.Context, in BuildInput) (BuildResult, error)
@@ -25,7 +25,7 @@ type Ops interface {
 	// 引数:
 	//   - in: コマンドの入力
 	//
-	// Throws: hozoc.CheckFailed, hozoc.ConfigInvalid, hozoc.LanguageMismatch, proc.Crashed, proc.MalformedOutput, hozoc.OutputConflict, hozoc.TestsNotRun, hozoc.CoverageUnusable
+	// Throws: hozoc.CheckFailed, hozoc.ConfigInvalid, hozoc.LanguageMismatch, hozoc.Crashed, hozoc.MalformedOutput, hozoc.OutputConflict, hozoc.TestsNotRun, hozoc.CoverageUnusable
 	Tests(ctx context.Context, in TestsInput) (TestsResult, error)
 
 	// Lsp は言語サーバーとして標準入出力で動く（docs/lsp.md）。クライアントが exit を送るまで戻らない。

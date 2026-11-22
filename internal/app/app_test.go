@@ -16,7 +16,6 @@ import (
 	"github.com/mew-ton/hozo/internal/fakeplugin"
 	"github.com/mew-ton/hozo/internal/gen/hozoc"
 	"github.com/mew-ton/hozo/internal/gen/hozoc/inner"
-	"github.com/mew-ton/hozo/internal/gen/proc"
 )
 
 var update = flag.Bool("update", false, "ゴールデンを更新する")
@@ -27,7 +26,7 @@ const (
 	exitConfigInvalid   = 2  // ConfigInvalid / LanguageMismatch
 	exitOutputConflict  = 3  // OutputConflict
 	exitUsage           = 64 // UnknownNamespace、使い方の誤り
-	exitSoftwareOrCrash = 70 // proc.Crashed / proc.MalformedOutput、宣言にない例外
+	exitSoftwareOrCrash = 70 // hozoc.Crashed / hozoc.MalformedOutput、宣言にない例外
 )
 
 const corpusDir = "../../tests/corpus/design"
@@ -467,7 +466,7 @@ func TestEmit(t *testing.T) {
 	}
 }
 
-// TestEmitStaleAndConflict はトランスパイラの出力の書き出し、単位から外したあとの古いファイルの削除、CFG-5、PLG-*、errors、proc.Crashed。
+// TestEmitStaleAndConflict はトランスパイラの出力の書き出し、単位から外したあとの古いファイルの削除、CFG-5、PLG-*、errors、hozoc.Crashed。
 func TestEmitStaleAndConflict(t *testing.T) {
 	dir := copyCorpus(t)
 	// fake は server の単位の二つ目のトランスパイラ（基底 base に相乗りする）
@@ -508,7 +507,7 @@ func TestEmitStaleAndConflict(t *testing.T) {
 		}
 	}
 
-	// PLG-1 → proc.MalformedOutput → 70。files の path は、その起動の Dir(U, N)（ここでは gen/server）の下でなければ
+	// PLG-1 → hozoc.MalformedOutput → 70。files の path は、その起動の Dir(U, N)（ここでは gen/server）の下でなければ
 	// ならない（docs/plugin-protocol.md「emit」）: ルートの外、絶対パス、ルートの中の別のディレクトリ、別の出力の
 	// Dir、Dir そのもの。何も書かない。
 	outside := filepath.Join(filepath.Dir(dir), "x.go")
@@ -528,7 +527,7 @@ func TestEmitStaleAndConflict(t *testing.T) {
 			t.Fatalf("path %q: ルートの外に書いた", path)
 		}
 	}
-	if code, _, stderr = run(t, dir, nil, "build", "--format=json"); code != exitSoftwareOrCrash || !strings.Contains(stderr, `"error": "proc.MalformedOutput"`) {
+	if code, _, stderr = run(t, dir, nil, "build", "--format=json"); code != exitSoftwareOrCrash || !strings.Contains(stderr, `"error": "hozoc.MalformedOutput"`) {
 		t.Fatalf("json: code=%d stderr=%q", code, stderr)
 	}
 	// Dir(U, N) の下なら、深い場所でもよい
@@ -536,12 +535,12 @@ func TestEmitStaleAndConflict(t *testing.T) {
 	if code, stdout, stderr = run(t, dir, nil, "build"); code != 0 || !strings.Contains(stdout, "written: gen/server/deep/a.txt\n") {
 		t.Fatalf("code=%d stdout=%q stderr=%q", code, stdout, stderr)
 	}
-	// PLG-2: 同じ応答の中で同じ path が二度 → proc.MalformedOutput → 70
+	// PLG-2: 同じ応答の中で同じ path が二度 → hozoc.MalformedOutput → 70
 	fakeRider(t, dir, "fake", "go", `"base"`, `{"files":[{"path":"gen/server/a.txt","content":"1"},{"path":"gen/server/./a.txt","content":"2"}],"warnings":[]}`, 0)
 	if code, _, stderr = run(t, dir, nil, "build"); code != exitSoftwareOrCrash || !strings.Contains(stderr, "PLG-2") {
 		t.Fatalf("code=%d stderr=%q", code, stderr)
 	}
-	// 応答の形が違う（必須の files / warnings がない、型が違う）→ 終了コード 0 でも proc.MalformedOutput → 70
+	// 応答の形が違う（必須の files / warnings がない、型が違う）→ 終了コード 0 でも hozoc.MalformedOutput → 70
 	// （docs/plugin-protocol.md「応答の形」）。知らない項目（版 0.3 までの select を含む）があるだけなら通る
 	for _, resp := range []string{`{"unknown":1}`, `{"files":[]}`, `{"files":[],"warnings":"none"}`, `{"files":[{"path":"gen/server/a.txt"}],"warnings":[]}`} {
 		fakeRider(t, dir, "fake", "go", `"base"`, resp, 0)
@@ -1619,7 +1618,7 @@ func TestEmitIn(t *testing.T) {
 // TestRunEmit は cli.hozo の op runEmit（hozoc.Leaves のメソッド。docs/cli.md「手で書くもの」）: plugin を起動し、req を JSON に
 // して送り、応答を hozoc.EmitResponse に読んで返す。内部の op なので、内側のパッケージの Ops から呼ぶ。動かすのは、
 // plugin.wasm の WASM。hozoc.Spec と hozoc.OutputView は中身のない model なので、要求の spec と、
-// 出力の view は空のオブジェクト。異常終了は proc.Crashed、形の違う応答は proc.MalformedOutput（どちらも internal/gen/proc の型）。
+// 出力の view は空のオブジェクト。異常終了は hozoc.Crashed、形の違う応答は hozoc.MalformedOutput（どちらも、生成した hozoc の型）。
 func TestRunEmit(t *testing.T) {
 	root := t.TempDir()
 	dir := filepath.Join(root, "plugins", "echo")
@@ -1661,27 +1660,27 @@ func TestRunEmit(t *testing.T) {
 		t.Errorf("送った要求 = %s", got)
 	}
 
-	// 異常終了は proc.Crashed
+	// 異常終了は hozoc.Crashed
 	write(t, filepath.Join(dir, "exit"), "3")
-	var crashed proc.Crashed
+	var crashed hozoc.Crashed
 	if _, err = ops.RunEmit(ctx, plugin, req); !errors.As(err, &crashed) {
-		t.Errorf("異常終了: err = %v, want proc.Crashed", err)
+		t.Errorf("異常終了: err = %v, want hozoc.Crashed", err)
 	}
-	// ない WASM も、空の wasm も proc.Crashed
+	// ない WASM も、空の wasm も hozoc.Crashed
 	for _, wasm := range []hozoc.Path{hozoc.Path(filepath.Join(root, "no-such.wasm")), ""} {
 		broken := plugin
 		broken.Wasm = wasm
 		if _, err = ops.RunEmit(ctx, broken, req); !errors.As(err, &crashed) {
-			t.Errorf("wasm %q: err = %v, want proc.Crashed", wasm, err)
+			t.Errorf("wasm %q: err = %v, want hozoc.Crashed", wasm, err)
 		}
 	}
-	// 形の違う応答（必須の files がない）と、JSON でない応答は proc.MalformedOutput
+	// 形の違う応答（必須の files がない）と、JSON でない応答は hozoc.MalformedOutput
 	write(t, filepath.Join(dir, "exit"), "0")
-	var malformed proc.MalformedOutput
+	var malformed hozoc.MalformedOutput
 	for _, body := range []string{`{"warnings":[]}`, `not json`} {
 		write(t, filepath.Join(dir, "response.json"), body)
 		if _, err = ops.RunEmit(ctx, plugin, req); !errors.As(err, &malformed) {
-			t.Errorf("応答 %s: err = %v, want proc.MalformedOutput", body, err)
+			t.Errorf("応答 %s: err = %v, want hozoc.MalformedOutput", body, err)
 		}
 	}
 	// 中断された ctx では、起動しない
@@ -1918,7 +1917,7 @@ func TestBuildNoEmit(t *testing.T) {
 		t.Errorf("build: code=%d stdout=%q", code, stdout)
 	}
 
-	// 集めて確かめるところは、--no-emit でも、行う: 出力先の外の path は PLG-1（proc.MalformedOutput。70）
+	// 集めて確かめるところは、--no-emit でも、行う: 出力先の外の path は PLG-1（hozoc.MalformedOutput。70）
 	write(t, filepath.Join(dir, "plugins", "rider", "response.json"), `{"files":[{"path":"elsewhere/x.txt","content":"x"}],"warnings":[]}`)
 	if code, _, stderr := run(t, dir, nil, "build", "--no-emit"); code != exitSoftwareOrCrash || !strings.Contains(stderr, "PLG-1") {
 		t.Errorf("PLG-1: code=%d stderr=%q", code, stderr)

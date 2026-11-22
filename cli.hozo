@@ -100,6 +100,12 @@ namespace hozoc {
   @cli.exitCode(64)
   exception UnknownNamespace;
 
+  /** プラグインが異常終了した（WASM の実行環境で、0 と 2 のほかの終了コードで終わった、途中で止まった、起動できなかった。docs/plugin-protocol.md「起動」） */
+  exception Crashed;
+
+  /** プラグインの出力が、約束した形（JSON）でなかった（docs/plugin-protocol.md「応答の形」） */
+  exception MalformedOutput;
+
   /** 検査の結果（誤りではない指摘） */
   model CheckResult { warnings: Diagnostic[]; }
 
@@ -213,12 +219,12 @@ namespace hozoc {
    * @param in コマンドの入力
    * @throws LanguageMismatch 一つの単位のトランスパイラの language がそろっていない（docs/config.md の CFG-16）
    * @throws CheckFailed 仕様に誤りがある、または、トランスパイラが errors を返した
-   * @throws proc.Crashed プラグインが異常終了した
+   * @throws Crashed プラグインが異常終了した
    * @see build
    */
   fn check(in: CheckInput): CheckResult
     throws CheckFailed, ConfigInvalid, LanguageMismatch
-    throws proc.Crashed, proc.MalformedOutput;
+    throws Crashed, MalformedOutput;
 
   /**
    * 検査がプラグインから受け取った答えから、出力ごとのファイルを集める。プラグインは、起動しない。ファイルには触れない。
@@ -227,11 +233,11 @@ namespace hozoc {
    * @param checked 検査の結果
    * @throws OutputConflict 同じファイルに二つの出どころが書こうとした
    * @throws UnknownNamespace 引数の名前空間も、その子孫も、どの単位の対象でもない
-   * @throws proc.MalformedOutput トランスパイラの返したファイルのパスか、テストの対応表が、約束の形でない
+   * @throws MalformedOutput トランスパイラの返したファイルのパスか、テストの対応表が、約束の形でない
    */
   fn collectOutputs(in: BuildInput, checked: CheckResult): EmitPlan
     throws OutputConflict, UnknownNamespace
-    throws proc.MalformedOutput;
+    throws MalformedOutput;
 
   /**
    * 検査がプラグインから受け取った答えの、出力ごとのファイルを書き出す。in の noEmit が真なら、集めて確かめるだけで、書き出さない。
@@ -243,7 +249,7 @@ namespace hozoc {
   fn writeOutputs(in: BuildInput, checked: CheckResult): BuildResult
     effects syncOutputs
     throws OutputConflict, UnknownNamespace prevents effects
-    throws proc.MalformedOutput prevents effects
+    throws MalformedOutput prevents effects
   {
     val plan = collectOutputs(in, checked);
     val result = outputChanges(plan);
@@ -260,7 +266,7 @@ namespace hozoc {
   @cli.command("build")
   export fn build(in: BuildInput): BuildResult
     throws CheckFailed, ConfigInvalid, LanguageMismatch, OutputConflict, UnknownNamespace prevents effects
-    throws proc.Crashed, proc.MalformedOutput prevents effects
+    throws Crashed, MalformedOutput prevents effects
   {
     val checked = check({ config: in.config, format: in.format, pluginPath: in.pluginPath, cacheDir: in.cacheDir });
     return writeOutputs(in, checked);
@@ -275,11 +281,11 @@ namespace hozoc {
    * @throws OutputConflict 同じファイルに二つの出どころが書こうとした
    * @throws TestsNotRun 求めるテストのうち、走ったと確かめられないものがある
    * @throws CoverageUnusable 置き場の出力が今の仕様からのものと違う、または、カバレッジを読めない
-   * @throws proc.Crashed カバレッジを読むプラグインが異常終了した
+   * @throws Crashed カバレッジを読むプラグインが異常終了した
    */
   fn matchTests(in: TestsInput, checked: CheckResult): TestsResult
     throws ConfigInvalid, OutputConflict, TestsNotRun, CoverageUnusable
-    throws proc.Crashed, proc.MalformedOutput;
+    throws Crashed, MalformedOutput;
 
   /**
    * 仕様を検査し、求めるテストが走ったかを、カバレッジと突き合わせて確かめる。テストは走らせない。
@@ -332,11 +338,14 @@ namespace hozoc {
   model EmitResponse { outputs: OutputResult[]; }
 
   /**
-   * プラグインを一つ起動して、受け持つ出力のすべてを、まとめて展開させる（docs/plugin-protocol.md「起動」）。
+   * プラグインを一つ、hozoc の中の WASM の実行環境で動かして、受け持つ出力のすべてを、まとめて展開させる
+   * （docs/plugin-protocol.md「起動」）。入力は、標準入力に JSON で渡し、標準出力の JSON を、出力として受け取る。
    *
-   * @param plugin 起動するプラグイン
+   * @param plugin 動かすプラグイン
    * @param req プラグインへの入力
+   * @throws Crashed プラグインが異常終了した
+   * @throws MalformedOutput プラグインの出力が、約束した形でない
    */
-  @proc.stdio
-  fn runEmit(plugin: Plugin, req: EmitRequest): EmitResponse;
+  fn runEmit(plugin: Plugin, req: EmitRequest): EmitResponse
+    throws Crashed, MalformedOutput;
 }

@@ -20,8 +20,8 @@ func writeFile(t *testing.T, path, content string) {
 	}
 }
 
-// module は「生成物 gen と gen2 を main が import する」小さなモジュールを作る（hozoc の二つの置き場 internal/gen/hozoc、
-// internal/gen/proc と、cmd/hozoc の関係）。
+// module は「生成物 gen と gen2 を main が import する」小さなモジュールを作る（置き場が、二つのパッケージを持つ場合。hozoc では
+// internal/gen/hozoc と、その下のパッケージと、cmd/hozoc の関係）。
 func module(t *testing.T) string {
 	t.Helper()
 	if _, err := exec.LookPath("go"); err != nil {

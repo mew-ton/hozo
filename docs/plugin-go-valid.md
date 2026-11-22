@@ -162,9 +162,9 @@ func CheckFormat(name, v string) bool                   // valid.format の四�
 | GOVALID-6 | error | `Validate` を持つ model が、`validate` という名前のフィールドを持つ（Go で、フィールド `Validate` とメソッド `Validate` が当たる）。位置は model |
 | GOVALID-7 | error | `[emit.options.go-valid]` に、知らないキーがある。位置なし |
 
-- **`go-valid` は、VALID-* の検査を通っていない仕様を受け取ったら、診断にせず、異常終了する**（`proc.Crashed`。`docs/plugin-protocol.md`「起動」）。hozoc からは、起きない: 語彙のプラグイン `valid` が error を返せば、`emit` は頼まれず、入っていなければ CFG-25（「マニフェスト」）。
+- **`go-valid` は、VALID-* の検査を通っていない仕様を受け取ったら、診断にせず、異常終了する**（`Crashed`。`docs/plugin-protocol.md`「起動」）。hozoc からは、起きない: 語彙のプラグイン `valid` が error を返せば、`emit` は頼まれず、入っていなければ CFG-25（「マニフェスト」）。
 - 基底のオプション `module` がないとき（同じ単位の基底が GO-8 を返し、何も書き出されない。`docs/plugin-go.md`「診断」）は、ファイルを返さず、GO-8 も重ねて返さない。置き場を求められないので、GOVALID-3 は確かめない。ほかの診断は、そのときも返す。
-- 生成器の不具合（`View` が欠けている、生成したコードを `go/format` で整形できない）は、診断にせず、異常終了する（`proc.Crashed`。`docs/plugin-protocol.md`「起動」）。
+- 生成器の不具合（`View` が欠けている、生成したコードを `go/format` で整形できない）は、診断にせず、異常終了する（`Crashed`。`docs/plugin-protocol.md`「起動」）。
 
 ### 欠番
 

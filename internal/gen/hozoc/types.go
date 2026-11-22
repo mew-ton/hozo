@@ -49,6 +49,12 @@ type CoverageUnusable = inner.CoverageUnusable
 // UnknownNamespace: emit の引数の名前空間も、その子孫も、どの単位の対象でもない
 type UnknownNamespace = inner.UnknownNamespace
 
+// Crashed: プラグインが異常終了した（WASM の実行環境で、0 と 2 のほかの終了コードで終わった、途中で止まった、起動できなかった。docs/plugin-protocol.md「起動」）
+type Crashed = inner.Crashed
+
+// MalformedOutput: プラグインの出力が、約束した形（JSON）でなかった（docs/plugin-protocol.md「応答の形」）
+type MalformedOutput = inner.MalformedOutput
+
 // CheckResult は検査の結果（誤りではない指摘）
 type CheckResult = inner.CheckResult
 

@@ -52,7 +52,7 @@ hozoc 自身（リポジトリ直下の `cli.hozo` と `hozo.toml`）はコー�
 
 ## 生成物の一致
 
-CI で `go generate ./...` と `make generate`（`cli.hozo` からの自己生成。`docs/packages.md`「自己生成の手順」）を実行し、`git diff --exit-code` で差分がないことを確かめる。対象は `docs/packages.md`「生成するもの」の表。`hozoc build` の分は `tests/generated_test.go` も確かめる: 一時ディレクトリに `cli.hozo` と `hozo.toml` を写して emit し、コミット済みの `internal/gen/hozoc/**` と `internal/gen/proc/**` とバイト単位で比べる（`go test ./...` だけで遅れが分かる）。`tests/selfcheck_test.go` は、リポジトリ直下での `emit --dry-run` が、コミット済みの生成物とちょうど同じファイルを書く予定にすることを確かめる。
+CI で `go generate ./...` と `make generate`（`cli.hozo` からの自己生成。`docs/packages.md`「自己生成の手順」）を実行し、`git diff --exit-code` で差分がないことを確かめる。対象は `docs/packages.md`「生成するもの」の表。`hozoc build` の分は `tests/generated_test.go` も確かめる: 一時ディレクトリに `cli.hozo` と `hozo.toml` を写して emit し、コミット済みの `internal/gen/hozoc/**` とバイト単位で比べる（`go test ./...` だけで遅れが分かる）。`tests/selfcheck_test.go` は、リポジトリ直下での `emit --dry-run` が、コミット済みの生成物とちょうど同じファイルを書く予定にすることを確かめる。
 
 手で写すもの（生成しないもの）の一致もテストで確かめる: `docs/cli.md` のブロックがリポジトリ直下のファイルと同じであること（「コーパス」の `TestDocsEmbedRootFiles`）。
 
@@ -83,7 +83,7 @@ CI で `go generate ./...` と `make generate`（`cli.hozo` からの自己生�
 `internal/plugin` のテストは、`testdata/echo-plugin/`（テストの初めに、WASM にビルドする小さなプラグイン）を使い、次を確かめる。
 
 - 要求がそのまま応答に写ること。標準エラーが、プラグインの名前を頭に付けて、流れること。
-- 終了コードが 0 と 2 以外なら `proc.Crashed`、JSON でない・形が違う（`docs/plugin-protocol.md`「応答の形」: 必須の項目がない、型が違う。知らない項目は通る）なら `proc.MalformedOutput` になること。`wasm` のファイルがない・WASM として読めないなら `proc.Crashed`。
+- 終了コードが 0 と 2 以外なら `Crashed`、JSON でない・形が違う（`docs/plugin-protocol.md`「応答の形」: 必須の項目がない、型が違う。知らない項目は通る）なら `MalformedOutput` になること。`wasm` のファイルがない・WASM として読めないなら `Crashed`。
 - **サンドボックスが、効いていること**（同「起動」の、渡さないものの表）: プラグインが、ファイルを開けない（hozoc の作業ディレクトリのファイルも、絶対パスのファイルも、ディレクトリの一覧も）、環境変数が一つもない、引数がない、ネットワークに、つなげないこと、プラグインが待ち受けたアドレスに、外から、つなげないこと。時計が、今の時刻でないこと。テストだけの口（`MountForTest`）で見せたディレクトリは、言った WASM にだけ見え、取り消せば、見えないこと。
 - **同じ要求に、同じ答えが返ること**: 時計と乱数を読んで答えに入れるプラグインを、二度、動かして、答えが同じこと。
 - **動いているプラグインを、途中で止められること**: 終わらないプラグイン（回り続けるものと、眠り続けるもの）を動かし、やめさせると、すぐ戻り、次の起動が、動くこと。
@@ -108,7 +108,7 @@ hozoc が起動するのは、WASM だけ（`docs/plugin-protocol.md`「マニ�
 | `internal/plugin` のテスト | `testdata/echo-plugin` | パッケージのテストの初め |
 | `make generate`（`internal/tools/selfgen`） | `plugins/` の `go`、`go-valid`、`go-cli` | 生成の前（`docs/packages.md`「自己生成の手順」） |
 
-- `go run ./cmd/hozoc build --no-emit`（リポジトリのルート。`CLAUDE.md`「確かめ方」の三つ目）は、WASM を作らない: 上のどれかが置いたものを使う。なければ、`proc.Crashed` で、ファイルがないことを言う。テストを走らせずに、作るなら、`make plugins`（`plugins/` の六つ）。
+- `go run ./cmd/hozoc build --no-emit`（リポジトリのルート。`CLAUDE.md`「確かめ方」の三つ目）は、WASM を作らない: 上のどれかが置いたものを使う。なければ、`Crashed` で、ファイルがないことを言う。テストを走らせずに、作るなら、`make plugins`（`plugins/` の六つ）。
 - 機械の言葉に直したもの（`docs/plugin-protocol.md`「起動」）は、テストも、実行する人の、ふだんの置き場を使う（答えは、変わらない。`make generate` も、ホームを空に向けるが、置き場は、もとの場所を渡す）。
 
 ## 単体テスト

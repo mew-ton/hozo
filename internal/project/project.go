@@ -53,7 +53,7 @@ type Project struct {
 	// 出力一つへの答え。単位の設定の順、名前空間の IR の順、transpilers に書いた順。プラグインを起動しなかったとき
 	// （Options.NoPlugins、1〜3 に error がある、設定なし）は、空。途中で止まったとき（RunErr）は、そこまでの分。
 	Answers []Answer
-	// RunErr はプラグインが proc.Crashed / proc.MalformedOutput（internal/plugin の ErrCrashed /
+	// RunErr はプラグインが hozoc.Crashed / hozoc.MalformedOutput（internal/plugin の ErrCrashed /
 	// ErrMalformedOutput）で終わったときのその誤り。最初の一つで止め、以降のプラグインは呼ばない。なければ nil。
 	// Options.Context で、やめさせたときは、Context の誤り。
 	RunErr error
@@ -783,7 +783,7 @@ func (p *Project) Spec() *ir.Spec {
 
 // runReaders は、頼む語彙のプラグイン（p.Readers のうち、protocol の合うもの）ごとに一回、direction "read" を送り、その診断を返す
 // （docs/plugin-protocol.md「語彙のプラグイン」「read」）。errors は error の診断、warnings は PLUGIN の warning（メッセージの先頭に、
-// プラグインの名前）。code "protocol" / "unsupported" の応答は MAN-2 / MAN-5 の診断。proc.Crashed / proc.MalformedOutput なら、
+// プラグインの名前）。code "protocol" / "unsupported" の応答は MAN-2 / MAN-5 の診断。hozoc.Crashed / hozoc.MalformedOutput なら、
 // そこで止めて、その誤りを返す。add は、同じ診断を、一度だけ足す口（emit の診断と、共有する）。
 func (p *Project) runReaders(opts Options, runner hostplugin.Runner, add func(diag.Diagnostic)) error {
 	var spec *ir.Spec
@@ -824,9 +824,9 @@ func (p *Project) runReaders(opts Options, runner hostplugin.Runner, add func(di
 // （docs/cli.md「検査」の 4、docs/plugin-protocol.md「起動」「emit」）。一つの要求に、仕様を一度と、そのプラグインが受け持つ
 // 出力を並べる。errors は error の診断、warnings は PLUGIN の warning。重さ、code、位置、メッセージが、すべて同じ診断は、最初の
 // 一つだけを残す（同じ名前空間を、二つの単位が出力しているとき）。
-// code "protocol" / "unsupported" の応答は MAN-2 / MAN-5 の診断（そのプラグインの答えは、ない）。proc.Crashed /
-// proc.MalformedOutput なら、そこで止めて、その誤りを返す。応答の outputs と results の数が、要求と合わないのも、
-// proc.MalformedOutput。
+// code "protocol" / "unsupported" の応答は MAN-2 / MAN-5 の診断（そのプラグインの答えは、ない）。hozoc.Crashed /
+// hozoc.MalformedOutput なら、そこで止めて、その誤りを返す。応答の outputs と results の数が、要求と合わないのも、
+// hozoc.MalformedOutput。
 func (p *Project) runPlugins(opts Options) ([]diag.Diagnostic, error) {
 	var diags []diag.Diagnostic
 	runner := hostplugin.Runner{Stderr: opts.Stderr, Context: opts.Context, CacheDir: opts.CacheDir}

@@ -95,7 +95,7 @@ func TestViewFromEntry(t *testing.T) {
 		// files は、単位の in に合ったユーザーのファイルと、読み込んだすべての語彙のファイル。web の単位は in を省いているので、
 		// 読み込んだすべてのファイル（ユーザーのファイルを辞書順に、その後に語彙のファイルを辞書順に）
 		expect(t, "files", v.Files, []string{"api.hozo", "t.hozo", "web.hozo",
-			"hozo:vocab/actor.hozo", "hozo:vocab/business.hozo", "hozo:vocab/db.hozo", "hozo:vocab/fs.hozo", "hozo:vocab/http.hozo", "hozo:vocab/localstorage.hozo", "hozo:vocab/page.hozo", "hozo:vocab/prd.hozo", "hozo:vocab/proc.hozo", "hozo:vocab/usecase.hozo", "hozo:vocab/valid.hozo"})
+			"hozo:vocab/actor.hozo", "hozo:vocab/business.hozo", "hozo:vocab/db.hozo", "hozo:vocab/fs.hozo", "hozo:vocab/http.hozo", "hozo:vocab/localstorage.hozo", "hozo:vocab/page.hozo", "hozo:vocab/prd.hozo", "hozo:vocab/usecase.hozo", "hozo:vocab/valid.hozo"})
 		expect(t, "InUnit（viewer の宣言で、span.file が files にある）", []bool{v.InUnit("web.openUser"), v.InUnit("api.getUser"), v.InUnit("web.nope")}, []bool{true, false, false})
 		// namespaces は出力のあるすべての名前空間（viewer を含む）。値は、その名前空間を出力する単位ごとの設定。
 		// t はどの単位の対象でもないので入らない。page は、web が使う語彙の型（page.Route）の置き場の単位が出力する
@@ -125,7 +125,7 @@ func TestViewFromEntry(t *testing.T) {
 			names = append(names, ns.Name)
 		}
 		// グローバルが先頭、ユーザーのファイル（api.hozo、t.hozo、web.hozo）の順、その後に語彙（hozo:vocab/*.hozo）の辞書順
-		expect(t, "名前空間の順", names, []string{"", "api", "t", "web", "actor", "business", "db", "fs", "http", "page", "prd", "proc", "usecase", "valid"})
+		expect(t, "名前空間の順", names, []string{"", "api", "t", "web", "actor", "business", "db", "fs", "http", "page", "prd", "usecase", "valid"})
 		// nullable<api.Token>: 空になりうることは形が持ち、要素の型は optional にならない（docs/ir.md「state / exception / effect」）
 		expect(t, "web.token の要素（別の名前空間の scalar は FQN）", typeStr(declOf(t, prog, "web.token").(*ir.State).Element), "api.Token")
 		expect(t, "web.location の要素（語彙の型は FQN）", typeStr(declOf(t, prog, "web.location").(*ir.State).Element), "page.Route")

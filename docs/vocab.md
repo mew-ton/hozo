@@ -15,7 +15,7 @@ hozoc が同梱して常に読み込む語彙（`vocab/*.hozo`）と、その読
 
 **語彙の名前空間**は、宣言のすべてが語彙のファイル（`Span.file` が `hozo:` で始まる。`docs/ir.md`「Program」）にある名前空間。標準の語彙（`valid`、`http`、`page` など）も、使うプラグインの語彙（`cli`）も同じに数える。宣言を一つも持たない名前空間は数えない。ユーザーが同じ名前空間に宣言を一つでも足せば（§6.5 の `valid` への制約の追加など）、その名前空間はもう語彙の名前空間ではない。
 
-語彙の名前空間も、単位の `namespace` に書ける（`docs/config.md`「単位の対象」）。語彙の型（`http` や `proc` の例外、`page.Route` など）を使う出力は、その語彙の名前空間に、同じ基底の単位を要る（`docs/config.md`「型の置き場」）。語彙のファイルの宣言は、単位の `in` によらず、いつも単位の対象の宣言（`docs/config.md`「in」）。デコレータだけの語彙（`valid`、`db`、`cli` など）は、型を持たないので、単位は要らない。
+語彙の名前空間も、単位の `namespace` に書ける（`docs/config.md`「単位の対象」）。語彙の型（`http` の例外、`page.Route` など）を使う出力は、その語彙の名前空間に、同じ基底の単位を要る（`docs/config.md`「型の置き場」）。語彙のファイルの宣言は、単位の `in` によらず、いつも単位の対象の宣言（`docs/config.md`「in」）。デコレータだけの語彙（`valid`、`db`、`cli` など）は、型を持たないので、単位は要らない。
 
 ## 同梱する語彙
 
@@ -27,7 +27,6 @@ hozoc が同梱して常に読み込む語彙（`vocab/*.hozo`）と、その読
 | `vocab/localstorage.hozo` | グローバルの `decorator localStorage for state;` | §4.2 |
 | `vocab/page.hozo` | `namespace page { Aborted / Route / Query / path / query / route / dialog / fallback / interaction }` | §4.2 |
 | `vocab/fs.hozo` | `namespace fs { files }` | `examples/hozoc.hozo` |
-| `vocab/proc.hozo` | `namespace proc { Crashed / MalformedOutput / stdio }` | `examples/hozoc.hozo` |
 | `vocab/actor.hozo` | `namespace actor { human / bot / ai }` | `docs/decisions.md`「決めたこと」364 |
 | `vocab/usecase.hozo` | `namespace usecase { of }` | 同 364 |
 | `vocab/business.hozo` | `namespace business { flow }` | 同 366 |
@@ -36,7 +35,8 @@ hozoc が同梱して常に読み込む語彙（`vocab/*.hozo`）と、その読
 - 各ファイルの中身は出典の宣言をそのまま写す。ドキュメンテーションコメントも写す（ホバーに出るため）。ただし、出典の書き方のうち、言語からなくしたものは直す: 省略可能な引数の `x?: T` は `x: T?` に（`length(min: int?, max: int?)`、`route(path: string, from: any state?, onInvalid: any effect?)`）、節に並べるものの区切りの `|` は `,` に（`decorator fn get(path: string): throws ServerError, NetworkError;`。`docs/decisions.md`「設計書から離れた決定」S25）。どちらも `docs/grammar.md`「決めたこと」。
 - `valid.length` は、付けた先で、数えるものが変わる: 文字列（scalar か、フィールド）なら、文字の数。配列のフィールドなら、要素の数。配列の要素に掛けるなら、要素の型（scalar）に付ける。意味の持ち主は `docs/plugin-valid.md`「制約」（`docs/decisions.md`「決めたこと」400、401）。
 - `actor`、`usecase`、`business`、`prd` は、設計書にはない。設計の図（ユースケース図、業務フロー図、要求の文書）から決めたもので、中身は「設計の図の語彙」。
-- `fs` / `proc` は `examples/hozoc.hozo` では同じファイルの中に語彙として書かれているが、hozoc 自身の境界（ファイルとプラグインの起動）なので標準に入れる。`cli.hozo` からはこれらの宣言を外す（二重に宣言すると RES-6）。
+- `fs` は `examples/hozoc.hozo` では同じファイルの中に語彙として書かれているが、hozoc 自身の境界（ファイル）なので標準に入れる。`cli.hozo` からは、その宣言を外す（二重に宣言すると RES-6）。
+- 出典の `examples/hozoc.hozo` の語彙 `proc`（外部プロセスの起動: `stdio`、`Crashed`、`MalformedOutput`）は、標準に入れない（`docs/decisions.md`「決めたこと」434）: プラグインは、hozoc の中の WASM の実行環境で動き、外部プロセスを起動しない。二つの例外は、hozoc 自身の仕様の、名前空間 `hozoc` の例外（`docs/cli.md`「cli.hozo」）。
 - `@http.get` / `@http.post` は、境界の入口（`@entry`）で、通信の途中の失敗（`ServerError`、`NetworkError`）は、fn の外で起きる例外（`outer throws`）として、宣言する（出典の `@external` は、なくした: `docs/grammar.md`「decorator の宣言」）。
 - `http` には、出典にない例外を一つ足す: op を呼ぶ前の失敗（要求を入力に読めない、入力が制約に合わない）を伝える `BadRequest`。運ぶ値は、例外の引数で書く（`docs/grammar.md`「exception / effect / read」）。HTTP のサーバーのトランスパイラが返し（`docs/plugin-go-http.md`「op を呼ぶ前の失敗」）、通信の上の名前 `http.BadRequest` と値の形の持ち主になる。`@http.get` / `@http.post` の `throws`（外から見たときに加わる例外）には、まだ入れない: 入れると、HTTP の op を呼ぶすべての配線が `http.BadRequest` を書くことになる。呼ぶ側のトランスパイラを作るときに決める。
 
@@ -49,7 +49,6 @@ hozoc が同梱して常に読み込む語彙（`vocab/*.hozo`）と、その読
 
 - `db` は、出典のグローバルのデコレータ `db`（`@db state …`）をなくして `db.table` に置き換え、出典にないデコレータを足す。中身は「`db` の語彙」。
 - `http` は、要求のどこから読むかを言うフィールドのデコレータを、出典から変える。中身は「`http` の語彙」。
-- `proc.stdio` だけは出典から変える: 引数 `command` を持たず、`outer throws` にもしない（`decorator fn stdio(): throws Crashed, MalformedOutput;`。節の区切りは `docs/grammar.md`「decorator の宣言」）。呼び先は呼び出す op の入力で渡し（`docs/cli.md` の `runEmit`）、例外は同じ名前空間の呼び出し元にも見えなければならないため。`docs/decisions.md`。
 
 ### `db` の語彙
 
@@ -311,7 +310,7 @@ namespace flows {
 標準の語彙で、核の印 `@hint`（`docs/grammar.md`「decorator の宣言」）を持つのは、設計の図の語彙の六つ: `prd.ref`、`actor.human`、`actor.bot`、`actor.ai`、`usecase.of`、`business.flow`（`docs/decisions.md`「決めたこと」433）。読むトランスパイラ（`go-design`）を並べていない設定で書いても、warning（CFG-26。`docs/config.md`「解釈するトランスパイラ」）は、出ない。
 
 - 理由: 六つは、振る舞いにも、出力の中身にも効かず、設計を説明するだけ。読まれなくても、落ちるものがない。
-- ほかの標準のデコレータ（`db`、`http`、`valid`、`page`、`localstorage`、`fs`、`proc`）は、持たない。状態の置き場（`fs.files`、`localStorage`）も、振る舞いに効くので、持たない: 解釈するトランスパイラのいない設定で、単位の対象に書けば、CFG-26 が出る（人が中身を書いている、という事実の提示）。
+- ほかの標準のデコレータ（`db`、`http`、`valid`、`page`、`localstorage`、`fs`）は、持たない。状態の置き場（`fs.files`、`localStorage`）も、振る舞いに効くので、持たない: 解釈するトランスパイラのいない設定で、単位の対象に書けば、CFG-26 が出る（人が中身を書いている、という事実の提示）。
 
 ## 同梱しない語彙
 
@@ -327,7 +326,7 @@ namespace flows {
 | `valid`（言語に依らない決まり: 制約の意味、使い方の検査） | 語彙のプラグイン `valid`（`docs/plugin-valid.md`） |
 | `valid` の標準の制約（確かめる関数） | `go-valid`（`docs/plugin-go-valid.md`） |
 | `cli`（go-cli の語彙） | `plugins/go-cli/`（`docs/plugin-go-cli.md`） |
-| `fs` / `proc` | 語彙を実装するプラグインはない。`@proc.stdio` の付いた op は、基底が、人が実装する葉として出す（`docs/plugin-go.md`「op の置き場」。hozoc 自身では `runEmit`。`docs/cli.md`「手で書くもの」）。`@fs.files` は読むトランスパイラがなく、印のまま（`docs/plugin-go.md`「デコレータ」）。どちらも、解釈するトランスパイラがないので、単位の対象に書けば、CFG-26 の warning が出る（hozoc 自身の仕様で、三か所。「解釈されなくてよいデコレータ」）。`proc` の例外の型は、`proc` の単位の基底が出す |
+| `fs` | 語彙を実装するプラグインはない。`@fs.files` は読むトランスパイラがなく、印のまま（`docs/plugin-go.md`「デコレータ」）。解釈するトランスパイラがないので、単位の対象に書けば、CFG-26 の warning が出る（hozoc 自身の仕様で、二か所。「解釈されなくてよいデコレータ」） |
 | `http`（言語に依らない決まり: 経路、通信の上の形、使い方の検査） | 語彙のプラグイン `http`（`docs/plugin-http.md`） |
 | `http`（サーバー） | `go-http`（`docs/plugin-go-http.md`） |
 | `db` | `go-sqlite`（`docs/plugin-go-sqlite.md`） |

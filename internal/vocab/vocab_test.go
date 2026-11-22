@@ -24,7 +24,6 @@ var expected = map[string][]string{
 	"hozo:vocab/localstorage.hozo": {"decorator localStorage for state;"},
 	"hozo:vocab/page.hozo":         {"namespace page {", "exception Aborted;", "scalar Route extends string;", "decorator path for state;", "decorator query for state;", "decorator fn route(path: string, from: any state?, onInvalid: any effect?);", "decorator fn dialog(", "decorator fn fallback(", "decorator fn interaction("},
 	"hozo:vocab/fs.hozo":           {"namespace fs {", "decorator files(glob: string) for state;"},
-	"hozo:vocab/proc.hozo":         {"namespace proc {", "exception Crashed;", "exception MalformedOutput;", "decorator fn stdio(): throws Crashed, MalformedOutput;"},
 	// 設計の図の語彙（docs/vocab.md「設計の図の語彙」）
 	"hozo:vocab/actor.hozo":    {"namespace actor {", "decorator human for case of never;", "decorator bot for case of never;", "decorator ai for case of never;"},
 	"hozo:vocab/usecase.hozo":  {"namespace usecase {", "decorator fn of(...actors: any case of never);"},
@@ -54,7 +53,7 @@ func TestFiles(t *testing.T) {
 				t.Errorf("%s: missing %q", f.Path, w)
 			}
 		}
-		// docs/vocab.md「同梱する語彙」: x?: T は書かない。cache は同梱しない。proc.stdio は @external でなく引数もない。
+		// docs/vocab.md「同梱する語彙」: x?: T は書かない。cache は同梱しない。語彙 proc（stdio）は、なくした（docs/decisions.md「決めたこと」434）。
 		if regexp.MustCompile(`\w\?:`).MatchString(s) {
 			t.Errorf("%s: uses x?: T", f.Path)
 		}
@@ -65,8 +64,8 @@ func TestFiles(t *testing.T) {
 		if strings.Contains(s, "cache") {
 			t.Errorf("%s: contains cache", f.Path)
 		}
-		if regexp.MustCompile(`stdio\([^)]`).MatchString(s) || regexp.MustCompile(`@external\s+decorator (fn )?stdio`).MatchString(s) {
-			t.Errorf("%s: stdio must have no parameter and no @external", f.Path)
+		if regexp.MustCompile(`\bnamespace proc\b|\bstdio\b`).MatchString(s) {
+			t.Errorf("%s: declares the removed vocabulary proc (stdio)", f.Path)
 		}
 	}
 }

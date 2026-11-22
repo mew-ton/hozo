@@ -505,7 +505,7 @@ func dbConflict(err, conflict error) error {
 | GOSQL-29 | error | N の単位の対象の op に `@db.transaction` が付いているのに、N に表の状態が一つもない（継ぎ目の実装を出せない。「出力」）。位置は op |
 | GOSQL-33 | error | `@db.insert` / `@db.update` / `@db.delete` を付けた効果の `throws` に、`@db.conflict` が名指ししていない例外がある（このトランスパイラは、それを投げるコードを出せない）。メッセージに、その例外。位置は効果 |
 
-- **`go-sqlite` は、`db` の語彙の検査（DB-*。`docs/plugin-db.md`「診断」）を通っていない仕様を受け取ったら、診断にせず、異常終了する**（`proc.Crashed`。`docs/plugin-protocol.md`「起動」）。hozoc からは、起きない: 語彙のプラグイン `db` が error を返せば、`emit` は頼まれず、入っていなければ CFG-25（「マニフェスト」）。見るのは、N の検査だけ（ほかの名前空間の DB-* は、見ない）。
+- **`go-sqlite` は、`db` の語彙の検査（DB-*。`docs/plugin-db.md`「診断」）を通っていない仕様を受け取ったら、診断にせず、異常終了する**（`Crashed`。`docs/plugin-protocol.md`「起動」）。hozoc からは、起きない: 語彙のプラグイン `db` が error を返せば、`emit` は頼まれず、入っていなければ CFG-25（「マニフェスト」）。見るのは、N の検査だけ（ほかの名前空間の DB-* は、見ない）。
 - **残した診断は、このトランスパイラが、出すときに要るもの**: しまい方（GOSQL-3、GOSQL-16、GOSQL-17、GOSQL-27。語彙のプラグイン `db` は、しまい方を確かめない: `docs/plugin-db.md`「しまい方」）、出力の形と設定（GOSQL-4、GOSQL-6）、このトランスパイラが出せないもの（GOSQL-29: 継ぎ目の実装を置くファイルがない。GOSQL-33: 投げるコードを出せない例外）。
 - GOSQL-3 を返したフィールドに、GOSQL-17 は、重ねて出さない。
 - warning（コードは `PLUGIN`）は一つ: 表の状態が一つもない（GOSQL-29 のときは出さない）。`db` のデコレータを付けていない `read` と効果には、warning を出さない（「状態ごとの型」）。

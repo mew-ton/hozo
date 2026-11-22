@@ -122,6 +122,22 @@ func (UnknownNamespace) HozoException() string { return "hozoc.UnknownNamespace"
 
 var _ runtime.Exception = UnknownNamespace{}
 
+// Crashed: プラグインが異常終了した（WASM の実行環境で、0 と 2 のほかの終了コードで終わった、途中で止まった、起動できなかった。docs/plugin-protocol.md「起動」）
+type Crashed struct{}
+
+func (Crashed) Error() string         { return "hozoc.Crashed" }
+func (Crashed) HozoException() string { return "hozoc.Crashed" }
+
+var _ runtime.Exception = Crashed{}
+
+// MalformedOutput: プラグインの出力が、約束した形（JSON）でなかった（docs/plugin-protocol.md「応答の形」）
+type MalformedOutput struct{}
+
+func (MalformedOutput) Error() string         { return "hozoc.MalformedOutput" }
+func (MalformedOutput) HozoException() string { return "hozoc.MalformedOutput" }
+
+var _ runtime.Exception = MalformedOutput{}
+
 // CheckResult は検査の結果（誤りではない指摘）
 type CheckResult struct {
 	Warnings []Diagnostic `json:"warnings"`

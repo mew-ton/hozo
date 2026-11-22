@@ -221,7 +221,7 @@ func TestTestsCoverageUnusable(t *testing.T) {
 			t.Fatalf("code=%d stderr=%q", code, stderr)
 		}
 	})
-	// 応答の形の誤りは、proc.MalformedOutput（docs/plugin-protocol.md「応答の形」）
+	// 応答の形の誤りは、hozoc.MalformedOutput（docs/plugin-protocol.md「応答の形」）
 	for name, response := range map[string]string{
 		"no recognized":   `{"files":[]}`,
 		"no files":        `{"recognized":true}`,
@@ -297,7 +297,7 @@ func TestTestsRider(t *testing.T) {
 	}
 }
 
-// 対応表の名前か中身が、約束の形でなければ、PLG-4（proc.MalformedOutput）。emit でも、tests でも。
+// 対応表の名前か中身が、約束の形でなければ、PLG-4（hozoc.MalformedOutput）。emit でも、tests でも。
 func TestTestMapMalformed(t *testing.T) {
 	file := `{"path":"@DIR@/shoptest/leaves.txt","content":"1\n"}`
 	for name, mapFile := range map[string]string{
