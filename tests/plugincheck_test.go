@@ -132,11 +132,11 @@ func TestCheckPassesThenEmitPasses(t *testing.T) {
 	}
 }
 
-// vocabularyProject は、語彙の読み解きの単体テストの入力 plugin/httpvocab/testdata/<name>/ の .hozo を、一時ディレクトリの
+// vocabularyProject は、語彙の読み解きの単体テストの入力 plugin/<library>/testdata/<name>/ の .hozo を、一時ディレクトリの
 // プロジェクトに写し、hozo.toml を config の中身で置く。期待する診断（その expected/errors.txt の行）も返す。
-func vocabularyProject(t *testing.T, name, config string) (root string, lines []string) {
+func vocabularyProject(t *testing.T, library, name, config string) (root string, lines []string) {
 	t.Helper()
-	src := filepath.Join("..", "plugin", "httpvocab", "testdata", name)
+	src := filepath.Join("..", "plugin", library, "testdata", name)
 	root = t.TempDir()
 	sources, err := filepath.Glob(filepath.Join(src, "*.hozo"))
 	if err != nil || len(sources) == 0 {
@@ -161,17 +161,17 @@ func vocabularyProject(t *testing.T, name, config string) (root string, lines []
 	return root, strings.Split(strings.TrimSpace(string(want)), "\n")
 }
 
-// wantVocabularyDiagnostics は、hozoc の出力 out に、期待する診断 lines（コード、位置の宣言、文面）が、どれも、位置（ファイル、行、列）と
+// wantVocabularyDiagnostics は、hozoc の出力 out に、期待する診断 lines（コード code、位置の宣言、文面）が、どれも、位置（ファイル、行、列）と
 // 一緒に、一度ずつ出ていて、数が合うことを確かめる。
-func wantVocabularyDiagnostics(t *testing.T, out string, lines []string) {
+func wantVocabularyDiagnostics(t *testing.T, out, code string, lines []string) {
 	t.Helper()
-	located := regexp.MustCompile(`(?m)^app\.hozo:\d+:\d+: error\[HTTP-5\]: `)
+	located := regexp.MustCompile(`(?m)^app\.hozo:\d+:\d+: error\[` + regexp.QuoteMeta(code) + `\]: `)
 	if got := len(located.FindAllString(out, -1)); got != len(lines) {
-		t.Errorf("位置の付いた HTTP-5 が %d 件（期待は %d 件）\n%s", got, len(lines), out)
+		t.Errorf("位置の付いた %s が %d 件（期待は %d 件）\n%s", code, got, len(lines), out)
 	}
 	for _, l := range lines {
 		f := strings.SplitN(l, "\t", 3)
-		if len(f) != 3 || strings.Count(out, "error[HTTP-5]: "+f[2]) != 1 {
+		if len(f) != 3 || strings.Count(out, "error["+code+"]: "+f[2]+"\n") != 1 {
 			t.Errorf("診断が、ちょうど一度、出ていない: %s", l)
 		}
 	}
@@ -185,16 +185,16 @@ func wantVocabularyDiagnostics(t *testing.T, out string, lines []string) {
 // 使っていれば（HTTP-5。docs/plugin-http.md「通信の形」の「union」）、hozoc build --no-emit が、本物の語彙のプラグイン http の診断を、
 // 位置と一緒に出して、0 でない終了コードで終わる。
 func TestVocabularyDiagnosticsWithoutUnits(t *testing.T) {
-	root, lines := vocabularyProject(t, "http5", "# 単位は、一つもない\n[hozo]\nsources = [\"*.hozo\"]\n")
+	root, lines := vocabularyProject(t, "httpvocab", "http5", "# 単位は、一つもない\n[hozo]\nsources = [\"*.hozo\"]\n")
 	var stdout, stderr bytes.Buffer
 	code := hozocCorpus(t, root, []string{"build", "--no-emit"}, &stdout, &stderr)
 	if code != 1 {
 		t.Fatalf("hozoc build --no-emit の終了コード = %d（期待は 1: CheckFailed）\n%s", code, stderr.String())
 	}
-	wantVocabularyDiagnostics(t, stderr.String(), lines)
+	wantVocabularyDiagnostics(t, stderr.String(), "HTTP-5", lines)
 
 	// http の語彙を、正しく使っている仕様（plugin/httpvocab の入力 namespaces）は、単位がなくても、通る
-	root, _ = vocabularyProject(t, "http5", "[hozo]\nsources = [\"*.hozo\"]\n")
+	root, _ = vocabularyProject(t, "httpvocab", "http5", "[hozo]\nsources = [\"*.hozo\"]\n")
 	ok, err := os.ReadFile(filepath.Join("..", "plugin", "httpvocab", "testdata", "namespaces", "app.hozo"))
 	if err != nil {
 		t.Fatal(err)
@@ -214,12 +214,12 @@ func TestVocabularyDiagnosticsWithoutUnits(t *testing.T) {
 // 自分では返さない）。hozoc build も、同じ診断で止まり、何も書き出さない。
 func TestVocabularyDiagnosticsBeforeEmit(t *testing.T) {
 	config := "[options.go]\nmodule = \"example.com/app\"\n\n[[emit]]\nnamespace = \"app\"\ntranspilers = [\"go\", \"go-valid\", \"go-http\"]\nout = \"gen/app\"\n"
-	root, lines := vocabularyProject(t, "http5", config)
+	root, lines := vocabularyProject(t, "httpvocab", "http5", config)
 	var stdout, stderr bytes.Buffer
 	if code := hozocCorpus(t, root, []string{"build", "--no-emit"}, &stdout, &stderr); code != 1 {
 		t.Fatalf("hozoc build --no-emit の終了コード = %d（期待は 1: CheckFailed）\n%s", code, stderr.String())
 	}
-	wantVocabularyDiagnostics(t, stderr.String(), lines)
+	wantVocabularyDiagnostics(t, stderr.String(), "HTTP-5", lines)
 	if strings.Contains(stderr.String(), "GOHTTP-") {
 		t.Errorf("語彙の使い方の誤りが、go-http の診断としても出た\n%s", stderr.String())
 	}
@@ -230,5 +230,55 @@ func TestVocabularyDiagnosticsBeforeEmit(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(root, "gen")); err == nil {
 		t.Error("診断があるのに、build が、ファイルを書き出した")
+	}
+}
+
+// TestValidVocabularyDiagnostics は、語彙のプラグイン valid が、制約の使い方の誤り（VALID-1。docs/plugin-valid.md「診断」）を、
+// 出力の単位がなくても、位置と一緒に出すこと（docs/decisions.md「決めたこと」429）。同じ仕様に、go-valid の単位を足しても、
+// 診断は、一度だけ出る: 語彙のプラグインが error を返したら、emit は、頼まない（go-valid は、同じ診断を、自分では返さない。
+// docs/plugin-go-valid.md「診断」）。hozoc build も、同じ診断で止まり、何も書き出さない。
+func TestValidVocabularyDiagnostics(t *testing.T) {
+	root, lines := vocabularyProject(t, "validvocab", "valid1", "# 単位は、一つもない\n[hozo]\nsources = [\"*.hozo\"]\n")
+	var stdout, stderr bytes.Buffer
+	if code := hozocCorpus(t, root, []string{"build", "--no-emit"}, &stdout, &stderr); code != 1 {
+		t.Fatalf("hozoc build --no-emit の終了コード = %d（期待は 1: CheckFailed）\n%s", code, stderr.String())
+	}
+	wantVocabularyDiagnostics(t, stderr.String(), "VALID-1", lines)
+
+	// 制約を、正しく使っている仕様（利用者が valid に足した制約を含む。plugin/validvocab の入力 clean）は、単位がなくても、通る
+	ok, err := os.ReadFile(filepath.Join("..", "plugin", "validvocab", "testdata", "clean", "app.hozo"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	clean := t.TempDir()
+	for name, data := range map[string][]byte{"app.hozo": ok, "hozo.toml": []byte("[hozo]\nsources = [\"*.hozo\"]\n")} {
+		if err := os.WriteFile(filepath.Join(clean, name), data, 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	stdout.Reset()
+	stderr.Reset()
+	if code := hozocCorpus(t, clean, []string{"build", "--no-emit"}, &stdout, &stderr); code != 0 || !strings.HasPrefix(stdout.String(), "0 errors") {
+		t.Errorf("正しい仕様の hozoc build --no-emit の終了コード = %d\n%s%s", code, stdout.String(), stderr.String())
+	}
+
+	config := "[options.go]\nmodule = \"example.com/app\"\n\n[[emit]]\nnamespace = \"app\"\ntranspilers = [\"go\", \"go-valid\"]\nout = \"gen/app\"\n"
+	root, lines = vocabularyProject(t, "validvocab", "valid1", config)
+	stdout.Reset()
+	stderr.Reset()
+	if code := hozocCorpus(t, root, []string{"build", "--no-emit"}, &stdout, &stderr); code != 1 {
+		t.Fatalf("hozoc build --no-emit の終了コード = %d（期待は 1: CheckFailed）\n%s", code, stderr.String())
+	}
+	wantVocabularyDiagnostics(t, stderr.String(), "VALID-1", lines)
+	if strings.Contains(stderr.String(), "GOVALID-") || strings.Contains(stderr.String(), "PLG-") {
+		t.Errorf("制約の使い方の誤りが、go-valid からも出た\n%s", stderr.String())
+	}
+	stdout.Reset()
+	stderr.Reset()
+	if code := hozocCorpus(t, root, []string{"build"}, &stdout, &stderr); code != 1 || !strings.Contains(stderr.String(), "error[VALID-1]") {
+		t.Errorf("hozoc build の終了コード = %d\n%s", code, stderr.String())
+	}
+	if _, err := os.Stat(filepath.Join(root, "gen")); !os.IsNotExist(err) {
+		t.Errorf("診断で止まったのに、gen/ がある（%v）", err)
 	}
 }

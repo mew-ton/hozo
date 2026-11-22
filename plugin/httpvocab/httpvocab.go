@@ -15,7 +15,7 @@ import (
 
 	"github.com/mew-ton/hozo/ir"
 	"github.com/mew-ton/hozo/plugin"
-	"github.com/mew-ton/hozo/plugin/govalid"
+	"github.com/mew-ton/hozo/plugin/validvocab"
 )
 
 // Namespace は、この語彙の名前空間（マニフェストの [read] の namespaces。docs/plugin-http.md「マニフェスト」）。
@@ -551,7 +551,7 @@ func (r *Reader) checkMissing(m *ir.Model, f *ir.Field, item bool, via string) (
 //
 //   - HTTP-14: リテラルが、フィールドの型（scalar は元の核の型）に渡せない。
 //   - HTTP-15: 値が、フィールドの制約（フィールドに付いた @valid.* と、型の scalar に付いた @valid.*）に合わない。
-//     確かめるのは、go-cli の @cli.default と同じ govalid.CheckLiteral。
+//     確かめるのは、go-cli の @cli.default と同じ validvocab.CheckLiteral。
 func (r *Reader) checkDefault(m *ir.Model, f *ir.Field, lit ir.Literal) {
 	// HTTP-14
 	if !r.assignable(lit, f.Type) {
@@ -560,7 +560,7 @@ func (r *Reader) checkDefault(m *ir.Model, f *ir.Field, lit ir.Literal) {
 		return
 	}
 	// HTTP-15
-	for _, x := range govalid.CheckLiteral(r.p, f, lit) {
+	for _, x := range validvocab.CheckLiteral(r.p, f, lit) {
 		owner := "フィールドの制約"
 		if x.Scalar != "" {
 			owner = "型の scalar " + x.Scalar + " の制約"

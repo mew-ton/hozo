@@ -106,10 +106,10 @@ func TestPluginViewFixtures(t *testing.T) {
 const pluginSpecsFile = "spec.json"
 
 // specFixtureRoots は、語彙の読み解きの単体テストの入力の置き場（tests/ からの相対パス）。それぞれの直下のディレクトリが、入力一つ。
-var specFixtureRoots = []string{filepath.Join("..", "plugin", "httpvocab", "testdata")}
+var specFixtureRoots = []string{filepath.Join("..", "plugin", "httpvocab", "testdata"), filepath.Join("..", "plugin", "validvocab", "testdata")}
 
 // TestPluginSpecFixtures は、語彙の読み解きの単体テストの入力が、その元の仕様から作ったものと同じであることを確かめる
-// （docs/testing.md「単体テスト」の `plugin/httpvocab`）。
+// （docs/testing.md「単体テスト」の `plugin/httpvocab`、`plugin/validvocab`）。
 //
 // 語彙の決まりは、単位に依らない（docs/plugin-protocol.md「語彙のプラグイン」）ので、入力は、`.hozo` だけ（hozo.toml を置かない）。
 // ここで、`.hozo` を一時ディレクトリに写して、設定なしで internal/project に解析させ、hozoc が、語彙のプラグインに渡すのと同じ仕様（同「read」の spec: Project.Spec）を、

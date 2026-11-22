@@ -1,0 +1,2 @@
+VALID-4	app.Phone	@valid.format の名前 "phone" を知らない（scalar app.Phone。知っているのは email / uri / uuid / date-time）
+VALID-4	app.Form	@valid.format の名前 "zip" を知らない（model app.Form のフィールド zip。知っているのは email / uri / uuid / date-time）

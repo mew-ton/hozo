@@ -9,16 +9,16 @@ import (
 	"github.com/mew-ton/hozo/plugin"
 	"github.com/mew-ton/hozo/plugin/golang"
 	"github.com/mew-ton/hozo/plugin/govalid"
+	"github.com/mew-ton/hozo/plugin/validvocab"
 )
 
 // 診断のコード（docs/plugin-go-valid.md「診断」）。
 const (
-	codeValidConstraint = "GOVALID-1" // 制約が元の型に合わない、など（「制約」の表）
-	codeValidHome       = "GOVALID-3" // Validate を持つ別の名前空間の型の置き場の単位が、go-valid を並べていない
-	codeValidUnion      = "GOVALID-4" // フィールドの型が union で、そのアームに Validate を持つ型がある
-	codeValidCustom     = "GOVALID-5" // 標準でない valid の制約が付いている
-	codeValidField      = "GOVALID-6" // Validate を持つ model が、validate という名前のフィールドを持つ
-	codeValidOption     = "GOVALID-7" // [emit.options.go-valid] に、知らないキーがある
+	codeValidHome   = "GOVALID-3" // Validate を持つ別の名前空間の型の置き場の単位が、go-valid を並べていない
+	codeValidUnion  = "GOVALID-4" // フィールドの型が union で、そのアームに Validate を持つ型がある
+	codeValidCustom = "GOVALID-5" // 標準でない valid の制約が付いている
+	codeValidField  = "GOVALID-6" // Validate を持つ model が、validate という名前のフィールドを持つ
+	codeValidOption = "GOVALID-7" // [emit.options.go-valid] に、知らないキーがある
 )
 
 // FileName は、このトランスパイラが出すただ一つのファイルの名前（docs/plugin-go.md「相乗りのファイル」）。定義のパッケージに置く。
@@ -161,39 +161,6 @@ func (g *generator) checked(t ir.Type) bool {
 // （docs/plugin-go-valid.md「Validate を持つ型」の 4）。
 func (g *generator) through(t ir.Type) ir.Type { return govalid.Through(g.p, t) }
 
-// unwrap は、フィールドの型から、optional を外した型（制約が付く値の型）。
-func unwrap(t ir.Type) ir.Type {
-	for {
-		switch x := t.(type) {
-		case ir.OptionalType:
-			t = x.Of
-		case ir.CaseType:
-			t = x.Of
-		default:
-			return t
-		}
-	}
-}
-
-// coreOf は、型 t の元の型（docs/plugin-go-valid.md「制約」: scalar ならその継承を辿った核の型）。核の型を元に持たなければ false。
-func (g *generator) coreOf(t ir.Type) (ir.CoreName, bool) {
-	for depth := 0; depth < 64; depth++ {
-		switch x := t.(type) {
-		case ir.CoreType:
-			return x.Name, true
-		case ir.RefType:
-			s, ok := g.p.Lookup(x.Target).(*ir.Scalar)
-			if !ok {
-				return "", false
-			}
-			t = s.Base
-		default:
-			return "", false
-		}
-	}
-	return "", false
-}
-
 // target は、Validate を出す型一つ: N の scalar か model か、union のアームを包む型（union と、そのアーム）。
 type target struct {
 	scalar *ir.Scalar
@@ -202,7 +169,7 @@ type target struct {
 	arm    *ir.UnionArm
 }
 
-// check は、N の scalar と model を宣言順に見て、診断（GOVALID-1〜GOVALID-6）を集め、Validate を出す型を返す。
+// check は、N の scalar と model を宣言順に見て、診断（GOVALID-3〜GOVALID-6）を集め、Validate を出す型を返す。
 func (g *generator) check() []target {
 	var targets []target
 	for _, d := range g.ns.Decls {
@@ -233,23 +200,31 @@ func (g *generator) check() []target {
 	return targets
 }
 
-// checkScalar は scalar s の診断: 自分に付いた制約（GOVALID-5、GOVALID-1）と、元の scalar の置き場（GOVALID-3）。
+// unchecked は、制約の使い方の誤り problems（VALID-*）を見つけたとき: 語彙のプラグイン valid の検査を通っていない仕様なので、
+// 診断にせず、異常終了にする（docs/plugin-go-valid.md「診断」）。
+func (g *generator) unchecked(problems []validvocab.Problem) {
+	if len(problems) > 0 && g.fatal == nil {
+		g.fatal = fmt.Errorf("valid の語彙の検査（%s）を通っていない仕様を受け取った: %s", problems[0].Code, problems[0].Message)
+	}
+}
+
+// scalarConstraints は、scalar s に付いた valid の標準の制約（書かれた順。validvocab.Scalar）。
+func (g *generator) scalarConstraints(s *ir.Scalar) []constraint {
+	cons, problems := validvocab.Scalar(g.p, s)
+	g.unchecked(problems)
+	return wrap(cons)
+}
+
+// checkScalar は scalar s の診断: 自分に付いた、標準でない制約（GOVALID-5）と、元の scalar の置き場（GOVALID-3）。
 func (g *generator) checkScalar(s *ir.Scalar) {
-	core, ok := g.coreOf(s.Base)
 	subject := "scalar " + s.Name
 	for i := range s.Decorators {
 		app := &s.Decorators[i]
-		if !g.vocab[app.Decorator] {
-			continue
-		}
-		if !govalid.Standard(app.Decorator) {
+		if g.vocab[app.Decorator] && !validvocab.Standard(app.Decorator) {
 			g.custom(app, s.Name, subject)
-			continue
-		}
-		if _, problem := parse(app, core, ok, subject); problem != "" {
-			g.errorf(codeValidConstraint, s.Name, "%s", problem)
 		}
 	}
+	g.scalarConstraints(s)
 	if base, ok := g.validatedRef(s.Base); ok {
 		g.checkHome(base, s.Name, fmt.Sprintf("scalar %s の元の型 %s", s.Name, base))
 	}
@@ -261,15 +236,19 @@ func (g *generator) custom(app *ir.Application, at, subject string) {
 		subject, vocabulary, app.Decorator, vocabulary)
 }
 
-// checkModel は model m の診断を、フィールドの順に: フィールドに付いた制約（GOVALID-5、GOVALID-1）、フィールドの型
+// checkModel は model m の診断を、フィールドの順に: フィールドに付いた、標準でない制約（GOVALID-5）、フィールドの型
 // （GOVALID-4、GOVALID-3）。最後に、フィールドの名前（GOVALID-6）。
 func (g *generator) checkModel(m *ir.Model) {
 	for i := range m.Fields {
 		f := &m.Fields[i]
 		subject := fmt.Sprintf("model %s のフィールド %s", m.Name, f.Name)
-		for _, problem := range g.fieldProblems(f, subject, m.Name) {
-			g.errorf(codeValidConstraint, m.Name, "%s", problem)
+		for j := range f.Decorators {
+			app := &f.Decorators[j]
+			if g.vocab[app.Decorator] && !validvocab.Standard(app.Decorator) {
+				g.custom(app, m.Name, subject)
+			}
 		}
+		g.fieldConstraints(m, f)
 		if t, isRef := g.through(f.Type).(ir.RefType); isRef {
 			if u, ok := g.p.Lookup(t.Target).(*ir.Union); ok && u.Variant == ir.UnionArms {
 				g.checkUnion(u, m.Name, subject)
@@ -289,56 +268,12 @@ func (g *generator) checkModel(m *ir.Model) {
 	}
 }
 
-// fieldConstraints は、フィールド f に付いた valid の標準の制約（書かれた順）と、「制約」の表に合わないものの理由。
-// 標準でない制約は、ここでは飛ばす（GOVALID-5 は fieldProblems が返す）。
-func (g *generator) fieldConstraints(f *ir.Field, subject string) (cons []constraint, problems []string) {
-	value := unwrap(f.Type)
-	core, ok := g.coreOf(value)
-	for i := range f.Decorators {
-		app := &f.Decorators[i]
-		if !g.vocab[app.Decorator] || !govalid.Standard(app.Decorator) {
-			continue
-		}
-		if _, isArray := value.(ir.ArrayType); isArray {
-			// 配列のフィールドに付けられるのは、length だけ: 要素の数に掛かる（docs/plugin-go-valid.md「制約」）
-			if app.Decorator != validLength {
-				problems = append(problems, fmt.Sprintf("@%s が、配列（%s）に付いている（配列のフィールドに付けられるのは @%s だけで、要素の数に掛かる。要素に掛けるなら、要素の型に付ける）", app.Decorator, subject, validLength))
-				continue
-			}
-			c, problem := parse(app, ir.CoreString, true, subject)
-			if problem != "" {
-				problems = append(problems, problem)
-				continue
-			}
-			c.count, c.name = true, constraintCount
-			cons = append(cons, c)
-			continue
-		}
-		if g.p.IndexOf(value) != nil {
-			problems = append(problems, fmt.Sprintf("@%s が、インデックスの model そのもの（%s）に付いている（制約を付けられるのは、値の型）", app.Decorator, subject))
-			continue
-		}
-		c, problem := parse(app, core, ok, subject)
-		if problem != "" {
-			problems = append(problems, problem)
-			continue
-		}
-		cons = append(cons, c)
-	}
-	return cons, problems
-}
-
-// fieldProblems は、フィールド f に付いた制約の誤り: 標準でない制約は GOVALID-5 として報告し、「制約」の表に合わないものの
-// 理由（GOVALID-1）を返す。
-func (g *generator) fieldProblems(f *ir.Field, subject, at string) []string {
-	for i := range f.Decorators {
-		app := &f.Decorators[i]
-		if g.vocab[app.Decorator] && !govalid.Standard(app.Decorator) {
-			g.custom(app, at, subject)
-		}
-	}
-	_, problems := g.fieldConstraints(f, subject)
-	return problems
+// fieldConstraints は、model m のフィールド f に付いた valid の標準の制約（書かれた順。validvocab.Field）。
+// 配列のフィールドに付けた length は、要素の数に掛かる（Count。違反の名前は count）。
+func (g *generator) fieldConstraints(m *ir.Model, f *ir.Field) []constraint {
+	cons, problems := validvocab.Field(g.p, m, f)
+	g.unchecked(problems)
+	return wrap(cons)
 }
 
 // checkUnion は、model at のフィールド（subject）の型の union u の診断（docs/plugin-go-valid.md「Validate を持つ型」の、

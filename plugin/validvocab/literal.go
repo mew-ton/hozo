@@ -1,8 +1,7 @@
-package govalid
+package validvocab
 
 import (
 	"regexp"
-	"strconv"
 	"strings"
 	"unicode/utf8"
 
@@ -10,9 +9,9 @@ import (
 	"github.com/mew-ton/hozo/runtime"
 )
 
-// このファイルは、値一つを制約で確かめる CheckLiteral（docs/packages.md「`plugin/govalid`（公開）」）。境界のデコレータが補う値
-// （`@http.default`、`@cli.default`）を、相乗りが、生成するときに確かめるのに使う（docs/plugin-go-http.md「補う値と制約」、
-// docs/plugin-go-cli.md「補う値と制約」）。制約の意味は、go-valid が出す Validate と同じ（docs/plugin-go-valid.md「制約」の表）。
+// このファイルは、値一つを制約で確かめる CheckLiteral（docs/plugin-valid.md「値一つを確かめる」）。境界のデコレータが補う値
+// （`@http.default`、`@cli.default`）を、それを読むプラグインが、生成の前に確かめるのに使う（docs/plugin-http.md「補う値と制約」、
+// docs/plugin-go-cli.md「補う値と制約」）。値が制約を通るかは、docs/plugin-valid.md「制約」の表の「通す値」。
 
 // Mismatch は、値が合わなかった制約一つ。
 type Mismatch struct {
@@ -27,12 +26,12 @@ type Mismatch struct {
 // CheckLiteral は、リテラル lit が、フィールド field の制約に合うかを確かめ、合わなかった制約を返す。すべてに合えば nil。
 //
 // 確かめる制約は、valid の標準の制約（[Standard]）のうち、フィールドの型の scalar（と、その元の scalar）に付いたものと、
-// フィールドに付いたもの。返す順は、go-valid の Validate が確かめる順（docs/plugin-go-valid.md「scalar」「model」）:
-// 元の scalar から自分の scalar へ、その後にフィールド。それぞれ、書かれた順。省略可能なフィールドは、中の型で見る。
+// フィールドに付いたもの。返す順は、元の scalar から自分の scalar へ、その後にフィールド。それぞれ、書かれた順。
+// 省略可能なフィールドは、中の型で見る（docs/plugin-valid.md「値一つを確かめる」）。
 //
 // リテラルがフィールドの型に渡せることは、呼ぶ側が先に確かめる（http の HTTP-14）。ここで確かめられないものは、合わないとは
-// 言わない: リテラルの型に当たらない制約と、解釈できない正規表現（go-valid が GOVALID-1 にする）、利用者が valid に足した制約
-// （同 GOVALID-5）。p が nil なら、フィールドに付いた制約だけを確かめる。
+// 言わない: リテラルの型に当たらない制約と、解釈できない正規表現（VALID-1、VALID-3 が、別に知らせる）、利用者が valid に足した制約。
+// p が nil なら、フィールドに付いた制約だけを確かめる。
 func CheckLiteral(p *ir.Program, field *ir.Field, lit ir.Literal) []Mismatch {
 	if field == nil || lit == nil {
 		return nil
@@ -73,22 +72,11 @@ func CheckLiteral(p *ir.Program, field *ir.Field, lit ir.Literal) []Mismatch {
 	return out
 }
 
-// argLiteral は、適用 app の引数 param のリテラル。書かれていない（省略可能な引数を省いた）か、リテラルでなければ false。
-func argLiteral(app *ir.Application, param string) (ir.Literal, bool) {
-	for _, a := range app.Args {
-		if a.Param == param {
-			l, ok := a.Value.(ir.LiteralValue)
-			return l.Literal, ok && l.Literal != nil
-		}
-	}
-	return nil, false
-}
-
-// satisfies は、リテラル lit が、標準の制約の適用 app に合うか（docs/plugin-go-valid.md「制約」の表の条件の裏）。
+// satisfies は、リテラル lit が、標準の制約の適用 app を通るか（docs/plugin-valid.md「制約」の表の「通す値」）。
 // 確かめられない組（リテラルの型に当たらない制約、引数の形が合わない制約）は true。
 func satisfies(app *ir.Application, lit ir.Literal) bool {
 	switch app.Decorator {
-	case vocabulary + ".min", vocabulary + ".max":
+	case Min, Max:
 		bound, ok := argLiteral(app, "value")
 		if !ok {
 			return true
@@ -97,11 +85,11 @@ func satisfies(app *ir.Application, lit ir.Literal) bool {
 		if !ok {
 			return true
 		}
-		if app.Decorator == vocabulary+".min" {
+		if app.Decorator == Min {
 			return cmp >= 0
 		}
 		return cmp <= 0
-	case vocabulary + ".length":
+	case Length:
 		s, ok := lit.(ir.StringLiteral)
 		if !ok {
 			return true
@@ -118,7 +106,7 @@ func satisfies(app *ir.Application, lit ir.Literal) bool {
 			}
 		}
 		return true
-	case vocabulary + ".pattern":
+	case Pattern:
 		s, ok := lit.(ir.StringLiteral)
 		regex, _ := argLiteral(app, "regex")
 		r, isString := regex.(ir.StringLiteral)
@@ -127,7 +115,7 @@ func satisfies(app *ir.Application, lit ir.Literal) bool {
 		}
 		re, err := regexp.Compile(r.Value)
 		return err != nil || re.MatchString(s.Value)
-	case vocabulary + ".format":
+	case Format:
 		s, ok := lit.(ir.StringLiteral)
 		name, _ := argLiteral(app, "name")
 		n, isString := name.(ir.StringLiteral)
@@ -188,31 +176,10 @@ func describe(app *ir.Application) string {
 			continue
 		}
 		text := literalText(l.Literal)
-		if app.Decorator == vocabulary+".length" {
+		if app.Decorator == Length {
 			text = a.Param + ": " + text
 		}
 		args = append(args, text)
 	}
 	return "@" + app.Decorator + "(" + strings.Join(args, ", ") + ")"
-}
-
-// literalText は、リテラルの書き方（小数は、docs/plugin-go.md「値」の表の literal の行と同じ）。
-func literalText(l ir.Literal) string {
-	switch x := l.(type) {
-	case ir.StringLiteral:
-		return strconv.Quote(x.Value)
-	case ir.IntLiteral:
-		return strconv.FormatInt(x.Value, 10)
-	case ir.FloatLiteral:
-		s := strconv.FormatFloat(x.Value, 'g', -1, 64)
-		if !strings.ContainsAny(s, ".e") {
-			s += ".0"
-		}
-		return s
-	case ir.BooleanLiteral:
-		return strconv.FormatBool(x.Value)
-	case ir.DurationLiteral:
-		return x.Value.String()
-	}
-	return "?"
 }

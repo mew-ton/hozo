@@ -6,7 +6,8 @@ import (
 	"time"
 )
 
-// CheckFormat は valid.format(name) の実装（docs/plugin-go-valid.md「runtime」）。
+// CheckFormat は valid.format(name) の、Go の実装（docs/plugin-go-valid.md「runtime」）。四つの形式が、何を通すかの持ち主は
+// docs/plugin-valid.md「形式」で、下の箇条は、その写し。
 // name は "email" / "uri" / "uuid" / "date-time" のどれかで、v がその形なら true。
 // 知らない name は false を返す（生成の時点で診断になるので、ここに来るのは生成器の不具合）。
 //

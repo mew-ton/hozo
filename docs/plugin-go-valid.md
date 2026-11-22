@@ -4,7 +4,9 @@
 
 `valid` の語彙（`docs/vocab.md`「同梱する語彙」）の制約を確かめる Go の関数を出す、標準の検証のトランスパイラ `go-valid`。Go の基底 `go`（`docs/plugin-go.md`）に相乗りする。プラグインは `plugins/go-valid/`、ほかの相乗りが使う規則の写しは公開の `plugin/govalid`（`docs/packages.md`）。期待する出力の実物は、サンプル `tests/samples/shop-server/` の `gen/type/validate.go` と `gen/server/inner/validate.go`。
 
-制約（`@valid.*`）は、型に一度だけ書く、型の性質。それ自体は何も起こさない。このトランスパイラが出すのは**確かめる関数**だけで、**いつ確かめるか**（HTTP の要求を受けたとき、コマンドの引数を読んだとき）は、境界を持つ相乗り（`docs/plugin-go-http.md`、`docs/plugin-go-cli.md`）が決め、失敗をその語彙の形で伝える。語彙ごとに制約のデコレータを持つ形（`@http.valid.*`）は採らない。
+制約の、言語に依らない決まり（何に付けられ、どの値を通すか。使い方の検査 VALID-*）の持ち主は、語彙のプラグイン `valid`（`docs/plugin-valid.md`）。この文書が持つのは、Go への出し方。
+
+このトランスパイラが出すのは**確かめる関数**だけで、**いつ確かめるか**（HTTP の要求を受けたとき、コマンドの引数を読んだとき）は、境界を持つ相乗り（`docs/plugin-go-http.md`、`docs/plugin-go-cli.md`）が決め、失敗をその語彙の形で伝える。語彙ごとに制約のデコレータを持つ形（`@http.valid.*`）は採らない。
 
 ## マニフェスト
 
@@ -17,9 +19,11 @@ protocol = "0.23"
 name     = "go-valid"
 language = "go"
 requires = ["go"]
+requires_vocabulary = ["valid"]
 ```
 
 - 読む語彙は、標準の `valid`（`min` / `max` / `length` / `pattern` / `format`）。語彙は提供しない。
+- `requires_vocabulary`（`docs/plugin-protocol.md`「マニフェスト `hozo-plugin.toml`」）: 語彙のプラグイン `valid` が入っていなければ CFG-25。制約の使い方の検査（VALID-*）を通った仕様だけを、受け取るため（「診断」）。`go-valid` を `requires` に書く相乗り（`go-http`、`go-cli`）は、自分では書かない: 単位に `go-valid` が並ぶ（CFG-19）ので、同じ CFG-25 が掛かる。
 - オプションはない。`[emit.options.go-valid]` にキーがあれば GOVALID-7。
 
 ## Validate を持つ型
@@ -99,27 +103,28 @@ func (m User) Validate() error {
 | フィールドの型 | 形 |
 |---|---|
 | `optional(T)`（Go でポインタ） | `if m.<F> != nil { … }` の中で、値を `*m.<F>` として、上の 1 と 2 |
-| `array(T)` | `for i0, x0 := range m.<F> { … }` の中で、要素 `x0` について 1。`Path` は `"<フィールド名>["+strconv.Itoa(i0)+"]"`。入れ子の配列は `i1`、`x1`、…。その後に、配列のフィールドに付いた `@valid.length`（要素の数に掛かる。「制約」）を、2 として確かめる（`Path` は、フィールド名）。配列のフィールドに付いた、ほかの `@valid.*` は GOVALID-1 |
+| `array(T)` | `for i0, x0 := range m.<F> { … }` の中で、要素 `x0` について 1。`Path` は `"<フィールド名>["+strconv.Itoa(i0)+"]"`。入れ子の配列は `i1`、`x1`、…。その後に、配列のフィールドに付いた `@valid.length`（要素の数に掛かる。「制約」）を、2 として確かめる（`Path` は、フィールド名） |
 | union（`arms`）への `ref`（「Validate を持つ型」の 5） | `if u0, ok := m.<F>.(interface{ Validate() error }); ok { violations = validAppend(violations, "<フィールド名>", u0.Validate()) }`。値が当たっているアームの値が、`Validate` を持てば、呼ぶ（値のない、省略可能な union は、当たらない）。`Path` に、アームの名前は、入れない。配列やインデックスの model の中では、番号は、その深さ（`u1`、…） |
-| インデックスの model への `ref`（値の型が T） | `for _, k0 := range validKeys(m.<F>) { x0 := m.<F>[k0]; … }`（キーの辞書順に回す。`validKeys` は、キーを並べ替えて返す補助の関数）の中で、値 `x0` について 1。`Path` は `"<フィールド名>["+string(k0)+"]"`。キーは確かめない。インデックスの model を型に持つフィールドに付いた `@valid.*` は GOVALID-1 |
+| インデックスの model への `ref`（値の型が T） | `for _, k0 := range validKeys(m.<F>) { x0 := m.<F>[k0]; … }`（キーの辞書順に回す。`validKeys` は、キーを並べ替えて返す補助の関数）の中で、値 `x0` について 1。`Path` は `"<フィールド名>["+string(k0)+"]"`。キーは確かめない |
 
 - 省略可能な array と、省略可能な、インデックスの model は、Go でポインタにならない（`docs/plugin-go.md`「型」）ので、`nil` を確かめずに、上の二つの行のまま回す。
 - 包まれた型は、入れ子にできる（`T?[]`、値の型が `T[]` のインデックスの model、値の型が別のインデックスの model であるもの）。入れ子の番号は、配列とインデックスの model で通しに振る（`x0` の中の `k1`、`x1`）。
 
 ### 制約
 
-| `valid` | 条件（違反のとき真） | 付けられる元の型（違えば GOVALID-1） |
-|---|---|---|
-| `min(value)` | `<数の型>(<値>) < <value>` | `int`（`int64(…)`）か `float`（`float64(…)`）。`int` に付けた `value` が整数でなければ GOVALID-1 |
-| `max(value)` | `<数の型>(<値>) > <value>` | 同上 |
-| `length(min?, max?)` | `l := utf8.RuneCountInString(string(<値>)); l < <min> \|\| l > <max>`（片方だけなら、その比較だけ。どちらもなければ GOVALID-1） | `string` |
-| `length(min?, max?)`（配列のフィールドに付けたもの） | `l := len(<値>); l < <min> \|\| l > <max>`（同じ）。**要素の数**に掛かる。違反の `Constraint` は `count` | 配列（`T[]`、`T[]?`）のフィールド。配列に付けられるのは、`length` だけ |
-| `pattern(regex)` | `!validPattern….MatchString(string(<値>))`。RE2 で解釈できなければ GOVALID-1 | `string` |
-| `format(name)` | `!runtime.CheckFormat("<name>", string(<値>))`。知らない `name`（「runtime」）は GOVALID-1 | `string` |
+どの制約が、何に付けられ、どの値を通すかの持ち主は `docs/plugin-valid.md`「制約」「形式」。ここは、その条件を、Go の式にしたもの。
 
-- 「元の型」は、scalar ならその継承を辿った核の型、フィールドなら、その型（scalar なら同じに辿る）。
-- 違反は `violations = append(violations, runtime.Violation{Path: "<パス>", Constraint: "<デコレータの名前>"})`。`Constraint` は、`valid` の語彙のデコレータの名前（`min`、`length`、…）。**例外は一つ**: 配列のフィールドに付けた `length` の違反は、`count`（文字列の長さの違反 `length` と、言い分ける。`docs/decisions.md`「決めたこと」400）。
-- **配列の要素に制約を掛ける道は、一つ**（同 401）: 要素の型を scalar にして、そちらに付ける（`@valid.length(min: 1, max: 20) scalar Tag extends string;` と `@valid.length(max: 10) tags: Tag[];`）。配列のフィールドに付けた `length` が、要素に掛かることは、ない。warning も、出さない。
+| `valid` | 条件（違反のとき真） | 元の型 |
+|---|---|---|
+| `min(value)` | `<数の型>(<値>) < <value>` | `int`（`int64(…)`）か `float`（`float64(…)`） |
+| `max(value)` | `<数の型>(<値>) > <value>` | 同上 |
+| `length(min?, max?)` | `l := utf8.RuneCountInString(string(<値>)); l < <min> \|\| l > <max>`（片方だけなら、その比較だけ） | `string` |
+| `length(min?, max?)`（配列のフィールドに付けたもの） | `l := len(<値>); l < <min> \|\| l > <max>`（同じ） | 配列（`T[]`、`T[]?`）のフィールド |
+| `pattern(regex)` | `!validPattern….MatchString(string(<値>))`（標準ライブラリの `regexp`。文法は RE2） | `string` |
+| `format(name)` | `!runtime.CheckFormat("<name>", string(<値>))`（「runtime」） | `string` |
+
+- 「元の型」は、`docs/plugin-valid.md`「制約」の言うもの。
+- 違反は `violations = append(violations, runtime.Violation{Path: "<パス>", Constraint: "<違反の名前>"})`。違反の名前は、同「制約」の表（デコレータの名前。配列のフィールドに付けた `length` だけ、`count`）。
 - **利用者が `valid` に足した制約**（設計書 §6.5）は、中身を人が書くもので、`Validate()` に実装を渡す形がまだない。使われていれば GOVALID-5。
 
 ## runtime
@@ -129,7 +134,7 @@ func (m User) Validate() error {
 ```go
 type Violation struct { Path, Constraint string }       // Path は違反した値への道（scalar 自身なら ""、model なら "body.email"、"lines[2].quantity"）
 type ValidationError struct { Violations []Violation }  // Error() を持つ。Violations は確かめた順で、空にはならない
-func CheckFormat(name, v string) bool                   // "email" / "uri" / "uuid" / "date-time"
+func CheckFormat(name, v string) bool                   // valid.format の四つの形式（docs/plugin-valid.md「形式」）。知らない name は false
 ```
 
 `validAppend(dst, path, err)` は、`err` が `*runtime.ValidationError` なら、その違反の `Path` に `path` を前置して（元が空なら `path` だけ、そうでなければ `path + "." + 元`）`dst` に足す。それ以外のエラーは、`Constraint` にその文言を入れた違反一つにする。
@@ -146,13 +151,25 @@ func CheckFormat(name, v string) bool                   // "email" / "uri" / "uu
 
 | ID | 重さ | 意味 |
 |---|---|---|
-| GOVALID-1 | error | 制約が元の型に合わない（「制約」の表）、元の型が `int` の `min` / `max` の `value` が整数でない、`length` に `min` も `max` もない、`pattern` が RE2 でない、`format` の名前を知らない、配列のフィールドに `length` のほかの制約が付いている、インデックスの model そのもの（を型に持つフィールド）に制約が付いている。位置は、付いた scalar か model |
 | GOVALID-3 | error | `Validate` を持つ別の名前空間の型を、フィールドに持つか、scalar の元の型にするが、その名前空間の型の置き場の単位が `go-valid` を並べていない。メッセージに、その単位（何番目の `[[emit]]` か）を示す。位置は model（元の型なら、その scalar） |
 | GOVALID-4 | error | フィールドの型が union で、そのアームの型が、`ref` でないか、インデックスの model か、別の union への `ref` で、その中に `Validate` を持つ型がある（「Validate を持つ型」。確かめる形が、まだない）。位置は model |
 | GOVALID-5 | error | 標準でない `valid` の制約（利用者が `valid` に足したデコレータ）が付いている。位置は、付いた scalar か model |
 | GOVALID-6 | error | `Validate` を持つ model が、`validate` という名前のフィールドを持つ（Go で、フィールド `Validate` とメソッド `Validate` が当たる）。位置は model |
 | GOVALID-7 | error | `[emit.options.go-valid]` に、知らないキーがある。位置なし |
 
-- GOVALID-2 は欠番。「フィールドの既定値が、その型かフィールドの制約に合わない」という規則だったが、フィールドの既定値を言語からなくしたので、確かめるものがない（`docs/decisions.md`「設計書から離れた決定」S24）。値を入れるデコレータ（`@http.default`、`@cli.default`）の値は、それを読む相乗りが、生成するときに制約で確かめる（`docs/plugin-http.md`「補う値と制約」）。番号は別の意味に使い回さない（欠番の一覧は `docs/requirements.md`「検査の規則の一覧」）。
+- **`go-valid` は、VALID-* の検査を通っていない仕様を受け取ったら、診断にせず、異常終了する**（`proc.Crashed`。`docs/plugin-protocol.md`「起動」）。hozoc からは、起きない: 語彙のプラグイン `valid` が error を返せば、`emit` は頼まれず、入っていなければ CFG-25（「マニフェスト」）。
 - 基底のオプション `module` がないとき（同じ単位の基底が GO-8 を返し、何も書き出されない。`docs/plugin-go.md`「診断」）は、ファイルを返さず、GO-8 も重ねて返さない。置き場を求められないので、GOVALID-3 は確かめない。ほかの診断は、そのときも返す。
 - 生成器の不具合（`View` が欠けている、生成したコードを `go/format` で整形できない）は、診断にせず、異常終了する（`proc.Crashed`。`docs/plugin-protocol.md`「起動」）。
+
+### 欠番
+
+- **GOVALID-1 は欠番。** 制約の使い方の誤りで、言語に依らないので、語彙のプラグイン `valid` の診断に、四つに分けて移した（`docs/plugin-valid.md`「診断」）。
+
+  | GOVALID-1 の条件 | 移した先 |
+  |---|---|
+  | 制約が元の型に合わない。配列のフィールドに `length` のほかの制約が付いている。インデックスの model を型に持つフィールドに制約が付いている | VALID-1 |
+  | 元の型が `int` の `min` / `max` の `value` が整数でない。`length` に `min` も `max` もない | VALID-2 |
+  | `pattern` が RE2 でない | VALID-3 |
+  | `format` の名前を知らない | VALID-4 |
+
+- GOVALID-2 は欠番。「フィールドの既定値が、その型かフィールドの制約に合わない」という規則だったが、フィールドの既定値を言語からなくしたので、確かめるものがない（`docs/decisions.md`「設計書から離れた決定」S24）。値を入れるデコレータ（`@http.default`、`@cli.default`）の値は、それを読む相乗りが、生成するときに制約で確かめる（`docs/plugin-http.md`「補う値と制約」）。番号は別の意味に使い回さない（欠番の一覧は `docs/requirements.md`「検査の規則の一覧」）。

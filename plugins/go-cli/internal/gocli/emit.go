@@ -11,6 +11,7 @@ import (
 	"github.com/mew-ton/hozo/plugin"
 	"github.com/mew-ton/hozo/plugin/golang"
 	"github.com/mew-ton/hozo/plugin/govalid"
+	"github.com/mew-ton/hozo/plugin/validvocab"
 )
 
 // 診断のコード（docs/plugin-go-cli.md「診断」）。
@@ -518,7 +519,7 @@ func (g *generator) checkDefault(decl *ir.Model, fd *ir.Field, def *ir.Applicati
 			decl.Name, fd.Name, cliDefault, goLiteral(lit), lit.Kind(), golang.TypeDisplay(fd.Type))
 		return
 	}
-	for _, miss := range govalid.CheckLiteral(g.p, fd, lit) {
+	for _, miss := range validvocab.CheckLiteral(g.p, fd, lit) {
 		where := "フィールドの制約"
 		if miss.Scalar != "" {
 			where = "型 " + miss.Scalar + " の制約"

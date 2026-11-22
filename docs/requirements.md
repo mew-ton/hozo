@@ -274,7 +274,7 @@ hozoc は自分自身の境界（コマンド、ファイル、プラグイン�
 | 持つもの | 持ち主 | 例 |
 |---|---|---|
 | 言語の規則と、仕様だけから決まる計算 | 本体 | 例外、効果、読む状態。入口ごとの、起こりうる結果と、例外の出どころと、そこへ入らせる方法（同 409） |
-| 語彙ごとの決まり（その語彙にしかなく、言語には依らない） | 語彙のプラグイン（同 410） | `http`: 経路と入力の対応、通信の上の形、通信に出せる型の条件。`db`: 状態を表に写す決まり。`valid`: 制約の意味 |
+| 語彙ごとの決まり（その語彙にしかなく、言語には依らない） | 語彙のプラグイン（同 410） | `http`: 経路と入力の対応、通信の上の形、通信に出せる型の条件。`db`: 状態を表に写す決まり。`valid`: 制約が、何に付けられ、どの値を通すか |
 | ある言語での、型と関数の形 | 言語の基底 | Go の型、関数の形、実装を受け取る口、にせもの |
 | ある語彙の、ある言語への出し方 | 相乗り | Go の HTTP のハンドラ、Go の SQL |
 
@@ -341,11 +341,11 @@ hozoc は自分自身の境界（コマンド、ファイル、プラグイン�
 | 2 | 本体の計算: 入口ごとの、結果と、出どころと、入らせ方を、本体が求めて、プラグインに渡す。`outer throws` の出どころ（fn の境界）。受ける道のケース | 409 |
 | 3 | やり取りの形: 頼みごとを一つに（検査のための頼みごとを、なくす）。起動を、プラグインごとに、まとめる。`hozoc build`。プラグインが、ファイルを読まないようにする（Go のモジュールの名前は、設定に。カバレッジの中身は、本体が渡す）。知らない項目を、無視する | 411、416、417、421、425 |
 | 4 | サンドボックス: WASM の実行環境を、本体に組み込む。プラグインを WASM にする（子プロセスで起動する道は、残さない）。WASM を、機械の言葉に直したものを、覚える。プラグインの答えを覚えることと、言語サーバーの縛り（412）の見直しは、後（同 426） | 413、414、426 |
-| 5 | 語彙のプラグイン: 言語に依らない検査（`http` から。診断の ID の移し替え。次に `valid`、`db`）。語彙の IR は、決めない | 410、428 |
+| 5 | 語彙のプラグイン: 言語に依らない検査（`http`、`valid`、`db` の順。診断の ID の移し替え）。語彙の IR は、決めない | 410、428 |
 | 6 | （入れない。同 428: 基底と相乗りの約束は、今までどおり、ライブラリ） | — |
 | 7 | 解釈するデコレータの名指しと、warning | 420 |
 
-- **入った段**は、1、2、3、4 と、5 のうち、`http` の語彙の分（`valid` と `db` は、まだ）。段 5 の持ち主は、`docs/plugin-protocol.md`「語彙のプラグイン」「read」（語彙のプラグインの種類。マニフェストの `[read]` と `requires_vocabulary`。版 0.23）と、`docs/plugin-http.md`（`http` の語彙の、言語に依らない決まり。診断 HTTP-*。`go-http` から移した ID の対応は `docs/plugin-go-http.md`「診断」の「欠番」）。段 4 の持ち主は、`docs/plugin-protocol.md`「マニフェスト `hozo-plugin.toml`」（`wasm`）、「起動」（プラグインに渡すものと、渡さないもの。途中で止めること。機械の言葉に直したものを、覚えること）、「信頼の前提」。段 2 の、本体の計算の持ち主は、`docs/check.md`「入口ごとの、求めるケース」。段 3 の、やり取りの形の持ち主は、`docs/plugin-protocol.md`「起動」「emit」と、`docs/ir.md`「まとめた形」（プラグインごとに、一度の起動。検査のための頼みごとを、なくしたこと。版 0.22）、`docs/config.md`「プロジェクト全体のオプション」と `docs/plugin-go.md`「パッケージと import パス」（プラグインは、ファイルも、環境変数も、読まない。Go のモジュールの名前は、設定に）、`docs/cli.md`「build」（`hozoc build` と `hozoc build --no-emit`）。
+- **入った段**は、1、2、3、4 と、5 のうち、`http` と `valid` の語彙の分（`db` は、まだ）。段 5 の持ち主は、`docs/plugin-protocol.md`「語彙のプラグイン」「read」（語彙のプラグインの種類。マニフェストの `[read]` と `requires_vocabulary`。版 0.23）と、`docs/plugin-http.md`（`http` の語彙の、言語に依らない決まり。診断 HTTP-*。`go-http` から移した ID の対応は `docs/plugin-go-http.md`「診断」の「欠番」）、`docs/plugin-valid.md`（`valid` の語彙の、言語に依らない決まり。診断 VALID-*。`go-valid` から移した ID の対応は `docs/plugin-go-valid.md`「診断」の「欠番」）。段 4 の持ち主は、`docs/plugin-protocol.md`「マニフェスト `hozo-plugin.toml`」（`wasm`）、「起動」（プラグインに渡すものと、渡さないもの。途中で止めること。機械の言葉に直したものを、覚えること）、「信頼の前提」。段 2 の、本体の計算の持ち主は、`docs/check.md`「入口ごとの、求めるケース」。段 3 の、やり取りの形の持ち主は、`docs/plugin-protocol.md`「起動」「emit」と、`docs/ir.md`「まとめた形」（プラグインごとに、一度の起動。検査のための頼みごとを、なくしたこと。版 0.22）、`docs/config.md`「プロジェクト全体のオプション」と `docs/plugin-go.md`「パッケージと import パス」（プラグインは、ファイルも、環境変数も、読まない。Go のモジュールの名前は、設定に）、`docs/cli.md`「build」（`hozoc build` と `hozoc build --no-emit`）。
 
 段 7 が済んだ版が、1.0（「版」）。
 
@@ -479,7 +479,7 @@ R2 の成果物:
 | 設定: `[emit.options]`、プロジェクト全体の `[options]`（CFG-24）、基底と相乗り（CFG-19〜CFG-21）、型の置き場（CFG-22）、継ぎ目（CFG-23）、語彙の名前空間の単位 | `docs/config.md` |
 | プロトコル: 版 0.4（`requires`、`seams`、`View.config` の `index` / `base` / `options` / `seams`、`select` の廃止） | `docs/plugin-protocol.md`、`docs/ir.md`「その名前空間から見た IR」 |
 | 公開の SDK: `plugin`（`Options`）、`plugin/golang`（形の規則）、`plugin/govalid` | `docs/packages.md` |
-| プラグイン `plugins/go`、`plugins/go-valid`、`plugins/go-sqlite`、`plugins/go-http`、`plugins/go-cli`（作り直し） | `docs/plugin-go.md`、`docs/plugin-go-valid.md`、`docs/plugin-go-sqlite.md`、`docs/plugin-go-http.md`、`docs/plugin-http.md`、`docs/plugin-go-cli.md` |
+| プラグイン `plugins/go`、`plugins/go-valid`、`plugins/go-sqlite`、`plugins/go-http`、`plugins/go-cli`（作り直し） | `docs/plugin-go.md`、`docs/plugin-go-valid.md`、`docs/plugin-go-sqlite.md`、`docs/plugin-go-http.md`、`docs/plugin-http.md`、`docs/plugin-valid.md`、`docs/plugin-go-cli.md` |
 | `emit` の手順（本体は出力を作らない）、`cli.hozo` と `hozo.toml`、`internal/app` | `docs/cli.md` |
 | 語彙: `http.BadRequest` | `docs/vocab.md`「同梱する語彙」 |
 | テスト: サンプルのサブテスト、コーパスのゴールデンの作り直し、`select` のコーパスと `pick` の削除 | `docs/testing.md`、`tests/samples/README.md` |
@@ -624,7 +624,7 @@ Go にした理由は「プラグインの書き方」に依る。設計書の�
 | 語彙の宣言の読み込み元 | なし | `docs/vocab.md` |
 | プラグインの探索、マニフェストの追加項目（トランスパイラの一覧を含む）、語彙に固有の検査 | §4.6 に形だけ | `docs/plugin-protocol.md` |
 | 言語ごとの出力の担い手と形 | §4.3 に方針 | 担い手は、言語ごとの基底のトランスパイラ（`docs/config.md`「基底と相乗り」）。本体は言語を知らない。Go の形は `docs/plugin-go.md`。TS は段階 5 |
-| 語彙ごとの出力（検証、HTTP、DB） | §4.2、§4.3 に方針 | `docs/plugin-go-valid.md`、`docs/plugin-go-http.md`、`docs/plugin-http.md`（HTTP の通信の形）、`docs/plugin-go-sqlite.md` |
+| 語彙ごとの出力（検証、HTTP、DB） | §4.2、§4.3 に方針 | `docs/plugin-go-valid.md`、`docs/plugin-valid.md`（制約の意味）、`docs/plugin-go-http.md`、`docs/plugin-http.md`（HTTP の通信の形）、`docs/plugin-go-sqlite.md` |
 | `cli` の語彙の意味 | `examples/hozoc.hozo` | `docs/plugin-go-cli.md` |
 | 診断の形と終了コード | `examples/hozoc.hozo` に一部 | `docs/diagnostics.md` |
 | hozoc の振る舞いと `cli.hozo` | `examples/hozoc.hozo` | `docs/cli.md` |
@@ -656,6 +656,7 @@ Go にした理由は「プラグインの書き方」に依る。設計書の�
 | NS-4 | `classify` は宣言した名前空間の中でだけ使える（§3.2、§10.1）。分類の置き場を自由にした（S18）ときになくなった | `docs/check.md`「名前空間」 |
 | GOSQL-5 | 状態の単位のメソッドの名前が、`go-sqlite` の型のフィールド `db` と当たること（op `db`）。起きない条件だったので、`go-sqlite` を実装したときになくした（メソッドの名前は op 名の先頭を大文字にした `Db` で、フィールド `db` とは別の名前） | `docs/plugin-go-sqlite.md`「診断」 |
 | TYPE-13 | 既定値のリテラルが、フィールドの型（`scalar` なら元の型）に渡せないこと。フィールドの既定値を言語からなくしたときになくなった（値がないときに何を入れるかは、境界のデコレータが言う） | `docs/types.md`「診断」、`docs/grammar.md`「決めたこと」 |
+| GOVALID-1 | `go-valid` が返していた、`valid` の制約の使い方の検査。言語に依らないので、語彙のプラグイン `valid` に移した（`docs/decisions.md` の 410）ときになくなった。行き先（VALID-1〜VALID-4）の対応は、持ち主の文書 | `docs/plugin-go-valid.md`「診断」の「欠番」 |
 | GOVALID-2 | フィールドの既定値が、その型かフィールドの制約に合わないこと。フィールドの既定値を言語からなくした（`docs/decisions.md`「設計書から離れた決定」S24）ときになくなった | `docs/plugin-go-valid.md`「診断」 |
 | EFF-3 | 葉の op が自分で書いた `effects` が二つ以上であること（§5.2、§7.3。S8）。葉の op が `reads` / `effects` の節を書けなくなった（STATE-5）ときになくなった | `docs/check.md`「状態と効果」 |
 | MATCH-8 | アームの本体の `throw E` の `E` が、値を運ぶ例外であること。`throw` が例外の引数に値を渡せるようになったときになくなった | `docs/check.md`「classify / match」 |

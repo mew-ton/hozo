@@ -1,0 +1,20 @@
+// VALID-2: 制約の引数が、足りないか、先に合わない。位置は、付いた scalar か model。
+namespace app {
+  // 元の型が int の先に付けた min / max の value が整数でない
+  @valid.min(0.5)
+  scalar Half extends int;
+
+  // length に min も max もない
+  @valid.length
+  scalar Any extends string;
+
+  model Form {
+    // 配列のフィールドの length（要素の数に掛かる）も、min も max もなければ、同じに当たる
+    @valid.length empty: string[];
+    @valid.length note: string;
+    // 引数が合っていれば、診断にならない
+    @valid.length(min: 1, max: 3) few: string[];
+    @valid.max(0.5) ratio: float;
+    @valid.min(1) count: int;
+  }
+}

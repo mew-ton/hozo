@@ -6,33 +6,9 @@
 package govalid
 
 import (
-	"strings"
-
 	"github.com/mew-ton/hozo/ir"
+	"github.com/mew-ton/hozo/plugin/validvocab"
 )
-
-// vocabulary は、制約のデコレータを持つ語彙の名前空間（docs/vocab.md「同梱する語彙」の valid）。
-const vocabulary = "valid"
-
-// standard は valid の標準の制約（docs/plugin-go-valid.md「マニフェスト」「制約」）。
-var standard = map[string]bool{
-	vocabulary + ".min":     true,
-	vocabulary + ".max":     true,
-	vocabulary + ".length":  true,
-	vocabulary + ".pattern": true,
-	vocabulary + ".format":  true,
-}
-
-// Standard は、decorator（汎用デコレータの FQN。Application.Decorator）が valid の標準の制約
-// （min / max / length / pattern / format）か。利用者が valid に足した制約（設計書 §6.5）は false。
-func Standard(decorator string) bool { return standard[decorator] }
-
-// constraint は、decorator が valid の語彙のデコレータ（`@valid.*`）か: 名前空間 valid に宣言されたもの。標準のものも、
-// 利用者が足したものも数える。子の名前空間（valid.sub.x）のものは数えない。
-func constraint(decorator string) bool {
-	name, ok := strings.CutPrefix(decorator, vocabulary+".")
-	return ok && name != "" && !strings.Contains(name, ".")
-}
 
 // HasValidate は、宣言 typeFQN（scalar か model）が Validate を持つか（docs/plugin-go-valid.md「Validate を持つ型」）。
 // 仕様だけから決まり、設定によらない。次のどれかに当たるものが持ち、当たるものがなくなるまで繰り返して決める
@@ -139,10 +115,10 @@ func validated(p *ir.Program) map[string]bool {
 	return has
 }
 
-// constrained は、decorators に `@valid.*` があるか。
+// constrained は、decorators に `@valid.*`（標準の制約と、利用者が valid に足した制約。validvocab.Applied）があるか。
 func constrained(decorators []ir.Application) bool {
 	for _, app := range decorators {
-		if constraint(app.Decorator) {
+		if validvocab.Applied(app.Decorator) {
 			return true
 		}
 	}

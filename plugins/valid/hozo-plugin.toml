@@ -1,0 +1,8 @@
+# 語彙のプラグイン valid（docs/plugin-valid.md「マニフェスト」）: 標準の語彙 valid の、言語に依らない決まりを確かめる。
+# トランスパイラも、語彙の宣言も、持たない（宣言は、hozoc に同梱の vocab/valid.hozo）
+name     = "valid"
+wasm     = "plugin.wasm"
+protocol = "0.23"
+
+[read]
+namespaces = ["valid"]

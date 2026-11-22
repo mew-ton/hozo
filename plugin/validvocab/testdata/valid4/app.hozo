@@ -1,0 +1,14 @@
+// VALID-4: format の name が、四つの形式のどれでもない。位置は、付いた scalar か model。
+namespace app {
+  @valid.format("phone")
+  scalar Phone extends string;
+
+  model Form {
+    @valid.format("zip") zip: string;
+    // 四つの形式は、診断にならない
+    @valid.format("email") email: string;
+    @valid.format("uri") link: string;
+    @valid.format("uuid") id: string;
+    @valid.format("date-time") at: string;
+  }
+}

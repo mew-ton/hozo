@@ -73,7 +73,7 @@
 | `gen/browser/` | 同じく `inner/` と入口。述語で決まる分類（`WarrantyKind`、`WarrantyAvailable`）の `classify.go`、`server` の op の口 `ServerOps`、`server` の入口のパッケージの型の import |
 | `gen/http/`、`gen/page/` | 語彙の型（`http` の例外、`page.Route` など）だけ。op を持たないので、`inner/` はない。`http.BadRequest` は、二つの引数（`message`、`violations`）が、そのまま二つのフィールド |
 
-相乗りを並べていないので、語彙のデコレータ（`@http.get`、`@page.route`、`@db.table` など）と、利用者が `valid` に足した制約（§6.5）は印のままで、出力に現れない（`docs/plugin-go.md`「デコレータ」）。`http` の語彙の検査は、相乗りを並べていなくても、掛かる（語彙のプラグイン `http`。`docs/plugin-http.md`）。
+相乗りを並べていないので、語彙のデコレータ（`@http.get`、`@page.route`、`@db.table` など）と、利用者が `valid` に足した制約（§6.5）は印のままで、出力に現れない（`docs/plugin-go.md`「デコレータ」）。`http` と `valid` の語彙の検査は、相乗りを並べていなくても、掛かる（語彙のプラグイン `http`、`valid`。`docs/plugin-http.md`、`docs/plugin-valid.md`）。利用者が `valid` に足した制約は、語彙のプラグイン `valid` も、読まない（`docs/plugin-valid.md`「対象」）。
 
 ## 設計書の例が規則に触れるところ
 

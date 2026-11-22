@@ -12,6 +12,7 @@ import (
 	"github.com/mew-ton/hozo/plugin"
 	"github.com/mew-ton/hozo/plugin/golang"
 	"github.com/mew-ton/hozo/plugin/govalid"
+	"github.com/mew-ton/hozo/plugin/validvocab"
 )
 
 // goldenFixtures は、出力をゴールデンと比べる入力（testdata/<名前>/）と、それが確かめる docs/plugin-go-valid.md の見出し。
@@ -187,7 +188,7 @@ func TestNone(t *testing.T) {
 // diagnosticFixtures は、診断を返す入力（testdata/<名前>/）。期待する診断は testdata/<名前>/expected/errors.txt
 // （一行に、コード、位置、メッセージをタブで区切って。View の順、その中は返した順）。
 var diagnosticFixtures = []struct{ name, code string }{
-	{"govalid1", codeValidConstraint}, // 制約が元の型に合わない、length に min も max もない、pattern が RE2 でない、format の名前を知らない、配列か record そのもの
+	// GOVALID-1 は欠番（制約の使い方の誤りは、語彙のプラグイン valid の VALID-1〜VALID-4 に移した。入力も、plugin/validvocab/testdata に移した）
 	// GOVALID-2 は欠番（フィールドの既定値を言語からなくした。docs/plugin-go-valid.md「診断」）。番号は使い回さない
 	{"govalid3", codeValidHome},   // Validate を持つ別の名前空間の型の置き場の単位が、go-valid を並べていない
 	{"govalid4", codeValidUnion},  // フィールドの型が union で、そのアームの型が、Validate を持つ型そのものでなく、その中に Validate を持つ型がある
@@ -196,26 +197,28 @@ var diagnosticFixtures = []struct{ name, code string }{
 	{"govalid7", codeValidOption}, // [emit.options.go-valid] に、知らないキーがある
 }
 
-// TestDiagnosticCodes は、「診断」の表の ID（GOVALID-1〜GOVALID-7。GOVALID-2 は欠番）のどれもが、入力を一つ持つこと。
+// TestDiagnosticCodes は、「診断」の表の ID（GOVALID-3〜GOVALID-7。GOVALID-1 と GOVALID-2 は欠番）のどれもが、入力を一つ持つこと。
 func TestDiagnosticCodes(t *testing.T) {
 	seen := map[string]bool{}
 	for _, fx := range diagnosticFixtures {
 		seen[fx.code] = true
 	}
-	for _, code := range []string{codeValidConstraint, codeValidHome, codeValidUnion, codeValidCustom, codeValidField, codeValidOption} {
+	for _, code := range []string{codeValidHome, codeValidUnion, codeValidCustom, codeValidField, codeValidOption} {
 		if !seen[code] {
 			t.Errorf("%s の入力がない", code)
 		}
 	}
-	if seen["GOVALID-2"] {
-		t.Error("欠番の GOVALID-2 の入力がある")
+	for _, retired := range []string{"GOVALID-1", "GOVALID-2"} {
+		if seen[retired] {
+			t.Errorf("欠番の %s の入力がある", retired)
+		}
 	}
-	if len(seen) != 6 {
-		t.Errorf("診断の入力のコードが %d 種類（6 のはず）", len(seen))
+	if len(seen) != 5 {
+		t.Errorf("診断の入力のコードが %d 種類（5 のはず）", len(seen))
 	}
 }
 
-// TestDiagnostics は docs/plugin-go-valid.md「診断」の GOVALID-1〜GOVALID-7: 診断のコード・位置・メッセージがゴールデンと同じで、
+// TestDiagnostics は docs/plugin-go-valid.md「診断」の GOVALID-3〜GOVALID-7: 診断のコード・位置・メッセージがゴールデンと同じで、
 // 診断を返した出力がファイルを返さないこと（emitViews が確かめる）。
 func TestDiagnostics(t *testing.T) {
 	for _, fx := range diagnosticFixtures {
@@ -247,7 +250,6 @@ func TestDiagnosticPositions(t *testing.T) {
 		return set
 	}
 	for name, want := range map[string][]string{
-		"govalid1": {"app.Name", "app.Wait", "app.Count", "app.Flag", "app.At", "app.Alias", "app.Half", "app.Any", "app.Look", "app.Phone", "app.Form"},
 		"govalid3": {"app.User", "app.WorkEmail"},
 		"govalid4": {"app.Lists"},
 		"govalid5": {"app.Jan", "app.Order"},
@@ -273,9 +275,39 @@ func TestNoModule(t *testing.T) {
 	if len(files) != 0 || len(diags) != 0 {
 		t.Errorf("files=%v 診断=%+v, want どちらも空（GO-8 は基底が返す）", sortedPaths(files), diags)
 	}
-	_, diags = emitViews(t, "", noModule(loadViews(t, "govalid1")))
-	if len(diags) == 0 || diags[0].Code != codeValidConstraint {
-		t.Errorf("診断 = %+v, want GOVALID-1", diags)
+	_, diags = emitViews(t, "", noModule(loadViews(t, "govalid5")))
+	if len(diags) == 0 || diags[0].Code != codeValidCustom {
+		t.Errorf("診断 = %+v, want GOVALID-5", diags)
+	}
+}
+
+// TestUncheckedSpec は「診断」: 制約の使い方の誤り（VALID-*。docs/plugin-valid.md「診断」）は、語彙のプラグイン valid が、先に断る。
+// その検査を通っていない仕様（ここでは、scalar と、model のフィールドに、min も max もない @valid.length を足した View: VALID-1 か VALID-2）を
+// 受け取ったら、go-valid は、診断にせず、error で終わる（hozoc からは proc.Crashed）。
+func TestUncheckedSpec(t *testing.T) {
+	bare := ir.Application{Decorator: validvocab.Length}
+	for _, kind := range []string{"scalar", "field"} {
+		view := loadViews(t, "constraints")[0]
+		broken := false
+		for _, d := range view.Program.Namespace(view.Viewer).Decls {
+			switch x := d.(type) {
+			case *ir.Scalar:
+				if kind == "scalar" && !broken {
+					x.Decorators, broken = append(x.Decorators, bare), true
+				}
+			case *ir.Model:
+				if kind == "field" && !broken && len(x.Fields) > 0 && x.SynthesizedFrom == "" {
+					x.Fields[0].Decorators, broken = append(x.Fields[0].Decorators, bare), true
+				}
+			}
+		}
+		if !broken {
+			t.Fatalf("入力 constraints の名前空間 %s に、%s がない", view.Viewer, kind)
+		}
+		resp, err := Handler{}.Emit(request(view, TranspilerName))
+		if err == nil || !strings.Contains(err.Error(), "VALID-") {
+			t.Fatalf("%s: resp = %+v, err = %v, want VALID-* を名指しした error", kind, resp, err)
+		}
 	}
 }
 

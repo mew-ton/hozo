@@ -24,6 +24,7 @@ Hozo の言語と、その実装（このリポジトリ）の設計。言語の
 | [`vocab.md`](vocab.md) | 標準の語彙 | `vocab/`、`internal/vocab` |
 | [`plugin-protocol.md`](plugin-protocol.md) | マニフェスト（基底と相乗りの `requires`、継ぎ目の `seams`）、探索、JSON のやり取り、相乗りが基底の形を知る方法 | `internal/plugin`、`plugin` |
 | [`plugin-go.md`](plugin-go.md) | Go の基底のトランスパイラ `go`: 語彙によらずに決まる Go の出力のすべて（置き場、名前、型、op の形、実装を受け取る口、配線の本体、継ぎ目） | `plugins/go`、`plugin/golang`、`runtime` |
+| [`plugin-valid.md`](plugin-valid.md) | 語彙のプラグイン `valid`: `valid` の語彙の、言語に依らない決まり（制約が、何に付けられ、どの値を通すか、使い方の検査 VALID-*） | `plugins/valid`、`plugin/validvocab` |
 | [`plugin-go-valid.md`](plugin-go-valid.md) | `valid` の制約を確かめる関数を出す相乗り `go-valid` | `plugins/go-valid`、`plugin/govalid`、`runtime` |
 | [`plugin-go-sqlite.md`](plugin-go-sqlite.md) | `db` の状態を SQLite の表と読み書きにする相乗り `go-sqlite` | `plugins/go-sqlite` |
 | [`plugin-http.md`](plugin-http.md) | 語彙のプラグイン `http`: `http` の語彙の、言語に依らない決まり（経路、HTTP の通信の上の形、使い方の検査 HTTP-*） | `plugins/http`、`plugin/httpvocab` |

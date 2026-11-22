@@ -9,6 +9,7 @@ import (
 	"github.com/mew-ton/hozo/ir"
 	"github.com/mew-ton/hozo/plugin"
 	"github.com/mew-ton/hozo/plugin/golang"
+	"github.com/mew-ton/hozo/plugin/validvocab"
 )
 
 // このファイルは validate.go のテキスト（docs/plugin-go-valid.md「出力」「scalar」「model」）。検査（emit.go）を通った入力だけを描く。
@@ -115,7 +116,7 @@ func (f *file) pattern(c constraint, owner string) string {
 		name = patternPrefix + owner + strconv.Itoa(i)
 	}
 	f.taken[name] = true
-	f.patterns = append(f.patterns, fmt.Sprintf("var %s = %s.MustCompile(%s)\n", name, f.im.Add("regexp", "regexp"), strconv.Quote(c.regex)))
+	f.patterns = append(f.patterns, fmt.Sprintf("var %s = %s.MustCompile(%s)\n", name, f.im.Add("regexp", "regexp"), strconv.Quote(c.Regex)))
 	return name
 }
 
@@ -140,14 +141,8 @@ func (f *file) scalar(s *ir.Scalar) string {
 		f.usesAppend = true
 		fmt.Fprintf(&b, "%s = %s(%s, \"\", %s(%s).%s())\n", violations, helperAppend, violations, golang.GoType(s.Base, f.im), v, method)
 	}
-	core, ok := f.g.coreOf(s.Base)
-	for i := range s.Decorators {
-		app := &s.Decorators[i]
-		if !f.g.vocab[app.Decorator] {
-			continue
-		}
-		c, _ := parse(app, core, ok, "")
-		if c.decorator == validPattern {
+	for _, c := range f.g.scalarConstraints(s) {
+		if c.Decorator == validvocab.Pattern {
 			c.variable = f.pattern(c, name)
 		}
 		b.WriteString(f.violation(c, v, `""`, violations))
@@ -166,7 +161,7 @@ func (f *file) wrapper(u *ir.Union, a *ir.UnionArm) string {
 // violation は、制約 c 一つの検査: 値 value が違反していれば、Path が path（Go の式）の違反を足す。
 func (f *file) violation(c constraint, value, path, violations string) string {
 	return fmt.Sprintf("if %s {\n%s = append(%s, %s.Violation{Path: %s, Constraint: %s})\n}\n",
-		c.condition(value, f), violations, violations, f.runtime(), path, strconv.Quote(c.name))
+		c.condition(value, f), violations, violations, f.runtime(), path, strconv.Quote(c.Name))
 }
 
 // model は、model m の Validate（docs/plugin-go-valid.md「model」）: フィールドの順に、フィールドの型の Validate と、
@@ -178,9 +173,9 @@ func (f *file) model(m *ir.Model) string {
 	b.WriteString(f.open(fmt.Sprintf("%s は %s の各フィールドの制約を確かめる。違反の Path はフィールド名を . でつないだもの。", method, m.Name), recv, name, violations))
 	for i := range m.Fields {
 		fd := &m.Fields[i]
-		cons, _ := f.g.fieldConstraints(fd, "")
+		cons := f.g.fieldConstraints(m, fd)
 		for j := range cons {
-			if cons[j].decorator == validPattern {
+			if cons[j].Decorator == validvocab.Pattern {
 				cons[j].variable = f.pattern(cons[j], name+golang.Capitalize(fd.Name))
 			}
 		}

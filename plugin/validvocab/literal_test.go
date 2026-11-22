@@ -1,4 +1,4 @@
-package govalid
+package validvocab
 
 import (
 	"reflect"
@@ -7,8 +7,8 @@ import (
 	"github.com/mew-ton/hozo/ir"
 )
 
-// このファイルは CheckLiteral（docs/packages.md「`plugin/govalid`（公開）」）: 値一つを、フィールドの制約で確かめる。
-// 制約の意味は docs/plugin-go-valid.md「制約」の表、確かめる順は同「scalar」「model」。
+// このファイルは CheckLiteral（docs/plugin-valid.md「値一つを確かめる」）: 値一つを、フィールドの制約で確かめる。
+// 値が制約を通るかは、同「制約」の表の「通す値」。
 
 // app は、制約の適用を組み立てる。args は、引数名とリテラルを交互に。
 func app(decorator string, args ...any) ir.Application {
@@ -42,7 +42,7 @@ func TestCheckLiteral(t *testing.T) {
 			constrainedScalar("type.Name", ir.String(), app("valid.length", "min", num(1), "max", num(3))),
 			constrainedScalar("type.Email", ir.String(), app("valid.format", "name", str("email"))),
 			constrainedScalar("type.Plain", ir.String()),
-			// 利用者が valid に足した制約は、中身を人が書く（GOVALID-5）: ここでは確かめない
+			// 利用者が valid に足した制約は、中身を人が書く: ここでは確かめない
 			constrainedScalar("type.Code", ir.String(), app("valid.checkDigit")),
 		},
 	}, "type")
@@ -92,8 +92,8 @@ func TestCheckLiteral(t *testing.T) {
 		// 省略可能なフィールドは、中の型で見る
 		{"省略可能", constrainedField("f", ir.Optional(ir.Ref("type.Page"))), num(0),
 			[]Mismatch{{Decorator: "valid.min", Text: "@valid.min(1)", Scalar: "type.Page"}}},
-		// 確かめられないものは、合わないとは言わない: リテラルの型に当たらない制約と、解釈できない正規表現（go-valid の GOVALID-1）、
-		// 利用者が足した制約（GOVALID-5）、valid の語彙でないデコレータ
+		// 確かめられないものは、合わないとは言わない: リテラルの型に当たらない制約と、解釈できない正規表現（VALID-3）、
+		// 利用者が足した制約、valid の語彙でないデコレータ
 		{"型の合わない制約", constrainedField("f", ir.String(), fieldMin), str("x"), nil},
 		{"真偽値と期間には、当たる制約がない", constrainedField("f", ir.Boolean(), fieldMin, app("valid.length", "min", num(9))), ir.BooleanLiteral{Value: false}, nil},
 		{"解釈できない正規表現", constrainedField("f", ir.String(), app("valid.pattern", "regex", str("("))), str("x"), nil},

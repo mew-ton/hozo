@@ -1,0 +1,15 @@
+VALID-1	app.Name	@valid.min は、元の型が int か float の位置にだけ付けられるが、scalar app.Name は元の型が string
+VALID-1	app.Wait	@valid.max は、元の型が int か float の位置にだけ付けられるが、scalar app.Wait は元の型が duration
+VALID-1	app.Count	@valid.length は、元の型が string の位置にだけ付けられるが、scalar app.Count は元の型が int
+VALID-1	app.Flag	@valid.pattern は、元の型が string の位置にだけ付けられるが、scalar app.Flag は元の型が boolean
+VALID-1	app.At	@valid.format は、元の型が string の位置にだけ付けられるが、scalar app.At は元の型が datetime
+VALID-1	app.Alias	@valid.max は、元の型が int か float の位置にだけ付けられるが、scalar app.Alias は元の型が string
+VALID-1	app.Form	@valid.min が、配列（model app.Form のフィールド tags）に付いている（配列のフィールドに付けられるのは @valid.length だけで、要素の数に掛かる。要素に掛けるなら、要素の型に付ける）
+VALID-1	app.Form	@valid.length が、インデックスの model そのもの（model app.Form のフィールド attrs）に付いている（制約を付けられるのは、値の型）
+VALID-1	app.Form	@valid.min が、配列（model app.Form のフィールド later）に付いている（配列のフィールドに付けられるのは @valid.length だけで、要素の数に掛かる。要素に掛けるなら、要素の型に付ける）
+VALID-1	app.Form	@valid.pattern が、配列（model app.Form のフィールド words）に付いている（配列のフィールドに付けられるのは @valid.length だけで、要素の数に掛かる。要素に掛けるなら、要素の型に付ける）
+VALID-1	app.Form	@valid.format が、配列（model app.Form のフィールド words）に付いている（配列のフィールドに付けられるのは @valid.length だけで、要素の数に掛かる。要素に掛けるなら、要素の型に付ける）
+VALID-1	app.Form	@valid.min は、元の型が int か float の位置にだけ付けられるが、model app.Form のフィールド name は元の型が string
+VALID-1	app.Form	@valid.length は、元の型が string の位置にだけ付けられるが、model app.Form のフィールド inner は核の型を元に持たない
+VALID-1	app.Form	@valid.max は、元の型が int か float の位置にだけ付けられるが、model app.Form のフィールド nick は元の型が string
+VALID-1	app.Form	@valid.format は、元の型が string の位置にだけ付けられるが、model app.Form のフィールド count は元の型が int

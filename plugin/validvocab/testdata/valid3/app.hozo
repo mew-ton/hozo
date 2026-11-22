@@ -1,0 +1,12 @@
+// VALID-3: pattern の regex を、RE2 で解釈できない。位置は、付いた scalar か model。
+namespace app {
+  // 後読みは、RE2 にない
+  @valid.pattern("(?<!a)b")
+  scalar Look extends string;
+
+  model Form {
+    @valid.pattern("[") code: string;
+    // RE2 で解釈できれば、診断にならない
+    @valid.pattern("^[a-z]+$") slug: string;
+  }
+}

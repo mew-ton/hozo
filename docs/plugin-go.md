@@ -1631,7 +1631,7 @@ func (f *FakeVoid[A]) Call(args A, impl func() error) error
 |---|---|---|
 | GOEMIT-1 | `out` の上に `go.mod` がない | GO-1（その後、欠番: 「診断」の表） |
 | GOEMIT-2 | 大文字化で名前が衝突する | GO-2（当たる名前の範囲を広げた） |
-| GOEMIT-3 | `valid` の制約が元の型に合わない、など | GOVALID-1（`docs/plugin-go-valid.md`） |
+| GOEMIT-3 | `valid` の制約が元の型に合わない、など | GOVALID-1。その後、VALID-1〜VALID-4 に移した（`docs/plugin-go-valid.md`「診断」の「欠番」） |
 | GOEMIT-4 | 既定値が `valid` の制約に合わない | GOVALID-2（同上。フィールドの既定値をなくしたときに、欠番になった） |
 | GOEMIT-5 | 出力どうしの import が循環する | GO-3 |
 | GOEMIT-6 | 組み込みの出力が支えない書き方（移行の間だけの規則） | なし（基底は、検査を通ったすべての書き方を出す。支えないのは GO-6 だけ） |

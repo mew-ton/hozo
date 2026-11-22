@@ -148,19 +148,6 @@ func TestHasValidateExtends(t *testing.T) {
 	}
 }
 
-func TestStandard(t *testing.T) {
-	for _, d := range []string{"valid.min", "valid.max", "valid.length", "valid.pattern", "valid.format"} {
-		if !Standard(d) {
-			t.Errorf("Standard(%q) = false", d)
-		}
-	}
-	for _, d := range []string{"valid.checkDigit", "min", "valid", "valid.", "http.query", "valid.sub.min", "x.valid.min", ""} {
-		if Standard(d) {
-			t.Errorf("Standard(%q) = true", d)
-		}
-	}
-}
-
 // docs/plugin-go-valid.md「出力」の GOVALID-3 と、それを前提にする相乗り（GOHTTP-11、CLI-9）が共有する規則: 別の名前空間の型の
 // Validate を呼べるのは、その名前空間の型の置き場（docs/config.md「型の置き場」）の単位が go-valid を並べているときだけ。
 func TestUnlisted(t *testing.T) {

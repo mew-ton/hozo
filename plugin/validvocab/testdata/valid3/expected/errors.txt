@@ -1,0 +1,2 @@
+VALID-3	app.Look	@valid.pattern の正規表現 "(?<!a)b" を、RE2 で解釈できない（scalar app.Look）: error parsing regexp: invalid named capture: `(?<!a)b`
+VALID-3	app.Form	@valid.pattern の正規表現 "[" を、RE2 で解釈できない（model app.Form のフィールド code）: error parsing regexp: missing closing ]: `[`

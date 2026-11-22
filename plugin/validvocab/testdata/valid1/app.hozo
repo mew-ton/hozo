@@ -1,6 +1,6 @@
-// GOVALID-1: 位置は、付いた scalar か model。
+// VALID-1: 制約が、付けた先に合わない。位置は、付いた scalar か model。
 namespace app {
-  // 制約が元の型に合わない（「制約」の表の「付けられる元の型」）
+  // 元の型に合わない（docs/plugin-valid.md「制約」の表の「付けられる先」）
   @valid.min(1)
   scalar Name extends string;
   @valid.max(1)
@@ -15,41 +15,22 @@ namespace app {
   @valid.max(3)
   scalar Alias extends Nick;
 
-  // int に付けた min / max の value が整数でない
-  @valid.min(0.5)
-  scalar Half extends int;
-
-  // length に min も max もない
-  @valid.length
-  scalar Any extends string;
-
-  // pattern が RE2 でない（後読み）
-  @valid.pattern("(?<!a)b")
-  scalar Look extends string;
-
-  // format の名前を知らない
-  @valid.format("phone")
-  scalar Phone extends string;
-
   model Inner { x: int; }
   model Attrs { [name: string]: string; }
 
   model Form {
-    // 配列のフィールドに、length のほかの制約が付いている（省略可能でも同じ）。インデックスの model そのものに、制約が付いている
+    // 配列のフィールドに、length のほかの制約が付いている（省略可能でも同じ）。インデックスの model を型に持つフィールドに、制約が付いている
     @valid.min(1) tags: string[];
     @valid.length(max: 3) attrs: Attrs;
     @valid.min(1) later: int[]?;
     @valid.pattern("x") @valid.format("email") words: string[];
-    // 配列のフィールドの length は、要素の数に掛かる: min も max もなければ、同じに当たる。あれば、診断にならない
-    @valid.length empty: string[];
+    // 配列のフィールドの length は、要素の数に掛かる: 診断にならない
     @valid.length(min: 1, max: 3) few: string[];
     // フィールドの型（scalar なら元の型）に合わない
     @valid.min(1) name: string;
     @valid.length(min: 1) inner: Inner;
     @valid.max(3) nick: string?;
     @valid.format("uri") count: Count;
-    @valid.pattern("[") code: string;
-    @valid.length note: string;
     // 合っている制約は、診断にならない
     @valid.min(1) ok: int;
   }

@@ -34,7 +34,7 @@ hozoc が同梱して常に読み込む語彙（`vocab/*.hozo`）と、その読
 | `vocab/prd.hozo` | `namespace prd { ref }` | 同 377、378 |
 
 - 各ファイルの中身は出典の宣言をそのまま写す。ドキュメンテーションコメントも写す（ホバーに出るため）。ただし、出典の書き方のうち、言語からなくしたものは直す: 省略可能な引数の `x?: T` は `x: T?` に（`length(min: int?, max: int?)`、`route(path: string, from: any state?, onInvalid: any effect?)`）、節に並べるものの区切りの `|` は `,` に（`decorator fn get(path: string): throws ServerError, NetworkError;`。`docs/decisions.md`「設計書から離れた決定」S25）。どちらも `docs/grammar.md`「決めたこと」。
-- `valid.length` は、付けた先で、数えるものが変わる: 文字列（scalar か、フィールド）なら、文字の数。配列のフィールドなら、要素の数。配列の要素に掛けるなら、要素の型（scalar）に付ける。意味の持ち主は `docs/plugin-go-valid.md`「制約」（`docs/decisions.md`「決めたこと」400、401）。
+- `valid.length` は、付けた先で、数えるものが変わる: 文字列（scalar か、フィールド）なら、文字の数。配列のフィールドなら、要素の数。配列の要素に掛けるなら、要素の型（scalar）に付ける。意味の持ち主は `docs/plugin-valid.md`「制約」（`docs/decisions.md`「決めたこと」400、401）。
 - `actor`、`usecase`、`business`、`prd` は、設計書にはない。設計の図（ユースケース図、業務フロー図、要求の文書）から決めたもので、中身は「設計の図の語彙」。
 - `fs` / `proc` は `examples/hozoc.hozo` では同じファイルの中に語彙として書かれているが、hozoc 自身の境界（ファイルとプラグインの起動）なので標準に入れる。`cli.hozo` からはこれらの宣言を外す（二重に宣言すると RES-6）。
 - `@http.get` / `@http.post` は、境界の入口（`@entry`）で、通信の途中の失敗（`ServerError`、`NetworkError`）は、fn の外で起きる例外（`outer throws`）として、宣言する（出典の `@external` は、なくした: `docs/grammar.md`「decorator の宣言」）。
@@ -310,7 +310,8 @@ namespace flows {
 
 | 語彙 | 実装 |
 |---|---|
-| `valid` の標準の制約 | `go-valid`（`docs/plugin-go-valid.md`） |
+| `valid`（言語に依らない決まり: 制約の意味、使い方の検査） | 語彙のプラグイン `valid`（`docs/plugin-valid.md`） |
+| `valid` の標準の制約（確かめる関数） | `go-valid`（`docs/plugin-go-valid.md`） |
 | `cli`（go-cli の語彙） | `plugins/go-cli/`（`docs/plugin-go-cli.md`） |
 | `fs` / `proc` | 語彙を実装するプラグインはない。`@proc.stdio` の付いた op は、基底が、人が実装する葉として出す（`docs/plugin-go.md`「op の置き場」。hozoc 自身では `runEmit`。`docs/cli.md`「手で書くもの」）。`@fs.files` は読むトランスパイラがなく、印のまま（`docs/plugin-go.md`「デコレータ」）。`proc` の例外の型は、`proc` の単位の基底が出す |
 | `http`（言語に依らない決まり: 経路、通信の上の形、使い方の検査） | 語彙のプラグイン `http`（`docs/plugin-http.md`） |

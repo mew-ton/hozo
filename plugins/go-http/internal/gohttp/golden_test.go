@@ -454,12 +454,12 @@ func TestUnitTargets(t *testing.T) {
 // diagnosticFixtures は、診断を返す入力（testdata/<名前>/）。期待する診断は testdata/<名前>/expected/errors.txt
 // （一行に、コード、位置、メッセージをタブで区切って。View の順、その中は返した順）。
 var diagnosticFixtures = []struct{ name, code string }{
-	{"gohttp9", codeHTTPOption},      // [emit.options.go-http] に、知らないキーか、型の違う値がある
-	{"gohttp10", codeHTTPName},       // NewHandler が、N の定義のパッケージの名前と当たる
-	{"gohttp11", codeHTTPValidate},   // validate = true で、Validate を持つ入力の model の置き場の単位が、go-valid を並べていない
-	{"gohttp16", codeHTTPResult},     // 経路の op の結果の型が、省略可能な配列か、省略可能な record
-	{"gohttp20", codeHTTPTestName},   // テストのパッケージに足す公開の名前が、基底の公開の名前か、自分のほかの名前と当たる
-	{"gohttp21", codeHTTPTestDir},    // テストのパッケージのディレクトリが、同じ単位が出力する子の名前空間の出力先と重なる
+	{"gohttp9", codeHTTPOption},    // [emit.options.go-http] に、知らないキーか、型の違う値がある
+	{"gohttp10", codeHTTPName},     // NewHandler が、N の定義のパッケージの名前と当たる
+	{"gohttp11", codeHTTPValidate}, // validate = true で、Validate を持つ入力の model の置き場の単位が、go-valid を並べていない
+	{"gohttp16", codeHTTPResult},   // 経路の op の結果の型が、省略可能な配列か、省略可能な record
+	{"gohttp20", codeHTTPTestName}, // テストのパッケージに足す公開の名前が、基底の公開の名前か、自分のほかの名前と当たる
+	{"gohttp21", codeHTTPTestDir},  // テストのパッケージのディレクトリが、同じ単位が出力する子の名前空間の出力先と重なる
 }
 
 // TestDiagnosticCodes は、「診断」の表の ID（GOHTTP-9〜GOHTTP-11、GOHTTP-16、GOHTTP-20、GOHTTP-21）のどれもが、入力を一つ持つこと。

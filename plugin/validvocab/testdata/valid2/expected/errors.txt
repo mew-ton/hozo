@@ -1,0 +1,4 @@
+VALID-2	app.Half	@valid.min の value 0.5 は整数でないので、元の型が int の scalar app.Half には付けられない
+VALID-2	app.Any	@valid.length に、min も max もない（scalar app.Any）
+VALID-2	app.Form	@valid.length に、min も max もない（model app.Form のフィールド empty）
+VALID-2	app.Form	@valid.length に、min も max もない（model app.Form のフィールド note）

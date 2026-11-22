@@ -1,0 +1,34 @@
+// 診断にならない仕様: 標準の制約の、正しい使い方と、利用者が valid に足した制約（読まない。docs/plugin-valid.md「対象」）。
+namespace valid {
+  /** 末尾の 1 桁が、チェックディジットと一致する */
+  decorator checkDigit for scalar, field;
+}
+
+namespace app {
+  @valid.length(min: 1, max: 20)
+  scalar Tag extends string;
+  @valid.min(1) @valid.max(100)
+  scalar Page extends int;
+  // 元の scalar を辿った核の型で見る
+  @valid.max(10)
+  scalar SmallPage extends Page;
+  @valid.checkDigit
+  scalar Jan extends string;
+
+  model Attrs { [name: string]: Tag; }
+
+  model Form {
+    @valid.length(max: 10) tags: Tag[];
+    @valid.length(min: 1) later: string[]?;
+    @valid.pattern("^[a-z]+$") @valid.format("email") name: string?;
+    @valid.min(0.5) ratio: float;
+    @valid.checkDigit code: int;
+    attrs: Attrs;
+    page: SmallPage;
+  }
+
+  // 受け継いだ制約も、同じに読む
+  model More extends Form {
+    @valid.max(3) extra: int;
+  }
+}

@@ -2,7 +2,7 @@
 # 設計書 §4.5 では browser は TS だが、TS の基底はまだないので、今は両方とも Go の基底 go で出力する（README.md）。
 # go は、リポジトリの plugins/ のプラグイン。テストが HOZO_PLUGIN_PATH として渡す（docs/testing.md「コーパス」）。
 # 設計書のプラグイン（http のサーバー、ルーター、db）は並べないので、語彙のデコレータは、出力では、印のまま（docs/plugin-go.md「デコレータ」）。
-# http の語彙の検査は、語彙のプラグイン http が、単位に依らず、行う（docs/plugin-http.md）。
+# http と valid の語彙の検査は、語彙のプラグイン http、valid が、単位に依らず、行う（docs/plugin-http.md、docs/plugin-valid.md）。
 
 [hozo]
 sources = ["**/*.hozo"]
