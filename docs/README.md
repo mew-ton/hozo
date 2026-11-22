@@ -44,6 +44,7 @@ Hozo の言語と、その実装（このリポジトリ）の設計。言語の
 | [`ide-shapes.md`](ide-shapes.md) | IDE の設計の段 3: ノートに置く図形と線を、プラグインが定義する仕組み（前提のほかは、案） | — |
 | [`ide-chain.md`](ide-chain.md) | IDE の設計の段 3: 設計の手法の部品ごとに、描くと、仕様の何に反映され、どんなハーネスが生まれるか（対応の表は、案） | — |
 | [`ide-harness-trial.md`](ide-harness-trial.md) | IDE の設計の段 3 の確かめ: ハーネスのプレビュー（節ごとの二つの強度）を、サンプル `order-app` に当てて、数えた記録 | — |
+| [`test-weight-trial.md`](test-weight-trial.md) | 求めるテストの重さを、サンプル `order-app` と `shop-server` で数えた記録: 入口ごとのケースの数、人か AI が書くものと Hozo が作るもの、道の上に、人か AI が書いた中身がないケース、例外の広がり（記録） | — |
 | [`wiring-trial.md`](wiring-trial.md) | R6 の、配線の綴りの確かめ: 文法の全体の案と、サンプル `order-app` の op の書き直しと、分かったこと（記録） | — |
 | [`ide-mock.md`](ide-mock.md) | IDE の設計の段 4: ノートの見本（`ide-mock/notes.html`）と、筋書きをなぞって分かったこと（案） | — |
 | [`ide-stack.md`](ide-stack.md) | IDE の設計の段 5: 動きの要件、枠組みを選ぶ規準、候補の比べ、動く試作で確かめること（案） | — |
