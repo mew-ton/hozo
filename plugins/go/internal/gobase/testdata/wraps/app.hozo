@@ -50,32 +50,32 @@ namespace gate {
   /** 内部の op（別の名前空間に付けるデコレータの本体からは、呼べない） */
   fn local();
 
-  // 前で確かめる。proceed() は、最後の文の match のアーム: return <内側の呼び出し>。別の名前空間の op にも付けられる
+  // 前で確かめる。next() は、最後の文の match のアーム: return <内側の呼び出し>。別の名前空間の op にも付けられる
   // （本体が呼ぶのは、export の op だけ）。分類 Gate の述語は、付けた先の New が受け取る
   /** 閉まっていれば、op の中身を呼ばずに Closed */
-  decorator fn guarded() {
+  decorator fn guarded(next: fn) {
     val now = ticket();
     match (now by Gate) {
-      Open => proceed();
+      Open => next();
       Shut => throw Closed;
     }
   }
 
-  // 後で記録する。proceed() の後ろに文が続く: 値を返す op では、結果を result に受けて、最後に返す。値の引数は、
+  // 後で記録する。next() の後ろに文が続く: 値を返す op では、結果を result に受けて、最後に返す。値の引数は、
   // 適用に書いたリテラルを、その場に書く。渡されていない省略可能な引数は nil
   /** op の中身が、正常に終わった後に、記録する */
-  decorator fn noted(label: string, times: int, memo: string?) {
-    proceed();
+  decorator fn noted(next: fn, label: string, times: int, memo: string?) {
+    next();
     note(label, times, memo);
   }
 
-  // 前で確かめ、後で記録する。proceed() のアームを持つ match の後ろに、文が続く: 値を返す op では、var result を置き、
-  // proceed() のアームが、result に入れる。throw のアームは、その場で、失敗を返す
+  // 前で確かめ、後で記録する。next() のアームを持つ match の後ろに、文が続く: 値を返す op では、var result を置き、
+  // next() のアームが、result に入れる。throw のアームは、その場で、失敗を返す
   /** 閉まっていれば、op の中身を呼ばずに Closed。op の中身が、正常に終わった後に、記録する */
-  decorator fn checked(label: string) {
+  decorator fn checked(next: fn, label: string) {
     val now = ticket();
     match (now by Gate) {
-      Open => proceed();
+      Open => next();
       Shut => throw Closed;
     }
     note(label, 1);
@@ -83,9 +83,9 @@ namespace gate {
 
   // 宣言した名前空間の op に付けるなら、内部の op も呼べる
   /** 前に、内部の op を呼ぶ */
-  decorator fn prepared() {
+  decorator fn prepared(next: fn) {
     local();
-    proceed();
+    next();
   }
 
   // 宣言した名前空間の、葉の op に付ける: 中身は Leaves のメソッド（名前は op 名のまま）
@@ -98,7 +98,7 @@ namespace gate {
 namespace shop {
   model Item { id: string; }
 
-  // 配線の op、値を返す、proceed() が最後: 中身は findBody
+  // 配線の op、値を返す、next() が最後: 中身は findBody
   /** 品物を探す */
   @gate.guarded
   export fn find(id: string): Item {
@@ -107,7 +107,7 @@ namespace shop {
   /** 品物を引く（人が書く） */
   fn lookup(id: string): Item;
 
-  // 葉の op、値を返す、proceed() の後ろに文: 中身は o.leaves.Save。値の引数のリテラル（省略可能な memo は、渡さない）
+  // 葉の op、値を返す、next() の後ろに文: 中身は o.leaves.Save。値の引数のリテラル（省略可能な memo は、渡さない）
   /** 品物をしまう（人が書く） */
   @gate.noted("save", 2)
   export fn save(item: Item): Item;
@@ -118,7 +118,7 @@ namespace shop {
   @trace.traced @gate.guarded @gate.noted("open", 1, "朝")
   export fn open();
 
-  // 本体のあるデコレータの内側に、継ぎ目: proceed() が、継ぎ目を呼ぶ
+  // 本体のあるデコレータの内側に、継ぎ目: next() が、継ぎ目を呼ぶ
   /** 店を閉める */
   @gate.guarded @trace.traced
   export fn close() {
@@ -127,14 +127,14 @@ namespace shop {
   /** 掃除する（人が書く） */
   fn sweep();
 
-  // proceed() のアームを持つ match の後ろに、文: 値を返す op（配線）
+  // next() のアームを持つ match の後ろに、文: 値を返す op（配線）
   /** 値段を引く */
   @gate.checked("price")
   export fn price(id: string): Item {
     return lookup(id);
   }
 
-  // proceed() のアームを持つ match の後ろに、文: 値を返さない op（葉）
+  // next() のアームを持つ match の後ろに、文: 値を返さない op（葉）
   /** 呼び鈴を鳴らす（人が書く） */
   @gate.checked("ring")
   export fn ring();
@@ -142,7 +142,7 @@ namespace shop {
   /** 断られた */
   exception Denied;
 
-  // never を返す op に、前で確かめるだけのデコレータ: proceed() は、「返らない」呼び出しと同じ。中身は refuseBody
+  // never を返す op に、前で確かめるだけのデコレータ: next() は、「返らない」呼び出しと同じ。中身は refuseBody
   /** いつも、断る */
   @gate.guarded
   export fn refuse(): never throws Denied;

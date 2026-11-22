@@ -14,7 +14,7 @@ func (o *ops) findBody(ctx context.Context, id string) (Item, error) {
 	return o.Lookup(ctx, id)
 }
 
-// findGateGuarded は op shop.find に付いた @gate.guarded の外側（デコレータの本体）。proceed() が、内側（o.findBody）を呼ぶ。
+// findGateGuarded は op shop.find に付いた @gate.guarded の外側（デコレータの本体）。包んだ関数の呼び出しが、内側（o.findBody）を呼ぶ。
 func (o *ops) findGateGuarded(ctx context.Context, id string) (Item, error) {
 	now, err := o.gate_.Ticket(ctx)
 	if err != nil {
@@ -34,7 +34,7 @@ func (o *ops) findGateGuarded(ctx context.Context, id string) (Item, error) {
 	return Item{}, &runtime.ClassificationError{Classify: "gate.Gate"}
 }
 
-// saveGateNoted は op shop.save に付いた @gate.noted の外側（デコレータの本体）。proceed() が、内側（o.leaves.Save）を呼ぶ。
+// saveGateNoted は op shop.save に付いた @gate.noted の外側（デコレータの本体）。包んだ関数の呼び出しが、内側（o.leaves.Save）を呼ぶ。
 func (o *ops) saveGateNoted(ctx context.Context, item Item) (Item, error) {
 	result, err := o.leaves.Save(ctx, item)
 	if err != nil {
@@ -46,7 +46,7 @@ func (o *ops) saveGateNoted(ctx context.Context, item Item) (Item, error) {
 	return result, nil
 }
 
-// openGateGuarded は op shop.open に付いた @gate.guarded の外側（デコレータの本体）。proceed() が、内側（@gate.noted）を呼ぶ。
+// openGateGuarded は op shop.open に付いた @gate.guarded の外側（デコレータの本体）。包んだ関数の呼び出しが、内側（@gate.noted）を呼ぶ。
 func (o *ops) openGateGuarded(ctx context.Context) error {
 	now, err := o.gate_.Ticket(ctx)
 	if err != nil {
@@ -68,7 +68,7 @@ func (o *ops) openGateGuarded(ctx context.Context) error {
 	return nil
 }
 
-// openGateNoted は op shop.open に付いた @gate.noted の外側（デコレータの本体）。proceed() が、内側（o.leaves.Open）を呼ぶ。
+// openGateNoted は op shop.open に付いた @gate.noted の外側（デコレータの本体）。包んだ関数の呼び出しが、内側（o.leaves.Open）を呼ぶ。
 func (o *ops) openGateNoted(ctx context.Context) error {
 	if err := o.leaves.Open(ctx); err != nil {
 		return err
@@ -87,7 +87,7 @@ func (o *ops) closeBody(ctx context.Context) error {
 	return nil
 }
 
-// closeGateGuarded は op shop.close に付いた @gate.guarded の外側（デコレータの本体）。proceed() が、内側（@trace.traced）を呼ぶ。
+// closeGateGuarded は op shop.close に付いた @gate.guarded の外側（デコレータの本体）。包んだ関数の呼び出しが、内側（@trace.traced）を呼ぶ。
 func (o *ops) closeGateGuarded(ctx context.Context) error {
 	now, err := o.gate_.Ticket(ctx)
 	if err != nil {
@@ -114,7 +114,7 @@ func (o *ops) priceBody(ctx context.Context, id string) (Item, error) {
 	return o.Lookup(ctx, id)
 }
 
-// priceGateChecked は op shop.price に付いた @gate.checked の外側（デコレータの本体）。proceed() が、内側（o.priceBody）を呼ぶ。
+// priceGateChecked は op shop.price に付いた @gate.checked の外側（デコレータの本体）。包んだ関数の呼び出しが、内側（o.priceBody）を呼ぶ。
 func (o *ops) priceGateChecked(ctx context.Context, id string) (Item, error) {
 	now, err := o.gate_.Ticket(ctx)
 	if err != nil {
@@ -142,7 +142,7 @@ func (o *ops) priceGateChecked(ctx context.Context, id string) (Item, error) {
 	return result, nil
 }
 
-// ringGateChecked は op shop.ring に付いた @gate.checked の外側（デコレータの本体）。proceed() が、内側（o.leaves.Ring）を呼ぶ。
+// ringGateChecked は op shop.ring に付いた @gate.checked の外側（デコレータの本体）。包んだ関数の呼び出しが、内側（o.leaves.Ring）を呼ぶ。
 func (o *ops) ringGateChecked(ctx context.Context) error {
 	now, err := o.gate_.Ticket(ctx)
 	if err != nil {
@@ -167,7 +167,7 @@ func (o *ops) ringGateChecked(ctx context.Context) error {
 	return nil
 }
 
-// refuseGateGuarded は op shop.refuse に付いた @gate.guarded の外側（デコレータの本体）。proceed() が、内側（o.refuseBody）を呼ぶ。
+// refuseGateGuarded は op shop.refuse に付いた @gate.guarded の外側（デコレータの本体）。包んだ関数の呼び出しが、内側（o.refuseBody）を呼ぶ。
 func (o *ops) refuseGateGuarded(ctx context.Context) error {
 	now, err := o.gate_.Ticket(ctx)
 	if err != nil {

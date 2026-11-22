@@ -904,17 +904,17 @@ func TestSigHaltsThrows(t *testing.T) {
 }
 
 // TestSigDecoratorBody は、本体のあるデコレータ（docs/check.md「デコレータの本体」）: 付けた op は、その配線が、自分で、
-// proceed() の前後の呼び出しを書いたのと、同じに計算する。proceed() より前の throw は、op の効果を「起きていない」にし、
-// proceed() より後の呼び出しが投げる例外には、op の効果が「起きている」。
+// 包んだ関数の呼び出しの前後の呼び出しを書いたのと、同じに計算する。包んだ関数の呼び出し より前の throw は、op の効果を「起きていない」にし、
+// 包んだ関数の呼び出し より後の呼び出しが投げる例外には、op の効果が「起きている」。
 func TestSigDecoratorBody(t *testing.T) {
 	proceed := ir.Call{Callee: ir.ProceedCallee{}}
-	// guard: 前で確かめる。match (…) { Open => proceed(); Closed => throw X; }
+	// guard: 前で確かめる。match (…) { Open => 包んだ関数の呼び出し; Closed => throw X; }
 	guard := decorator("server.guard")
 	guard.Fn = true
 	guard.Body = &ir.Wiring{Statements: []ir.Statement{
 		matchStmt("server.Gate", arm(&proceed, "Open"), throwArm("server.X", "Closed")),
 	}}
-	// audit: 後で記録する。proceed(); record();（record は、効果 e2 を持ち、Y を投げうる葉）
+	// audit: 後で記録する。包んだ関数の呼び出し; record();（record は、効果 e2 を持ち、Y を投げうる葉）
 	audit := decorator("server.audit")
 	audit.Fn = true
 	audit.Body = &ir.Wiring{Statements: []ir.Statement{cs(proceed), cs(call("server.record"))}}
@@ -936,11 +936,11 @@ func TestSigDecoratorBody(t *testing.T) {
 		e    string
 		want ir.EffectState
 	}{
-		{"server.X", "server.e1", ir.Prevented}, // guard が、proceed() より前に投げる: op の効果は、起きていない
+		{"server.X", "server.e1", ir.Prevented}, // guard が、包んだ関数の呼び出し より前に投げる: op の効果は、起きていない
 		{"server.X", "server.e2", ir.Prevented},
 		{"server.Z", "server.e1", ir.Prevented}, // work が投げる: work の効果は、起きていない
-		{"server.Z", "server.e2", ir.Prevented}, // audit の record は、proceed() の後: まだ、起きていない
-		{"server.Y", "server.e1", ir.Kept},      // record が投げる: proceed() は、済んでいる
+		{"server.Z", "server.e2", ir.Prevented}, // audit の record は、包んだ関数の呼び出しの後: まだ、起きていない
+		{"server.Y", "server.e1", ir.Kept},      // record が投げる: 包んだ関数の呼び出し は、済んでいる
 		{"server.Y", "server.e2", ir.Prevented},
 	} {
 		if got := relOf(t, sig, tt.x, tt.e); got != tt.want {

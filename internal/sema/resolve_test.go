@@ -583,14 +583,16 @@ namespace a {
 }
 
 // TestResolveDecoratorBody は、デコレータの本体（docs/grammar.md「デコレータの本体」、docs/resolve.md「手続き」の 1.1）:
-// 本体の中の名前は、デコレータを宣言した名前空間で解決し、値の引数は、そのデコレータの引数を指す。proceed() は、解決せずに、
-// 包んだ op の中身の呼び出し（Callee の proceed）になり、参照を残さない。IR は、Decorator.fn と Decorator.body。
+// 本体の中の名前は、デコレータを宣言した名前空間で解決し、値の引数は、そのデコレータの引数を指す。包んだ関数の引数の呼び出しは、
+// 包んだ op の中身の呼び出し（Callee の proceed）になり、その引数への参照を残す（同じ名前の op を隠す）。IR は、Decorator.fn と
+// Decorator.body で、包んだ関数の引数は、Decorator.params に入らない。
 func TestResolveDecoratorBody(t *testing.T) {
 	res, fs := analyzeProject(t, project{"a.hozo": `
 namespace a {
   fn note(label: string);
-  decorator fn noted(label: string) {
-    proceed();
+  fn next();
+  decorator fn noted(next: fn, label: string) {
+    next();
     note(label);
   }
   @noted("x")
@@ -601,9 +603,12 @@ namespace a {
 	if !d.Fn || d.Body == nil || len(d.Body.Statements) != 2 {
 		t.Fatalf("Decorator = %+v", d)
 	}
+	if len(d.Params) != 1 || d.Params[0].Name != "label" {
+		t.Errorf("Decorator.params = %+v（期待は、label だけ: 包んだ関数の引数は、入らない）", d.Params)
+	}
 	first, ok := d.Body.Statements[0].(ir.CallStmt)
 	if !ok || !first.Call.IsProceed() || len(first.Call.Args) != 0 {
-		t.Errorf("一つ目の文 = %+v（期待は proceed()）", d.Body.Statements[0])
+		t.Errorf("一つ目の文 = %+v（期待は、包んだ関数の呼び出し。同じ名前の op a.next では、ない）", d.Body.Statements[0])
 	}
 	second, ok := d.Body.Statements[1].(ir.CallStmt)
 	if !ok || second.Call.CalledOp() != "a.note" || len(second.Call.Args) != 1 {
@@ -612,8 +617,9 @@ namespace a {
 	if atom, ok := second.Call.Args[0].Value.(ir.NameAtom); !ok || len(atom.Path) != 1 || atom.Path[0] != "label" {
 		t.Errorf("note の引数 = %+v（期待は、デコレータの引数 label）", second.Call.Args[0].Value)
 	}
-	hasRef(t, res, fs, "a.hozo:6:5 decl a.note")
-	hasRef(t, res, fs, "a.hozo:6:10 decoratorParam a.noted.label")
+	hasRef(t, res, fs, "a.hozo:6:5 decoratorParam a.noted.next")
+	hasRef(t, res, fs, "a.hozo:7:5 decl a.note")
+	hasRef(t, res, fs, "a.hozo:7:10 decoratorParam a.noted.label")
 	// 付けた op の Signature は、本体を広げたもの: 本体が呼ぶ op の分を含む（ここでは、例外も効果もない）
 	if f := res.Program.Lookup("a.f").(*ir.Op); len(f.Decorators) != 1 || f.Decorators[0].Decorator != "a.noted" {
 		t.Errorf("f のデコレータ = %+v", f.Decorators)

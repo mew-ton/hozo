@@ -50,7 +50,7 @@ DecoratorRef  = [ QualifiedName "." ] DecoratorName ;
 | 核の型と形 | `string` `boolean` `int` `float` `datetime` `date` `time` `duration` `void` `never` `list` `nullable` `single` |
 | リテラル | `true` `false` |
 
-`fn` は、関数の宣言の頭。`read` と `effect` は、その前に書く、関数の種類の語（「関数の宣言」）。`op` は、種類の名前で、宣言の頭には書かない: 書くのは、デコレータの宣言の、付ける先の並び（`for model, state, op`）と `any op`（「decorator の宣言」）。関数に付けるデコレータの宣言の頭は、`decorator fn`（同）。
+`fn` は、関数の宣言の頭。型の位置に書けるのは、一か所だけ: 本体のある `decorator fn` の、最初の引数（包んだ関数の引数。「デコレータの本体」）。`read` と `effect` は、その前に書く、関数の種類の語（「関数の宣言」）。`op` は、種類の名前で、宣言の頭には書かない: 書くのは、デコレータの宣言の、付ける先の並び（`for model, state, op`）と `any op`（「decorator の宣言」）。関数に付けるデコレータの宣言の頭は、`decorator fn`（同）。
 
 `for` と `of` は、節の頭（デコレータの宣言の `for`、`classify` の `of`）のほかに、配線の繰り返し（「配線」の `For`）の頭にも書く、同じ字句。`case` は、デコレータの宣言で、分類のケースを言う語（「decorator の宣言」の `CaseKind`）。
 
@@ -312,12 +312,14 @@ ClassifySubject = "never" | "any" "exception" | Type { "," Type } ;
 ### decorator の宣言
 
 ```
-DecoratorDecl = { CoreMark } "decorator" "fn" DecoratorName Params [ ":" DecoratorClause { DecoratorClause } ] ( ";" | Block )
+DecoratorDecl = { CoreMark } "decorator" "fn" DecoratorName FnParams [ ":" DecoratorClause { DecoratorClause } ] ( ";" | Block )
               | { CoreMark } "decorator" DecoratorName [ Params ] "for" Target { "," Target } ";"
               | "decorator" DecoratorName "=" DecoratorRef Args ";" ;
 CoreMark      = "@repeatable" | "@entry" | "@hint" ;   (* 核の印。それぞれ一度まで。@entry は、一つ目の形（decorator fn）にだけ *)
 
 Params    = "(" [ Param { "," Param } [ "," RestParam ] | RestParam ] ")" ;
+FnParams  = "(" [ WrappedParam [ "," ParamList ] | ParamList ] ")" ;   (* decorator fn の引数。ParamList は、Params の括弧の中 *)
+WrappedParam = Ident ":" "fn" ;                       (* 包んだ関数の引数。最初に一つだけ。本体のあるデコレータだけが持つ *)
 Param     = Ident ":" ParamType ;
 RestParam = "..." Ident ":" RestType ;                 (* 残りの引数。最後に一つだけ *)
 ParamType = AnyType [ "?" ] | Type { "|" Type } ;      (* 省略可能は型の ? で書く。any の種類にも付けられる（from: any state?） *)
@@ -344,10 +346,10 @@ DecoEffectsClause = "effects" EffectElem { "," EffectElem } ;
 | そのほかのデコレータ | `decorator table for state;`、`decorator context(name: string) for model, state, op;` | `for` の後ろに並べた種類 | 書けない | 書けない |
 | 名前付きのデコレータ | `decorator redirectToLogin = redirectOn(server.Unauthorized, transitionToLogin);` | 汎用の側の宣言に従う | 書けない | 書けない |
 
-- **関数に付けるデコレータは、`decorator fn` と書く。** `fn` が、付ける先（op）を言うので、`for` は書かない。後ろの形は、関数の宣言（「関数の宣言」の `FnType`）と、同じ決まり: `()` は、引数がなくても書く。`)` の後ろに節を書くなら、`:` で始める。節がなければ、`:` も書かない（`decorator fn post(path: string);`、`decorator fn audited() { … }`）。戻り値は、書かない（包んだ op の結果が、そのまま返る）。`:` のない節（`decorator fn f() throws E;`）と、`:` の後ろに節のない形は、SYNTAX。
+- **関数に付けるデコレータは、`decorator fn` と書く。** `fn` が、付ける先（op）を言うので、`for` は書かない。後ろの形は、関数の宣言（「関数の宣言」の `FnType`）と、同じ決まり: `()` は、引数がなくても書く。`)` の後ろに節を書くなら、`:` で始める。節がなければ、`:` も書かない（`decorator fn post(path: string);`、`decorator fn audited(next: fn) { … }`）。戻り値は、書かない（包んだ op の結果が、そのまま返る）。`:` のない節（`decorator fn f() throws E;`）と、`:` の後ろに節のない形は、SYNTAX。
 - **`decorator` の直後の `fn` は、いつも、この頭**: `fn` という名前のデコレータは、宣言できない（`DecoratorName` に書ける予約語の、ただ一つの例外）。
 - **本体のないものは、プラグインが解釈する**（同 393）。op の中身を包む（継ぎ目。`docs/config.md`「継ぎ目」）か、語彙として読むだけかは、そのプラグインが決める。宣言では、言い分けない。
-- **本体のあるものは、包み方が、仕様にある。** 本体は、配線のブロック（「配線」の `Block`）で、包んだ op の中身が動く所に、`proceed();` を書く（下の「デコレータの本体」）。
+- **本体のあるものは、包み方が、仕様にある。** 本体は、配線のブロック（「配線」の `Block`）で、包んだ関数を、最初の引数（`WrappedParam`）で受け取り、その中身が動く所に、その引数の呼び出し（`next();`）を書く（下の「デコレータの本体」）。
 - **op だけに付けるデコレータを、`for` の形で書くことは、なくした**: `decorator x for op …;` と、`for` を省いた `decorator x …;`（前は、op の意味）。パーサーは、新しい書き方（`decorator fn x(…)`）をメッセージで示して SYNTAX にし、`decorator fn` として読み進める。op と、ほかの種類の、両方に付けるデコレータ（`for model, state, op`）と、`read fn`・`effect fn` に付けるデコレータ（`for read`、`for effect`）は、`for` の形のまま。
 - **`for` の形は、節も、本体も、持てない**（文法で閉じる。前は、検査の DEC-2）。`for` の対象の後ろに、節の頭（`throws`、`catches`、`reads`、`effects`）か、`{` が来たら、SYNTAX: メッセージは、節と本体を書けるのは `decorator fn` だけであることを示す。
 
@@ -385,29 +387,36 @@ DecoEffectsClause = "effects" EffectElem { "," EffectElem } ;
 
 #### デコレータの本体
 
-`docs/decisions.md`「決めたこと」392。`decorator fn` の本体は、配線のブロックに、`proceed()` を足したもの。
+`docs/decisions.md`「決めたこと」392、447。`decorator fn` の本体は、配線のブロックに、包んだ関数の呼び出しを足したもの。
 
 ```
-decorator fn limited(): throws LimitExceeded {
-  val allowance = currentAllowance();
+decorator fn limited(next: fn, max: int): throws LimitExceeded {
+  val allowance = currentAllowance(max);
   match (allowance by Allowance) {
-    Allowed => proceed();
+    Allowed => next();
     Denied  => throw LimitExceeded;
   }
 }
 
-decorator fn audited() {
-  proceed();
+decorator fn audited(next: fn) {
+  next();
   recordAudit();
 }
+
+@limited(10)                 // 付ける側は、包んだ関数の引数を書かない
+@audited
+export fn post(in: PostInput): PostOk { … }
 ```
 
-- **`proceed()` は、包んだ op の中身を呼ぶ。** 二つ以上のデコレータを重ねた op では、外側の `proceed()` は、内側のデコレータごと、先へ進める。
-- **`proceed` は、文脈キーワード**: 予約語ではなく、デコレータの本体の中の、修飾のない呼び出し `proceed(…)` だけが、この意味になる。本体の外では、ふつうの名前。
-- **書ける位置は、二つだけ**: 文（`proceed();`）と、`match` のアームの本体（`Allowed => proceed();`）。引数は、書かない。値は、ない: `val` に入れる、`return` する、呼び出しの引数にする、は、書けない（`docs/check.md`「デコレータ」の DEC-19）。`for` と `disjoint` の中にも、書けない（同）。 `try` のブロックに書くなら、最初の文（`try { proceed(); } catch (e) { noteFailure(); throw e; }`）。`catch` のブロックには、書けない（同）。
+- **本体のあるデコレータは、包んだ関数を、最初の引数で受け取る**（`WrappedParam`。同 447）。見分けるのは、型の位置の `fn` で、名前は、書く人が付ける（上の例は `next`）。付ける側は、この引数を書かない: 引数の数、位置、名前の対応（`docs/types.md`「呼び出しの引数」、`docs/check.md`「デコレータ」）は、この引数を数えずに決まり、IR の `Decorator.params` にも入らない（`docs/ir.md`「decorator」）。
+- **本体があるなら、この引数を、必ず書く。本体がないなら、書けない**（`docs/check.md`「デコレータ」の DEC-28）。本体のないデコレータは、プラグインが解釈するので、呼ぶ所がない。ほかの引数と同じ名前も、付けられない（同）。
+- **`fn` を型の位置に書けるのは、ここだけ**: `decorator fn` の、最初の引数。二つ目以降の引数、残りの引数、`for` の形のデコレータの引数、関数の引数、フィールド、`val` の型に書けば、SYNTAX（Hozo に、関数を値として渡す書き方は、ない）。`?` も `[]` も、付けられない（同）。
+- **この引数の呼び出し（`next()`）が、包んだ op の中身を呼ぶ。** 二つ以上のデコレータを重ねた op では、外側の呼び出しは、内側のデコレータごと、先へ進める。
+- **本体の中では、この名前が、同じ名前の op、`read`、効果を隠す**（`docs/resolve.md`「手続き」の 1.1）。本体の外では、この名前に、何の意味もない。`proceed` も、ふつうの名前（前は、`proceed()` という決まった書き方だった。同 447 が、なくした）。
+- **書ける位置は、二つだけ**: 文（`next();`）と、`match` のアームの本体（`Allowed => next();`）。引数は、書かない。値は、ない: `val` に入れる、`return` する、呼び出しの引数にする、は、書けない（`docs/check.md`「デコレータ」の DEC-19）。呼び出しでない位置（`val x = next;`）にも、書けない（同）。`for` と `disjoint` の中にも、書けない（同）。 `try` のブロックに書くなら、最初の文（`try { next(); } catch (e) { noteFailure(); throw e; }`）。`catch` のブロックには、書けない（同）。
 - **本体に、`return` は、書けない**（同 DEC-21）。op の結果は、そのまま、呼び元に返る。
-- **どの道も、`proceed()` を、ちょうど一度呼ぶか、例外を投げる**（同 DEC-20）。
-- **本体の中の名前は、デコレータを宣言した名前空間で、解決する**（`docs/resolve.md`「スコープ」）。引数のうち、値の型のもの（`max: int`）は、本体の中で、値として読める。`any <種類>` の引数は、本体では、まだ、使えない（同 DEC-23）。
+- **どの道も、包んだ関数を、ちょうど一度呼ぶか、例外を投げる**（同 DEC-20）。
+- **本体の中の名前は、デコレータを宣言した名前空間で、解決する**（`docs/resolve.md`「スコープ」）。包んだ関数の引数のほかの引数のうち、値の型のもの（`max: int`）は、本体の中で、値として読める。`any <種類>` の引数は、本体では、まだ、使えない（同 DEC-23）。
 - 本体の意味（付けた所で、広げたものとして計算する）の持ち主は、`docs/check.md`「デコレータの本体」。
 
 ### op
@@ -662,5 +671,5 @@ DocComment の中身 = { 本文の行 } { タグの行 } ;
 | デコレータの宣言の、付ける先の並びの区切りは `,`（`for model, state, op`）。`for model \| op` は、なくした（同 358） | `for` の後ろは、型ではなく、修飾する先の一覧。節の並びと同じ `,` にすると、`\|` は、「その場で書く union」の一つの意味になる |
 | 引数の種類には `any` を書き（`error: any exception`）、付ける先には書かない（`for effect`）（同 357） | `any <種類>` は、種類から、型を作る。`for` の後ろは種類、`:` の後ろは型。引数の種類から `any` を取ると、種類の語が、そのまま型として扱われる |
 | キーが決まっていない構造は、model の本体のインデックスで書く（`model Attrs { [name: string]: string[]; }`）。`Record<K, V>` と、予約語 `Record` は、なくした（同 360） | 構造を持つ型は、どれも、名前を付けて宣言する（union と同じ）。「何を、何で引くのか」に、名前と、説明と、キーの名前が付く。大文字で始まる、言語の語が、なくなる |
-| 関数に付けるデコレータは、`decorator fn` と書き、後ろの形を、関数の宣言にそろえる。本体を書ける。包んだ op の中身は、`proceed()` で呼ぶ。op だけに付けるデコレータの、`for` の形と、`for` を省いた形は、なくした（同 392〜394） | デコレータも、op を受け取って、同じ結果を返す、関数。中身が仕様にあるか、ないかで、葉の op と配線の op と同じに、分かれる。`for op` と、`fn` で、同じことを、二通りに言わない |
+| 関数に付けるデコレータは、`decorator fn` と書き、後ろの形を、関数の宣言にそろえる。本体を書ける。包んだ関数は、最初の引数（型の位置に `fn`。名前は自由）で受け取り、その呼び出しが、包んだ op の中身を呼ぶ（同 447。前の、決まった書き方 `proceed()` は、なくした）。op だけに付けるデコレータの、`for` の形と、`for` を省いた形は、なくした（同 392〜394） | デコレータも、op を受け取って、同じ結果を返す、関数。中身が仕様にあるか、ないかで、葉の op と配線の op と同じに、分かれる。`for op` と、`fn` で、同じことを、二通りに言わない |
 | 例外を受ける文は `try { … } catch (e) { … }`。分類して受けるなら `catch (e by 分類) { ケース => 本体; }`。例外の分類は `classify C of any exception { K: any exception as E1 \| E2; }`。`try` と `catch` は、予約語（同 419、422） | 文の頭の語は、どれも予約語（`val`、`match`、`for`）。`catch` のブロックの最後にだけ `throw` の文を書けるのは、「受けて、記録して、投げ直す」を、`match` なしで書くため。途中の `throw` は、下の文が評価されないので、文法で閉じる |

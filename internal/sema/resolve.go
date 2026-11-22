@@ -207,6 +207,9 @@ func (a *analyzer) resolveHead(qn ast.QualifiedName, sc *scope, acc accept, refs
 		if v, ok := sc.wiring.lookup(head.Name); ok {
 			*refs = append(*refs, Ref{Span: head.Span, Target: v.target})
 			v.markUsed()
+			if v.wrapped {
+				return resolved{}, nil, &resolveError{code: "DEC-19", span: head.Span, msg: fmt.Sprintf("包んだ関数の引数 %s は、呼び出し（%s();）としてだけ書ける。値としては、読めない", head.Name, head.Name)}
+			}
 			if v.unusable != "" {
 				return resolved{}, nil, &resolveError{code: "DEC-23", span: head.Span, msg: fmt.Sprintf("デコレータの引数 %s は、%s なので、本体の中では、まだ使えない。本体で読めるのは、型を一つ書いた、値の引数だけ", head.Name, v.unusable)}
 			}

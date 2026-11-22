@@ -64,10 +64,10 @@ func hasBodied(os golang.OpShape) bool {
 	return false
 }
 
-// wrapResult は、本体のあるデコレータの外側で、proceed() の結果を受ける val の名前（docs/plugin-go.md「本体のあるデコレータ」）。
+// wrapResult は、本体のあるデコレータの外側で、包んだ関数の呼び出しの結果を受ける val の名前（docs/plugin-go.md「本体のあるデコレータ」）。
 const wrapResult = "result"
 
-// wrapStatements は、デコレータの本体の文を、値を返す op の配線として書ける形に、直す: proceed()（か、proceed() のアームを
+// wrapStatements は、デコレータの本体の文を、値を返す op の配線として書ける形に、直す: 包んだ関数の呼び出し（か、包んだ関数の呼び出しのアームを
 // 持つ match）が、最後の文なら、その return にする。後ろに文が続くなら、結果を val に受けて、最後に、その val を return する。
 // 値を返さない op では、何も変えない。
 func wrapStatements(stmts []ir.Statement, o *ir.Op) []ir.Statement {
@@ -104,7 +104,7 @@ func wrapStatements(stmts []ir.Statement, o *ir.Op) []ir.Statement {
 				expr, span = ir.MatchExpr{Match: x.Match}, x.Span
 			}
 		case ir.TryStmt:
-			// try { proceed(); … }: 結果の val を、try の前に、空で宣言し、try のブロックの中で入れる（docs/plugin-go.md「例外を受ける文」）
+			// try { next(); … }: 結果の val を、try の前に、空で宣言し、try のブロックの中で入れる（docs/plugin-go.md「例外を受ける文」）
 			if len(x.Body) > 0 {
 				if cs, isCall := x.Body[0].(ir.CallStmt); isCall && cs.Call.IsProceed() {
 					body := append([]ir.Statement{ir.AssignStmt{Name: name, Expr: ir.CallExpr{Call: cs.Call}, Span: cs.Span}}, x.Body[1:]...)
@@ -132,7 +132,7 @@ func wrapStatements(stmts []ir.Statement, o *ir.Op) []ir.Statement {
 }
 
 // genWrap は、op os に付いた、本体のあるデコレータ（os.Layers[i]）の外側のメソッド（docs/plugin-go.md「本体のあるデコレータ」）。
-// 本体を、op の配線として書く。proceed() は、内側の層を、op の引数のまま呼ぶ。
+// 本体を、op の配線として書く。包んだ関数の呼び出し は、内側の層を、op の引数のまま呼ぶ。
 func (e *emitter) genWrap(f *fileGen, os golang.OpShape, i int) {
 	o := e.op(os.FQN)
 	l := os.Layers[i]
@@ -176,7 +176,7 @@ func (e *emitter) genWrap(f *fileGen, os golang.OpShape, i int) {
 	if i+1 < len(os.Layers) {
 		inner = "@" + os.Layers[i+1].Decorator
 	}
-	f.print(comment(l.Method + " は op " + o.Name + " に付いた @" + l.Decorator + " の外側（デコレータの本体）。proceed() が、内側（" + inner + "）を呼ぶ。"))
+	f.print(comment(l.Method + " は op " + o.Name + " に付いた @" + l.Decorator + " の外側（デコレータの本体）。包んだ関数の呼び出しが、内側（" + inner + "）を呼ぶ。"))
 	params, results := golang.Signature(o, f.im, e.reserved)
 	f.printf("func (o *ops) %s {\n%s}\n\n", method(l.Method, params, results), b.buf.String())
 }
@@ -232,7 +232,7 @@ type bodyGen struct {
 	ret ir.Type // 配線の戻り値の型（void なら nil）
 	// terminated は、直前に書いた文が、関数を抜ける文（return）か。
 	terminated bool
-	// proceed は、本体のあるデコレータの外側を書いているときの、proceed() の式（内側の層の呼び出し）。配線の本体では空。
+	// proceed は、本体のあるデコレータの外側を書いているときの、包んだ関数の呼び出しの式（内側の層の呼び出し）。配線の本体では空。
 	proceed string
 	// catches は、今、中にいる catch のブロック（外から内へ）。
 	catches []catchVar
@@ -988,7 +988,7 @@ func (b *bodyGen) targetOf(c *ir.Call) (target, bool) {
 	}
 	switch callee := c.Callee.(type) {
 	case ir.ProceedCallee:
-		// デコレータの本体の proceed(): 内側の層。形は、op のまま（式は call が作る）
+		// デコレータの本体の 包んだ関数の呼び出し: 内側の層。形は、op のまま（式は call が作る）
 		t := target{never: ir.IsNever(b.op.Returns)}
 		if b.op.Returns != nil && !t.never {
 			t.ret = b.op.Returns

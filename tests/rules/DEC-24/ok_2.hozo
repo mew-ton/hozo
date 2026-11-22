@@ -4,15 +4,15 @@ namespace a {
   state door: nullable<string>;
   /** 戸の状態（述語で決まる、状態の分類） */
   classify Door of door { Opened; Closed; }
-  decorator fn byClassify() {
+  decorator fn byClassify(next: fn) {
     match (by Door) {
-      Opened => proceed();
+      Opened => next();
       Closed => throw Shut;
     }
   }
-  decorator fn byState() {
+  decorator fn byState(next: fn) {
     match (door by nullable) {
-      Some => proceed();
+      Some => next();
       None => throw Shut;
     }
   }

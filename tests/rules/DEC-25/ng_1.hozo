@@ -1,4 +1,4 @@
-// DEC-25（docs/check.md「デコレータ」）: proceed() の後ろに文を持つデコレータを、never を返す op に付けた。
+// DEC-25（docs/check.md「デコレータ」）: next() の後ろに文を持つデコレータを、never を返す op に付けた。
 // op は、いつも、例外を投げるので、後ろの文が、評価されない
 namespace a {
   exception Denied;
@@ -7,14 +7,14 @@ namespace a {
   classify Gate of Ticket { Open; Closed; }
   fn ticket(): Ticket;
   fn record();
-  decorator fn after() {
-    proceed();
+  decorator fn after(next: fn) {
+    next();
     record();
   }
-  decorator fn guardedAfter() {
+  decorator fn guardedAfter(next: fn) {
     val now = ticket();
     match (now by Gate) {
-      Open   => proceed();
+      Open   => next();
       Closed => throw Shut;
     }
     record();

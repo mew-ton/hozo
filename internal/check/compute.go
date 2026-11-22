@@ -32,7 +32,7 @@ func newSigState() *sigState {
 	return &sigState{rel: map[string]map[ir.EffectRef]ir.EffectState{}, succ: map[ir.EffectRef]ir.EffectState{}}
 }
 
-// clone は s の写し（デコレータの本体の proceed() の Sc にする。docs/check.md「デコレータの本体」）。
+// clone は s の写し（デコレータの本体の 包んだ関数の呼び出しの Sc にする。docs/check.md「デコレータの本体」）。
 func (s *sigState) clone() *sigState {
 	out := newSigState()
 	out.E = append([]string(nil), s.E...)
@@ -350,7 +350,7 @@ type computer struct {
 	// reads と pure は op ごとの R と pure（docs/check.md「reads」「純粋」）。見る側によらない。
 	reads map[string][]string
 	pure  map[string]bool
-	// proceed は、今、計算しているデコレータの本体の proceed() の Sc（包んだ op の、そこまでの Sig）。本体の外では nil。
+	// proceed は、今、計算しているデコレータの本体の 包んだ関数の呼び出しの Sc（包んだ op の、そこまでの Sig）。本体の外では nil。
 	proceed *sigState
 }
 
@@ -548,7 +548,7 @@ func (c *computer) wiringStep0(o *ir.Op, ns string, s *sigState, emit bool) {
 
 // blockStep は、文の並び一つ（op の配線の本体か、デコレータの本体）の、手順 0 の計算: 行を順に見て、E / F / rel / succ を
 // s に入れる。written は、節に書いた例外（Declared）、throws は、その節（出どころのない例外の rel を決める）。
-// デコレータの本体では、proceed() の Sc が、c.proceed（包んだ op の、そこまでの Sig）。
+// デコレータの本体では、包んだ関数の呼び出しの Sc が、c.proceed（包んだ op の、そこまでの Sig）。
 func (c *computer) blockStep(body *ir.Wiring, ns string, s *sigState, written []string, throws []ir.ThrowsClause) *bodyInfo {
 	info := &bodyInfo{sources: map[string][]exSource{}}
 	info.rows, info.tries = rowsAndTries(body)
@@ -904,7 +904,7 @@ func (c *computer) callSig(cr callRef, ns string) *sigState {
 	case ir.ReadCallee:
 		return newSigState()
 	case ir.ProceedCallee:
-		// デコレータの本体の proceed(): 包んだ op の、そこまでの Sig（docs/check.md「デコレータの本体」）
+		// デコレータの本体の 包んだ関数の呼び出し: 包んだ op の、そこまでの Sig（docs/check.md「デコレータの本体」）
 		return c.proceed
 	}
 	return nil
@@ -942,7 +942,7 @@ func (c *computer) decoratorSteps(o *ir.Op, ns, viewer string, s *sigState, emit
 		}
 		if d.Body != nil {
 			// 本体のあるデコレータ: 付けた所で、広げたものとして計算する（docs/check.md「デコレータの本体」）。
-			// 本体を、配線として手順 0 と同じに計算し、proceed() の Sc を、ここまでの Sig にする。
+			// 本体を、配線として手順 0 と同じに計算し、包んだ関数の呼び出しの Sc を、ここまでの Sig にする。
 			inner, outer := s.clone(), c.proceed
 			*s = *newSigState()
 			c.proceed = inner

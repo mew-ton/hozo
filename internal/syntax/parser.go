@@ -1232,7 +1232,7 @@ func (p *parser) parseDecoratorDecl(start source.Offset, doc *ast.DocComment, de
 		if !p.at(token.LParen) {
 			p.fail(p.tok().Span, fmt.Sprintf("decorator fn の引数の「(」が要る。引数がなくても書く（decorator fn %s() と書く。docs/grammar.md「decorator の宣言」）", name))
 		}
-		d.Params = p.parseParams()
+		d.Params, d.Wrapped = p.parseParams(true)
 		p.parseDecoratorFnTail(d)
 		outerOld()
 		d.Span = p.spanFrom(start)
@@ -1243,7 +1243,7 @@ func (p *parser) parseDecoratorDecl(start source.Offset, doc *ast.DocComment, de
 		d.Entry, d.EntrySpan = false, source.Span{}
 	}
 	if p.at(token.LParen) {
-		d.Params = p.parseParams()
+		d.Params, _ = p.parseParams(false)
 	}
 	if !p.at(token.For) {
 		// なくした書き方: for を省いた形（前は、op の意味）。decorator fn として読み進める
@@ -1371,9 +1371,15 @@ func (p *parser) parseOldDecoratorClauses(d *ast.DecoratorDecl) {
 //	RestType  = AnyType | Type { "|" Type } ;
 //
 // 残りの引数（RestParam）は最後に一つだけ書け、型は渡す値一つの型で、? も [] も付けない（文法で閉じる）。
-func (p *parser) parseParams() []*ast.Param {
+//
+// fnParams が true なら、decorator fn の FnParams: 最初の引数に、包んだ関数の引数（WrappedParam = Ident ":" "fn"）を書ける
+// （docs/grammar.md「デコレータの本体」）。それを、二つ目の戻り値で返す（なければ nil）。Params には、入れない。
+// 型の位置の fn は、そこにしか書けない: ほかの引数、残りの引数、for の形のデコレータの引数に書けば、SYNTAX。
+func (p *parser) parseParams(fnParams bool) ([]*ast.Param, *ast.WrappedParam) {
 	p.expect(token.LParen)
 	params := []*ast.Param{}
+	var wrapped *ast.WrappedParam
+	first := true
 	for !p.at(token.RParen) {
 		start := p.tok().Span.Start
 		param := &ast.Param{}
@@ -1382,6 +1388,24 @@ func (p *parser) parseParams() []*ast.Param {
 		}
 		param.Name = p.parseIdent()
 		p.expect(token.Colon)
+		if p.at(token.Fn) {
+			fnSpan := p.advance().Span
+			switch {
+			case !fnParams:
+				p.fail(fnSpan, "for で付ける先を書いたデコレータは、包んだ関数の引数（"+param.Name.Name+": fn）を持てない。持てるのは、本体のある、関数に付けるデコレータ（decorator fn 名前("+param.Name.Name+": fn) { … }）だけ（docs/grammar.md「デコレータの本体」）")
+			case param.Rest || !first:
+				p.fail(fnSpan, "包んだ関数の引数（"+param.Name.Name+": fn）は、decorator fn の、最初の引数に、一つだけ書ける（docs/grammar.md「デコレータの本体」）")
+			case p.at(token.Question) || p.at(token.LBracket):
+				p.fail(p.tok().Span, "包んだ関数の引数の型 fn に、? も [] も付けられない（docs/grammar.md「デコレータの本体」）")
+			}
+			wrapped = &ast.WrappedParam{Span: p.spanFrom(start), Name: param.Name, FnSpan: fnSpan}
+			first = false
+			if !p.got(token.Comma) {
+				break
+			}
+			continue
+		}
+		first = false
 		param.Type = p.parseParamType()
 		param.Span = p.spanFrom(start)
 		if param.Rest {
@@ -1396,7 +1420,7 @@ func (p *parser) parseParams() []*ast.Param {
 		}
 	}
 	p.expect(token.RParen)
-	return params
+	return params, wrapped
 }
 
 // checkRestType は RestType の形を確かめる: 渡す値一つの型で、省略可能（?）にも配列（[]）にもできない。
@@ -1760,6 +1784,8 @@ func (p *parser) parseType() ast.Type {
 		p.fail(p.tok().Span, "never は op の戻り値の型と、override のなくす印にだけ書ける（docs/grammar.md「型」）")
 	case token.LBrace:
 		p.fail(p.tok().Span, "その場で書く model はユニオンのアームと例外の値にだけ置ける（docs/grammar.md「決めたこと」）")
+	case token.Fn:
+		p.fail(p.tok().Span, "fn は、型ではない（関数を、値として渡す書き方は、ない）。型の位置に書けるのは、decorator fn の、最初の引数（包んだ関数の引数）だけ（docs/grammar.md「デコレータの本体」）")
 	default:
 		p.failExpected("型")
 	}

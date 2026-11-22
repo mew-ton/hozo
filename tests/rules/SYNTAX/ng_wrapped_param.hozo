@@ -1,0 +1,14 @@
+// SYNTAX（docs/grammar.md「デコレータの本体」）: fn を、型の位置に書けるのは、decorator fn の、最初の引数（包んだ関数の引数）だけ
+namespace a {
+  // 二つ目以降の引数、残りの引数
+  decorator fn second(max: int, next: fn);                  // ERROR: SYNTAX
+  decorator fn rest(...next: fn);                           // ERROR: SYNTAX
+  // ? も [] も、付けられない
+  decorator fn optional(next: fn?);                         // ERROR: SYNTAX
+  decorator fn many(next: fn[]);                            // ERROR: SYNTAX
+  // for の形のデコレータの引数
+  decorator tagged(next: fn) for state;                     // ERROR: SYNTAX
+  // 関数の引数、フィールド
+  fn takes(callback: fn);                                   // ERROR: SYNTAX
+  model M { callback: fn; }                                 // ERROR: SYNTAX
+}

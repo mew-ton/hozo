@@ -1,5 +1,5 @@
 // 生成したコードの振る舞いのテスト（docs/testing.md「単体テスト」の `plugins/go`）: 本体のあるデコレータの外側が、本体の順に
-// 動くこと、proceed() が、内側の層を、op の引数のまま呼ぶこと、op の結果が、そのまま返ること、継ぎ目との入れ子の順
+// 動くこと、next() が、内側の層を、op の引数のまま呼ぶこと、op の結果が、そのまま返ること、継ぎ目との入れ子の順
 // （docs/plugin-go.md「本体のあるデコレータ」）。plugins/go の TestBehavior が、生成したコードのモジュールのルートに置いて走らせる。
 package behavior
 
@@ -230,7 +230,7 @@ func TestSeamCases(t *testing.T) {
 	shoptest.RunSeams(t, seamCases{})
 }
 
-// TestMatchThenStatement は、proceed() のアームを持つ match の後ろに、文が続くデコレータ（gate.checked）: proceed() のアームに
+// TestMatchThenStatement は、next() のアームを持つ match の後ろに、文が続くデコレータ（gate.checked）: next() のアームに
 // 入ったとき、op の結果が、そのまま返り、後ろの文が、動く。throw のアームに入ったとき、中身も、後ろの文も、動かない。中身が
 // 失敗したとき、後ろの文が、動かない。値を返す op（price）と、値を返さない op（ring）の、両方。
 func TestMatchThenStatement(t *testing.T) {

@@ -231,7 +231,7 @@ interface Decorator extends DeclBase {
                                   // named の effect に "$param:名前"。なければ []
                                   // 付いた op に何が運ばれるかは Op.carried（docs/check.md「デコレータが運ぶ reads と effects」）
   body?: Wiring;                  // 本体（docs/grammar.md「デコレータの本体」）。本体のない宣言には、ない。形は「配線」の Wiring で、
-                                  // 包んだ op の中身を呼ぶ所は、Callee が proceed の呼び出し。値の型の引数（Param）は、
+                                  // 包んだ op の中身を呼ぶ所は、Callee が proceed の呼び出し（包んだ関数の引数の名前は、IR に渡さない。params にも入らない）。値の型の引数（Param）は、
                                   // Atom の name の、path の頭の名前で読む。意味は docs/check.md「デコレータの本体」
   alias?: { target: string; args: Arg[] };   // 名前付きデコレータ。target は汎用デコレータの FQN。
                                              // alias を持つ宣言は params / targets / throws / outerThrows / catches / reads / effects を持たず、
@@ -372,7 +372,7 @@ type Callee =
   | { kind: "op"; op: string }                        // op の FQN
   | { kind: "read"; read: string }                    // read の宣言の FQN。名前を付けない read は、呼び出しではなく Atom の state
   | { kind: "effect"; effect: EffectRef }             // named: effect の宣言の呼び出し。direct: 組み込みの効果を直に呼んだもの（`users.post(user)`）
-  | { kind: "proceed" };                              // デコレータの本体の `proceed()`: 包んだ op の中身。現れるのは Decorator.body の中だけ。args は []
+  | { kind: "proceed" };                              // デコレータの本体の、包んだ関数の呼び出し（仕様の `next()`。名前は、書く人が付け、IR には、この種類だけが残る）: 包んだ op の中身。現れるのは Decorator.body の中だけ。args は []
 
 interface BoundPosition {
   path: string[];                 // ["in", "token"] のように、引数名から始まるフィールドのパス

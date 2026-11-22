@@ -142,6 +142,11 @@ func (r *renderer) hover(t sema.Target) (string, bool) {
 				return b.String(), true
 			}
 		}
+		if d.Body != nil {
+			// Decorator.params にない名前は、包んだ関数の引数（IR には、渡らない。docs/lsp.md「ホバー」）
+			code(r.head(d), "  "+t.Name+": fn")
+			return b.String(), true
+		}
 	case sema.TargetOpParam:
 		// op のほか、exception、effect、read の引数も同じ形（docs/ir.md の OpParam）
 		owner := r.prog.Lookup(t.Decl)

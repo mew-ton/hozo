@@ -344,7 +344,7 @@ HOZO_PLUGIN_PATH="$PWD/../../../plugins" /tmp/hozoc tests --coverage /tmp/cover.
 
 | ファイル | 変えたこと | 持ち主 |
 |---|---|---|
-| `server.hozo`、`plugins/go-ratelimit/rate.hozo` | op に付けるデコレータの宣言を、`decorator fn` に（`decorator fn limited(): throws LimitExceeded prevents effects;`）。足した: 本体のあるデコレータ `server.audited`（`proceed(); recordAudit();`）と、それが呼ぶ葉 `server.recordAudit`。`logout` に `@audited` を付けた | `docs/grammar.md`「decorator の宣言」「デコレータの本体」 |
+| `server.hozo`、`plugins/go-ratelimit/rate.hozo` | op に付けるデコレータの宣言を、`decorator fn` に（`decorator fn limited(): throws LimitExceeded prevents effects;`）。足した: 本体のあるデコレータ `server.audited`（`next(); recordAudit();`）と、それが呼ぶ葉 `server.recordAudit`。`logout` に `@audited` を付けた | `docs/grammar.md`「decorator の宣言」「デコレータの本体」 |
 | `gen/server/inner/ops.go`、`wiring.go` | `Logout` が二層になった: 外側 `Logout` が `o.logoutServerAudited` を呼び、それ（デコレータの本体から作った外側）が、中身 `o.logoutBody` と、葉 `o.RecordAudit` を、順に呼ぶ。`Leaves` と、内側の `Ops` に、`RecordAudit` | `docs/plugin-go.md`「本体のあるデコレータ」 |
 | `gen/server/servertest/leaves.go`、`fakes.go` | 葉 `recordAudit` の口（`RecordAuditCases`、`RecordAuditCase`）と、にせもの（`LeavesFake.RecordAudit`） | 同「単体テストの口」「テストのにせもの」 |
 | `gen/server/servertest/seams.go`、`gen/store/storetest/seams.go` | 足した: デコレータのテストの口。`server` は `rate.limited`（結果は `OK` と `LimitExceeded`）、`store` は `db.transaction`（結果は `OK` だけ: 宣言が `throws` を持たない） | 同「デコレータのテストの口」 |

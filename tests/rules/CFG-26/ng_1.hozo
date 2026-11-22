@@ -5,7 +5,7 @@ namespace a {
   decorator mark for field, state;
   decorator tag for case of never;
   /** 本体のあるデコレータには、出さない */
-  decorator fn logged() { proceed(); }
+  decorator fn logged(next: fn) { next(); }
   /** @hint のデコレータには、出さない */
   @hint
   decorator note for op, field;

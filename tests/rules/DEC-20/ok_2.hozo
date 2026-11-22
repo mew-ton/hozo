@@ -1,18 +1,18 @@
-// DEC-20 に当たらない: try の文は、try のブロックの中の回数で数える（proceed() は、try のブロックの最初の文）
+// DEC-20 に当たらない: try の文は、try のブロックの中の回数で数える（next() は、try のブロックの最初の文）
 namespace a {
   fn note();
-  decorator fn noted() {
+  decorator fn noted(next: fn) {
     try {
-      proceed();
+      next();
       note();
     } catch (e) {
       note();
       throw e;
     }
   }
-  decorator fn quiet() {
+  decorator fn quiet(next: fn) {
     try {
-      proceed();
+      next();
     } catch (e) {
     }
   }

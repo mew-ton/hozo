@@ -1,8 +1,13 @@
-// DEC-19: デコレータの本体の外の proceed()（その名前の op が、見えていないとき）
+// DEC-19: 包んだ関数の引数を、呼び出しでない位置に書いた（値として読む: 呼び出しの引数、フィールドの読み出し）
 namespace a {
-  fn leaf();
-  fn wiring() {
-    leaf();
-    proceed();                             // ERROR: DEC-19
+  fn note(label: string);
+  decorator fn asArg(next: fn) {
+    note(next);                            // ERROR: DEC-19
+    next();
   }
+  decorator fn asRecord(next: fn) {
+    note(next.label);                      // ERROR: DEC-19
+    next();
+  }
+  fn f();
 }

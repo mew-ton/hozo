@@ -229,7 +229,7 @@ func (o *ops) fetchBody(ctx context.Context, id string) (string, error) {
 	return o.Load(ctx, id)
 }
 
-// fetchAppNoted は op app.fetch に付いた @app.noted の外側（デコレータの本体）。proceed() が、内側（o.fetchBody）を呼ぶ。
+// fetchAppNoted は op app.fetch に付いた @app.noted の外側（デコレータの本体）。包んだ関数の呼び出しが、内側（o.fetchBody）を呼ぶ。
 func (o *ops) fetchAppNoted(ctx context.Context, id string) (string, error) {
 	var result string
 	// try
@@ -265,7 +265,7 @@ func (o *ops) pushBody(ctx context.Context, text string) error {
 	return nil
 }
 
-// pushAppBestEffort は op app.push に付いた @app.bestEffort の外側（デコレータの本体）。proceed() が、内側（o.pushBody）を呼ぶ。
+// pushAppBestEffort は op app.push に付いた @app.bestEffort の外側（デコレータの本体）。包んだ関数の呼び出しが、内側（o.pushBody）を呼ぶ。
 func (o *ops) pushAppBestEffort(ctx context.Context, text string) error {
 	// try
 	if caught := func(ctx context.Context) error {

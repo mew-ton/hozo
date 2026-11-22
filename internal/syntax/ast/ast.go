@@ -583,7 +583,10 @@ type DecoratorDecl struct {
 	// Fn は decorator fn（付ける先は op）。FnSpan は、その fn の範囲（なくした書き方から読み直したときは、ゼロ値）。
 	Fn     bool
 	FnSpan source.Span
-	Params []*Param
+	// Wrapped は、包んだ関数の引数（decorator fn の、最初の引数。型の位置に fn。docs/grammar.md「デコレータの本体」）。
+	// なければ nil。Params には、入らない（付ける側は、書かない）。
+	Wrapped *WrappedParam
+	Params  []*Param
 	// For は付けられる対象。decorator fn と、名前付きのデコレータでは、空。
 	For []*Target
 	// Clauses は節。*ThrowsClause、*CatchesClause と、デコレータが op に運ぶ *ReadsClause、*EffectsClause
@@ -622,6 +625,18 @@ type Param struct {
 
 // NodeSpan は Node の実装。
 func (n *Param) NodeSpan() source.Span { return n.Span }
+
+// WrappedParam は、包んだ関数の引数（docs/grammar.md「デコレータの本体」の WrappedParam = Ident ":" "fn"）。
+// 本体の中の、この名前の呼び出しが、包んだ op の中身を呼ぶ。
+type WrappedParam struct {
+	Span source.Span
+	Name Ident
+	// FnSpan は、型の位置の fn の範囲。
+	FnSpan source.Span
+}
+
+// NodeSpan は Node の実装。
+func (n *WrappedParam) NodeSpan() source.Span { return n.Span }
 
 // ParamType はデコレータの引数の型。Any が nil でなければ "any ... [?]"、
 // そうでなければ Types（"|" でつないだ一つ以上の Type）。

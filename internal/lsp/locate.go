@@ -140,6 +140,10 @@ func (s *server) declIndex(id source.FileID) []declEntry {
 					add(p.Name.Span, sema.Target{Kind: sema.TargetDecoratorParam, Decl: fqn, Name: p.Name.Name})
 					params[p.Name.Name] = p.Name.Span
 				}
+				if wp := d.Wrapped; wp != nil {
+					// 包んだ関数の引数（docs/grammar.md「デコレータの本体」）。@param では、指せない（付ける側が書く引数では、ない）
+					add(wp.Name.Span, sema.Target{Kind: sema.TargetDecoratorParam, Decl: fqn, Name: wp.Name.Name})
+				}
 				docTags(d.Doc, ns, fqn, params, sema.TargetDecoratorParam)
 			case *ast.OpDecl:
 				fqn := joinNS(ns, d.Name.Name)

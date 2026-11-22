@@ -2,10 +2,10 @@
 namespace a {
   fn note(text: string);
   fn count(n: int);
-  decorator fn labeled(label: string, times: int) {
+  decorator fn labeled(next: fn, label: string, times: int) {
     note(label);
     count(times);
-    proceed();
+    next();
   }
   @labeled("f", 3)
   fn f();

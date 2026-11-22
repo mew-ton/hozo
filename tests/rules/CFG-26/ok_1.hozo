@@ -4,7 +4,7 @@ namespace a {
   decorator fn note();
   @hint
   decorator memo for field;
-  decorator fn logged() { proceed(); }
+  decorator fn logged(next: fn) { next(); }
 
   model M {
     @memo

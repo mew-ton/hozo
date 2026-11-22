@@ -6,14 +6,14 @@ namespace a {
   effect fn add(text: string): effects log.post;
   export fn show(lines: string[]);
   fn hidden();
-  decorator fn usesHidden() {
+  decorator fn usesHidden(next: fn) {
     hidden();
-    proceed();
+    next();
   }
-  decorator fn usesState() {
+  decorator fn usesState(next: fn) {
     val all = entries();
     show(all);
-    proceed();
+    next();
     add("done");
   }
 }

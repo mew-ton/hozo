@@ -91,7 +91,7 @@ func (o *ops) logoutBody(ctx context.Context, in AuthInput) error {
 	return nil
 }
 
-// logoutServerAudited は op server.logout に付いた @server.audited の外側（デコレータの本体）。proceed() が、内側（o.logoutBody）を呼ぶ。
+// logoutServerAudited は op server.logout に付いた @server.audited の外側（デコレータの本体）。包んだ関数の呼び出しが、内側（o.logoutBody）を呼ぶ。
 func (o *ops) logoutServerAudited(ctx context.Context, in AuthInput) error {
 	if err := o.logoutBody(ctx, in); err != nil {
 		return err

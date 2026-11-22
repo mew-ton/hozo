@@ -7,13 +7,13 @@ namespace a {
   export fn record() {
     add("done");
   }
-  decorator fn local() {
+  decorator fn local(next: fn) {
     hidden();
-    proceed();
+    next();
     add("done");
   }
-  decorator fn shared() {
-    proceed();
+  decorator fn shared(next: fn) {
+    next();
     record();
   }
   @local

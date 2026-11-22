@@ -1,8 +1,8 @@
 // DEC-22（docs/check.md「デコレータ」）: 本体のあるデコレータは、catches の節を持てない
 namespace a {
   exception E;
-  decorator fn d(): catches E recovers {   // ERROR: DEC-22
-    proceed();
+  decorator fn d(next: fn): catches E recovers {   // ERROR: DEC-22
+    next();
   }
   fn f();
 }

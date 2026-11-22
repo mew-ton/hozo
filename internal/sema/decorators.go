@@ -765,6 +765,15 @@ func (a *analyzer) lowerDecoratorDecl(s *symbol, d *ast.DecoratorDecl, sc *scope
 			a.errorf("DEC-26", d.HintSpan, "デコレータ %s に @hint は付けられない: %s。@hint は、解釈されなくても、よいデコレータの印", s.fqn, strings.Join(why, "。"))
 		}
 	}
+	// DEC-28: 包んだ関数の引数と、本体が、そろっていない（docs/check.md「デコレータ」）
+	switch wp := d.Wrapped; {
+	case d.Body != nil && wp == nil:
+		a.errorf("DEC-28", d.Name.Span, "本体のあるデコレータ %s は、包んだ関数を、最初の引数で受け取る（decorator fn %s(next: fn) { next(); … }。名前は、自由）。前の書き方 proceed() は、なくなった", s.fqn, d.Name.Name)
+	case d.Body == nil && wp != nil:
+		a.errorf("DEC-28", wp.Span, "本体のないデコレータ %s は、包んだ関数の引数 %s: fn を持てない（プラグインが解釈するので、呼ぶ所がない）。本体を書くか、この引数を外す", s.fqn, wp.Name.Name)
+	case wp != nil && params.params[wp.Name.Name] != nil:
+		a.errorf("DEC-28", wp.Name.Span, "包んだ関数の引数 %s は、デコレータ %s の、ほかの引数と同じ名前", wp.Name.Name, s.fqn)
+	}
 	if d.Body != nil {
 		for _, c := range d.Clauses {
 			if cc, ok := c.(*ast.CatchesClause); ok {

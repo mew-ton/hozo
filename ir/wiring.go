@@ -454,7 +454,7 @@ type EffectCallee struct {
 	Effect EffectRef `json:"effect"`
 }
 
-// ProceedCallee は、デコレータの本体の `proceed()`: 包んだ op の中身（内側のデコレータを含む）の呼び出し
+// ProceedCallee は、デコレータの本体の 包んだ関数の呼び出し: 包んだ op の中身（内側のデコレータを含む）の呼び出し
 // （docs/grammar.md「デコレータの本体」）。現れるのは [Decorator] の Body の中だけで、引数は、ない。
 type ProceedCallee struct{}
 
@@ -476,7 +476,7 @@ func (ProceedCallee) isCallee() {}
 // MarshalJSON は kind だけを書く。
 func (ProceedCallee) MarshalJSON() ([]byte, error) { return []byte(`{"kind":"proceed"}`), nil }
 
-// IsProceed は、呼び出しが `proceed()` か。
+// IsProceed は、呼び出しが 包んだ関数の呼び出し か。
 func (c Call) IsProceed() bool {
 	_, ok := c.Callee.(ProceedCallee)
 	return ok

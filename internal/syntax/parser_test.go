@@ -2636,17 +2636,24 @@ func TestDecoratorFn(t *testing.T) {
 	if !d.Fn || len(d.Params) != 0 || len(d.Clauses) != 1 || d.Body != nil {
 		t.Errorf("decorator fn limited = %+v", d)
 	}
-	d = firstDecl[*ast.DecoratorDecl](t, "decorator fn limited(): throws LimitExceeded { val a = allowance(); match (a by Allowance) { Allowed => proceed(); Denied => throw LimitExceeded; } }")
+	d = firstDecl[*ast.DecoratorDecl](t, "decorator fn limited(next: fn): throws LimitExceeded { val a = allowance(); match (a by Allowance) { Allowed => next(); Denied => throw LimitExceeded; } }")
 	if !d.Fn || len(d.Clauses) != 1 || d.Body == nil || len(d.Body.Stmts) != 2 {
 		t.Fatalf("本体のある decorator fn = %+v", d)
 	}
+	// 包んだ関数の引数は、Params に入らない
+	if d.Wrapped == nil || d.Wrapped.Name.Name != "next" || len(d.Params) != 0 {
+		t.Errorf("包んだ関数の引数 = %+v、Params = %+v", d.Wrapped, d.Params)
+	}
 	arm := d.Body.Stmts[1].(*ast.MatchStmt).Match.Arms[0]
-	if call, ok := arm.Body.(*ast.Call); !ok || call.Callee.String() != "proceed" || len(call.Args) != 0 {
+	if call, ok := arm.Body.(*ast.Call); !ok || call.Callee.String() != "next" || len(call.Args) != 0 {
 		t.Errorf("アームの本体 = %+v", arm.Body)
 	}
-	d = firstDecl[*ast.DecoratorDecl](t, "decorator fn audited() { proceed(); record(); }")
+	d = firstDecl[*ast.DecoratorDecl](t, "decorator fn audited(body: fn, label: string) { body(); record(); }")
 	if d.Body == nil || len(d.Body.Stmts) != 2 || len(d.Clauses) != 0 {
 		t.Errorf("節のない、本体のある decorator fn = %+v", d)
+	}
+	if d.Wrapped == nil || d.Wrapped.Name.Name != "body" || len(d.Params) != 1 || d.Params[0].Name.Name != "label" {
+		t.Errorf("包んだ関数の引数 = %+v、Params = %+v", d.Wrapped, d.Params)
 	}
 	d = firstDecl[*ast.DecoratorDecl](t, "@entry @repeatable decorator fn get(path: string): outer throws ServerError;")
 	if !d.Fn || !d.Entry || !d.Repeatable {
@@ -2673,13 +2680,20 @@ func TestDecoratorFn(t *testing.T) {
 		{"no parens", "decorator fn a;", "decorator fn の引数の「(」が要る。引数がなくても書く（decorator fn a() と書く"},
 		{"clause without colon", "decorator fn a() throws X;", "「)」の後ろに、節を書くなら、「:」で始める（decorator fn a(…): throws … と書く"},
 		{"colon without clause", "decorator fn a():;", "「:」の後ろに、節が要る。何も書かないなら、「:」も書かない"},
-		{"colon before body", "decorator fn a(): { proceed(); }", "「:」の後ろに、節が要る。何も書かないなら、「:」も書かない"},
+		{"colon before body", "decorator fn a(next: fn): { next(); }", "「:」の後ろに、節が要る。何も書かないなら、「:」も書かない"},
 		{"return type", "decorator fn a(): string;", "decorator fn に、戻り値は書かない"},
 		{"for after fn", "decorator fn a() for op;", "decorator fn に for は書かない"},
 		{"fn alias", "decorator fn a = b();", "名前付きのデコレータに fn は書かない"},
 		{"clause on for form", "decorator a for model, op throws X;", "for で付ける先を書いたデコレータは、節も本体も持てない"},
-		{"body on for form", "decorator a for state { proceed(); }", "for で付ける先を書いたデコレータは、節も本体も持てない"},
+		{"body on for form", "decorator a for state { next(); }", "for で付ける先を書いたデコレータは、節も本体も持てない"},
 		{"no end", "decorator fn a()", "「;」かデコレータの本体の「{」が必要"},
+		{"wrapped not first", "decorator fn a(max: int, next: fn);", "包んだ関数の引数（next: fn）は、decorator fn の、最初の引数に、一つだけ書ける"},
+		{"wrapped twice", "decorator fn a(next: fn, other: fn);", "包んだ関数の引数（other: fn）は、decorator fn の、最初の引数に、一つだけ書ける"},
+		{"wrapped rest", "decorator fn a(...next: fn);", "包んだ関数の引数（next: fn）は、decorator fn の、最初の引数に、一つだけ書ける"},
+		{"wrapped optional", "decorator fn a(next: fn?);", "包んだ関数の引数の型 fn に、? も [] も付けられない"},
+		{"wrapped on for form", "decorator a(next: fn) for state;", "for で付ける先を書いたデコレータは、包んだ関数の引数（next: fn）を持てない"},
+		{"fn type on op param", "fn f(callback: fn);", "fn は、型ではない"},
+		{"fn type on field", "model M { callback: fn; }", "fn は、型ではない"},
 	}
 	for _, tt := range rejects {
 		t.Run(tt.name, func(t *testing.T) { mustFail(t, tt.src, tt.want) })

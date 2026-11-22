@@ -3,8 +3,8 @@ namespace a {
   exception E;
   exception X;
   decorator fn catching(): catches E recovers;
-  decorator fn throwing(): throws X {
-    proceed();
+  decorator fn throwing(next: fn): throws X {
+    next();
   }
   fn leaf(): throws E;
   @catching @throwing

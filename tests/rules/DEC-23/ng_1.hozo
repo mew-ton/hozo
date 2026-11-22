@@ -3,17 +3,17 @@ namespace a {
   state log: list<string>;
   fn note(text: string);
   fn count(n: int);
-  decorator fn byState(target: any state) {
+  decorator fn byState(next: fn, target: any state) {
     note(target);                          // ERROR: DEC-23
-    proceed();
+    next();
   }
-  decorator fn byUnion(value: string | int) {
+  decorator fn byUnion(next: fn, value: string | int) {
     note(value);                           // ERROR: DEC-23
-    proceed();
+    next();
   }
-  decorator fn byRest(...labels: string) {
+  decorator fn byRest(next: fn, ...labels: string) {
     note(labels);                          // ERROR: DEC-23
-    proceed();
+    next();
   }
   fn f();
 }

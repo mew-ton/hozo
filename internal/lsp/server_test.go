@@ -1659,7 +1659,8 @@ func TestIndexModel(t *testing.T) {
 
 // TestDecoratorBody は、デコレータの本体（docs/grammar.md「デコレータの本体」）の中の、ホバーと、定義へジャンプ
 // （docs/lsp.md「ホバー」「定義へジャンプ」）: 本体が呼ぶ op、match の分類とケース、throw の例外、val、値の引数は、op の配線の
-// 中と同じに働く。値の引数の定義は、そのデコレータの宣言の引数。proceed は、名前ではないので、ホバーも、定義も、ない。
+// 中と同じに働く。値の引数の定義は、そのデコレータの宣言の引数。包んだ関数の引数の呼び出しも、定義は、宣言のその引数で、
+// ホバーは、見出し（付ける側が書く引数だけ）と、<名前>: fn の一行。
 func TestDecoratorBody(t *testing.T) {
 	root := t.TempDir()
 	text := `namespace gate {
@@ -1677,11 +1678,11 @@ func TestDecoratorBody(t *testing.T) {
    *
    * @param label 記録に残す名前
    */
-  decorator fn guarded(label: string) {
+  decorator fn guarded(next: fn, label: string) {
     val now = ticket();
     note(label);
     match (now by Gate) {
-      Open => proceed();
+      Open => next();
       Shut => throw Closed;
     }
   }
@@ -1713,11 +1714,13 @@ func TestDecoratorBody(t *testing.T) {
 		{"本体が呼ぶ op", at("val now = ticket();", len("val now = ")), "ticket(): Ticket;", 0, []string{"fn ticket(): Ticket", "今の切符"}},
 		{"本体の、文の呼び出し", at("note(label);", 0), "note(label: string);", 0, []string{"fn note(label: string)", "記録する"}},
 		{"値の引数", at("note(label);", len("note(")), "label: string) {", 0, []string{head, "  label: string", "記録に残す名前"}},
+		{"包んだ関数の引数の呼び出し", at("Open => next();", len("Open => ")), "next: fn, label", 0, []string{head, "  next: fn"}},
+		{"包んだ関数の引数の宣言", at("next: fn, label", 0), "next: fn, label", 0, []string{head, "  next: fn"}},
 		{"match の対象の val", at("match (now by Gate)", len("match (")), "now = ticket();", 0, nil},
 		{"match の分類", at("match (now by Gate)", len("match (now by ")), "Gate of Ticket", 0, []string{"classify Gate of Ticket", "通してよいか"}},
-		{"アームのケース", at("Open => proceed();", 0), "Open; Shut;", 0, nil},
+		{"アームのケース", at("Open => next();", 0), "Open; Shut;", 0, nil},
 		{"throw の例外", at("throw Closed;", len("throw ")), "Closed;", 0, []string{"exception Closed", "閉まっている"}},
-		{"適用", at("@guarded(\"x\")", 1), "guarded(label: string) {", 0, []string{head, "閉まっていれば、op の中身を呼ばずに Closed"}},
+		{"適用", at("@guarded(\"x\")", 1), "guarded(next: fn, label: string) {", 0, []string{head, "閉まっていれば、op の中身を呼ばずに Closed"}},
 	} {
 		if tt.hover != nil {
 			var hov *protocol.Hover
@@ -1738,21 +1741,11 @@ func TestDecoratorBody(t *testing.T) {
 			t.Errorf("definition(%s) = %+v, want %+v", tt.what, loc, want)
 		}
 	}
-	// proceed は、名前ではない: ホバーも、定義も、ない
 	var hov *protocol.Hover
-	c.result(protocol.MethodHover, at("Open => proceed();", len("Open => ")), &hov)
-	if hov != nil {
-		t.Errorf("hover(proceed) = %+v, want nil", hov)
-	}
-	var none *protocol.Location
-	c.result(protocol.MethodDefinition, at("Open => proceed();", len("Open => ")), &none)
-	if none != nil {
-		t.Errorf("definition(proceed) = %+v, want nil", none)
-	}
 	// 本体は、ホバーの見出しに出ない
 	c.result(protocol.MethodHover, at("@guarded(\"x\")", 1), &hov)
-	if hov != nil && strings.Contains(hov.Contents.Value, "proceed") {
-		t.Errorf("hover(@guarded) に、本体が出ている:\n%s", hov.Contents.Value)
+	if hov != nil && (strings.Contains(hov.Contents.Value, "next()") || strings.Contains(hov.Contents.Value, "next: fn")) {
+		t.Errorf("hover(@guarded) に、本体か、包んだ関数の引数が出ている:\n%s", hov.Contents.Value)
 	}
 }
 

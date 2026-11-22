@@ -119,10 +119,10 @@ namespace app {
     }
   }
 
-  // 本体のあるデコレータの try { proceed(); … }: 値を返す op では、result を、try の前に置き、try の中で入れる
-  decorator fn noted() {
+  // 本体のあるデコレータの try { next(); … }: 値を返す op では、result を、try の前に置き、try の中で入れる
+  decorator fn noted(next: fn) {
     try {
-      proceed();
+      next();
       note("done");
     } catch (e) {
       note("failed");
@@ -130,9 +130,9 @@ namespace app {
     }
   }
   // 本体のあるデコレータの catch (e by 分類): 値を返さない op にだけ付く（DEC-27）
-  decorator fn bestEffort() {
+  decorator fn bestEffort(next: fn) {
     try {
-      proceed();
+      next();
     } catch (e by Failure) {
       Soft => none;
       Hard => throw e;

@@ -50,6 +50,8 @@ type binding struct {
 	caught bool
 	// partial は、try か catch の、片方だけが、値を入れた val か（抜けた後、読めず、入れられない。docs/check.md「例外を受ける」）。
 	partial bool
+	// wrapped は、包んだ関数の引数か（docs/grammar.md「デコレータの本体」）。書けるのは、呼び出しとしてだけ（DEC-19）。
+	wrapped bool
 	// unusable は、デコレータの本体で、まだ使えない引数（any <種類>、型が二つ以上、残りの引数）なら、その引数の型の言い方（DEC-23）。
 	unusable string
 }
@@ -127,7 +129,7 @@ type tryFrame struct {
 	catchDepth int
 	// never は、catch のブロックが「返らない」か（最後の文が throw か、「返らない」式の文）。
 	never bool
-	// first は、try のブロックの、最初の文の呼び出し（呼び出しの文でなければ nil）。proceed() を書けるのは、ここだけ（DEC-19）。
+	// first は、try のブロックの、最初の文の呼び出し（呼び出しの文でなければ nil）。包んだ関数の呼び出し を書けるのは、ここだけ（DEC-19）。
 	first *ast.Call
 	// assigned は、今のブロック（try か catch）で、代入が済んだ val。
 	assigned []*binding
@@ -177,7 +179,7 @@ func (a *analyzer) lowerWiring(j *wiringJob) {
 // lowerDecoratorBody は、デコレータの本体（docs/grammar.md「デコレータの本体」、docs/check.md「デコレータの本体」）。
 // 配線と同じに下ろす。違うのは: 名前は、デコレータを宣言した名前空間で解決する。値の型の引数は、値として読める
 // （any <種類> と、型が二つ以上の引数と、残りの引数は、まだ読めない。DEC-23）。return は書けない（DEC-21）。
-// proceed() は、文か、match のアームの本体にだけ書ける（DEC-19）。どの道も、proceed() をちょうど一度呼ぶか、例外を投げる（DEC-20）。
+// 包んだ関数の呼び出し は、文か、match のアームの本体にだけ書ける（DEC-19）。どの道も、包んだ関数の呼び出し をちょうど一度呼ぶか、例外を投げる（DEC-20）。
 func (a *analyzer) lowerDecoratorBody(j *wiringJob) {
 	ws := &wiringScope{op: j.sym.fqn, params: map[string]*binding{}}
 	ws.unassignedRead = func(b *binding, at source.Span) {
@@ -213,16 +215,24 @@ func (a *analyzer) lowerDecoratorBody(j *wiringJob) {
 		_ = i
 		ws.params[p.Name] = b
 	}
+	if wp := j.decoDecl.Wrapped; wp != nil {
+		// 包んだ関数の引数: 本体の中で、同じ名前の op を隠す。ほかの引数と同じ名前（DEC-28）なら、本体の中では、こちらを指す
+		ws.params[wp.Name.Name] = &binding{name: wp.Name.Name, typ: unknownType(), span: wp.Name.Span, isParam: true, used: true, wrapped: true,
+			target: Target{Kind: TargetDecoratorParam, Decl: j.sym.fqn, Name: wp.Name.Name, Span: wp.Name.Span}}
+	}
 	w := &wiring{job: j, scope: ws, sc: &scope{ns: j.sym.ns, wiring: ws}, vsc: &scope{ns: j.sym.ns, wiring: ws, values: true}, vals: map[ir.Span]*binding{}}
 	body := &ir.Wiring{}
 	body.Statements = a.lowerBlock(w, j.decoDecl.Body.Stmts)
 	a.checkWIRE8(ws)
 	a.fillVals(w, body.Statements)
 	j.deco.Body = body
-	a.checkDEC20(j, body.Statements)
+	if j.decoDecl.Wrapped != nil {
+		// 包んだ関数の引数がなければ、DEC-28 が、宣言で言っている
+		a.checkDEC20(j, body.Statements)
+	}
 }
 
-// proceedCount は、文の並びを通る道ごとの、proceed() の回数の集まり（0、1、2 以上は 2）。例外を投げて終わる道
+// proceedCount は、文の並びを通る道ごとの、包んだ関数の呼び出しの回数の集まり（0、1、2 以上は 2）。例外を投げて終わる道
 // （throw のアーム、すべてのアームが返らない match）は、数えない。done は、その並びが、必ず、返らずに終わるか。
 // try の文は、try のブロックの中の回数で数える（docs/check.md「デコレータの本体」）。
 func proceedCounts(stmts []ir.Statement) (counts map[int]bool, done bool) {
@@ -242,7 +252,7 @@ func proceedCounts(stmts []ir.Statement) (counts map[int]bool, done bool) {
 	}
 	for _, st := range stmts {
 		if try, isTry := st.(ir.TryStmt); isTry {
-			// try の文は、try のブロックの中の回数で数える（proceed() は、try のブロックの最初の文で、catch のブロックには、ない: DEC-19）
+			// try の文は、try のブロックの中の回数で数える（包んだ関数の呼び出し は、try のブロックの最初の文で、catch のブロックには、ない: DEC-19）
 			sub, _ := proceedCounts(try.Body)
 			add(sub)
 			continue
@@ -281,20 +291,21 @@ func proceedCounts(stmts []ir.Statement) (counts map[int]bool, done bool) {
 	return counts, false
 }
 
-// checkDEC20 は DEC-20（docs/check.md「デコレータ」）: デコレータの本体に、proceed() を、ちょうど一度呼ばずに終わる道がある。
+// checkDEC20 は DEC-20（docs/check.md「デコレータ」）: デコレータの本体に、包んだ関数の呼び出し を、ちょうど一度呼ばずに終わる道がある。
 // never を返す op の呼び出しで終わる道は、ここでは見分けない（投げて終わる道として数えるのは、throw のアームだけ）。
 func (a *analyzer) checkDEC20(j *wiringJob, stmts []ir.Statement) {
 	counts, done := proceedCounts(stmts)
 	if done {
 		return
 	}
+	name := j.decoDecl.Wrapped.Name.Name
 	switch {
 	case counts[0] && len(counts) == 1:
-		a.errorf("DEC-20", j.sym.nameSpan, "デコレータ %s の本体は、proceed() を呼ばない。どの道も、proceed() を、ちょうど一度呼ぶか、例外を投げる", j.sym.fqn)
+		a.errorf("DEC-20", j.sym.nameSpan, "デコレータ %s の本体は、包んだ関数 %s() を呼ばない。どの道も、%s() を、ちょうど一度呼ぶか、例外を投げる", j.sym.fqn, name, name)
 	case counts[0]:
-		a.errorf("DEC-20", j.sym.nameSpan, "デコレータ %s の本体に、proceed() を呼ばずに終わる道がある。どの道も、proceed() を、ちょうど一度呼ぶか、例外を投げる", j.sym.fqn)
+		a.errorf("DEC-20", j.sym.nameSpan, "デコレータ %s の本体に、包んだ関数 %s() を呼ばずに終わる道がある。どの道も、%s() を、ちょうど一度呼ぶか、例外を投げる", j.sym.fqn, name, name)
 	case counts[2]:
-		a.errorf("DEC-20", j.sym.nameSpan, "デコレータ %s の本体に、proceed() を二度以上呼ぶ道がある。どの道も、proceed() を、ちょうど一度呼ぶか、例外を投げる", j.sym.fqn)
+		a.errorf("DEC-20", j.sym.nameSpan, "デコレータ %s の本体に、包んだ関数 %s() を二度以上呼ぶ道がある。どの道も、%s() を、ちょうど一度呼ぶか、例外を投げる", j.sym.fqn, name, name)
 	}
 }
 
@@ -975,6 +986,26 @@ type callTarget struct {
 	params []ir.OpParam
 }
 
+// wrappedCall は、呼び出し c が、デコレータの本体の、包んだ関数の引数の呼び出しか（docs/grammar.md「デコレータの本体」）。
+// そうなら、その名前を返し、引数への参照を残す。包んだ関数の引数を持たない、本体のあるデコレータ（DEC-28 が、宣言で
+// 言っている）では、なくした書き方 包んだ関数の呼び出し を、その名前の op が見えていなければ、包んだ関数の呼び出しとして読み進める。
+func (a *analyzer) wrappedCall(w *wiring, c *ast.Call) (string, bool) {
+	if w.job.deco == nil || len(c.Callee.Segments) != 1 {
+		return "", false
+	}
+	head := c.Callee.Segments[0]
+	if b, ok := w.scope.lookup(head.Name); ok && b.wrapped {
+		a.refs = append(a.refs, Ref{Span: head.Span, Target: b.target})
+		return head.Name, true
+	}
+	if w.job.decoDecl.Wrapped == nil && head.Name == "proceed" {
+		if _, rerr := a.resolveName(c.Callee, &scope{ns: w.sc.ns}, acCallPos); rerr != nil {
+			return head.Name, true
+		}
+	}
+	return "", false
+}
+
 // evalCall は配線の呼び出し（docs/check.md「配線からの呼び出し」）。名前を解決し、行き着いたものの種類で、何を呼ぶかを
 // 決める（docs/resolve.md「呼び出しの読み分け」）: op、read、効果（effect の宣言）、直に呼ぶ組み込みの効果（状態.操作）。
 // 位置の引数を、呼び出し先の引数名に対応付け（docs/ir.md「正規化」）、型を照合する（TYPE-4、MATCH-4）。
@@ -982,34 +1013,28 @@ type callTarget struct {
 // （docs/check.md「bind」が、op の呼び出しにだけ埋める）。
 func (a *analyzer) evalCall(w *wiring, c *ast.Call, arm *armContext) (exprType, ir.Call, bool) {
 	call := ir.Call{Span: a.irSpan(c.Span)}
-	if len(c.Callee.Segments) == 1 && c.Callee.Segments[0].Name == "proceed" {
-		if w.job.deco != nil {
-			// デコレータの本体の proceed(): 包んだ op の中身（docs/grammar.md「デコレータの本体」）
-			call.Callee = ir.ProceedCallee{}
-			if len(c.Args) > 0 {
-				a.errorf("DEC-19", c.Args[0].NodeSpan(), "proceed() に、引数は書かない。包んだ op は、呼ばれたときの引数のまま、動く")
-			}
-			switch {
-			case len(w.loops) > 0 || len(w.arms) > 0:
-				a.errorf("DEC-19", c.Span, "proceed() は、for と disjoint の中には書けない。書けるのは、本体のいちばん外の文と、その match のアームの本体")
-			default:
-				for _, f := range w.tries {
-					if f.inCatch {
-						a.errorf("DEC-19", c.Span, "proceed() は、catch のブロックには書けない（受ける道が、包んだ op を、もう一度呼ぶことになる）")
-						break
-					}
-					if f.first != c {
-						a.errorf("DEC-19", c.Span, "proceed() を、try のブロックに書くなら、最初の文（try { proceed(); … } catch (e) { … }）")
-						break
-					}
+	if name, ok := a.wrappedCall(w, c); ok {
+		// 包んだ関数の引数の呼び出し: 包んだ op の中身（docs/grammar.md「デコレータの本体」）
+		call.Callee = ir.ProceedCallee{}
+		if len(c.Args) > 0 {
+			a.errorf("DEC-19", c.Args[0].NodeSpan(), "包んだ関数の呼び出し %s() に、引数は書かない。包んだ op は、呼ばれたときの引数のまま、動く", name)
+		}
+		switch {
+		case len(w.loops) > 0 || len(w.arms) > 0:
+			a.errorf("DEC-19", c.Span, "包んだ関数の呼び出し %s() は、for と disjoint の中には書けない。書けるのは、本体のいちばん外の文と、その match のアームの本体", name)
+		default:
+			for _, f := range w.tries {
+				if f.inCatch {
+					a.errorf("DEC-19", c.Span, "包んだ関数の呼び出し %s() は、catch のブロックには書けない（受ける道が、包んだ op を、もう一度呼ぶことになる）", name)
+					break
+				}
+				if f.first != c {
+					a.errorf("DEC-19", c.Span, "包んだ関数の呼び出し %s() を、try のブロックに書くなら、最初の文（try { %s(); … } catch (e) { … }）", name, name)
+					break
 				}
 			}
-			return noValue(), call, true
 		}
-		if _, rerr := a.resolveName(c.Callee, &scope{ns: w.sc.ns}, acCallPos); rerr != nil {
-			a.errorf("DEC-19", c.Span, "proceed() は、デコレータの本体（decorator fn 名前(…) { … }）の中でだけ書ける")
-			return unknownType(), call, false
-		}
+		return noValue(), call, true
 	}
 	args := a.evalArgs(w, c.Args)
 	r, ok := a.resolve(c.Callee, w.sc, acCallPos)

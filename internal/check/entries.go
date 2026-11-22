@@ -127,7 +127,7 @@ type entryFrame struct {
 	call   *ir.Call // 呼んだ側の呼び出し（入口なら nil）
 	parent *entryFrame
 	// deco は、op に付いた、本体のあるデコレータの本体を辿っているときの、そのデコレータ。そのとき、body は、その本体の文で、
-	// proceed は、proceed() の先（内側の層）を辿る関数。op の配線を辿っているときは nil。
+	// proceed は、包んだ関数の呼び出しの先（内側の層）を辿る関数。op の配線を辿っているときは nil。
 	deco    *ir.Decorator
 	body    []ir.Statement
 	proceed func(c entryCond)
@@ -386,7 +386,7 @@ func (w *entryWalker) layers(u entryUnit, o *ir.Op) []entryLayer {
 }
 
 // layer は、op の層 i（0 が、いちばん外。len(layers) が、op の中身）から内側の、出どころを足す。本体のないデコレータは、
-// 中身の前に、デコレータが投げる。本体のあるデコレータは、本体を、配線として辿り、proceed() の所で、内側の層へ進む。
+// 中身の前に、デコレータが投げる。本体のあるデコレータは、本体を、配線として辿り、包んだ関数の呼び出しの所で、内側の層へ進む。
 func (w *entryWalker) layer(fr *entryFrame, layers []entryLayer, i int, c entryCond, byDecorator map[string]bool) {
 	o, u, fqn := fr.op, fr.unit, fr.op.Name
 	if i < len(layers) {

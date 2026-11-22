@@ -726,6 +726,15 @@ test('予約語のデコレータ名（宣言、適用、別名の先、@see）'
   assertScope(see, '@see', 'db.list', 'variable.other.jsdoc');
 });
 
+test('包んだ関数の引数（docs/grammar.md「デコレータの本体」）', () => {
+  const t = tokensOf('decorator fn audited(next: fn) {\n  next();\n  record();\n}');
+  // 頭の fn と、型の位置の fn は、どちらも、予約語。名前と、その呼び出しは、ほかの引数、ほかの呼び出しと同じ
+  assertScope(t, 'decorator fn audited', 'fn', 'keyword.declaration.hozo', 0);
+  assertScope(t, 'decorator fn audited', 'fn', 'keyword.declaration.hozo', 1);
+  assertScope(t, 'decorator fn audited', 'audited', 'entity.name.function.hozo');
+  assert.deepEqual(scopesAt(t, 'next();', '  next();'), scopesAt(t, 'record();', '  record();'));
+});
+
 test('コメントとドキュメンテーションコメント', () => {
   const s = linesOf(files.server);
   assertScope(s, '// ---- §6.1 exception ----', '// ---- §6.1 exception ----', 'comment.line.double-slash.hozo');

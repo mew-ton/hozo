@@ -15,8 +15,8 @@ namespace a {
   @hint                                // ERROR: DEC-26
   decorator fn doer(): effects add;
   @hint                                // ERROR: DEC-26
-  decorator fn bodied() {
-    proceed();
+  decorator fn bodied(next: fn) {
+    next();
   }
   @hint @entry                         // ERROR: DEC-26
   decorator fn door();

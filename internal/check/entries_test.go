@@ -102,14 +102,14 @@ namespace app {
   /** 本体のないデコレータ: 受ける */
   decorator fn swallow(): catches Caught ignores;
   /** 本体のあるデコレータ */
-  decorator fn guarded() {
+  decorator fn guarded(next: fn) {
     match (by Door) {
-      Opened => proceed();
+      Opened => next();
       Closed => throw Shut;
     }
   }
-  decorator fn noted() {
-    proceed();
+  decorator fn noted(next: fn) {
+    next();
     note();
   }
 
@@ -230,7 +230,7 @@ func TestEntrySources(t *testing.T) {
 		"app.Caught leaf app.risky made [leaf app.risky throws app.Caught]")
 	wantLines(t, "limitedEntry", lines("limitedEntry"),
 		"app.LimitExceeded decorator app.limitedEntry@app.limited made [decorator app.limitedEntry@app.limited throws app.LimitExceeded]")
-	// 本体の throw のアーム、proceed() の先の葉、proceed() の後ろで、本体が呼ぶ葉
+	// 本体の throw のアーム、包んだ関数の呼び出しの先の葉、包んだ関数の呼び出しの後ろで、本体が呼ぶ葉
 	wantLines(t, "wrapped", lines("wrapped"),
 		"app.Broken leaf app.work made [leaf app.work throws app.Broken]",
 		"app.Failed leaf app.note made [leaf app.note throws app.Failed]",
@@ -248,8 +248,8 @@ namespace app {
   }
   @entry decorator fn route();
   /** 本体のあるデコレータが、受ける */
-  decorator fn quiet() {
-    try { proceed(); } catch (e) { }
+  decorator fn quiet(next: fn) {
+    try { next(); } catch (e) { }
   }
   fn send(): throws Refused, Broken;
   fn note(): throws Other;

@@ -4,7 +4,7 @@ package inner
 
 import "context"
 
-// peekGatePrepared は op gate.peek に付いた @gate.prepared の外側（デコレータの本体）。proceed() が、内側（o.leaves.Peek）を呼ぶ。
+// peekGatePrepared は op gate.peek に付いた @gate.prepared の外側（デコレータの本体）。包んだ関数の呼び出しが、内側（o.leaves.Peek）を呼ぶ。
 func (o *ops) peekGatePrepared(ctx context.Context) (Ticket, error) {
 	if err := o.Local(ctx); err != nil {
 		return Ticket{}, err

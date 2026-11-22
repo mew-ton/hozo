@@ -8,7 +8,7 @@
 //   - flow.shelve/Jammed/flow.checkDoor: 本体のあるデコレータ @flow.opened の本体が呼ぶ葉が、投げる例外。葉のにせものが、投げる。
 //   - flow.shelve/Shut/flow.shelve@flow.opened.Late: デコレータの本体の match の、throw のアーム。判定のにせものが、Late だと言う
 //     （本物の述語 hoursCases は、番 "day" を Open と言う）。
-//   - flow.shelve/Taken/flow.addItem: デコレータの本体の proceed() の先（op の中身）の、effect fn が投げる例外。
+//   - flow.shelve/Taken/flow.addItem: デコレータの本体の next() の先（op の中身）の、effect fn が投げる例外。
 //   - flow.announce/caught/Undelivered/flow.notify: 受ける道。try の中の葉 notify のにせものが、投げ、catch が受けて、成功の応答になる
 //     （本物の葉 notify は、投げない）。
 //   - flow.reannounce/Undelivered/flow.notify: try の外の notify が投げる道。葉のにせものが、投げる（どの呼び出しでも）。

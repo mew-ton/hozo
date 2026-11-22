@@ -1,0 +1,12 @@
+// DEC-28: 本体のある decorator fn は、包んだ関数の引数（最初の引数。型の位置に fn）を持ち、本体のないものは、持たない
+namespace a {
+  exception Limit;
+  fn record(label: string);
+  decorator fn limited(max: int): throws Limit;
+  decorator fn noted(next: fn, label: string) {
+    next();
+    record(label);
+  }
+  @noted("f")
+  fn f();
+}

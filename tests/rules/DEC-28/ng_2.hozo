@@ -1,0 +1,11 @@
+// DEC-28: 本体のない decorator fn が、包んだ関数の引数を持つ。包んだ関数の引数の名前が、ほかの引数と同じ
+namespace a {
+  exception Limit;
+  fn record();
+  decorator fn limited(next: fn, max: int): throws Limit;   // ERROR: DEC-28
+  decorator fn twice(next: fn, next: int) {                 // ERROR: DEC-28
+    next();
+    record();
+  }
+  fn f();
+}

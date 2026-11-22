@@ -694,7 +694,7 @@ try {
   			}
   ```
 
-- **本体のあるデコレータ**（「本体のあるデコレータ」）の `try { proceed(); … }` で、op が値を返すとき: `var result <型>` を、`try` の前に置き、`try` のブロックの中で `result, err = <内側の呼び出し>` と入れ、本体の最後に `return result, nil`。
+- **本体のあるデコレータ**（「本体のあるデコレータ」）の `try { next(); … }` で、op が値を返すとき: `var result <型>` を、`try` の前に置き、`try` のブロックの中で `result, err = <内側の呼び出し>` と入れ、本体の最後に `return result, nil`。
 - import は、`errors` と、runtime パッケージ。
 
 ### 状態の参照
@@ -963,8 +963,8 @@ func (o *ops) Foo(ctx context.Context, in FooInput) (FooOk, error) {
 仕様:
 
 ```
-decorator fn audited() {
-  proceed();
+decorator fn audited(next: fn) {
+  next();
   recordAudit();
 }
 
@@ -986,7 +986,7 @@ func (o *ops) GetMe(ctx context.Context, in AuthInput) (pkgtype.PublicUser, erro
 ```go
 // wiring.go
 
-// getMeServerAudited は op server.getMe に付いた @server.audited の外側（デコレータの本体）。proceed() が、内側（o.getMeBody）を呼ぶ。
+// getMeServerAudited は op server.getMe に付いた @server.audited の外側（デコレータの本体）。包んだ関数の呼び出しが、内側（o.getMeBody）を呼ぶ。
 func (o *ops) getMeServerAudited(ctx context.Context, in AuthInput) (pkgtype.PublicUser, error) {
 	result, err := o.getMeBody(ctx, in)
 	if err != nil {
@@ -1001,10 +1001,10 @@ func (o *ops) getMeServerAudited(ctx context.Context, in AuthInput) (pkgtype.Pub
 
 - **外側のメソッド**は、適用ごとに一つ。名前は、継ぎ目のメソッドの名前（「Seams」）の、先頭を小文字にしたもの（op `getMe` と `server.audited` → `getMeServerAudited`）。非公開で、形（引数と戻り値）は、op の形のまま。置き場は `wiring.go`: 配線の op なら、その op の中身のメソッドの、すぐ後ろ。そのほかの op（葉、`never` を返す op）なら、op の宣言順の、その位置。当たる名前は「名前」の GO-2。
 - **本体は、「配線の本体」の規則で書く。** 本体の中の名前は、op の配線が書いたのと、同じ式になる: 同じ名前空間の op は `o.<Op>(…)`、別の名前空間の op は `o.<名前空間の引数名>.<Op>(…)`（「別の名前空間の op」の口に、その op が並ぶ）、`read` と効果は、状態の単位のメソッド。
-- **`proceed()` は、内側を、op の引数のまま呼ぶ式**になる: 内側が、op の中身なら `o.<op>Body(ctx, …)`（葉なら `o.leaves.<Op>(ctx, …)`）、本体のある別のデコレータなら、その外側のメソッド、継ぎ目なら `o.seams.<継ぎ目>(ctx, …, <その内側>)`。
-- **op が値を返すとき**、`proceed()` の結果を、そのまま返す: `proceed()` が、本体の最後の文（か、最後の文の `match` のアーム）なら `return <内側の呼び出し>`。後ろに文が続くなら、結果を `result` に受けて、最後に `return result, nil`。値を返さない op では、`proceed()` は、ふつうの、値のない呼び出しと同じ。
-- **`proceed()` のアームを持つ `match` の後ろに、文が続くとき**も、同じ: 値を返す op では、`var result <型>` を置き、`proceed()` のアームが `result` に入れ（内側が失敗すれば、その場で、失敗を返す）、`throw` のアームは、その場で、失敗を返し、最後に `return result, nil`。
-- **`never` を返す op** では、`proceed()` は、「返らない」呼び出しと同じ（「文」）: `return <内側の呼び出し>`（op の形は、`error` だけを返す）。後ろに文を持つデコレータは、付けられない（`docs/check.md`「デコレータ」の DEC-25）。
+- **包んだ関数の呼び出し（仕様の `next()`。`docs/grammar.md`「デコレータの本体」）は、内側を、op の引数のまま呼ぶ式**になる: 内側が、op の中身なら `o.<op>Body(ctx, …)`（葉なら `o.leaves.<Op>(ctx, …)`）、本体のある別のデコレータなら、その外側のメソッド、継ぎ目なら `o.seams.<継ぎ目>(ctx, …, <その内側>)`。
+- **op が値を返すとき**、包んだ関数の呼び出し の結果を、そのまま返す: 包んだ関数の呼び出し が、本体の最後の文（か、最後の文の `match` のアーム）なら `return <内側の呼び出し>`。後ろに文が続くなら、結果を `result` に受けて、最後に `return result, nil`。値を返さない op では、包んだ関数の呼び出し は、ふつうの、値のない呼び出しと同じ。
+- **包んだ関数の呼び出しのアームを持つ `match` の後ろに、文が続くとき**も、同じ: 値を返す op では、`var result <型>` を置き、包んだ関数の呼び出し のアームが `result` に入れ（内側が失敗すれば、その場で、失敗を返す）、`throw` のアームは、その場で、失敗を返し、最後に `return result, nil`。
+- **`never` を返す op** では、包んだ関数の呼び出し は、「返らない」呼び出しと同じ（「文」）: `return <内側の呼び出し>`（op の形は、`error` だけを返す）。後ろに文を持つデコレータは、付けられない（`docs/check.md`「デコレータ」の DEC-25）。
 - **デコレータの、値の引数**は、適用に書いたリテラルを、「値」の規則で、その場に書く。渡されていない省略可能な引数は `nil`。
 - **中身の名前**（`<op>Body`）は、継ぎ目を持つ op と同じに、基底が中身を出す op（配線と、`never` を返す op）が、包むデコレータを一つでも持てば、付く（「継ぎ目」の「中身」）。
 - **コメントの言い方**: 包むものに、本体のあるデコレータが一つでもあれば、外側と中身のコメントは、「継ぎ目」の代わりに「デコレータ」と言う（`Logout は、デコレータ（@server.audited）を通して、中身（o.logoutBody）を呼ぶ。`、`logoutBody は op server.logout の中身（配線の本体）。外側の Logout が、デコレータを通して呼ぶ。`）。

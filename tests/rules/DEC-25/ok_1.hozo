@@ -1,4 +1,4 @@
-// DEC-25: 前で確かめるだけのデコレータ（proceed() が、最後）は、never を返す op にも付けられる。後ろに文を持つデコレータも、
+// DEC-25: 前で確かめるだけのデコレータ（next() が、最後）は、never を返す op にも付けられる。後ろに文を持つデコレータも、
 // never を返さない op には、付けられる
 namespace a {
   exception Denied;
@@ -7,19 +7,19 @@ namespace a {
   classify Gate of Ticket { Open; Closed; }
   fn ticket(): Ticket;
   fn record();
-  decorator fn before() {
+  decorator fn before(next: fn) {
     record();
-    proceed();
+    next();
   }
-  decorator fn guarded() {
+  decorator fn guarded(next: fn) {
     val now = ticket();
     match (now by Gate) {
-      Open   => proceed();
+      Open   => next();
       Closed => throw Shut;
     }
   }
-  decorator fn after() {
-    proceed();
+  decorator fn after(next: fn) {
+    next();
     record();
   }
   @before @guarded

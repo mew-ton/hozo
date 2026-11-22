@@ -191,7 +191,7 @@ func TestNested(t *testing.T) {
 	}
 }
 
-// 本体のあるデコレータの try { proceed(); … }: 値を返す op は、proceed() の結果を返す。例外は、受けて、記録して、投げ直す
+// 本体のあるデコレータの try { next(); … }: 値を返す op は、next() の結果を返す。例外は、受けて、記録して、投げ直す
 func TestDecoratorTry(t *testing.T) {
 	ctx := context.Background()
 	o, l := newOps(nil)

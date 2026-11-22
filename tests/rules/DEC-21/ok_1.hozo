@@ -1,8 +1,8 @@
 // DEC-21: 包んだ op の結果は、そのまま、呼び元に返る。本体は、return を書かない
 namespace a {
   fn record();
-  decorator fn d() {
-    proceed();
+  decorator fn d(next: fn) {
+    next();
     record();
   }
   @d

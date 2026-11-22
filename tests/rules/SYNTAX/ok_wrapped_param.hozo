@@ -1,0 +1,14 @@
+// SYNTAX（docs/grammar.md「デコレータの本体」）: 包んだ関数の引数は、decorator fn の、最初の引数。名前は、自由。付ける側は、書かない
+namespace a {
+  fn record(label: string);
+  decorator fn audited(next: fn) {
+    next();
+    record("audited");
+  }
+  decorator fn labelled(body: fn, label: string) {
+    body();
+    record(label);
+  }
+  @audited @labelled("f")
+  fn f();
+}

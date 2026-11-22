@@ -3,16 +3,16 @@ namespace a {
   exception Failed;
   model M { id: string; }
   fn note();
-  decorator fn quiet() {
+  decorator fn quiet(next: fn) {
     try {
-      proceed();
+      next();
     } catch (e) {
       note();
     }
   }
-  decorator fn noted() {
+  decorator fn noted(next: fn) {
     try {
-      proceed();
+      next();
     } catch (e) {
       note();
       throw e;

@@ -25,7 +25,7 @@ func checkDecorators(ix *index, c *computer, r *reporter) {
 	}
 }
 
-// checkDec27 は DEC-27（docs/check.md「デコレータの本体」）: proceed() を try のブロックに持ち、catch のブロックが「返らない」でない
+// checkDec27 は DEC-27（docs/check.md「デコレータの本体」）: 包んだ関数の呼び出し を try のブロックに持ち、catch のブロックが「返らない」でない
 // デコレータを、returns が null でない op に付けた（DEC-4 と同じ理由: 受けた後に、返す値がない）。位置は、適用。
 func checkDec27(ix *index, o *ir.Op, r *reporter) {
 	if o.Returns == nil {
@@ -45,15 +45,15 @@ func checkDec27(ix *index, o *ir.Op, r *reporter) {
 			}
 			if cs, isCall := try.Body[0].(ir.CallStmt); isCall && cs.Call.IsProceed() {
 				reported = true
-				r.report(diag.Error, "DEC-27", app.Span, sprintf("デコレータ %s の本体は、proceed() の例外を受けて、投げずに終わる道を持つので、値を返す op %s には付けられない（受けた後に、返す値がない）", d.Name, o.Name),
+				r.report(diag.Error, "DEC-27", app.Span, sprintf("デコレータ %s の本体は、包んだ関数の呼び出しの例外を受けて、投げずに終わる道を持つので、値を返す op %s には付けられない（受けた後に、返す値がない）", d.Name, o.Name),
 					[]related{{span: try.Catch.Span, msg: "投げずに終わりうる catch"}}, nil)
 			}
 		})
 	}
 }
 
-// checkDec25 は DEC-25（docs/check.md「デコレータ」）: 本体のあるデコレータを、never を返す op に付けていて、本体の proceed()
-// （か、proceed() のアームを持つ match）の後ろに、文がある。包んだ op は、いつも、例外を投げるので、後ろの文は、評価されない
+// checkDec25 は DEC-25（docs/check.md「デコレータ」）: 本体のあるデコレータを、never を返す op に付けていて、本体の 包んだ関数の呼び出し
+// （か、包んだ関数の呼び出し のアームを持つ match）の後ろに、文がある。包んだ op は、いつも、例外を投げるので、後ろの文は、評価されない
 // （WIRE-9 と、同じ理由）。位置は、適用。後ろの、最初の文を Related に示す。
 func checkDec25(ix *index, o *ir.Op, r *reporter) {
 	if !ir.IsNever(o.Returns) {
@@ -87,8 +87,8 @@ func checkDec25(ix *index, o *ir.Op, r *reporter) {
 			}
 			if i < len(stmts)-1 {
 				_, next, _ := stmtExpr(stmts[i+1])
-				r.report(diag.Error, "DEC-25", app.Span, sprintf("デコレータ %s の本体は、proceed() の後ろに、文を持つので、never を返す op %s には付けられない（op は、いつも、例外を投げるので、後ろの文が、評価されない）", d.Name, o.Name),
-					[]related{{span: span, msg: "proceed()"}, {span: next, msg: "評価されない文"}}, nil)
+				r.report(diag.Error, "DEC-25", app.Span, sprintf("デコレータ %s の本体は、包んだ関数の呼び出しの後ろに、文を持つので、never を返す op %s には付けられない（op は、いつも、例外を投げるので、後ろの文が、評価されない）", d.Name, o.Name),
+					[]related{{span: span, msg: "包んだ関数の呼び出し"}, {span: next, msg: "評価されない文"}}, nil)
 			}
 			break
 		}

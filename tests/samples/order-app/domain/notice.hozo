@@ -12,9 +12,9 @@ namespace notice {
   }
 
   /** 送れなかったことを、呼び出し元に伝えない（値を返さない op にだけ付く）。そのほかの失敗は、そのまま伝える */
-  decorator fn bestEffort() {
+  decorator fn bestEffort(next: fn) {
     try {
-      proceed();
+      next();
     } catch (e by Delivery) {
       Undelivered => none;
       Other => throw e;

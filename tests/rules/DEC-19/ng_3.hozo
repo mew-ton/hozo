@@ -1,19 +1,19 @@
-// DEC-19（docs/check.md「デコレータ」）: proceed() を、try のブロックの、最初の文でない位置と、catch のブロックの中に書いた
+// DEC-19（docs/check.md「デコレータ」）: next() を、try のブロックの、最初の文でない位置と、catch のブロックの中に書いた
 namespace a {
   fn note();
-  decorator fn late() {
+  decorator fn late(next: fn) {
     try {
       note();
-      proceed();                           // ERROR: DEC-19
+      next();                           // ERROR: DEC-19
     } catch (e) {
       throw e;
     }
   }
-  decorator fn retry() {
+  decorator fn retry(next: fn) {
     try {
-      proceed();
+      next();
     } catch (e) {
-      proceed();                           // ERROR: DEC-19
+      next();                           // ERROR: DEC-19
     }
   }
   fn f();

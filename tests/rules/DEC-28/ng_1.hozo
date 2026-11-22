@@ -1,0 +1,12 @@
+// DEC-28（docs/check.md「デコレータ」）: 本体のある decorator fn が、包んだ関数の引数を持たない（なくした書き方 proceed() も、ここで断る）
+namespace a {
+  fn record();
+  decorator fn audited() {                 // ERROR: DEC-28
+    record();
+  }
+  decorator fn counted(times: int) {       // ERROR: DEC-28
+    proceed();
+    record();
+  }
+  fn f();
+}
