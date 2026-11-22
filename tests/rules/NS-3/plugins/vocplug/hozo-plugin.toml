@@ -1,6 +1,6 @@
 # テストの fixture: 語彙を提供するプラグイン。起動しない
 name       = "vocplug"
-command    = ["true"]
+wasm       = "plugin.wasm"
 protocol = "0.22"
 vocabulary = ["v.hozo"]
 

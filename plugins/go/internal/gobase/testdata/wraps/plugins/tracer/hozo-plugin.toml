@@ -1,7 +1,7 @@
 # 単体テストの入力のためのプラグイン: 継ぎ目を宣言する相乗り（docs/config.md「継ぎ目」）。基底 go の単体テストが読むのは
-# View.config.seams だけで、このプラグインは起動しない。hozoc build で試せるように、何も返さない sh の代役にしてある。
+# View.config.seams だけで、このプラグインは起動しない（wasm のファイルは、置いていない）。
 name     = "tracer"
-command  = ["sh", "-c", "cat >/dev/null; echo '{\"files\":[],\"warnings\":[]}'"]
+wasm     = "plugin.wasm"
 protocol = "0.22"
 
 [[transpiler]]

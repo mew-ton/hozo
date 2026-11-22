@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"reflect"
 	"sort"
@@ -1078,7 +1077,7 @@ func TestStateCorpusIR(t *testing.T) {
 }
 
 // TestViewDeliveredToPlugin は、実物の `hozoc build`（internal/app の App と生成した cli.Main。tests/selfcheck_test.go と同じ組み立て）が
-// view-dump プラグイン（tests/corpus/view/plugins/view-dump。`go run` で動く）に渡す View が、internal/project の web の View と
+// view-dump プラグイン（tests/corpus/view/plugins/view-dump）に渡す View が、internal/project の web の View と
 // 同じであることを確かめる。プラグインは受け取った view を <view.config.dir>/view.json に書き出すので、それを読み戻して比べる。
 // コーパスは一時ディレクトリに写してモジュールのルートにする（copyCorpusAsModule）。
 func TestViewDeliveredToPlugin(t *testing.T) {
@@ -1122,10 +1121,10 @@ func TestViewDeliveredToPlugin(t *testing.T) {
 	// docs/plugin-protocol.md「emit」: 応答は files と warnings だけ（select はない）。hozoc 本体はコードを出力しないので、
 	// 書き出されるのは、トランスパイラが返した view.json と、出力先ごとの記録だけ。api と page の単位も、同じ基底で出力を持つ
 	t.Run("plugin-protocol.md emit/応答", func(t *testing.T) {
-		m, dir := viewDumpBuilt(t, root)
+		name, wasm := viewDumpBuilt(t, root)
 		req := (&sdk.EmitRequest{Transpiler: "view-dump", View: want}).Batch()
 		var batch sdk.EmitBatchResponse
-		if err := (hostplugin.Runner{Root: root, Stderr: io.Discard}).Run(m, dir, req, &batch); err != nil {
+		if err := (hostplugin.Runner{Stderr: io.Discard}).Run(name, wasm, req, &batch); err != nil {
 			t.Fatal(err)
 		}
 		if len(batch.Outputs) != 1 || len(batch.Outputs[0].Results) != 1 {
@@ -1146,13 +1145,12 @@ func TestViewDeliveredToPlugin(t *testing.T) {
 
 	// docs/plugin-protocol.md「要求と応答」: protocol が合わなければ code "protocol"（MAN-2）、direction か、頼まれたトランスパイラを
 	// 実装していなければ code "unsupported"（MAN-5）で、どちらも終了コード 2。同じプラグインを internal/plugin.Runner で直接起動して確かめる。
-	// マニフェストの `go run` を通すと `go run` が終了コード 2 を 1 に変えてしまう（proc.Crashed になる）ので、
-	// ここではプラグインを go build した実行ファイルで起動する（internal/plugin の echo-plugin のテストと同じ）。
+	// 動かすのは、マニフェストの wasm（hozoc が起動するものと同じ）。
 	t.Run("plugin-protocol.md 要求と応答/protocol", func(t *testing.T) {
-		m, dir := viewDumpBuilt(t, root)
+		name, wasm := viewDumpBuilt(t, root)
 		req := (&sdk.EmitRequest{Protocol: "9.9", Transpiler: "view-dump", View: want}).Batch()
 		var resp sdk.EmitBatchResponse
-		err := hostplugin.Runner{Root: root, Stderr: io.Discard}.Run(m, dir, req, &resp)
+		err := hostplugin.Runner{Stderr: io.Discard}.Run(name, wasm, req, &resp)
 		var pe *hostplugin.PluginError
 		if !errors.As(err, &pe) || pe.Code != hostplugin.CodeProtocol {
 			t.Fatalf("protocol 9.9 の要求に対する誤り = %v, want *PluginError{Code: %q}", err, hostplugin.CodeProtocol)
@@ -1160,10 +1158,10 @@ func TestViewDeliveredToPlugin(t *testing.T) {
 		expect(t, "診断は MAN-2", pe.Diagnostic("plugins/view-dump/hozo-plugin.toml").Code, "MAN-2")
 	})
 	t.Run("plugin-protocol.md 要求と応答/unsupported", func(t *testing.T) {
-		m, dir := viewDumpBuilt(t, root)
+		name, wasm := viewDumpBuilt(t, root)
 		req := sdk.ImportRequest{Protocol: hostplugin.Protocol, Direction: "import", Format: "openapi", Files: []sdk.File{}}
 		var resp sdk.ImportResponse
-		err := hostplugin.Runner{Root: root, Stderr: io.Discard}.Run(m, dir, &req, &resp)
+		err := hostplugin.Runner{Stderr: io.Discard}.Run(name, wasm, &req, &resp)
 		var pe *hostplugin.PluginError
 		if !errors.As(err, &pe) || pe.Code != hostplugin.CodeUnsupported {
 			t.Fatalf("import の要求に対する誤り = %v, want *PluginError{Code: %q}", err, hostplugin.CodeUnsupported)
@@ -1171,10 +1169,10 @@ func TestViewDeliveredToPlugin(t *testing.T) {
 		expect(t, "診断は MAN-5", pe.Diagnostic("plugins/view-dump/hozo-plugin.toml").Code, "MAN-5")
 	})
 	t.Run("plugin-protocol.md 要求と応答/知らない transpiler", func(t *testing.T) {
-		m, dir := viewDumpBuilt(t, root)
+		name, wasm := viewDumpBuilt(t, root)
 		req := (&sdk.EmitRequest{Transpiler: "view-nope", View: want}).Batch()
 		var resp sdk.EmitBatchResponse
-		err := hostplugin.Runner{Root: root, Stderr: io.Discard}.Run(m, dir, req, &resp)
+		err := hostplugin.Runner{Stderr: io.Discard}.Run(name, wasm, req, &resp)
 		var pe *hostplugin.PluginError
 		if !errors.As(err, &pe) || pe.Code != hostplugin.CodeUnsupported || !strings.Contains(pe.Message, "view-nope") {
 			t.Fatalf("知らない transpiler の要求に対する誤り = %v, want *PluginError{Code: %q}", err, hostplugin.CodeUnsupported)
@@ -1183,23 +1181,16 @@ func TestViewDeliveredToPlugin(t *testing.T) {
 	})
 }
 
-// viewDumpBuilt は view-dump を go build して、その実行ファイルを command にしたマニフェストと、マニフェストのディレクトリ
-// （一時ディレクトリ root に写したもの）を返す。マニフェストの command（`go run`）は使わない: `go run` はプログラムの
-// 終了コードを伝えず、0 以外ならすべて 1 にするため（docs/plugin-protocol.md「起動」の終了コード 2 が見えない）。
-func viewDumpBuilt(t *testing.T, root string) (*hostplugin.Manifest, string) {
+// viewDumpBuilt は、view-dump の名前と、WASM のファイル（TestMain がビルドして、コーパスに置いたもの）を返す。hozoc を
+// 通さずに、internal/plugin.Runner で、じかに動かすため。
+func viewDumpBuilt(t *testing.T, root string) (name, wasm string) {
 	t.Helper()
-	dir := filepath.Join(root, "plugins", "view-dump")
+	dir := filepath.Join(viewCorpus, "plugins", "view-dump")
 	m, diags := hostplugin.LoadManifest(filepath.Join(dir, hostplugin.ManifestFileName))
 	if m == nil || len(diags) > 0 {
 		t.Fatalf("view-dump のマニフェストを読めない: %+v", diags)
 	}
-	exe := filepath.Join(root, "bin", "view-dump")
-	build := exec.Command("go", "build", "-o", exe, "./"+filepath.ToSlash(filepath.Join(viewCorpus, "plugins", "view-dump")))
-	if out, err := build.CombinedOutput(); err != nil {
-		t.Fatalf("view-dump を go build できない: %v\n%s", err, out)
-	}
-	m.Command = []string{exe}
-	return m, dir
+	return m.Name, m.WasmPath(dir)
 }
 
 // ---- 期待値の書き方 ----

@@ -4,16 +4,16 @@ import (
 	"encoding/json"
 	"io"
 	"os"
-	"os/exec"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"sync"
 	"testing"
 	"time"
 
+	"github.com/mew-ton/hozo/internal/fakeplugin"
 	"github.com/mew-ton/hozo/internal/lsp/jsonrpc"
 	"github.com/mew-ton/hozo/internal/lsp/protocol"
+	hostplugin "github.com/mew-ton/hozo/internal/plugin"
 	"github.com/mew-ton/hozo/internal/project"
 )
 
@@ -272,17 +272,12 @@ func repoPlugins(t *testing.T) string {
 	return dir
 }
 
-// standInPlugins は、リポジトリの plugins/ の代役: マニフェストと語彙は、同じで、起動するのは、診断を返さない sh のスクリプト
-// （本物は、開発中のマニフェストの go run で、go.mod のない一時のプロジェクトでは、異常終了する）。sh がなければ、本物の場所。
+// standInPlugins は、リポジトリの plugins/ の代役: マニフェストと語彙は、同じで、中身は、ファイルも診断も返さない、にせものの
+// プラグイン（internal/fakeplugin。本物の WASM は、このパッケージのテストでは、ビルドしない）。
 func standInPlugins(t *testing.T) string {
 	t.Helper()
 	repo := repoPlugins(t)
-	if _, err := exec.LookPath("sh"); err != nil {
-		return repo
-	}
 	dir := t.TempDir()
-	script := filepath.Join(dir, "ok.sh")
-	writeFile(t, script, "cat >/dev/null\nprintf '{\"diagnostics\":[]}'\n")
 	entries, err := os.ReadDir(repo)
 	if err != nil {
 		t.Fatal(err)
@@ -296,20 +291,17 @@ func standInPlugins(t *testing.T) string {
 			t.Fatal(err)
 		}
 		for _, f := range files {
-			if f.IsDir() || strings.HasSuffix(f.Name(), ".go") {
+			if f.IsDir() || strings.HasSuffix(f.Name(), ".go") || strings.HasSuffix(f.Name(), ".wasm") {
 				continue
 			}
-			content := readFile(t, filepath.Join(repo, e.Name(), f.Name()))
-			if f.Name() == "hozo-plugin.toml" {
-				lines := strings.Split(content, "\n")
-				for i, l := range lines {
-					if strings.HasPrefix(l, "command") {
-						lines[i] = "command = [\"sh\", " + strconv.Quote(script) + "]"
-					}
+			writeFile(t, filepath.Join(dir, e.Name(), f.Name()), readFile(t, filepath.Join(repo, e.Name(), f.Name())))
+			if f.Name() == hostplugin.ManifestFileName {
+				m, diags := hostplugin.LoadManifest(filepath.Join(repo, e.Name(), f.Name()))
+				if m == nil {
+					t.Fatalf("%s のマニフェストを読めない: %+v", e.Name(), diags)
 				}
-				content = strings.Join(lines, "\n")
+				fakeplugin.Place(t, m.WasmPath(filepath.Join(dir, e.Name())))
 			}
-			writeFile(t, filepath.Join(dir, e.Name(), f.Name()), content)
 		}
 	}
 	return dir

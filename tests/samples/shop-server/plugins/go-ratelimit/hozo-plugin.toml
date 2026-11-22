@@ -2,7 +2,7 @@
 # 語彙 rate と、そのデコレータ @rate.limited の継ぎ目の中身を出すトランスパイラ go-ratelimit を提供する（../../README.md「サンプルの中のプラグイン」）。
 # 実装は、このディレクトリの main パッケージ（main.go、emit.go）。期待する出力は ../../gen/server/ratelimit.go。
 name     = "go-ratelimit"
-command  = ["go", "run", "example.com/shop-server/plugins/go-ratelimit"]
+wasm     = "plugin.wasm"
 protocol = "0.22"
 
 vocabulary = ["rate.hozo"]      # 語彙 rate: 例外 LimitExceeded と、デコレータ limited

@@ -2,7 +2,7 @@
 # 基底 go / go-b（言語は go）と ts（言語は ts）、go に相乗りする go-x、go と go-x に相乗りする go-y を提供する
 # （docs/testing.md「規則ごとのテスト」）。このテストは、プラグインを起動しない（tests/rules_test.go）
 name     = "std"
-command  = ["true"]
+wasm     = "plugin.wasm"
 protocol = "0.22"
 
 [[transpiler]]

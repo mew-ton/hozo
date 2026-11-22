@@ -10,7 +10,7 @@
 
 ```toml
 name     = "go-valid"
-command  = ["go", "run", "github.com/mew-ton/hozo/plugins/go-valid"]
+wasm     = "plugin.wasm"
 protocol = "0.22"
 
 [[transpiler]]

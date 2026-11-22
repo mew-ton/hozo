@@ -15,7 +15,7 @@ import (
 // update はゴールデンを書き直す（docs/testing.md「コーパス」: `go test ./... -update`）。
 var update = flag.Bool("update", false, "update golden files (docs/testing.md「コーパス」)")
 
-// corpora はゴールデンを持つコーパス（docs/testing.md「コーパス」）。needsGo は emit が `go run` のプラグインを起動するもの。
+// corpora はゴールデンを持つコーパス（docs/testing.md「コーパス」）。needsGo は、出力の Go を、go の道具で確かめるもの。
 // noOutput は、emit が何も書かないもの（emit のゴールデンは持たない）。noGoOutput は、書き出すものに Go のファイルがないもの
 // （書き出した Go の go vet をしない）。
 //
@@ -30,12 +30,12 @@ var corpora = []struct {
 	noGoOutput bool
 }{
 	{name: "design", needsGo: true}, // 設計書の例。server と browser と、使う型の置き場の http と page
-	// plugins/view-dump（`go run` で動く、テストのための基底）が、受け取った View を view.json に書き出す
+	// plugins/view-dump（テストのための基底）が、受け取った View を view.json に書き出す
 	{name: "view", needsGo: true, noGoOutput: true},
 	{name: "state", needsGo: true}, // 状態の分類・遷移の効果・状態での match
 	// 単位: 同じ名前空間の二つの単位、in、子孫を名指しする単位、単位をまたぐ一方向の import（docs/config.md「単位」）
 	{name: "units", needsGo: true},
-	// モデルが先: 出力しない名前空間、宣言に付けた印のデコレータ。単位のトランスパイラ none（sh で動く、テストのための基底）は
+	// モデルが先: 出力しない名前空間、宣言に付けた印のデコレータ。単位のトランスパイラ none（テストのための基底。中身は、にせもののプラグイン）は
 	// ファイルを返さないので、emit は何も書かない
 	{name: "model", noOutput: true},
 }
@@ -88,8 +88,6 @@ func TestCorpusEmitGolden(t *testing.T) {
 		t.Run(c.name, func(t *testing.T) {
 			if c.needsGo {
 				requireGo(t)
-			} else {
-				requireSh(t)
 			}
 			root, before := copyCorpusAsModule(t, c.name)
 			var stdout, stderr bytes.Buffer
@@ -159,15 +157,7 @@ func vetEmitted(t *testing.T, root string, got map[string][]byte) {
 	}
 }
 
-// requireSh は `sh` が PATH になければテストを飛ばす（sh で動くプラグインのため。tests/corpus/model/plugins/none）。
-func requireSh(t *testing.T) {
-	t.Helper()
-	if _, err := exec.LookPath("sh"); err != nil {
-		t.Skip("sh がない")
-	}
-}
-
-// requireGo は `go` が PATH になければテストを飛ばす（`go run` で動くプラグインのため）。
+// requireGo は `go` が PATH になければテストを飛ばす（出力の Go を、go の道具で確かめるため）。
 func requireGo(t *testing.T) {
 	t.Helper()
 	if _, err := exec.LookPath("go"); err != nil {
@@ -178,10 +168,9 @@ func requireGo(t *testing.T) {
 // copyCorpusAsModule はコーパス name を一時ディレクトリに写し、そこを Go のモジュールのルートにする:
 // リポジトリの go.mod と go.sum を複製し、ir/、plugin/、plugins/、tests/ をシンボリックリンクで足す（tests/generated_test.go と
 // 同じやり方。コーパスが自分の plugins/ を持つなら、そちらを使い、リポジトリの plugins/ は足さない）。
-// こうすると、プラグインのマニフェストの `go run github.com/mew-ton/hozo/plugins/go`（と、コーパスのプラグインの
-// `go run github.com/mew-ton/hozo/tests/corpus/<名前>/plugins/<p>`）が、プロジェクトのルート（= 作業ディレクトリ）から同じ
-// モジュールのパッケージとして解決でき、生成したコードの import パス（docs/plugin-go.md「パッケージと import パス」: Dir(U, N) の
-// 上の go.mod の module）も `github.com/mew-ton/hozo/<out>` に決まる。
+// こうすると、生成したコード（import パスは、hozo.toml の [options.go] の module から決まる。docs/plugin-go.md「パッケージと
+// import パス」）を、リポジトリと同じモジュールのパッケージとして、go の道具で確かめられる。プラグインは、マニフェストの
+// wasm（TestMain がビルドしたもの）を動かすので、作業ディレクトリにも、go.mod にも、依らない。
 // `testdata/`（ゴールデン）は写さない。戻り値は一時ディレクトリと、emit の前にあったファイル（readTree の形）。
 func copyCorpusAsModule(t *testing.T, name string) (string, map[string][]byte) {
 	t.Helper()

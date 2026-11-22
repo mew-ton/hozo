@@ -10,6 +10,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/mew-ton/hozo/internal/fakeplugin"
 	"github.com/mew-ton/hozo/internal/project"
 	"github.com/mew-ton/hozo/ir"
 )
@@ -199,8 +200,8 @@ func TestModelCorpus(t *testing.T) {
 		// コードを出力しない（docs/plugin-protocol.md「この文書が決めること」）ので、emit は何も書かない。印のデコレータ
 		// （@marks.*）も何も生成しない。前回の出力（.hozoc-outputs.json にあるもの）は古いファイルとして消え、記録も残らない
 		// （docs/cli.md「書き出し」の 5 と 7）。
-		requireSh(t)
 		dir := t.TempDir()
+		fakeplugin.Place(t, filepath.Join(dir, "plugins", "none", fakeplugin.WasmFile))
 		copyHozo(t, modelCorpus, dir)
 		manifest, err := os.ReadFile(filepath.Join(modelCorpus, "plugins", "none", "hozo-plugin.toml"))
 		if err != nil {

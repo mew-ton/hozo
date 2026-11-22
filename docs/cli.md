@@ -24,6 +24,8 @@ hozoc 自身の仕様は、リポジトリ直下の `cli.hozo`。下のコード
 - 出力の形式を選ぶ `format` のフラグを足す。診断を機械が読めるようにするため（`docs/diagnostics.md`「json」）。
 - 例外 `UnknownNamespace` を足す。`build` の引数の名前空間の書き間違いを、何も書かずに成功したことにしないため（「書き出し」の 1）。
 - 環境変数 `HOZO_PLUGIN_PATH` を、`build` / `tests` / `lsp` の入力のフィールド `pluginPath` として足す（内部の op `check` には、配線が、入力から渡す）。プラグインの探索が見るプロジェクトの外の場所（`docs/plugin-protocol.md`「探索」の 2）も、ほかの環境変数（`HOZO_CONFIG`）と同じく境界の入力として書き、葉の op の実装がプロセスの環境を自分で読まないようにするため（同じ入力から同じ結果になり、テストが実行する人の環境に左右されない）。
+- 環境変数 `HOZO_CACHE_DIR` も、同じ流儀で、`build` / `tests` / `lsp` の入力のフィールド `cacheDir` として足す（`check` には、配線が渡す）。プラグインの WASM を、機械の言葉に直したものを、覚える置き場（`docs/plugin-protocol.md`「起動」）。
+- model `Plugin` は、プラグインの名前と、WASM のファイルの場所だけを持つ。プラグインは、hozoc の中の、サンドボックスで動き、作業ディレクトリも、引数も、渡さない（同「起動」）ので、前にあった `command`、`dir`、`root` は、ない。
 - 設定を単位の一覧にした（`docs/config.md`「単位」）のに合わせて、`EmitRequest` に `transpiler` を足し、`LanguageMismatch` と `UnknownNamespace` の意味を単位の言葉に直す。
 - プラグインとやり取りする model（`EmitRequest` / `EmitResponse` と、その中の `EmitOutput`、`OutputResult`、`TranspilerResult`）は `docs/plugin-protocol.md`「要求と応答」の JSON をそのまま写す（一つの要求に、仕様を一度と、受け持つ出力の並び。`docs/decisions.md`「決めたこと」411）。IR の中身（`Spec`、`OutputView`）は、書かない。応答の `select` をなくした（同「選択をなくしたこと」）のに合わせて、`Select` と `Wrap` を持たない。
 - **コマンドは `build`、`tests`、`lsp` の三つ**（`docs/decisions.md`「決めたこと」417）。前にあった `check` と `emit` の二つのコマンドは、`build` 一つにまとめた（「build」）: `build` は、検査して、書き出す。`build --no-emit` は、検査だけ。検査の op `check` は、コマンドではない、内部の葉の op として残る（`build` と `tests` の配線が、はじめに呼ぶ）。その入力 `CheckInput` は、`@cli.flag` も `@cli.env` も持たない（配線が、コマンドの入力から作る）。
@@ -162,6 +164,8 @@ namespace hozoc {
     format: OutputFormat?;
     /** プラグインを探すディレクトリ（OS のパス区切りで複数） */
     pluginPath: string?;
+    /** プラグインの WASM を、機械の言葉に直したものを、覚える置き場 */
+    cacheDir: Path?;
   }
 
   /** build の入力 */
@@ -178,6 +182,8 @@ namespace hozoc {
     @cli.flag("dry-run") dryRun: boolean?;
     /** プラグインを探すディレクトリ（OS のパス区切りで複数） */
     @cli.env("HOZO_PLUGIN_PATH") pluginPath: string?;
+    /** プラグインの WASM を、機械の言葉に直したものを、覚える置き場 */
+    @cli.env("HOZO_CACHE_DIR") cacheDir: Path?;
   }
 
   /** tests の入力 */
@@ -190,6 +196,8 @@ namespace hozoc {
     @cli.required @cli.flag("coverage") coverage: Path;
     /** プラグインを探すディレクトリ（OS のパス区切りで複数） */
     @cli.env("HOZO_PLUGIN_PATH") pluginPath: string?;
+    /** プラグインの WASM を、機械の言葉に直したものを、覚える置き場 */
+    @cli.env("HOZO_CACHE_DIR") cacheDir: Path?;
   }
 
   /** lsp の入力 */
@@ -200,6 +208,8 @@ namespace hozoc {
     @cli.flag("log") @cli.env("HOZO_LSP_LOG") log: Path?;
     /** プラグインを探すディレクトリ（OS のパス区切りで複数） */
     @cli.env("HOZO_PLUGIN_PATH") pluginPath: string?;
+    /** プラグインの WASM を、機械の言葉に直したものを、覚える置き場 */
+    @cli.env("HOZO_CACHE_DIR") cacheDir: Path?;
   }
 
   /** 生成したファイルが、今の仕様と設定から生成し直したものと一致しているか */
@@ -289,7 +299,7 @@ namespace hozoc {
     throws CheckFailed, ConfigInvalid, LanguageMismatch, OutputConflict, UnknownNamespace prevents effects
     throws proc.Crashed, proc.MalformedOutput prevents effects
   {
-    val checked = check({ config: in.config, format: in.format, pluginPath: in.pluginPath });
+    val checked = check({ config: in.config, format: in.format, pluginPath: in.pluginPath, cacheDir: in.cacheDir });
     return writeOutputs(in, checked);
   }
 
@@ -316,7 +326,7 @@ namespace hozoc {
    */
   @cli.command("tests")
   export fn tests(in: TestsInput): TestsResult {
-    val checked = check({ config: in.config, format: in.format, pluginPath: in.pluginPath });
+    val checked = check({ config: in.config, format: in.format, pluginPath: in.pluginPath, cacheDir: in.cacheDir });
     return matchTests(in, checked);
   }
 
@@ -328,8 +338,8 @@ namespace hozoc {
   @cli.command("lsp")
   export fn lsp(in: LspInput);
 
-  /** プラグインの起動のしかた（docs/plugin-protocol.md「起動」）。root は作業ディレクトリにするプロジェクトのルート、dir はマニフェストのディレクトリ */
-  model Plugin { name: string; command: string[]; dir: Path; root: Path; }
+  /** プラグインの起動のしかた（docs/plugin-protocol.md「起動」）。wasm は、プラグインの本体（WASM）のファイル */
+  model Plugin { name: string; wasm: Path; }
 
   /** 仕様: IR の、出力に依らない部分（docs/ir.md「まとめた形」の Spec）。中身はこの仕様では書かない */
   model Spec {}

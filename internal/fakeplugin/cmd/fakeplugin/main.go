@@ -2,7 +2,9 @@
 // docs/plugin-protocol.md「emit」のまとめた要求を読み、決まった応答を返す: テストが、hozoc の側（起動、要求の形、応答の読み方）を、
 // プラグインの実装と切り離して確かめるためのもの。
 //
-// 引数は、プラグインのディレクトリ（マニフェストのある場所）一つ。振る舞いは、そのディレクトリのファイルで決める:
+// WASM（WASI）にビルドして、hozoc の、サンドボックスの中で動かす。サンドボックスは、プラグインに、ファイルを見せない
+// （docs/plugin-protocol.md「起動」）ので、テストが、internal/plugin の MountForTest で、プラグインのディレクトリ
+// （マニフェストのある場所）を、"/" として見せる。振る舞いは、そのディレクトリのファイルで決める:
 //
 //	launches        起動のたびに、一行足す（起動の回数）
 //	requests.jsonl  direction "emit" なら、要求の、出力とトランスパイラの組ごとに、一行足す:
@@ -19,6 +21,10 @@
 //	gate、open      gate がある間は、open ができるまで待つ（起動したプラグインが、終わらない間を作る）
 //	crash           あれば、応答を書かずに、終了コード 3
 //	exit            終了コード（なければ 0）。応答を書いてから、そのコードで終わる
+//	spin            あれば、応答を書かずに、終わらない（途中で止められるまで、回り続ける）
+//
+// ディレクトリが見えなければ（MountForTest なしで置かれた、代役）、何も記録せず、emit には、頼まれたトランスパイラごとに、
+// ファイルを返さない答え {"files":[],"warnings":[]} を返す。
 package main
 
 import (
@@ -34,17 +40,17 @@ import (
 )
 
 func main() {
-	if len(os.Args) != 2 {
-		fmt.Fprintln(os.Stderr, "usage: fakeplugin <plugin dir>")
-		os.Exit(9)
-	}
-	dir := os.Args[1]
+	const dir = "/"
+	mounted := exists(dir)
 	file := func(name string) string { return filepath.Join(dir, name) }
 	read := func(name string) (string, bool) {
 		data, err := os.ReadFile(file(name))
 		return string(data), err == nil
 	}
 	appendLine := func(name string, line []byte) {
+		if !mounted {
+			return
+		}
 		f, err := os.OpenFile(file(name), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
 		if err != nil {
 			fmt.Fprintln(os.Stderr, "fakeplugin:", err)
@@ -70,6 +76,10 @@ func main() {
 	}
 	for exists(file("gate")) && !exists(file("open")) {
 		time.Sleep(10 * time.Millisecond)
+	}
+	if exists(file("spin")) {
+		for {
+		}
 	}
 	if exists(file("crash")) {
 		os.Exit(3)
@@ -119,7 +129,10 @@ func main() {
 			appendLine("requests.jsonl", call)
 			template, ok := read("response." + name + ".json")
 			if !ok {
-				template, _ = read("response.json")
+				template, ok = read("response.json")
+			}
+			if !ok && !mounted {
+				template = `{"files":[],"warnings":[]}`
 			}
 			answer := strings.NewReplacer("@DIR@", view.Config.Dir, "@NS@", view.Viewer, "@T@", name, "@RUN@", strconv.Itoa(run)).Replace(template)
 			if j > 0 {

@@ -85,4 +85,4 @@
 | 文書 | 書きたかった構文 | 今の実装 |
 |---|---|---|
 | `docs/ir.md`「その名前空間から見た IR」の `params`（入れ子の位置） | `model Auth { token: Token?; locale: string; }`、`model GetUserInput { auth: Auth; id: UserId; }`（位置 `in.auth.token`） | 外した理由（本体に組み込んでいた Go の出力が、合成した `web.getUser$in$auth` の名前を作れなかった）は、なくなった: このコーパスは Go を出さず、基底 `go` は合成した model を出さない（`docs/plugin-go.md`「出力の対象」）。足すと `view.web.json` と `TestViewFromEntry` の期待値を書き直すことになるので、まだ足していない |
-| `docs/plugin-protocol.md`「起動」の終了コード 2 | マニフェストの `command = ["go", "run", ...]` のまま `protocol` の不一致を MAN-2 にする | `go run` はプログラムの終了コードを伝えず 0 以外を 1 にするので、`proc.Crashed` になる。`TestViewDeliveredToPlugin` の protocol のサブテストは `go build` した実行ファイルで起動する |
+| `docs/plugin-protocol.md`「起動」の終了コード 2 | マニフェストのとおりに起動して、`protocol` の不一致を MAN-2 にする | 外した理由（マニフェストの `go run` が、プログラムの終了コードを伝えず、`proc.Crashed` になった）は、なくなった: マニフェストの `wasm` を動かせば、終了コード 2 が、そのまま届く。`TestViewDeliveredToPlugin` の protocol のサブテストは、マニフェストの WASM を、`internal/plugin` の `Runner` で、じかに動かす |

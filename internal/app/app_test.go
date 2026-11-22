@@ -76,7 +76,7 @@ func corpusConfig(serverTranspilers string) string {
 }
 
 // copyCorpus は設計書のコーパスの .hozo を一時ディレクトリに写し、warning を一つ出す warn.hozo（warnFile）を足す。
-// hozo.toml は corpusConfig で、どの単位も、sh で動くテストの基底 base（fakePlugin。出力ごとに out.txt を一つ書く）を使う。
+// hozo.toml は corpusConfig で、どの単位も、テストの基底 base（にせもののプラグイン fakePlugin。出力ごとに out.txt を一つ書く）を使う。
 // ファイルを返さない基底 none も入れておく。
 func copyCorpus(t *testing.T) string {
 	t.Helper()
@@ -1035,6 +1035,48 @@ func readAll(t *testing.T, dir string) map[string]string {
 	return out
 }
 
+// TestCacheDirEnvironment は docs/plugin-protocol.md「起動」の、機械の言葉に直したものの置き場が、hozoc に届く道:
+// HOZO_CACHE_DIR は、cli.Main に渡した env から、cli.hozo の入力の cacheDir に入る。プロセスの環境変数は、読まない。
+func TestCacheDirEnvironment(t *testing.T) {
+	dir := t.TempDir()
+	write(t, filepath.Join(dir, "a.hozo"), "namespace a {\n  fn f();\n}\n")
+	write(t, filepath.Join(dir, "hozo.toml"), pluginDirs+unit("a", "gen/a", `"base"`))
+	fakePlugin(t, dir, "base", "go", "", baseResponse, 0)
+	passed, ambient := t.TempDir(), t.TempDir()
+	t.Setenv("HOZO_CACHE_DIR", ambient)
+	empty := func(d string) bool {
+		entries, err := os.ReadDir(d)
+		return err != nil || len(entries) == 0
+	}
+	if code, _, stderr := runHome(t, dir, "", map[string]string{"HOZO_CACHE_DIR": passed}, "build", "--no-emit"); code != 0 {
+		t.Fatalf("code=%d stderr=%q", code, stderr)
+	}
+	if empty(filepath.Join(passed, "wasm")) {
+		t.Errorf("渡した置き場 %s の下の wasm/ に、覚えたものが、ない", passed)
+	}
+	if !empty(ambient) {
+		t.Errorf("プロセスの環境変数 HOZO_CACHE_DIR の置き場 %s を、使った", ambient)
+	}
+}
+
+// TestManifestCommandIsGone は docs/plugin-protocol.md「診断」の MAN-6: なくした書き方 command のマニフェストがあれば、
+// hozoc build は、設定の誤り（ConfigInvalid）で止まり、新しい書き方を示す。プラグインは、起動しない。
+func TestManifestCommandIsGone(t *testing.T) {
+	dir := t.TempDir()
+	write(t, filepath.Join(dir, "a.hozo"), "namespace a {\n  fn f();\n}\n")
+	write(t, filepath.Join(dir, "hozo.toml"), pluginDirs+unit("a", "gen/a", `"base"`))
+	fakePlugin(t, dir, "base", "go", "", baseResponse, 0)
+	manifest := filepath.Join(dir, "plugins", "base", "hozo-plugin.toml")
+	write(t, manifest, strings.Replace(readFile(t, manifest), "wasm = "+fakeplugin.WasmTOML, `command = ["go", "run", "example.com/base"]`, 1))
+	code, _, stderr := run(t, dir, nil, "build", "--no-emit")
+	if code != exitConfigInvalid || !strings.Contains(stderr, "error[MAN-6]") || !strings.Contains(stderr, `wasm = "`) {
+		t.Errorf("code=%d stderr=%q", code, stderr)
+	}
+	if n := strings.Count(readFile(t, filepath.Join(dir, "plugins", "base", "launches")), "\n"); n != 0 {
+		t.Errorf("プラグインを %d 回、起動した", n)
+	}
+}
+
 // TestPluginSearchEnvironment は docs/plugin-protocol.md「探索」の 2 と 3 が hozoc に届く道: HOZO_PLUGIN_PATH は cli.Main に
 // 渡した env から cli.hozo の入力の pluginPath に入り、ホームは App.Home。プロセスの環境変数とホームディレクトリは読まない。
 func TestPluginSearchEnvironment(t *testing.T) {
@@ -1053,6 +1095,10 @@ func TestPluginSearchEnvironment(t *testing.T) {
 	if err := os.Rename(filepath.Join(dir, "plugins", "from-home"), filepath.Join(home, ".hozo", "plugins", "from-home")); err != nil {
 		t.Fatal(err)
 	}
+
+	// にせものに見せるディレクトリは、置いた場所で決まるので、移した先で、置き直す
+	fakeplugin.Install(t, filepath.Join(envDir, "from-env"))
+	fakeplugin.Install(t, filepath.Join(home, ".hozo", "plugins", "from-home"))
 
 	// プロセスの環境に向けても、渡していなければ見つからない（CFG-14）
 	t.Setenv("HOZO_PLUGIN_PATH", envDir)
@@ -1172,10 +1218,10 @@ func fakeRider(t *testing.T, dir, name, lang, requires, stdout string, exit int)
 func fakeTranspiler(t *testing.T, dir, name, lang, extra, transpilerExtra, stdout string, exit int) {
 	t.Helper()
 	pluginDir := filepath.Join(dir, "plugins", name)
-	fakeplugin.Install(t, pluginDir, "")
+	fakeplugin.Install(t, pluginDir)
 	write(t, filepath.Join(pluginDir, "response.json"), stdout)
 	write(t, filepath.Join(pluginDir, "exit"), string(rune('0'+exit)))
-	manifest := "name = \"" + name + "\"\ncommand = " + fakeplugin.CommandTOML + "\nprotocol = \"0.22\"\n" + extra +
+	manifest := "name = \"" + name + "\"\nwasm = " + fakeplugin.WasmTOML + "\nprotocol = \"0.22\"\n" + extra +
 		"\n[[transpiler]]\nname = \"" + name + "\"\nlanguage = \"" + lang + "\"\n" + transpilerExtra
 	write(t, filepath.Join(pluginDir, "hozo-plugin.toml"), manifest)
 }
@@ -1405,14 +1451,16 @@ func TestEmitUnits(t *testing.T) {
 		// docs/plugin-protocol.md「起動」: 一度の emit（check と、書き出し）で、プラグインは、一回ずつ。api は、二つの単位の出力を、
 		// admin は、二つの出力を受け持つが、起動は一回。順は、単位の設定の順、transpilers に書いた順に見て、最初に現れた順
 		// （単位 1 の transpilers は、rider が先）
-		write(t, filepath.Join(dir, "plugins", "order.txt"), "")
+		// 起動の順は、プラグインが、標準エラーに書いた行（hozoc が、プラグインの名前を頭に付けて流す）の順で見る
 		for _, name := range []string{"api", "rider", "admin"} {
-			fakeplugin.Install(t, filepath.Join(dir, "plugins", name), "printf '%s\\n' "+name+" >>\"$d/../order.txt\"")
+			write(t, filepath.Join(dir, "plugins", name, "stderr"), "launched\n")
 		}
-		emitAll(t, dir)
-		order, err := os.ReadFile(filepath.Join(dir, "plugins", "order.txt"))
-		if err != nil || string(order) != "rider\napi\nadmin\n" {
-			t.Errorf("起動の順 = %q (%v)", order, err)
+		code, stdout, stderr := run(t, dir, nil, "build")
+		if code != 0 {
+			t.Fatalf("code=%d stdout=%q stderr=%q", code, stdout, stderr)
+		}
+		if stderr != "[rider] launched\n[api] launched\n[admin] launched\n" {
+			t.Errorf("起動の順（標準エラー） = %q", stderr)
 		}
 	})
 }
@@ -1567,17 +1615,17 @@ func TestEmitIn(t *testing.T) {
 }
 
 // TestRunEmit は cli.hozo の op runEmit（hozoc.Leaves のメソッド。docs/cli.md「手で書くもの」）: plugin を起動し、req を JSON に
-// して送り、応答を hozoc.EmitResponse に読んで返す。内部の op なので、内側のパッケージの Ops から呼ぶ。作業ディレクトリは
-// plugin.root、マニフェストのディレクトリは plugin.dir。hozoc.Spec と hozoc.OutputView は中身のない model なので、要求の spec と、
+// して送り、応答を hozoc.EmitResponse に読んで返す。内部の op なので、内側のパッケージの Ops から呼ぶ。動かすのは、
+// plugin.wasm の WASM。hozoc.Spec と hozoc.OutputView は中身のない model なので、要求の spec と、
 // 出力の view は空のオブジェクト。異常終了は proc.Crashed、形の違う応答は proc.MalformedOutput（どちらも internal/gen/proc の型）。
 func TestRunEmit(t *testing.T) {
 	root := t.TempDir()
 	dir := filepath.Join(root, "plugins", "echo")
-	// 受け取った要求（raw.jsonl）と、作業ディレクトリを記録して、頼まれたトランスパイラごとに、決まった答えを返す
-	fakeplugin.Install(t, dir, `pwd >"$d/cwd"`)
+	// 受け取った要求（raw.jsonl）を記録して、頼まれたトランスパイラごとに、決まった答えを返す
+	fakeplugin.Install(t, dir)
 	write(t, filepath.Join(dir, "response.json"), `{"files":[{"path":"gen/a/@T@.go","content":"package a\n"}],"warnings":[{"at":"a.f","message":"w"}],"errors":[{"code":"X-1","at":"a.g","message":"e"}]}`)
 	write(t, filepath.Join(dir, "exit"), "0")
-	plugin := hozoc.Plugin{Name: "echo", Command: fakeplugin.CommandArgs, Dir: hozoc.Path(dir), Root: hozoc.Path(root)}
+	plugin := hozoc.Plugin{Name: "echo", Wasm: hozoc.Path(filepath.Join(dir, fakeplugin.WasmFile))}
 	// 出力が二つ: 一つ目は、トランスパイラを二つ、二つ目は、一つ
 	req := hozoc.EmitRequest{Protocol: "0.22", Direction: "emit", Outputs: []hozoc.EmitOutput{
 		{Transpilers: []string{"echo", "echo2"}}, {Transpilers: []string{"echo"}}}}
@@ -1610,13 +1658,6 @@ func TestRunEmit(t *testing.T) {
 	if got := strings.TrimSpace(string(sent)); got != `{"protocol":"0.22","direction":"emit","spec":{},"outputs":[{"transpilers":["echo","echo2"],"view":{}},{"transpilers":["echo"],"view":{}}]}` {
 		t.Errorf("送った要求 = %s", got)
 	}
-	absRoot, _ := filepath.EvalSymlinks(root)
-	for _, name := range []string{"cwd"} {
-		got, _ := os.ReadFile(filepath.Join(dir, name))
-		if real, _ := filepath.EvalSymlinks(strings.TrimSpace(string(got))); real != absRoot {
-			t.Errorf("%s = %q, want %q", name, got, absRoot)
-		}
-	}
 
 	// 異常終了は proc.Crashed
 	write(t, filepath.Join(dir, "exit"), "3")
@@ -1624,12 +1665,12 @@ func TestRunEmit(t *testing.T) {
 	if _, err = ops.RunEmit(ctx, plugin, req); !errors.As(err, &crashed) {
 		t.Errorf("異常終了: err = %v, want proc.Crashed", err)
 	}
-	// 起動できないコマンドも、空のコマンドも proc.Crashed
-	for _, command := range [][]string{{filepath.Join(root, "no-such-command")}, nil} {
+	// ない WASM も、空の wasm も proc.Crashed
+	for _, wasm := range []hozoc.Path{hozoc.Path(filepath.Join(root, "no-such.wasm")), ""} {
 		broken := plugin
-		broken.Command = command
+		broken.Wasm = wasm
 		if _, err = ops.RunEmit(ctx, broken, req); !errors.As(err, &crashed) {
-			t.Errorf("コマンド %v: err = %v, want proc.Crashed", command, err)
+			t.Errorf("wasm %q: err = %v, want proc.Crashed", wasm, err)
 		}
 	}
 	// 形の違う応答（必須の files がない）と、JSON でない応答は proc.MalformedOutput

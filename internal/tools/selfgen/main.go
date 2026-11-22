@@ -5,9 +5,10 @@
 // コンパイルできない Go が出たときに、hozoc 自身がビルドできなくなり、生成し直すこともできなくなる。そうならないように、
 // 置き場には、コンパイルできると確かめたものしか置かない:
 //
-//  1. 今のソース（今の置き場を含む）で hozoc をビルドする。
-//  2. 一時ディレクトリに仕様と設定（cli.hozo、hozo.toml、go.mod、go.sum）を写し、プラグインが要るディレクトリ
-//     （ir、plugin、plugins、runtime）をシンボリックリンクで足して、そこで hozoc build を走らせる。
+//  1. 今のソース（今の置き場を含む）で hozoc をビルドする。使うプラグイン（plugins/ の go、go-valid、go-cli）を、WASM に
+//     ビルドして、それぞれのディレクトリの plugin.wasm に置く（docs/testing.md「プラグインの WASM」）。
+//  2. 一時ディレクトリに仕様と設定（cli.hozo、hozo.toml、go.mod、go.sum）を写し、プラグインの置き場 plugins と、3 の vet が
+//     要るディレクトリ（ir、plugin、runtime）をシンボリックリンクで足して、そこで hozoc build を走らせる。
 //     生成されるコードの import パスは、hozo.toml の [options.go] の module から決まる（docs/plugin-go.md「パッケージと import パス」）
 //     ので、リポジトリで生成したときと同じになる。go.mod は、3 の vet とビルドのために写す。
 //  3. 生成した置き場の中身を、その一時ディレクトリで vet に通し、次に、リポジトリの今のものの代わりに
@@ -40,8 +41,11 @@ var (
 	genDirs = []string{filepath.Join("internal", "gen", "hozoc"), filepath.Join("internal", "gen", "proc")}
 	// inputs は一時ディレクトリに写すファイル。
 	inputs = []string{"cli.hozo", "hozo.toml", "go.mod", "go.sum"}
-	// links は一時ディレクトリにシンボリックリンクで足すディレクトリ（プラグインを `go run` で動かすのに要る）。
+	// links は一時ディレクトリにシンボリックリンクで足すディレクトリ（プラグインの置き場と、生成物の vet が要るパッケージ）。
 	links = []string{"ir", "plugin", "plugins", "runtime"}
+	// plugins は、cli.hozo の出力に使うプラグイン（hozo.toml の単位の transpilers。plugins/ の下の名前）。生成の前に、WASM に
+	// ビルドする: マニフェストの wasm は plugin.wasm（docs/plugin-go.md「マニフェスト」）。
+	plugins = []string{"go", "go-valid", "go-cli"}
 	// users は、生成物を置き換えたつもりでビルドするパッケージ: 生成物そのものと、それを import するもの。
 	users = []string{"./internal/gen/...", "./internal/app/...", "./cmd/hozoc"}
 )
@@ -80,6 +84,14 @@ func run(repo string, stdout, stderr io.Writer) error {
 	hozoc := filepath.Join(tmp, "hozoc")
 	if err := command(repo, stdout, stderr, "go", "build", "-o", hozoc, "./cmd/hozoc"); err != nil {
 		return fmt.Errorf("hozoc をビルドできない（internal/gen/ が壊れているなら、git で元に戻してからやり直す）: %w", err)
+	}
+
+	for _, name := range plugins {
+		dir := filepath.Join(repo, "plugins", name)
+		wasmEnv := append(os.Environ(), "GOOS=wasip1", "GOARCH=wasm", "CGO_ENABLED=0")
+		if err := commandEnv(dir, wasmEnv, stdout, stderr, "go", "build", "-o", filepath.Join(dir, "plugin.wasm"), "."); err != nil {
+			return fmt.Errorf("プラグイン %s を WASM にビルドできない: %w", name, err)
+		}
 	}
 
 	// 2. 一時ディレクトリで emit する
@@ -143,7 +155,8 @@ func places() string {
 // isolatedEnv は、生成のために hozoc を走らせるときの環境変数: 今の環境から、プラグインの探索が見る場所
 // （docs/plugin-protocol.md「探索」の HOZO_PLUGIN_PATH とホーム）を外したもの。生成物が、実行する人の環境に入っている
 // プラグインに左右されないようにする（使うのは hozo.toml の plugin_dirs のものだけ）。ホームを空のディレクトリ home に
-// 向けるので、go（プラグインを `go run` で動かす）がホームから決めるキャッシュの場所は、今の値を明示して渡す。
+// 向けるので、ホームから決まるキャッシュの場所は、今の値を明示して渡す: go のものと、hozoc が、プラグインの WASM を、機械の
+// 言葉に直したものを覚える置き場（HOZO_CACHE_DIR。docs/plugin-protocol.md「起動」。答えは、変わらない）。
 func isolatedEnv(repo, home string) ([]string, error) {
 	if err := os.MkdirAll(home, 0o755); err != nil {
 		return nil, err
@@ -159,6 +172,11 @@ func isolatedEnv(repo, home string) ([]string, error) {
 	env := os.Environ()
 	for _, name := range []string{"GOCACHE", "GOMODCACHE", "GOPATH"} {
 		env = append(env, name+"="+goEnv[name])
+	}
+	if os.Getenv("HOZO_CACHE_DIR") == "" {
+		if base, err := os.UserCacheDir(); err == nil {
+			env = append(env, "HOZO_CACHE_DIR="+filepath.Join(base, "hozo"))
+		}
 	}
 	return append(env, "HOME="+home, "USERPROFILE="+home, "HOZO_PLUGIN_PATH=", "HOZO_CONFIG="), nil
 }

@@ -1,5 +1,5 @@
 name     = "go"
-command  = ["go", "run", "github.com/mew-ton/hozo/plugins/go"]
+wasm     = "plugin.wasm"
 protocol = "0.22"
 
 [[transpiler]]

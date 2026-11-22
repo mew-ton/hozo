@@ -22,7 +22,7 @@ import (
 // プラグインは、起動しない（状態の単位が、仕様と設定を読み直すだけの呼び出し）。真なら、Check と同じに、プラグインに頼み、
 // 答えを受け取る（生成し直して比べるとき。[App.collect] が、その答えを使う）。error の診断は、check と同じ例外で返す。
 func (a *App) load(plugins bool) (*project.Project, error) {
-	p := project.LoadWith(project.Options{Root: a.Dir, Stderr: a.Stderr, Env: a.Env, PluginPath: a.pluginPath, Home: a.Home, NoPlugins: !plugins})
+	p := project.LoadWith(project.Options{Root: a.Dir, Stderr: a.Stderr, CacheDir: a.cacheDir, PluginPath: a.pluginPath, Home: a.Home, NoPlugins: !plugins})
 	if p.RunErr != nil {
 		return nil, asProc(p.RunErr)
 	}
@@ -45,7 +45,7 @@ func (s sourcesState) Get(ctx context.Context) ([]hozoc.SourceFile, error) {
 		return nil, err
 	}
 	a := s.a
-	p := project.LoadWith(project.Options{Root: a.Dir, Stderr: a.Stderr, Env: a.Env, PluginPath: a.pluginPath, Home: a.Home, NoPlugins: true})
+	p := project.LoadWith(project.Options{Root: a.Dir, Stderr: a.Stderr, CacheDir: a.cacheDir, PluginPath: a.pluginPath, Home: a.Home, NoPlugins: true})
 	if p.RunErr != nil {
 		return nil, asProc(p.RunErr)
 	}

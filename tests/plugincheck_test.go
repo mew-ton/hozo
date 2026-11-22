@@ -18,8 +18,8 @@ import (
 // コマンドとして、つながっていること。
 
 // pluginCheckProject は、プラグインの単体テストの入力 plugins/<plugin>/internal/<pkg>/testdata/<name>/ を、一時ディレクトリの
-// プロジェクトに写す: hozo.toml と .hozo と、Go の基底が import パスを決めるための go.mod（リポジトリを replace で指す。プラグインは、
-// 開発中のマニフェストの `go run` で起動するので、go.mod は、プラグインのパッケージを解決するのにも要る）。
+// プロジェクトに写す: hozo.toml と .hozo と、Go の基底が import パスを決めるための go.mod（リポジトリを replace で指す）。プラグインは、
+// マニフェストの wasm（TestMain がビルドしたもの）を動かす。
 func pluginCheckProject(t *testing.T, plugin, pkg, name string) string {
 	t.Helper()
 	src := filepath.Join(repoPluginsDir, plugin, "internal", pkg, "testdata", name)
@@ -44,7 +44,7 @@ func pluginCheckProject(t *testing.T, plugin, pkg, name string) string {
 	if err != nil {
 		t.Fatal(err)
 	}
-	// リポジトリの go.mod の require を、間接の依存として写す（`go run` が、go.mod を書き換えずに、プラグインを解決できるように）
+	// リポジトリの go.mod の require を、間接の依存として写す（プラグインを `go run` で起動していた間に、要った形。今は、プラグインは WASM で、これに依らないが、写すプロジェクトの形は、変えていない）
 	repoMod, err := os.ReadFile(filepath.Join(repo, "go.mod"))
 	if err != nil {
 		t.Fatal(err)

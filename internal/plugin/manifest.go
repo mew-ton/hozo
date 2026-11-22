@@ -5,6 +5,7 @@ package plugin
 import (
 	"fmt"
 	"os"
+	"path"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -24,7 +25,7 @@ const Protocol = ir.Version
 // Manifest は hozo-plugin.toml（docs/plugin-protocol.md「マニフェスト」）。プラグイン（入れるもの）一つ分。
 type Manifest struct {
 	Name        string
-	Command     []string // 先頭が実行ファイル。文字列で書かれていれば一要素
+	Wasm        string // プラグインの本体（WASM）のファイル。マニフェストのディレクトリからの相対パス（スラッシュ区切り）
 	Protocol    string
 	Vocabulary  []string     // マニフェストからの相対パス。省略時は []
 	Transpilers []Transpiler // [[transpiler]]。書いた順。一つもなければ emit を持たない
@@ -75,6 +76,7 @@ func (m *Manifest) HasImport() bool { return len(m.Import.Formats) > 0 }
 // rawManifest は TOML の形。知らないキーは MetaData.Undecoded で拾う（MAN-4）。
 type rawManifest struct {
 	Name       string         `toml:"name"`
+	Wasm       toml.Primitive `toml:"wasm"`
 	Command    toml.Primitive `toml:"command"`
 	Protocol   string         `toml:"protocol"`
 	Vocabulary []string       `toml:"vocabulary"`
@@ -93,10 +95,11 @@ type rawManifest struct {
 	} `toml:"coverage"`
 }
 
-// LoadManifest は path のマニフェストを読む。診断は MAN-4（TOML の誤り、知らないキー、command が空、値の型違い、
+// LoadManifest は path のマニフェストを読む。診断は MAN-6（なくした書き方 command がある）と、
+// MAN-4（TOML の誤り、知らないキー、wasm がない・空・文字列でない・相対パスでない・ディレクトリの外に出る、値の型違い、
 // [[transpiler]] に name か language がない、language が空、requires に自分の名前か同じ名前が二度ある、
 // seams に空の文字列か同じ FQN が二度ある、同じ名前の [[transpiler]] が二つ）と
-// MAN-2（protocol が Protocol と違う）。MAN-4 なら Manifest は nil。MAN-2 だけなら Manifest も返す。
+// MAN-2（protocol が Protocol と違う）。MAN-4 か MAN-6 なら Manifest は nil。MAN-2 だけなら Manifest も返す。
 // 設計書 §4.6 の [emit]（decorate / entry / stop）とトップレベルの language は持たないので、書いてあれば知らないキー（MAN-4）。
 func LoadManifest(path string) (*Manifest, []diag.Diagnostic) {
 	var diags []diag.Diagnostic
@@ -122,7 +125,7 @@ func LoadManifest(path string) (*Manifest, []diag.Diagnostic) {
 	if undecoded := meta.Undecoded(); len(undecoded) > 0 {
 		keys := make([]string, 0, len(undecoded))
 		for _, k := range undecoded {
-			if k.String() == "command" { // Primitive はあとで読む
+			if k.String() == "wasm" || k.String() == "command" { // Primitive はあとで読む
 				continue
 			}
 			keys = append(keys, k.String())
@@ -145,25 +148,22 @@ func LoadManifest(path string) (*Manifest, []diag.Diagnostic) {
 	if m.Vocabulary == nil {
 		m.Vocabulary = []string{}
 	}
-	if !meta.IsDefined("command") {
-		errorf("MAN-4", "マニフェストに command がない")
+	if meta.IsDefined("command") {
+		errorf("MAN-6", "マニフェストの command（子プロセスで起動するコマンド）は、なくなった。プラグインを WASM（WASI の、コマンドの形）にビルドして、wasm = \"<マニフェストのディレクトリからの、WASM のファイルの相対パス>\" と書く")
+	}
+	if !meta.IsDefined("wasm") {
+		errorf("MAN-4", "マニフェストに wasm がない")
 	} else {
-		var s string
-		var list []string
-		if err := meta.PrimitiveDecode(raw.Command, &s); err == nil {
-			if s == "" {
-				errorf("MAN-4", "マニフェストの command が空")
-			} else {
-				m.Command = []string{s}
-			}
-		} else if err := meta.PrimitiveDecode(raw.Command, &list); err == nil {
-			if len(list) == 0 || list[0] == "" {
-				errorf("MAN-4", "マニフェストの command が空")
-			} else {
-				m.Command = list
-			}
-		} else {
-			errorf("MAN-4", "マニフェストの command は文字列か文字列の配列でなければならない")
+		var w string
+		switch err := meta.PrimitiveDecode(raw.Wasm, &w); {
+		case err != nil:
+			errorf("MAN-4", "マニフェストの wasm は文字列でなければならない")
+		case w == "":
+			errorf("MAN-4", "マニフェストの wasm が空")
+		case !localPath(w):
+			errorf("MAN-4", "マニフェストの wasm %q は、マニフェストのディレクトリの中の、相対パスでなければならない", w)
+		default:
+			m.Wasm = cleanSlash(w)
 		}
 	}
 	seen := map[string]bool{}
@@ -235,15 +235,21 @@ func orEmpty(s []string) []string {
 	return s
 }
 
-// ResolveCommand は Command[0] を実行ファイルのパスにする（docs/plugin-protocol.md「マニフェスト」）。
-// パスの区切りを含めばマニフェストのディレクトリ dir からの相対パス（絶対ならそのまま）、含まなければ PATH から探す名前のまま返す。
-func (m *Manifest) ResolveCommand(dir string) string {
-	exe := m.Command[0]
-	if filepath.Base(exe) == exe {
-		return exe
+// localPath は、p が、ディレクトリの中に収まる相対パスか（絶対パスでなく、.. で外に出ない）。
+func localPath(p string) bool {
+	p = filepath.ToSlash(p)
+	if path.IsAbs(p) || filepath.IsAbs(p) || filepath.VolumeName(p) != "" {
+		return false
 	}
-	if filepath.IsAbs(exe) {
-		return exe
-	}
-	return filepath.Join(dir, exe)
+	clean := path.Clean(p)
+	return clean != "." && clean != ".." && !strings.HasPrefix(clean, "../")
+}
+
+// cleanSlash は、p を、スラッシュ区切りの、整えたパスにする。
+func cleanSlash(p string) string { return path.Clean(filepath.ToSlash(p)) }
+
+// WasmPath は、プラグインの本体（WASM）のファイルのパス: マニフェストのディレクトリ dir からの Wasm
+// （docs/plugin-protocol.md「マニフェスト」）。
+func (m *Manifest) WasmPath(dir string) string {
+	return filepath.Join(dir, filepath.FromSlash(m.Wasm))
 }

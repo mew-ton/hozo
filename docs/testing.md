@@ -35,7 +35,7 @@
 | `state/` | `go` | 持つ（作り直す）。状態の分類、遷移の効果、状態での `match`。IR の中身は `tests/view_test.go` の `TestStateCorpusIR` が見出しごとに確かめる |
 | `units/` | 四つの単位とも `go` | 持つ（作り直す）。出力の単位（`docs/config.md`「単位」「単位の対象」「in」「型の置き場」）のサンプル: 同じ名前空間の二つの単位（どちらも自分の型を持つ）、`in` で絞った単位（`in` の外の op は、呼ばれていれば `Leaves` の口だけ、呼ばれていなければ出ない。型と状態はすべて出る）、子孫を名指しする単位、単位をまたぐ一方向の import（置き場は設定の順で最初の単位）。`tests/units_test.go` の `TestUnitsCorpus` が実物の `hozoc build` の出力を確かめる |
 | `view/` | `view-dump`（上） | 持つ（`view.json` だけ。作り直す） |
-| `model/` | `none`（sh で動く、テストのための基底。ファイルを返さない）。出力したい `shop` のほかに、`shop` が使う例外の置き場として、`carrier` と `marks` にも `none` の単位を置く | 持たない。「モデルが先」（`docs/requirements.md`）のサンプルで、`tests/model_test.go` の `TestModelCorpus` が、IR と、前回の出力が消えることを確かめる |
+| `model/` | `none`（テストのための基底。ファイルを返さない。中身は、にせもののプラグインの WASM: 「環境からの独立」）。出力したい `shop` のほかに、`shop` が使う例外の置き場として、`carrier` と `marks` にも `none` の単位を置く | 持たない。「モデルが先」（`docs/requirements.md`）のサンプルで、`tests/model_test.go` の `TestModelCorpus` が、IR と、前回の出力が消えることを確かめる |
 | `select/` | — | **コーパスごと消す。** 出力の対象をトランスパイラが選ぶ仕組み（`select`）のサンプルで、確かめる相手がなくなった。`tests/select_test.go` も消す。別の名前空間の op の口と、印のデコレータは `design/` が通る |
 
 テスト用のプラグイン `tests/plugins/pick`（選択だけを返す代役）は消す。コーパスの `plugins/pick/` も消す。
@@ -68,7 +68,9 @@ CI で `go generate ./...` と `make generate`（`cli.hozo` からの自己生�
 
 テストの結果は、実行する人の環境に入っているプラグインに左右されない。プラグインの探索が見るプロジェクトの外の場所（`HOZO_PLUGIN_PATH` とホーム。`docs/plugin-protocol.md`「探索」）は、探索が自分では読まず呼ぶ側が渡すもので、プロジェクトを読むテストはどれも、それを渡さない（`project.Load`、`Home` が空の `app.App`、環境変数を返さない関数を渡した `cli.Main`）か、テストが作った一時ディレクトリか、リポジトリの `plugins/`（コーパス、サンプル、プラグインの単体テストの入力。単位のトランスパイラが、リポジトリの本物のプラグインだから）を渡す。確かめ方は、壊れたマニフェストを置いたディレクトリを `HOZO_PLUGIN_PATH` に、`.hozo/plugins` に壊れたマニフェストを置いたディレクトリを `HOME` に向けて、`go test ./...` がすべて通ること（`HOME` を変えるときは、`GOCACHE` / `GOMODCACHE` / `GOPATH` を元の値で明示する）。渡したときに探すことと、渡さなければプロセスの環境を読まないことは、`internal/plugin`、`internal/project`、`internal/app` のテストが確かめる。
 
-- **にせもののプラグイン**: hozoc の側（起動、要求の形、応答の読み方）を確かめるテスト（`internal/app`、`internal/project`、`internal/lsp`）は、本物のプラグインではなく、`internal/fakeplugin` の、にせものを使う。SDK を通さずに、`docs/plugin-protocol.md`「emit」の、まとめた要求を読み、プラグインのディレクトリのファイルで決めた応答（トランスパイラ一つの答えのひな形。形の違う応答も）を返し、起動の回数と、受け取った頼みごとを、記録する。一度だけビルドして、どのテストも、それを起動する。
+- **にせもののプラグイン**: hozoc の側（起動、要求の形、応答の読み方）を確かめるテスト（`internal/app`、`internal/project`、`internal/lsp`）は、本物のプラグインではなく、`internal/fakeplugin` の、にせものを使う。SDK を通さずに、`docs/plugin-protocol.md`「emit」の、まとめた要求を読み、プラグインのディレクトリのファイルで決めた応答（トランスパイラ一つの答えのひな形。形の違う応答も）を返し、起動の回数と、受け取った頼みごとを、記録する。にせものも、WASM で、本物と同じ起動を通る（「プラグインの WASM」）。
+  - にせものは、振る舞いを決めるファイルと、記録を、読み書きする。サンドボックスは、プラグインに、ファイルを見せない（`docs/plugin-protocol.md`「起動」）ので、テストだけが呼べる口（`internal/plugin` の `MountForTest`）で、にせものの置き場のディレクトリ一つだけを、にせものに見せる。この口は、テストのプロセスでなければ、panic する。マニフェストからも、設定からも、コマンドからも、届かない。
+  - 振る舞いを決めるファイルが、一つもなければ（見せるディレクトリがなくても）、にせものは、ファイルを返さない答えを返す。実装のないプラグインの代役（`tests/samples/README.md`「飛ばす条件」）と、コーパスの、何も出さないプラグインは、これを使う。
 
 ## 予約語の一致
 
@@ -76,7 +78,36 @@ CI で `go generate ./...` と `make generate`（`cli.hozo` からの自己生�
 
 ## プラグインのプロトコル
 
-`internal/plugin` のテストは、`testdata/echo-plugin/`（テストの初めにビルドする小さなプラグイン）を使い、要求がそのまま応答に写ること、終了コードが 0 以外なら `proc.Crashed`、JSON でない・形が違う（`docs/plugin-protocol.md`「応答の形」: 必須の項目がない、型が違う。知らない項目は通る）なら `proc.MalformedOutput` になることを確かめる。SDK（Go の `plugin`）が、要求ごとに返す終了コードは、表（`plugin/testdata/request_head.json`）を読んで確かめる。`plugins/` のプラグインは、サンプル（「トランスパイラのテスト」）、それぞれの単体テスト（「単体テスト」）、生成物の遅れの検査（「生成物の一致」。`go`、`go-valid`、`go-cli`）で確かめる。
+`internal/plugin` のテストは、`testdata/echo-plugin/`（テストの初めに、WASM にビルドする小さなプラグイン）を使い、次を確かめる。
+
+- 要求がそのまま応答に写ること。標準エラーが、プラグインの名前を頭に付けて、流れること。
+- 終了コードが 0 と 2 以外なら `proc.Crashed`、JSON でない・形が違う（`docs/plugin-protocol.md`「応答の形」: 必須の項目がない、型が違う。知らない項目は通る）なら `proc.MalformedOutput` になること。`wasm` のファイルがない・WASM として読めないなら `proc.Crashed`。
+- **サンドボックスが、効いていること**（同「起動」の、渡さないものの表）: プラグインが、ファイルを開けない（hozoc の作業ディレクトリのファイルも、絶対パスのファイルも、ディレクトリの一覧も）、環境変数が一つもない、引数がない、ネットワークに、つなげないこと、プラグインが待ち受けたアドレスに、外から、つなげないこと。時計が、今の時刻でないこと。テストだけの口（`MountForTest`）で見せたディレクトリは、言った WASM にだけ見え、取り消せば、見えないこと。
+- **同じ要求に、同じ答えが返ること**: 時計と乱数を読んで答えに入れるプラグインを、二度、動かして、答えが同じこと。
+- **動いているプラグインを、途中で止められること**: 終わらないプラグイン（回り続けるものと、眠り続けるもの）を動かし、やめさせると、すぐ戻り、次の起動が、動くこと。
+- 機械の言葉に直したものを、覚える置き場: 言った場所に置かれること。置き場を作れなくても、動くこと。
+
+SDK（Go の `plugin`）が、要求ごとに返す終了コードは、表（`plugin/testdata/request_head.json`）を読んで確かめる。`plugins/` のプラグインは、サンプル（「トランスパイラのテスト」）、それぞれの単体テスト（「単体テスト」）、生成物の遅れの検査（「生成物の一致」。`go`、`go-valid`、`go-cli`）で確かめる。
+
+## プラグインの WASM
+
+hozoc が起動するのは、WASM だけ（`docs/plugin-protocol.md`「マニフェスト」の `wasm`）。このリポジトリのプラグインの WASM は、リポジトリに入れず（`.gitignore` の `*.wasm`）、使う側が、ビルドする。
+
+- **作り方**は、一つ: プラグインの main パッケージのディレクトリで `GOOS=wasip1 GOARCH=wasm go build -o <マニフェストの wasm の場所>`。`internal/wasmbuild` が、これを行う。
+  - `wasmbuild.Build`: パッケージ一つ。中身が変わっていなければ、`go build` は、作り直さない（0.1 秒ほど）。
+  - `wasmbuild.Repo`: リポジトリの下の、マニフェスト（`hozo-plugin.toml`）のあるディレクトリのうち、テストでない Go のファイルを持つもの、すべて（`plugins/` の六つ、`tests/corpus/view/plugins/view-dump`、サンプルの中のプラグイン）。
+  - テストのパッケージは、並んで走るので、同じ WASM を、同時に作らないように、鍵のファイル（OS の一時ディレクトリ）で、順にする。
+- **誰が、いつ、作るか**:
+
+| 使う側 | 作るもの | いつ |
+|---|---|---|
+| `tests` のテスト（コーパス、サンプル、生成物の一致、`View`） | `wasmbuild.Repo` | パッケージのテストの初め（`TestMain`） |
+| にせもののプラグイン（`internal/fakeplugin`。「環境からの独立」） | `cmd/fakeplugin` | はじめて置くとき。OS の一時ディレクトリに一つ作り、テストのプラグインのディレクトリには、その写しを置く |
+| `internal/plugin` のテスト | `testdata/echo-plugin` | パッケージのテストの初め |
+| `make generate`（`internal/tools/selfgen`） | `plugins/` の `go`、`go-valid`、`go-cli` | 生成の前（`docs/packages.md`「自己生成の手順」） |
+
+- `go run ./cmd/hozoc build --no-emit`（リポジトリのルート。`CLAUDE.md`「確かめ方」の三つ目）は、WASM を作らない: 上のどれかが置いたものを使う。なければ、`proc.Crashed` で、ファイルがないことを言う。テストを走らせずに、作るなら、`make plugins`（`plugins/` の六つ）。
+- 機械の言葉に直したもの（`docs/plugin-protocol.md`「起動」）は、テストも、実行する人の、ふだんの置き場を使う（答えは、変わらない。`make generate` も、ホームを空に向けるが、置き場は、もとの場所を渡す）。
 
 ## 単体テスト
 
@@ -99,14 +130,15 @@ CI で `go generate ./...` と `make generate`（`cli.hozo` からの自己生�
 - `internal/plugin`: MAN-* の各条件（`requires` と `seams` の誤りを含む）、応答の形の各条件（「プラグインのプロトコル」。版 0.3 までの `select` を持つ応答が、読まれずに通ること）。PLG-1 / PLG-2 は応答のファイルを集める `internal/app` のテストで確かめる。
 - `internal/project`: 単位のトランスパイラの解決（CFG-14〜CFG-16、CFG-19、CFG-20）、`in` の照合（CFG-18。語彙のファイルがいつも合うこと）、型の置き場（CFG-22 の表の各行）、単位の継ぎ目（CFG-23。別の単位なら重なってよいこと、解決できなかったトランスパイラを見ないこと）、`View` の `config`（`index`、`base`、`options`、`seams`）、使うプラグインだけの語彙と `check`、MAN-2 を使うプラグインにだけ出すこと。
 - `internal/app`: `emit` の手順（`docs/cli.md`「書き出し」）。にせもののプラグイン（`internal/fakeplugin`）で、同じ名前空間の複数の単位、`in`、子孫を名指しする単位、引数での書き出しの対象の絞り込み（子孫だけが単位の対象である引数、`UnknownNamespace`。絞っても内容が同じこと、対象でない出力のトランスパイラを起動しないこと）、二つのトランスパイラが同じパスを返す衝突（CFG-5）、`errors` を返したトランスパイラがあれば何も書かないこと、`.hozoc-outputs.json` に書かれた Dir(U, N) の外のパスを消さないこと、空になったディレクトリを消すことを確かめる。配線 `writeOutputs` が呼ぶ三つ（葉の `collectOutputs`、`read` の `outputChanges`、効果 `syncOutputs`。`docs/cli.md`「手で書くもの」）は、一つずつも動かす: 集めるのと決めるのは、生成したファイルに触れず、書き出すのは効果だけで、`dryRun` の予定では何もしない。中断された `ctx` では、`collectOutputs` は集めずに、その `error` を返し、`writeOutputs` は何も書かない。`internal/app` と `internal/project` が、`plugin/golang` も `plugins/` も import しないこと（本体が言語を知らないこと）は、依存の向きのテスト（「文書とコードの一致」）が確かめる。
-- `internal/app` の `tests` の手順（`docs/cli.md`「tests」）: sh で動く小さなプラグインで、すべて走った、走っていないテストの名指し（TESTS-1。測っていないファイルの文面を含む）、置き場の出力がない・違う（TESTS-2）、カバレッジのファイルを開けない・基底のプラグインが `[coverage] enabled` でない・`recognized: false`（TESTS-3）、対応表が一つもない、対応表の形の誤り（PLG-4。`emit` でも）、text と json の表示、終了コード。
+- `internal/app` の `tests` の手順（`docs/cli.md`「tests」）: にせもののプラグイン（`internal/fakeplugin`）で、すべて走った、走っていないテストの名指し（TESTS-1。測っていないファイルの文面を含む）、置き場の出力がない・違う（TESTS-2）、カバレッジのファイルを開けない・基底のプラグインが `[coverage] enabled` でない・`recognized: false`（TESTS-3）、対応表が一つもない、対応表の形の誤り（PLG-4。`emit` でも）、text と json の表示、終了コード。
+- **サンドボックスの、hozoc の側**（`docs/plugin-protocol.md`「マニフェスト」「起動」）: なくした書き方 `command` のマニフェストが、使っていなくても MAN-6 になること（`internal/project` の `TestManifestDiagnosticsOfInstalledPlugins`）と、`hozoc build` が、設定の誤りで止まり、プラグインを起動しないこと（`internal/app` の `TestManifestCommandIsGone`）。`HOZO_CACHE_DIR` が、コマンドの入力から、置き場に届き、プロセスの環境変数は、読まないこと（同 `TestCacheDirEnvironment`）。言語サーバーが、終わらないプラグインを、途中で止めて、次の check を走らせること（`internal/lsp` の `TestPluginCheckStopsStuckPlugin`）と、終わるときに、動いているプラグインを止めること（同 `TestPluginCheckExit`）。プラグインそのものの、サンドボックスの確かめは「プラグインのプロトコル」。
 - `internal/tools/selfgen`: コンパイルできない生成物を置き場に置かないこと（`docs/packages.md`「自己生成の手順」）。
 - `plugins/go-cli`: CLI-* の各条件と、引数の解釈の各規則（`docs/plugin-go-cli.md`「引数の解釈」）。
-- `internal/lsp`: `hozo.toml` のないワークスペースで LSP-1 が出ること。プラグインの診断（`docs/lsp.md`「プラグインの診断」。`plugincheck_test.go`。プラグインは、`sh` で動く、にせもので、待たせる・進ませるを、テストが決める）: クライアントが、許していなければ（既定。許しとして読めない `initializationOptions` を含む）、開いても、保存しても、外でファイルが変わっても、起動しないこと。動いている間に、許しがなくなれば、プラグインの診断が消え（走っている check の答えも、出ない）、その後は、起動しないこと。与えられれば、走ること（同 「許し」）。以下は、許されているとき: 開いたときと、保存したときに、裏で走り、終わったら、足されて出ること。解析（`initialized`、`didChange`）では、起動しないこと。走っている間も、ホバーと解析が、待たされないこと。古い答えが、出ないこと。中身が変われば消え、戻れば、起動し直さずに、また出ること。error があれば、起動しないこと。ファイルの監視の知らせで、走ること（同じ中身なら、走らないこと）。異常終了で、LSP-2 が出て、動き続けること。終わるときに、走っている check を、待つこと。ほかのテストのサーバーは、リポジトリの `plugins/` の代役（マニフェストと語彙は同じで、起動するのは、診断を返さない `sh`）を見る。
+- `internal/lsp`: `hozo.toml` のないワークスペースで LSP-1 が出ること。プラグインの診断（`docs/lsp.md`「プラグインの診断」。`plugincheck_test.go`。プラグインは、にせもの（`internal/fakeplugin`）で、待たせる・進ませるを、テストが決める）: クライアントが、許していなければ（既定。許しとして読めない `initializationOptions` を含む）、開いても、保存しても、外でファイルが変わっても、起動しないこと。動いている間に、許しがなくなれば、プラグインの診断が消え（走っている check の答えも、出ない）、その後は、起動しないこと。与えられれば、走ること（同 「許し」）。以下は、許されているとき: 開いたときと、保存したときに、裏で走り、終わったら、足されて出ること。解析（`initialized`、`didChange`）では、起動しないこと。走っている間も、ホバーと解析が、待たされないこと。古い答えが、出ないこと。中身が変われば消え、戻れば、起動し直さずに、また出ること。error があれば、起動しないこと。ファイルの監視の知らせで、走ること（同じ中身なら、走らないこと）。異常終了で、LSP-2 が出て、動き続けること。終わるときに、走っている check を、待つこと。ほかのテストのサーバーは、リポジトリの `plugins/` の代役（マニフェストと語彙は同じで、起動するのは、診断を返さない `sh`）を見る。
 
 ## CI
 
-`.github/workflows/ci.yml`: `go build ./...`、`go vet ./...`、`go test ./...`、生成物の一致。`editors/vscode` は Node 22 で、`npm ci`、ビルド（`npm run build`）、`npm test`。`editors/vscode` のテストのうち、`test/trust.test.js` は、ビルドした `out/trust.js` を読む（`docs/editors.md`「VS Code 拡張」）。
+`.github/workflows/ci.yml`: `go build ./...`、`go vet ./...`、`go test ./...`、生成物の一致。プラグインの WASM は、テストと `make generate` が、自分で作る（「プラグインの WASM」）ので、CI に、そのための手順は、ない。`editors/vscode` は Node 22 で、`npm ci`、ビルド（`npm run build`）、`npm test`。`editors/vscode` のテストのうち、`test/trust.test.js` は、ビルドした `out/trust.js` を読む（`docs/editors.md`「VS Code 拡張」）。
 
 - **実行は、同時に一つだけ。** `main` への push と、どの PR の実行も、一つの組（`concurrency` の `group: ci`）に入れる。新しい実行が始まると、動いている実行と、待っている実行は、止まる（`cancel-in-progress`）。止められた実行は、緑ではない。
 

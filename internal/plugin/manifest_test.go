@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"sort"
+	"strings"
 	"testing"
 
 	"github.com/mew-ton/hozo/internal/config"
@@ -14,7 +15,7 @@ import (
 // docs/plugin-protocol.md「マニフェスト」の形（protocol は hozoc のもの）。
 const exampleManifest = `
 name     = "react-router"
-command  = ["node", "dist/main.js"]
+wasm     = "dist/plugin.wasm"
 protocol = "0.22"
 
 vocabulary = ["vocab/page.hozo"]
@@ -36,7 +37,7 @@ enabled = true
 // docs/plugin-go-cli.md「マニフェスト」。
 const goCLIManifest = `
 name     = "go-cli"
-command  = ["go", "run", "github.com/mew-ton/hozo/plugins/go-cli"]
+wasm     = "plugin.wasm"
 protocol = "0.22"
 
 [[transpiler]]
@@ -45,7 +46,7 @@ language = "go"
 `
 
 // base は name = "x" の最小のマニフェスト（protocol は hozoc のもの）。後ろにテーブルを足して使う。
-const base = "name = \"x\"\ncommand = \"x\"\nprotocol = \"0.22\"\n"
+const base = "name = \"x\"\nwasm = \"x.wasm\"\nprotocol = \"0.22\"\n"
 
 func writeManifest(t *testing.T, dir, content string) string {
 	t.Helper()
@@ -75,7 +76,7 @@ func TestLoadManifestExample(t *testing.T) {
 		t.Fatalf("diags = %+v", diags)
 	}
 	want := &Manifest{
-		Name: "react-router", Command: []string{"node", "dist/main.js"}, Protocol: "0.22",
+		Name: "react-router", Wasm: "dist/plugin.wasm", Protocol: "0.22",
 		Vocabulary:  []string{"vocab/page.hozo"},
 		Transpilers: []Transpiler{{Name: "react-router", Language: "ts", Requires: []string{"ts", "ts-valid"}, Unsupported: []string{}, Seams: []string{"rate.limited"}}},
 		Import:      Import{Formats: []string{}},
@@ -97,7 +98,7 @@ func TestLoadManifestGoCLI(t *testing.T) {
 	if len(diags) != 0 {
 		t.Fatalf("diags = %+v", diags)
 	}
-	if m.Name != "go-cli" || !reflect.DeepEqual(m.Command, []string{"go", "run", "github.com/mew-ton/hozo/plugins/go-cli"}) {
+	if m.Name != "go-cli" || m.Wasm != "plugin.wasm" {
 		t.Errorf("%+v", m)
 	}
 	// requires を書かなければ基底（docs/config.md「基底と相乗り」）。省いた requires / unsupported / seams は []
@@ -121,10 +122,35 @@ func TestLoadManifestRepoGoCLI(t *testing.T) {
 	}
 }
 
-func TestLoadManifestStringCommand(t *testing.T) {
-	m, diags := LoadManifest(writeManifest(t, t.TempDir(), "name = \"x\"\ncommand = \"hozoc-plugin-x\"\nprotocol = \"0.22\"\n"))
-	if len(diags) != 0 || !reflect.DeepEqual(m.Command, []string{"hozoc-plugin-x"}) || m.HasEmit() {
+// docs/plugin-protocol.md「マニフェスト」の wasm: マニフェストのディレクトリからの相対パス。整えて持つ。
+func TestLoadManifestWasm(t *testing.T) {
+	m, diags := LoadManifest(writeManifest(t, t.TempDir(), "name = \"x\"\nwasm = \"./bin/../bin/x.wasm\"\nprotocol = \"0.22\"\n"))
+	if len(diags) != 0 || m.Wasm != "bin/x.wasm" || m.HasEmit() {
 		t.Errorf("m=%+v diags=%+v", m, diags)
+	}
+	dir := filepath.Join(string(filepath.Separator), "plugins", "x")
+	if got, want := m.WasmPath(dir), filepath.Join(dir, "bin", "x.wasm"); got != want {
+		t.Errorf("WasmPath = %q, want %q", got, want)
+	}
+}
+
+// docs/plugin-protocol.md「診断」の MAN-6: なくした書き方 command があれば、wasm に書き直すことを示す。wasm も書いてあっても、同じ。
+func TestLoadManifestCommandIsGone(t *testing.T) {
+	for _, body := range []string{
+		"name = \"x\"\ncommand = [\"go\", \"run\", \"example.com/x\"]\nprotocol = \"0.22\"\n",
+		"name = \"x\"\ncommand = \"hozoc-plugin-x\"\nprotocol = \"0.22\"\n",
+		"name = \"x\"\ncommand = \"hozoc-plugin-x\"\nwasm = \"plugin.wasm\"\nprotocol = \"0.22\"\n",
+	} {
+		m, diags := LoadManifest(writeManifest(t, t.TempDir(), body))
+		var man6 []diag.Diagnostic
+		for _, d := range diags {
+			if d.Code == "MAN-6" {
+				man6 = append(man6, d)
+			}
+		}
+		if m != nil || len(man6) != 1 || man6[0].Severity != diag.Error || !strings.Contains(man6[0].Message, "wasm = ") {
+			t.Errorf("%q: m=%+v diags=%+v", body, m, diags)
+		}
 	}
 }
 
@@ -156,11 +182,16 @@ func TestLoadManifestDiagnostics(t *testing.T) {
 		{"unknown key", base + "foo = 1\n", []string{"MAN-4"}, true},
 		{"unknown transpiler key", base + tr + "foo = 1\n", []string{"MAN-4"}, true},
 		{"unknown table", base + "[extra]\na = 1\n", []string{"MAN-4"}, true},
-		{"no command", "name = \"x\"\nprotocol = \"0.22\"\n", []string{"MAN-4"}, true},
-		{"empty string command", "name = \"x\"\ncommand = \"\"\nprotocol = \"0.22\"\n", []string{"MAN-4"}, true},
-		{"empty array command", "name = \"x\"\ncommand = []\nprotocol = \"0.22\"\n", []string{"MAN-4"}, true},
-		{"command wrong type", "name = \"x\"\ncommand = 1\nprotocol = \"0.22\"\n", []string{"MAN-4"}, true},
-		{"no name", "command = \"x\"\nprotocol = \"0.22\"\n", []string{"MAN-4"}, true},
+		{"no wasm", "name = \"x\"\nprotocol = \"0.22\"\n", []string{"MAN-4"}, true},
+		{"empty wasm", "name = \"x\"\nwasm = \"\"\nprotocol = \"0.22\"\n", []string{"MAN-4"}, true},
+		{"wasm is an array", "name = \"x\"\nwasm = [\"x.wasm\"]\nprotocol = \"0.22\"\n", []string{"MAN-4"}, true},
+		{"wasm wrong type", "name = \"x\"\nwasm = 1\nprotocol = \"0.22\"\n", []string{"MAN-4"}, true},
+		{"absolute wasm", "name = \"x\"\nwasm = \"/usr/lib/x.wasm\"\nprotocol = \"0.22\"\n", []string{"MAN-4"}, true},
+		{"wasm outside the directory", "name = \"x\"\nwasm = \"../x.wasm\"\nprotocol = \"0.22\"\n", []string{"MAN-4"}, true},
+		{"wasm outside the directory, hidden", "name = \"x\"\nwasm = \"bin/../../x.wasm\"\nprotocol = \"0.22\"\n", []string{"MAN-4"}, true},
+		{"wasm is the directory", "name = \"x\"\nwasm = \".\"\nprotocol = \"0.22\"\n", []string{"MAN-4"}, true},
+		{"command (MAN-6) and no wasm", "name = \"x\"\ncommand = \"x\"\nprotocol = \"0.22\"\n", []string{"MAN-4", "MAN-6"}, true},
+		{"no name", "wasm = \"x.wasm\"\nprotocol = \"0.22\"\n", []string{"MAN-4"}, true},
 		// 版 0.22 でなくした [check]（docs/plugin-protocol.md「マニフェスト」）は、知らないキー
 		{"removed check table", base + "\n[check]\nenabled = true\n", []string{"MAN-4"}, true},
 		{"unsupported wrong type", base + tr + "unsupported = \"a\"\n", []string{"MAN-4"}, true},
@@ -190,9 +221,9 @@ func TestLoadManifestDiagnostics(t *testing.T) {
 		// トランスパイラはなくてもよい（emit を持たない）
 		{"no transpiler", base, nil, false},
 		{"one transpiler", base + tr, nil, false},
-		{"MAN-2", "name = \"x\"\ncommand = \"x\"\nprotocol = \"0.1\"\n", []string{"MAN-2"}, false},
-		{"MAN-2 missing protocol", "name = \"x\"\ncommand = \"x\"\n", []string{"MAN-2"}, false},
-		{"MAN-2 with transpiler", "name = \"x\"\ncommand = \"x\"\nprotocol = \"9\"\n" + tr, []string{"MAN-2"}, false},
+		{"MAN-2", "name = \"x\"\nwasm = \"x.wasm\"\nprotocol = \"0.1\"\n", []string{"MAN-2"}, false},
+		{"MAN-2 missing protocol", "name = \"x\"\nwasm = \"x.wasm\"\n", []string{"MAN-2"}, false},
+		{"MAN-2 with transpiler", "name = \"x\"\nwasm = \"x.wasm\"\nprotocol = \"9\"\n" + tr, []string{"MAN-2"}, false},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -217,22 +248,6 @@ func TestLoadManifestMissing(t *testing.T) {
 	m, diags := LoadManifest(filepath.Join(t.TempDir(), ManifestFileName))
 	if m != nil || codes(diags)[0] != "MAN-4" {
 		t.Errorf("m=%v diags=%+v", m, diags)
-	}
-}
-
-func TestResolveCommand(t *testing.T) {
-	dir := filepath.Join(string(filepath.Separator), "plugins", "x")
-	cases := map[string]string{
-		"node":                         "node",
-		"./dist/main":                  filepath.Join(dir, "dist", "main"),
-		"dist/main.js":                 filepath.Join(dir, "dist", "main.js"),
-		filepath.Join(dir, "bin", "x"): filepath.Join(dir, "bin", "x"),
-	}
-	for exe, want := range cases {
-		m := &Manifest{Command: []string{exe}}
-		if got := m.ResolveCommand(dir); got != want {
-			t.Errorf("ResolveCommand(%q) = %q, want %q", exe, got, want)
-		}
 	}
 }
 
@@ -263,7 +278,7 @@ func TestDiscoverOrder(t *testing.T) {
 
 	// where は、どこのマニフェストかをトランスパイラの名前に書いたマニフェスト
 	manifest := func(name, where string) string {
-		return "name = \"" + name + "\"\ncommand = \"p\"\nprotocol = \"0.22\"\n[[transpiler]]\nname = \"" + where + "\"\nlanguage = \"go\"\n"
+		return "name = \"" + name + "\"\nwasm = \"p.wasm\"\nprotocol = \"0.22\"\n[[transpiler]]\nname = \"" + where + "\"\nlanguage = \"go\"\n"
 	}
 	plugins, diags := Discover(cfg, env)
 	if len(plugins) != 0 || len(diags) != 0 {
@@ -336,7 +351,7 @@ func TestDiscoverNameMismatch(t *testing.T) {
 	env := SearchEnv{}
 	cfg := config.Default(root)
 	cfg.Hozo.PluginDirs = []string{"plugins"}
-	p := writeManifest(t, filepath.Join(root, "plugins", "p"), "name = \"q\"\ncommand = \"q\"\nprotocol = \"0.22\"\n")
+	p := writeManifest(t, filepath.Join(root, "plugins", "p"), "name = \"q\"\nwasm = \"q.wasm\"\nprotocol = \"0.22\"\n")
 	plugins, diags := Discover(cfg, env)
 	if len(plugins) != 0 || !reflect.DeepEqual(codes(diags), []string{"MAN-3"}) || diags[0].File != p {
 		t.Errorf("plugins=%v diags=%+v", names(plugins), diags)
@@ -352,13 +367,13 @@ func TestDiscoverBadManifest(t *testing.T) {
 	cfg := config.Default(root)
 	cfg.Hozo.PluginDirs = []string{"plugins"}
 	writeManifest(t, filepath.Join(root, "plugins", "p"), "name = \n")
-	writeManifest(t, filepath.Join(home, ".hozo", "plugins", "p"), "name = \"p\"\ncommand = \"p\"\nprotocol = \"0.22\"\n")
+	writeManifest(t, filepath.Join(home, ".hozo", "plugins", "p"), "name = \"p\"\nwasm = \"p.wasm\"\nprotocol = \"0.22\"\n")
 	plugins, diags := Discover(cfg, env)
 	if len(plugins) != 0 || !reflect.DeepEqual(codes(diags), []string{"MAN-4"}) {
 		t.Errorf("plugins=%v diags=%+v", names(plugins), diags)
 	}
 	// protocol の不一致（MAN-2）はプラグインを返し、診断は Mismatch に置く（使うプラグインにだけ報告する）
-	writeManifest(t, filepath.Join(root, "plugins", "p"), "name = \"p\"\ncommand = \"p\"\nprotocol = \"0.1\"\n")
+	writeManifest(t, filepath.Join(root, "plugins", "p"), "name = \"p\"\nwasm = \"p.wasm\"\nprotocol = \"0.1\"\n")
 	plugins, diags = Discover(cfg, env)
 	if len(plugins) != 1 || len(diags) != 0 || !reflect.DeepEqual(codes(plugins[0].Mismatch), []string{"MAN-2"}) {
 		t.Errorf("plugins=%v diags=%+v", names(plugins), diags)

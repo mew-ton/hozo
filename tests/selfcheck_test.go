@@ -40,8 +40,8 @@ func TestSelfCheck(t *testing.T) {
 
 // TestSelfEmitDryRun は hozoc 自身への emit --dry-run が、コミット済みの生成物（二つの単位の出力: 基底 go と go-valid と go-cli の
 // internal/gen/hozoc/ と、基底 go の internal/gen/proc/）と、ちょうど同じファイルを書く予定にすること（出力先ごとの記録
-// .hozoc-outputs.json は、トランスパイラのファイルではないので、予定には出ない）。書き出さないこと。プラグインは `go run` で動く
-// ので、go がなければ飛ばす。
+// .hozoc-outputs.json は、トランスパイラのファイルではないので、予定には出ない）。書き出さないこと。プラグインの WASM は、
+// go でビルドするので、go がなければ飛ばす。
 func TestSelfEmitDryRun(t *testing.T) {
 	if _, err := exec.LookPath("go"); err != nil {
 		t.Skip("go がない")

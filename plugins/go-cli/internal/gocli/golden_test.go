@@ -535,7 +535,8 @@ func TestProtocol(t *testing.T) {
 	}
 }
 
-// TestPluginBinary は、プラグインの main を go run で起動し、標準入出力で一往復する（docs/plugin-protocol.md「起動」）。
+// TestPluginBinary は、プラグインの main を、ふつうの Go のプログラムとして（go run で）動かし、標準入出力で一往復する
+// （docs/plugin-protocol.md「要求と応答」）。hozoc が起動する形（WASM）は、tests のサンプルと、生成物の一致が確かめる。
 func TestPluginBinary(t *testing.T) {
 	goBin := goTool(t)
 	root := newRoot(t)
@@ -572,7 +573,7 @@ func TestManifest(t *testing.T) {
 	s := string(b)
 	checks := map[string]*regexp.Regexp{
 		"name":     regexp.MustCompile(`(?m)^name\s*=\s*"go-cli"$`),
-		"command":  regexp.MustCompile(`(?m)^command\s*=\s*\["go", "run", "github.com/mew-ton/hozo/plugins/go-cli"\]$`),
+		"wasm":     regexp.MustCompile(`(?m)^wasm\s*=\s*"plugin\.wasm"$`),
 		"protocol": regexp.MustCompile(`(?m)^protocol\s*=\s*"` + regexp.QuoteMeta(ir.Version) + `"$`),
 		// 提供するトランスパイラは一つ: 名前は TranspilerName、言語は go
 		"transpiler": regexp.MustCompile(`(?m)^\[\[transpiler\]\]\nname\s*=\s*"` + regexp.QuoteMeta(TranspilerName) + `"\nlanguage\s*=\s*"go"$`),

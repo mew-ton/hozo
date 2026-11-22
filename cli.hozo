@@ -127,6 +127,8 @@ namespace hozoc {
     format: OutputFormat?;
     /** プラグインを探すディレクトリ（OS のパス区切りで複数） */
     pluginPath: string?;
+    /** プラグインの WASM を、機械の言葉に直したものを、覚える置き場 */
+    cacheDir: Path?;
   }
 
   /** build の入力 */
@@ -143,6 +145,8 @@ namespace hozoc {
     @cli.flag("dry-run") dryRun: boolean?;
     /** プラグインを探すディレクトリ（OS のパス区切りで複数） */
     @cli.env("HOZO_PLUGIN_PATH") pluginPath: string?;
+    /** プラグインの WASM を、機械の言葉に直したものを、覚える置き場 */
+    @cli.env("HOZO_CACHE_DIR") cacheDir: Path?;
   }
 
   /** tests の入力 */
@@ -155,6 +159,8 @@ namespace hozoc {
     @cli.required @cli.flag("coverage") coverage: Path;
     /** プラグインを探すディレクトリ（OS のパス区切りで複数） */
     @cli.env("HOZO_PLUGIN_PATH") pluginPath: string?;
+    /** プラグインの WASM を、機械の言葉に直したものを、覚える置き場 */
+    @cli.env("HOZO_CACHE_DIR") cacheDir: Path?;
   }
 
   /** lsp の入力 */
@@ -165,6 +171,8 @@ namespace hozoc {
     @cli.flag("log") @cli.env("HOZO_LSP_LOG") log: Path?;
     /** プラグインを探すディレクトリ（OS のパス区切りで複数） */
     @cli.env("HOZO_PLUGIN_PATH") pluginPath: string?;
+    /** プラグインの WASM を、機械の言葉に直したものを、覚える置き場 */
+    @cli.env("HOZO_CACHE_DIR") cacheDir: Path?;
   }
 
   /** 生成したファイルが、今の仕様と設定から生成し直したものと一致しているか */
@@ -254,7 +262,7 @@ namespace hozoc {
     throws CheckFailed, ConfigInvalid, LanguageMismatch, OutputConflict, UnknownNamespace prevents effects
     throws proc.Crashed, proc.MalformedOutput prevents effects
   {
-    val checked = check({ config: in.config, format: in.format, pluginPath: in.pluginPath });
+    val checked = check({ config: in.config, format: in.format, pluginPath: in.pluginPath, cacheDir: in.cacheDir });
     return writeOutputs(in, checked);
   }
 
@@ -281,7 +289,7 @@ namespace hozoc {
    */
   @cli.command("tests")
   export fn tests(in: TestsInput): TestsResult {
-    val checked = check({ config: in.config, format: in.format, pluginPath: in.pluginPath });
+    val checked = check({ config: in.config, format: in.format, pluginPath: in.pluginPath, cacheDir: in.cacheDir });
     return matchTests(in, checked);
   }
 
@@ -293,8 +301,8 @@ namespace hozoc {
   @cli.command("lsp")
   export fn lsp(in: LspInput);
 
-  /** プラグインの起動のしかた（docs/plugin-protocol.md「起動」）。root は作業ディレクトリにするプロジェクトのルート、dir はマニフェストのディレクトリ */
-  model Plugin { name: string; command: string[]; dir: Path; root: Path; }
+  /** プラグインの起動のしかた（docs/plugin-protocol.md「起動」）。wasm は、プラグインの本体（WASM）のファイル */
+  model Plugin { name: string; wasm: Path; }
 
   /** 仕様: IR の、出力に依らない部分（docs/ir.md「まとめた形」の Spec）。中身はこの仕様では書かない */
   model Spec {}

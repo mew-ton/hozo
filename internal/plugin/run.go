@@ -1,22 +1,20 @@
 package plugin
 
 import (
-	"bufio"
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"os"
-	"os/exec"
-	"path/filepath"
 	"sync"
 
 	"github.com/mew-ton/hozo/internal/diag"
 )
 
 // ErrCrashed はプラグインの異常終了（例外 proc.Crashed。docs/plugin-protocol.md「起動」の「それ以外」の終了コード、
-// または起動できなかった）。*CrashedError が Unwrap する。
+// WASM の罠、または起動できなかった）。*CrashedError が Unwrap する。
 var ErrCrashed = errors.New("proc.Crashed")
 
 // ErrMalformedOutput はプラグインの出力が約束した形（JSON）でなかった（例外 proc.MalformedOutput）。
@@ -26,13 +24,13 @@ var ErrMalformedOutput = errors.New("proc.MalformedOutput")
 // CrashedError は proc.Crashed の中身。
 type CrashedError struct {
 	Plugin   string
-	ExitCode int   // 起動できなかったときは -1
-	Err      error // 起動の失敗など。なければ nil
+	ExitCode int   // 起動できなかったときと、終了コードなしに止まったときは -1
+	Err      error // 起動の失敗、WASM の罠など。なければ nil
 }
 
 func (e *CrashedError) Error() string {
 	if e.Err != nil {
-		return fmt.Sprintf("プラグイン %s を起動できない: %v", e.Plugin, e.Err)
+		return fmt.Sprintf("プラグイン %s を動かせない: %v", e.Plugin, e.Err)
 	}
 	return fmt.Sprintf("プラグイン %s が異常終了した（終了コード %d）", e.Plugin, e.ExitCode)
 }
@@ -97,25 +95,30 @@ type errorResponse struct {
 
 // Runner はプラグインを起動する側の設定（docs/plugin-protocol.md「起動」）。
 type Runner struct {
-	// Root はプロジェクトのルート。起動したプロセスの作業ディレクトリ。
-	Root string
 	// Stderr はプラグインの標準エラーを流す先。nil なら os.Stderr。各行の先頭に "[<プラグイン名>] " を付ける。
 	Stderr io.Writer
-	// Env は起動したプロセスの環境変数。nil なら os.Environ()。足すものはない（プラグインは、要求のほかに頼らない）。
-	Env []string
+	// Context は、動いているプラグインを、途中で止める口。nil なら、止めない。止めたとき、Run は、Context の誤りを返す。
+	// 止める口を持つ Context（Done が nil でない）を渡した起動は、途中で止められる形の WASM を使い、その分、遅い
+	// （docs/plugin-protocol.md「起動」）。
+	Context context.Context
+	// CacheDir は、WASM を、機械の言葉に直したものを、覚える置き場（HOZO_CACHE_DIR の値）。"" なら、os.UserCacheDir の下の
+	// hozo。どちらも、その下の wasm/ を使う。決められない・作れないときは、覚えずに動く。
+	CacheDir string
 }
 
-// runMu は起動を直列にする（docs/plugin-protocol.md「起動」: 並列には起動しない）。
+// runMu は起動を直列にする（docs/plugin-protocol.md「起動」: 並列には起動しない）。engines と、その中身も、これが守る。
 var runMu sync.Mutex
 
-// Run はプラグインを一度起動し、req を JSON にして標準入力に書き、標準出力の JSON を resp に読む
-// （docs/plugin-protocol.md「起動」）。dir はマニフェストのディレクトリ。
+// Run は、WASM のファイル wasm のプラグイン（名前 name）を、サンドボックスの中で一度動かし、req を JSON にして標準入力に渡し、
+// 標準出力の JSON を resp に読む（docs/plugin-protocol.md「起動」）。プラグインに渡すのは、標準入力、標準出力、標準エラーと、
+// 決まった値の時計と乱数だけ: ファイル、ネットワーク、環境変数、引数は、渡さない。
 //
 // 終了コードと返すエラー: 0 で JSON が読め、形が合えば nil。0 で JSON でない・形が違えば *MalformedOutputError
 // （形を確かめるのは、resp が *sdk.EmitBatchResponse か *sdk.CoverageResponse のとき。docs/plugin-protocol.md「応答の形」。shape.go）。
 // 2 で { "error": { "code": "protocol" | "unsupported" } } なら *PluginError。2 でそれ以外なら *MalformedOutputError。
-// ほかの終了コードと起動の失敗は *CrashedError。
-func (r Runner) Run(m *Manifest, dir string, req any, resp any) error {
+// ほかの終了コードと、WASM の罠と、起動の失敗（ファイルがない、WASM として読めない）は *CrashedError。
+// Context で止めたときは、Context の誤り。
+func (r Runner) Run(name, wasm string, req any, resp any) error {
 	runMu.Lock()
 	defer runMu.Unlock()
 
@@ -123,51 +126,26 @@ func (r Runner) Run(m *Manifest, dir string, req any, resp any) error {
 	if err != nil {
 		return fmt.Errorf("plugin: 要求を JSON にできない: %w", err)
 	}
-	absRoot, err := filepath.Abs(r.Root)
-	if err != nil {
-		return &CrashedError{Plugin: m.Name, ExitCode: -1, Err: err}
+	ctx := r.Context
+	if ctx == nil {
+		ctx = context.Background()
 	}
-	absDir, err := filepath.Abs(dir)
-	if err != nil {
-		return &CrashedError{Plugin: m.Name, ExitCode: -1, Err: err}
-	}
-
-	cmd := exec.Command(m.ResolveCommand(absDir), m.Command[1:]...)
-	cmd.Dir = absRoot
-	env := r.Env
-	if env == nil {
-		env = os.Environ()
-	}
-	cmd.Env = append([]string{}, env...)
-	cmd.Stdin = bytes.NewReader(input)
-	var stdout bytes.Buffer
-	cmd.Stdout = &stdout
-	stderrPipe, err := cmd.StderrPipe()
-	if err != nil {
-		return &CrashedError{Plugin: m.Name, ExitCode: -1, Err: err}
+	if err := ctx.Err(); err != nil {
+		return err
 	}
 	stderr := r.Stderr
 	if stderr == nil {
 		stderr = os.Stderr
 	}
-	if err := cmd.Start(); err != nil {
-		return &CrashedError{Plugin: m.Name, ExitCode: -1, Err: err}
-	}
-	done := make(chan struct{})
-	go func() {
-		defer close(done)
-		prefixLines(stderr, stderrPipe, "["+m.Name+"] ")
-	}()
-	<-done
-	waitErr := cmd.Wait()
-
-	exitCode := 0
-	if waitErr != nil {
-		var ee *exec.ExitError
-		if !errors.As(waitErr, &ee) {
-			return &CrashedError{Plugin: m.Name, ExitCode: -1, Err: waitErr}
+	var stdout bytes.Buffer
+	errOut := &prefixWriter{w: stderr, prefix: "[" + name + "] "}
+	exitCode, err := runWasm(ctx, r.CacheDir, wasm, bytes.NewReader(input), &stdout, errOut)
+	errOut.flush()
+	if err != nil {
+		if ctxErr := ctx.Err(); ctxErr != nil {
+			return ctxErr
 		}
-		exitCode = ee.ExitCode()
+		return &CrashedError{Plugin: name, ExitCode: -1, Err: err}
 	}
 	switch exitCode {
 	case 0:
@@ -175,34 +153,29 @@ func (r Runner) Run(m *Manifest, dir string, req any, resp any) error {
 		// encoding/json が、ない項目と null を黙って零値にするため。
 		var raw json.RawMessage
 		if err := decodeOne(stdout.Bytes(), &raw); err != nil {
-			return &MalformedOutputError{Plugin: m.Name, ExitCode: 0, Reason: "標準出力を応答の JSON として読めない", Err: err}
+			return &MalformedOutputError{Plugin: name, ExitCode: 0, Reason: "標準出力を応答の JSON として読めない", Err: err}
 		}
 		if err := checkShape(raw, resp); err != nil {
-			return &MalformedOutputError{Plugin: m.Name, ExitCode: 0, Reason: "応答の形が違う", Err: err}
+			return &MalformedOutputError{Plugin: name, ExitCode: 0, Reason: "応答の形が違う", Err: err}
 		}
 		if err := json.Unmarshal(raw, resp); err != nil {
-			return &MalformedOutputError{Plugin: m.Name, ExitCode: 0, Reason: "標準出力を応答の JSON として読めない", Err: err}
+			return &MalformedOutputError{Plugin: name, ExitCode: 0, Reason: "標準出力を応答の JSON として読めない", Err: err}
 		}
 		return nil
 	case 2:
 		var er errorResponse
 		if err := decodeOne(stdout.Bytes(), &er); err != nil || er.Error == nil {
-			return &MalformedOutputError{Plugin: m.Name, ExitCode: 2, Reason: "終了コード 2 だが標準出力が { \"error\": { \"code\", \"message\" } } でない", Err: err}
+			return &MalformedOutputError{Plugin: name, ExitCode: 2, Reason: "終了コード 2 だが標準出力が { \"error\": { \"code\", \"message\" } } でない", Err: err}
 		}
 		switch er.Error.Code {
 		case CodeProtocol, CodeUnsupported:
-			return &PluginError{Plugin: m.Name, Code: er.Error.Code, Message: er.Error.Message}
+			return &PluginError{Plugin: name, Code: er.Error.Code, Message: er.Error.Message}
 		default:
-			return &MalformedOutputError{Plugin: m.Name, ExitCode: 2, Reason: fmt.Sprintf("終了コード 2 の error の code %q を知らない", er.Error.Code)}
+			return &MalformedOutputError{Plugin: name, ExitCode: 2, Reason: fmt.Sprintf("終了コード 2 の error の code %q を知らない", er.Error.Code)}
 		}
 	default:
-		return &CrashedError{Plugin: m.Name, ExitCode: exitCode}
+		return &CrashedError{Plugin: name, ExitCode: exitCode}
 	}
-}
-
-// Run は Runner{Root: root}.Run。
-func Run(root string, m *Manifest, dir string, req any, resp any) error {
-	return Runner{Root: root}.Run(m, dir, req, resp)
 }
 
 // decodeOne は data を一つの JSON の値として v に読む。後ろに空白以外があれば誤り。
@@ -221,19 +194,29 @@ func decodeOne(data []byte, v any) error {
 	return nil
 }
 
-// prefixLines は r の各行の先頭に prefix を付けて w に書く。最後の行に改行がなくても付けて書く。
-func prefixLines(w io.Writer, r io.Reader, prefix string) {
-	br := bufio.NewReader(r)
+// prefixWriter は、書かれたものを、行ごとに、先頭に prefix を付けて w に書く。行の途中は、改行が来るまで持ち、flush で、
+// 改行を足して書く。
+type prefixWriter struct {
+	w      io.Writer
+	prefix string
+	buf    []byte
+}
+
+func (p *prefixWriter) Write(data []byte) (int, error) {
+	p.buf = append(p.buf, data...)
 	for {
-		line, err := br.ReadString('\n')
-		if line != "" {
-			if line[len(line)-1] != '\n' {
-				line += "\n"
-			}
-			_, _ = io.WriteString(w, prefix+line)
+		i := bytes.IndexByte(p.buf, '\n')
+		if i < 0 {
+			return len(data), nil
 		}
-		if err != nil {
-			return
-		}
+		_, _ = io.WriteString(p.w, p.prefix+string(p.buf[:i+1]))
+		p.buf = p.buf[i+1:]
+	}
+}
+
+func (p *prefixWriter) flush() {
+	if len(p.buf) > 0 {
+		_, _ = io.WriteString(p.w, p.prefix+string(p.buf)+"\n")
+		p.buf = nil
 	}
 }

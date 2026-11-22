@@ -20,8 +20,8 @@ var generatedDirs = []string{"internal/gen/hozoc", "internal/gen/proc"}
 // （docs/testing.md「生成物の一致」、docs/requirements.md「段階」の 3）。`go test ./...` だけで分かるように、
 // CI の `make generate && git diff --exit-code` と同じことをここでも確かめる。
 //
-// リポジトリを一時ディレクトリに写し（cli.hozo、hozo.toml、go.mod、go.sum は複製。プラグインを `go run` で動かすために
-// 要る ir/、plugin/、plugins/、runtime/ はシンボリックリンク）、そこで hozoc build を走らせ、出た置き場の中身を
+// リポジトリを一時ディレクトリに写し（cli.hozo、hozo.toml、go.mod、go.sum は複製。プラグインの置き場 plugins/ と、
+// ir/、plugin/、runtime/ はシンボリックリンク。プラグインの WASM は、TestMain がビルドしたもの）、そこで hozoc build を走らせ、出た置き場の中身を
 // コミット済みのものとバイト単位で比べる。go.mod が同じ module なので import パスも同じになる。
 // 差があれば `make generate` で生成し直してコミットする。
 func TestGeneratedUpToDate(t *testing.T) {

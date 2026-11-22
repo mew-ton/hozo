@@ -189,8 +189,8 @@ func (s *server) pluginCheckDone(r checkResult) {
 	}
 }
 
-// stopPluginChecks は、終わるときに、走っている check を、やめさせて、それが止まるのを待つ（exitWait まで）。待つのは、
-// プラグインが、プロジェクトのディレクトリで、動いているため。
+// stopPluginChecks は、終わるときに、走っている check を、やめさせて、それが止まるのを待つ（exitWait まで）。動いている
+// プラグインは、その場で止まる（docs/plugin-protocol.md「起動」）ので、ふつうは、すぐ戻る。
 func (s *server) stopPluginChecks() {
 	c := &s.checks
 	c.queued = nil

@@ -47,12 +47,12 @@ func newPluginProject(t *testing.T, text string) *pluginProject {
 		root = resolved
 	}
 	p := &pluginProject{t: t, root: root, dir: filepath.Join(root, "plugins", "chk"), uri: fileURI(filepath.Join(root, "a.hozo"))}
-	fakeplugin.Install(t, p.dir, "")
+	fakeplugin.Install(t, p.dir)
 	// トランスパイラ一つの答え: error の CHK-1（何度目の起動かを、メッセージに入れる）と、warning を一つ
 	writeFile(t, filepath.Join(p.dir, "response.json"),
 		`{"files":[{"path":"@DIR@/x.txt","content":"x"}],"warnings":[{"at":"a.f","message":"note"}],"errors":[{"code":"CHK-1","at":"a.f","message":"run @RUN@"}]}`)
 	writeFile(t, filepath.Join(p.dir, "hozo-plugin.toml"),
-		"name = \"chk\"\ncommand = "+fakeplugin.CommandTOML+"\nprotocol = \""+ir.Version+"\"\n\n[[transpiler]]\nname = \"chk\"\nlanguage = \"go\"\n")
+		"name = \"chk\"\nwasm = "+fakeplugin.WasmTOML+"\nprotocol = \""+ir.Version+"\"\n\n[[transpiler]]\nname = \"chk\"\nlanguage = \"go\"\n")
 	writeFile(t, filepath.Join(root, "hozo.toml"), "[hozo]\nplugin_dirs = [\"plugins\"]\n\n[[emit]]\nnamespace = \"a\"\ntranspilers = [\"chk\"]\nout = \"gen/a\"\n")
 	writeFile(t, filepath.Join(root, "a.hozo"), text)
 	return p
@@ -294,7 +294,8 @@ func TestPluginCheckDoesNotBlock(t *testing.T) {
 }
 
 // TestStalePluginDiagnosticsDropped は、古い check の答えが、新しい保存の後に、出ないこと: 一つ目の check が走っている間に、
-// 中身を変えて保存すると、一つ目の答えは、出ず、二つ目の check の答えだけが出る。裏の check は、一度に一つ。
+// 中身を変えて保存すると、一つ目は、その場で止まり（動いているプラグインも、止める）、その答えは、出ず、二つ目の check の
+// 答えだけが出る。
 func TestStalePluginDiagnosticsDropped(t *testing.T) {
 	p := newPluginProject(t, pluginSpec)
 	p.gate()
@@ -305,10 +306,8 @@ func TestStalePluginDiagnosticsDropped(t *testing.T) {
 
 	p.change(c, pluginSpecEdited)
 	p.save(c, pluginSpecEdited)
-	c.syncDiagnostics()
-	if p.calls() != 1 {
-		t.Fatalf("一つ目が終わる前に、二つ目のプラグインが起動した（%d 回）", p.calls())
-	}
+	// 一つ目のプラグインは、待たされたまま、止められる。二つ目が、起動する（release の前に）
+	p.waitCalls(2)
 
 	p.release()
 	var seen [][]protocol.Diagnostic
@@ -458,10 +457,37 @@ func TestPluginCheckCrash(t *testing.T) {
 	c.shutdown()
 }
 
-// TestPluginCheckExit は、プラグインの check が走っている間に、終わるとき、サーバーが、check が止まるのを待つこと
-// （プラグインが、進めば、すぐ終わる）と、待ちきれなければ、exitWait で、待つのをやめて、終わること。
+// TestPluginCheckStopsStuckPlugin は、終わらないプラグイン（回り続ける）が走っている間に、中身を変えて保存すると、サーバーが、
+// それを、その場で止めて、次の check を走らせること（docs/lsp.md「プラグインの診断」、docs/plugin-protocol.md「起動」）。
+func TestPluginCheckStopsStuckPlugin(t *testing.T) {
+	p := newPluginProject(t, pluginSpec)
+	spin := filepath.Join(p.dir, "spin")
+	writeFile(t, spin, "") // 起動したプラグインは、応答を書かずに、回り続ける
+	c := startServer(t, Options{})
+	p.allowed(c)
+	p.open(c, pluginSpec)
+	p.waitCalls(1)
+
+	if err := os.Remove(spin); err != nil { // 次の起動は、ふつうに答える
+		t.Fatal(err)
+	}
+	p.change(c, pluginSpecEdited)
+	p.save(c, pluginSpecEdited)
+	if msg, _ := c.waitPlugin(p.uri, nil); msg != "run 2" {
+		t.Fatalf("終わらないプラグインを止めた後の CHK-1 = %q（期待は、二つ目の \"run 2\"）", msg)
+	}
+	c.shutdown()
+	// 止めた check は、やめさせたもの（異常終了には、しない: 誤りを、ログに残さない）
+	if log := c.logBuf.String(); !strings.Contains(log, "plugin check: canceled") || strings.Contains(log, "proc.Crashed") || strings.Contains(log, "プラグイン chk") {
+		t.Errorf("止めた check の扱いが、ログと合わない:\n%s", log)
+	}
+}
+
+// TestPluginCheckExit は、プラグインの check が走っている間に、終わるとき、サーバーが、動いているプラグインを、その場で止めて、
+// check が止まるのを待つこと（プラグインが、進まなくても、すぐ終わる）と、待ちきれなければ、exitWait で、待つのをやめて、終わること
+// （docs/lsp.md「プラグインの診断」の「終わるとき」）。
 func TestPluginCheckExit(t *testing.T) {
-	// 進む場合: exit の後、プラグインが終わるまで、Serve は、戻らない
+	// プラグインは、進まない（release しない）。exit の後、サーバーが、それを止めるので、Serve は、exitWait（5 秒）を待たずに、戻る
 	p := newPluginProject(t, pluginSpec)
 	p.gate()
 	c := startServer(t, Options{})
@@ -471,26 +497,26 @@ func TestPluginCheckExit(t *testing.T) {
 	if r := c.call(protocol.MethodShutdown, nil); r.Error != nil {
 		t.Fatalf("shutdown: %+v", r)
 	}
+	start := time.Now()
 	c.notify(protocol.MethodExit, nil)
 	select {
 	case <-c.done:
-		t.Fatal("プラグインが走っているのに、Serve が戻った")
-	case <-time.After(50 * time.Millisecond):
-	}
-	p.release()
-	select {
-	case <-c.done:
 	case <-time.After(waitTimeout):
-		t.Fatal("プラグインが終わったのに、Serve が戻らない")
+		t.Fatal("動いているプラグインを、止められず、Serve が戻らない")
+	}
+	if d := time.Since(start); d >= exitWait {
+		t.Errorf("Serve が戻るまで %v（プラグインを止めずに、exitWait まで、待った）", d)
+	}
+	if strings.Contains(c.logBuf.String(), "待ちきれなかった") {
+		t.Errorf("プラグインを止めたのに、待ちきれなかった、とログにある:\n%s", c.logBuf.String())
 	}
 
-	// 進まない場合: exitWait で、待つのをやめる
+	// 待ちきれない場合（止まるのが、間に合わない）: exitWait で、待つのをやめる。exitWait を負にして、すぐ、やめさせる
 	saved := exitWait
-	exitWait = 50 * time.Millisecond
+	exitWait = -1
 	defer func() { exitWait = saved }()
 	p = newPluginProject(t, pluginSpec)
 	p.gate()
-	t.Cleanup(p.release) // テストの後に、待っているプラグインを、終わらせる
 	c = startServer(t, Options{})
 	p.allowed(c)
 	p.open(c, pluginSpec)

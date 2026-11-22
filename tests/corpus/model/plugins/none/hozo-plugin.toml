@@ -1,8 +1,8 @@
 # テスト用のプラグイン。トランスパイラ none は、requires を持たない、テストのための基底で、ファイルを返さない
-# （emit の応答は、出力ごとに、空の files と warnings の答えを一つ。このコーパスの hozo.toml は、単位が三つで、どれも、
-# 出力する名前空間が一つなので、outputs は三つ: 単位を足したら、ここも足す）。sh で動く（go run を待たないため）。
+# （emit の応答は、頼まれたトランスパイラごとに、空の files と warnings の答え）。中身は、にせもののプラグイン
+# （internal/fakeplugin）の WASM で、テストが、wasm の場所に置く（docs/testing.md「環境からの独立」）。
 name     = "none"
-command  = ["sh", "-c", "cat >/dev/null; printf '%s' '{\"outputs\":[{\"results\":[{\"files\":[],\"warnings\":[]}]},{\"results\":[{\"files\":[],\"warnings\":[]}]},{\"results\":[{\"files\":[],\"warnings\":[]}]}]}'"]
+wasm     = "plugin.wasm"
 protocol = "0.22"
 
 [[transpiler]]

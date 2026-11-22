@@ -17,7 +17,7 @@
 
 ```toml
 name     = "go-sqlite"
-command  = ["go", "run", "github.com/mew-ton/hozo/plugins/go-sqlite"]
+wasm     = "plugin.wasm"
 protocol = "0.22"
 
 [[transpiler]]

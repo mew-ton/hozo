@@ -50,8 +50,6 @@ type App struct {
 	Dir string
 	// Stderr はプラグインの標準エラーを流す先（docs/plugin-protocol.md「起動」）。nil なら os.Stderr。
 	Stderr io.Writer
-	// Env はプラグインに渡す環境変数の元。nil なら os.Environ()。
-	Env []string
 	// Home はホームディレクトリ。プラグインの探索が <ホーム>/.hozo/plugins を見るのに使う（docs/plugin-protocol.md「探索」の 3）。
 	// 空なら探さない。App はプロセスの環境から読まない: cmd/hozoc/main.go が os.UserHomeDir() を入れる。
 	// 探索のもう一つの外の場所 HOZO_PLUGIN_PATH は、cli.hozo の入力の pluginPath で届く（cli.Main に渡した env から）。
@@ -63,6 +61,8 @@ type App struct {
 	// pluginPath は直前の Check か Lsp の入力の pluginPath（HOZO_PLUGIN_PATH）。入力を取らない問い合わせ（UpToDate と、
 	// 状態の単位の IsEmpty / Get）が、自分で解析するときに使う。
 	pluginPath string
+	// cacheDir は、同じく、直前の Check か Lsp の入力の cacheDir（HOZO_CACHE_DIR。docs/plugin-protocol.md「起動」）。
+	cacheDir string
 
 	// checked は直前の Check が解析した Project。CollectOutputs の引数 checked（hozoc.CheckResult）はその warning だけ
 	// なので、Program・設定・マニフェストはここから取る。Check が失敗すれば nil。
@@ -94,7 +94,8 @@ func (a *App) Lsp(ctx context.Context, in hozoc.LspInput) error {
 		return err
 	}
 	a.pluginPath = str(in.PluginPath)
-	opts := lsp.Options{Root: a.Dir, Env: a.Env, PluginPath: a.pluginPath, Home: a.Home}
+	a.cacheDir = str(in.CacheDir)
+	opts := lsp.Options{Root: a.Dir, CacheDir: a.cacheDir, PluginPath: a.pluginPath, Home: a.Home}
 	if in.Config != nil && *in.Config != "" {
 		opts.ConfigPath = string(*in.Config)
 		if !filepath.IsAbs(opts.ConfigPath) && a.Dir != "" {

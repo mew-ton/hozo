@@ -157,9 +157,8 @@ func TestCoverageShape(t *testing.T) {
 // 起動を通して: 形が違う応答は終了コード 0 でも proc.MalformedOutput で、形が合えば知らない項目があっても読める
 // （docs/plugin-protocol.md「起動」の表、「応答の形」）。echo-plugin は要求をそのまま応答に写す。
 func TestRunResponseShape(t *testing.T) {
-	root := t.TempDir()
 	run := func(req map[string]any, resp any) error {
-		return Runner{Root: root}.Run(echoManifest(), root, req, resp)
+		return Runner{}.Run("echo", echoWasm, req, resp)
 	}
 	result := func(fields map[string]any) map[string]any {
 		return map[string]any{"mode": "echo", "outputs": []any{map[string]any{"results": []any{fields}}}}

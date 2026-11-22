@@ -122,6 +122,7 @@ func runBuild(ctx context.Context, ops hozoc.Ops, p Presenter, prog string, args
 	line.flag("no-emit", &in.NoEmit)
 	line.flag("dry-run", &in.DryRun)
 	line.env("HOZO_PLUGIN_PATH", &in.PluginPath)
+	line.env("HOZO_CACHE_DIR", &in.CacheDir)
 	if code, done := line.read(prog, usageBuild(), stdout, stderr); done {
 		return code
 	}
@@ -167,6 +168,7 @@ func usageBuild() cliHelp {
 		{"noEmit", "検査だけを行い、ファイルを書き出さない"},
 		{"dryRun", "書き出さずに、書き出す予定のファイルだけを表示する"},
 		{"pluginPath", "プラグインを探すディレクトリ（OS のパス区切りで複数）"},
+		{"cacheDir", "プラグインの WASM を、機械の言葉に直したものを、覚える置き場"},
 	}}
 }
 
@@ -180,6 +182,7 @@ func runTests(ctx context.Context, ops hozoc.Ops, p Presenter, prog string, args
 	line.required(&in.Coverage)
 	line.flag("coverage", &in.Coverage)
 	line.env("HOZO_PLUGIN_PATH", &in.PluginPath)
+	line.env("HOZO_CACHE_DIR", &in.CacheDir)
 	if code, done := line.read(prog, usageTests(), stdout, stderr); done {
 		return code
 	}
@@ -224,6 +227,7 @@ func usageTests() cliHelp {
 		{"format", "表示の形式"},
 		{"coverage", "テストを走らせたときに取った、カバレッジのファイル"},
 		{"pluginPath", "プラグインを探すディレクトリ（OS のパス区切りで複数）"},
+		{"cacheDir", "プラグインの WASM を、機械の言葉に直したものを、覚える置き場"},
 	}}
 }
 
@@ -236,6 +240,7 @@ func runLsp(ctx context.Context, ops hozoc.Ops, p Presenter, prog string, args [
 	line.flag("log", &in.Log)
 	line.env("HOZO_LSP_LOG", &in.Log)
 	line.env("HOZO_PLUGIN_PATH", &in.PluginPath)
+	line.env("HOZO_CACHE_DIR", &in.CacheDir)
 	if code, done := line.read(prog, usageLsp(), stdout, stderr); done {
 		return code
 	}
@@ -268,6 +273,7 @@ func usageLsp() cliHelp {
 		{"config", "設定ファイルの場所"},
 		{"log", "ログの書き出し先"},
 		{"pluginPath", "プラグインを探すディレクトリ（OS のパス区切りで複数）"},
+		{"cacheDir", "プラグインの WASM を、機械の言葉に直したものを、覚える置き場"},
 	}}
 }
 

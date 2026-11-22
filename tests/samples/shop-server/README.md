@@ -516,7 +516,7 @@ func (s RateSeams) <Op>RateLimited(<op の形の引数>, body func(<op の形の
 
 ### 実装
 
-`plugins/go-ratelimit/` の `main` パッケージ（`example.com/shop-server/plugins/go-ratelimit`。マニフェストの `command` が `go run` で動かす）。サンプルのモジュールの中のパッケージで、リポジトリの公開の SDK（`plugin`、`plugin/golang`）を、`go.mod` の `replace` を通して import する。`main.go` が入口、`emit.go` が中身。
+`plugins/go-ratelimit/` の `main` パッケージ（`example.com/shop-server/plugins/go-ratelimit`。マニフェストの `wasm` は、これを WASM にビルドした `plugin.wasm`）。サンプルのモジュールの中のパッケージで、リポジトリの公開の SDK（`plugin`、`plugin/golang`）を、`go.mod` の `replace` を通して import する。`main.go` が入口、`emit.go` が中身。
 
 - **ブラックボックスのテスト**は、リポジトリの `TestSamples` の `transpilers/go-ratelimit`: `gen/server/ratelimit.go` とバイト単位で比べる。
 - **単体テスト**は `emit_test.go`（このモジュールの `go test ./...` が走らせる。`TestSamples` の `go`）。サンプルが使わない場合を、小さな入力 `testdata/<名前>/`（`hozo.toml` と `.hozo`）とゴールデン `testdata/<名前>/expected/` で確かめる: `seams`（戻り値のない op、零値の各行、当たる引数名、内部の op、継ぎ目を宣言したトランスパイラがもう一つある単位、対象のない名前空間）、`gorate1`、`gorate2`（診断）。生成したコードは、基底のプラグインをビルドして出させた基底のファイルと合わせて、一時のモジュールで `go vet` を通し、`testdata/seams/behavior_test.go` で動かす（制限を超えれば中身を呼ばず、零値と `rate.LimitExceeded` を返す。許せば、引数と戻り値をそのまま通す）。

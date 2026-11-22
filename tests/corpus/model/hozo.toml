@@ -3,7 +3,7 @@
 # 出力しない（docs/config.md「単位の対象」）。検査は同じに掛かる。
 # shop は、印の語彙 marks と、外部のシステム carrier の例外（marks.NotApproved、carrier.Closed）を使うので、その二つには、
 # 型の置き場として同じ基底の単位が要る（docs/config.md「型の置き場」）。
-# 単位のトランスパイラ none（plugins/none。sh で動く、テストのための基底）はファイルを返さないので、どの単位も何も出力しない。
+# 単位のトランスパイラ none（plugins/none。テストのための基底。中身は、にせもののプラグインの WASM）はファイルを返さないので、どの単位も何も出力しない。
 
 [hozo]
 plugin_dirs = ["plugins"]

@@ -1,92 +1,103 @@
 // Package fakeplugin は、テストが使う、にせもののプラグインの置き方（docs/testing.md「環境からの独立」）。にせものの中身は
-// cmd/fakeplugin（一度だけビルドする）で、振る舞いは、プラグインのディレクトリのファイルで決める（そのコマンドの説明）。
+// cmd/fakeplugin（WASM に、一度だけビルドする）で、振る舞いは、プラグインのディレクトリのファイルで決める（そのコマンドの説明）。
 package fakeplugin
 
 import (
-	"fmt"
+	"crypto/sha256"
+	"encoding/hex"
+	"io"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"runtime"
 	"sync"
 	"testing"
+
+	hostplugin "github.com/mew-ton/hozo/internal/plugin"
+	"github.com/mew-ton/hozo/internal/wasmbuild"
 )
 
 var (
 	buildOnce sync.Once
-	binary    string
+	wasm      string
 	buildErr  error
 )
 
-// Binary は、にせもののプラグインの実行ファイルのパス。はじめて呼ばれたときに、一時ディレクトリにビルドする
-// （テストのプロセスが終わるまで、残る）。
-func Binary(t testing.TB) string {
+// Wasm は、にせもののプラグインの WASM のファイルのパス。はじめて呼ばれたときに、OS の一時ディレクトリ（リポジトリの
+// 置き場ごとに、決まった場所）にビルドする。中身が変わっていなければ、作り直さない。
+func Wasm(t testing.TB) string {
 	t.Helper()
-	buildOnce.Do(func() {
-		_, self, _, _ := runtime.Caller(0)
-		dir, err := os.MkdirTemp("", "hozo-fakeplugin")
-		if err != nil {
-			buildErr = err
-			return
-		}
-		binary = filepath.Join(dir, "fakeplugin")
-		if runtime.GOOS == "windows" {
-			binary += ".exe"
-		}
-		cmd := exec.Command("go", "build", "-o", binary, "./cmd/fakeplugin")
-		cmd.Dir = filepath.Dir(self)
-		if out, err := cmd.CombinedOutput(); err != nil {
-			buildErr = fmt.Errorf("fakeplugin をビルドできない: %v\n%s", err, out)
-		}
-	})
-	if buildErr != nil {
-		t.Fatal(buildErr)
+	path, err := Build()
+	if err != nil {
+		t.Fatal(err)
 	}
-	return binary
+	return path
 }
 
-// CommandTOML は、マニフェストの command に書く TOML の値: Install が置く、起動のスクリプト。実行ファイルを、マニフェストの
-// ディレクトリからの相対パスで指す（docs/plugin-protocol.md「マニフェスト」）ので、プラグインのディレクトリを、動かしても、動く。
-const CommandTOML = `["./plugin.sh"]`
+// Build は、Wasm と同じ（テストの外から呼ぶ形: TestMain）。
+func Build() (string, error) {
+	buildOnce.Do(func() {
+		_, self, _, _ := runtime.Caller(0)
+		src := filepath.Join(filepath.Dir(self), "cmd", "fakeplugin")
+		sum := sha256.Sum256([]byte(src))
+		wasm = filepath.Join(os.TempDir(), "hozo-fakeplugin-"+hex.EncodeToString(sum[:8]), WasmFile)
+		buildErr = wasmbuild.Build(src, wasm)
+	})
+	return wasm, buildErr
+}
 
-// CommandArgs は、CommandTOML と同じ起動の、引数の並び。
-var CommandArgs = []string{"./plugin.sh"}
+// WasmFile は、Install が置く、にせものの WASM の、ファイルの名前。マニフェストの wasm には、これを書く
+// （マニフェストのディレクトリからの相対パス。docs/plugin-protocol.md「マニフェスト」）。
+const WasmFile = "plugin.wasm"
 
-// Install は、プラグインのディレクトリ pluginDir に、にせものを起動するスクリプト plugin.sh を置く。prelude は、にせものを
-// 起動する前に走らせる、シェルの行（"" なら、なし。その中では、$d が、プラグインのディレクトリ）。hozoc は、プラグインに、
-// 環境変数を足さない（docs/plugin-protocol.md「起動」）ので、プラグインのディレクトリは、起動されたパス（$0）から求める。
-// sh がなければ、テストを飛ばす。
-func Install(t testing.TB, pluginDir, prelude string) {
+// WasmTOML は、マニフェストの wasm に書く TOML の値。
+const WasmTOML = `"` + WasmFile + `"`
+
+// Install は、プラグインのディレクトリ pluginDir に、にせものの WASM（WasmFile）を置き、そのディレクトリを、にせものに見せる
+// （振る舞いを決めるファイルと、記録の置き場。internal/plugin の MountForTest。テストが終われば、取り消す）。
+func Install(t testing.TB, pluginDir string) {
 	t.Helper()
-	if _, err := exec.LookPath("sh"); err != nil {
-		t.Skip("sh がない")
-	}
 	if err := os.MkdirAll(pluginDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	script := "#!/bin/sh\nd=$(dirname \"$0\")\n" + prelude
-	if prelude != "" && prelude[len(prelude)-1] != '\n' {
-		script += "\n"
-	}
-	script += "exec " + shellQuote(Binary(t)) + " \"$d\"\n"
-	path := filepath.Join(pluginDir, "plugin.sh")
-	if err := os.WriteFile(path, []byte(script), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.Chmod(path, 0o755); err != nil {
+	path := filepath.Join(pluginDir, WasmFile)
+	Place(t, path)
+	t.Cleanup(hostplugin.MountForTest(path, pluginDir))
+}
+
+// Place は、にせものの WASM を、path に置く（見せるディレクトリは、ない: にせものは、頼まれたトランスパイラごとに、ファイルを
+// 返さない答えを返す）。実装のないプラグインの代役に使う。
+func Place(t testing.TB, path string) {
+	t.Helper()
+	if err := PlaceAt(path); err != nil {
 		t.Fatal(err)
 	}
 }
 
-// shellQuote は、s を、sh の、一重引用符の文字列にする。
-func shellQuote(s string) string {
-	out := "'"
-	for _, r := range s {
-		if r == '\'' {
-			out += `'\''`
-		} else {
-			out += string(r)
-		}
+// PlaceAt は、Place と同じ（テストの外から呼ぶ形: TestMain）。
+func PlaceAt(path string) error {
+	src, err := Build()
+	if err != nil {
+		return err
 	}
-	return out + "'"
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return err
+	}
+	_ = os.Remove(path)
+	if os.Link(src, path) == nil {
+		return nil
+	}
+	in, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+	defer in.Close()
+	out, err := os.Create(path)
+	if err != nil {
+		return err
+	}
+	if _, err := io.Copy(out, in); err != nil {
+		out.Close()
+		return err
+	}
+	return out.Close()
 }

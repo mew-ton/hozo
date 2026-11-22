@@ -1,6 +1,7 @@
 // Package plugin は Go で書くプラグインのための SDK。
 //
-// プラグインは標準入出力で JSON をやり取りする実行ファイル（設計書 §4.6）。
+// プラグインは標準入出力で JSON をやり取りするプログラム（設計書 §4.6）。hozoc は、それを WASM（GOOS=wasip1 GOARCH=wasm）に
+// ビルドしたものを、サンドボックスの中で動かす（docs/plugin-protocol.md「起動」）。
 // JSON の形は docs/plugin-protocol.md「要求と応答」で、このパッケージの型はそれを写す。
 // 起動・終了コード・標準出力の読み方は同「起動」。API の形は docs/packages.md「`plugin`（公開）」。
 // プラグインの main は `os.Exit(plugin.Main(handler{}))` と書く。
@@ -85,7 +86,7 @@ func NewEmitBatch(views []*ir.View, transpilers [][]string) *EmitBatch {
 	return req
 }
 
-// Batch は、この一回の呼び出し（トランスパイラ一つ、出力一つ）だけを頼む、direction "emit" の要求。プラグインの実行ファイルを、
+// Batch は、この一回の呼び出し（トランスパイラ一つ、出力一つ）だけを頼む、direction "emit" の要求。プラグインのプログラムを、
 // テストで、標準入出力から動かすときに使う（応答は [SingleResult] で読む）。
 func (r *EmitRequest) Batch() *EmitBatch {
 	b := NewEmitBatch([]*ir.View{r.View}, [][]string{{r.Transpiler}})

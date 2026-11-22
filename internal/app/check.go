@@ -31,7 +31,8 @@ func (a *App) Check(ctx context.Context, in hozoc.CheckInput) (hozoc.CheckResult
 	}
 	a.checked, a.planned = nil, nil
 	a.pluginPath = str(in.PluginPath)
-	p := project.LoadWith(project.Options{Root: a.Dir, ConfigPath: str(in.Config), Stderr: a.Stderr, Env: a.Env,
+	a.cacheDir = str(in.CacheDir)
+	p := project.LoadWith(project.Options{Root: a.Dir, ConfigPath: str(in.Config), Stderr: a.Stderr, CacheDir: a.cacheDir,
 		PluginPath: a.pluginPath, Home: a.Home})
 	if p.RunErr != nil {
 		return hozoc.CheckResult{}, asProc(p.RunErr)

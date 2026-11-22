@@ -77,7 +77,7 @@ type EmitPlan = types.EmitPlan
 // effects hozoc.OutputsSync as any -> UpToDate
 const EffectSyncOutputs = types.EffectSyncOutputs
 
-// Plugin はプラグインの起動のしかた（docs/plugin-protocol.md「起動」）。root は作業ディレクトリにするプロジェクトのルート、dir はマニフェストのディレクトリ
+// Plugin はプラグインの起動のしかた（docs/plugin-protocol.md「起動」）。wasm は、プラグインの本体（WASM）のファイル
 type Plugin = types.Plugin
 
 // Spec は仕様: IR の、出力に依らない部分（docs/ir.md「まとめた形」の Spec）。中身はこの仕様では書かない

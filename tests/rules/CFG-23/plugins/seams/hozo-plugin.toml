@@ -1,7 +1,7 @@
 # CFG-23 のための fixture: 同じデコレータ a.dec を seams に書いた二つのトランスパイラ（seam-a、seam-b）と、
 # 別のデコレータを書いた seam-other。どれも基底 go に相乗りする
 name     = "seams"
-command  = ["true"]
+wasm     = "plugin.wasm"
 protocol = "0.22"
 
 [[transpiler]]

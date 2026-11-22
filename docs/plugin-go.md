@@ -12,7 +12,7 @@ Go の**基底**のトランスパイラ `go`（`docs/config.md`「基底と相�
 
 ```toml
 name     = "go"
-command  = ["go", "run", "github.com/mew-ton/hozo/plugins/go"]
+wasm     = "plugin.wasm"
 protocol = "0.22"
 
 [[transpiler]]
@@ -27,7 +27,7 @@ enabled = true
 - `[coverage] enabled`: `hozoc tests` が渡すカバレッジのファイルを読む（「カバレッジを読む」）。
 - オプションは、`module` の一つ: Go のモジュールの名前（文字列。`go.mod` の `module` の行と、同じもの）。ふつうは、プロジェクト全体のオプション `[options.go]` に書く（`docs/config.md`「プロジェクト全体のオプション」）。出力の import パスを作るのに使う（「パッケージと import パス」）。書かれていなければ GO-8。ほかのキーがあれば GO-5。
 - 語彙は提供せず、どの語彙も読まない。`seams` も持たない。デコレータの適用が基底の出力に効く道は「デコレータ」の二つで、どちらも hozoc が計算して IR と `View` に置いたもの（`Signature`、`View.config.seams`）を通る。
-- `command` が `go run` なのは、このリポジトリの中で `plugin_dirs = ["plugins"]` から使うため。配布するときはビルドした実行ファイル `hozoc-plugin-go` と、それを `command` に書いたマニフェストを `~/.hozo/plugins/go/` に置く（`docs/plugin-protocol.md`「探索」）。このリポジトリのほかの Go のプラグインも同じ。
+- `wasm` の `plugin.wasm` は、このディレクトリの main パッケージを、WASM（`GOOS=wasip1 GOARCH=wasm`）にビルドしたもの（`docs/plugin-protocol.md`「マニフェスト」）。リポジトリには、入れない: テストと `make generate` が、自分でビルドする（`docs/testing.md`「プラグインの WASM」）。利用者への配り方は、決めていない（`docs/open.md`「文書と道具」）。このリポジトリのほかの Go のプラグインも同じ。
 
 ## 出力の対象
 

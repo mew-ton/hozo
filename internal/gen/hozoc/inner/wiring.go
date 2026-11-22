@@ -38,7 +38,7 @@ func (o *ops) WriteOutputs(ctx context.Context, in BuildInput, checked CheckResu
 // Reads: hozoc.outputs
 // Effects: hozoc.syncOutputs
 func (o *ops) Build(ctx context.Context, in BuildInput) (BuildResult, error) {
-	checked, err := o.Check(ctx, CheckInput{Config: in.Config, Format: in.Format, PluginPath: in.PluginPath})
+	checked, err := o.Check(ctx, CheckInput{Config: in.Config, Format: in.Format, PluginPath: in.PluginPath, CacheDir: in.CacheDir})
 	if err != nil {
 		return BuildResult{}, err
 	}
@@ -52,7 +52,7 @@ func (o *ops) Build(ctx context.Context, in BuildInput) (BuildResult, error) {
 //
 // Throws: hozoc.CheckFailed, hozoc.ConfigInvalid, hozoc.LanguageMismatch, proc.Crashed, proc.MalformedOutput, hozoc.OutputConflict, hozoc.TestsNotRun, hozoc.CoverageUnusable
 func (o *ops) Tests(ctx context.Context, in TestsInput) (TestsResult, error) {
-	checked, err := o.Check(ctx, CheckInput{Config: in.Config, Format: in.Format, PluginPath: in.PluginPath})
+	checked, err := o.Check(ctx, CheckInput{Config: in.Config, Format: in.Format, PluginPath: in.PluginPath, CacheDir: in.CacheDir})
 	if err != nil {
 		return TestsResult{}, err
 	}

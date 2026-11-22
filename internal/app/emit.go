@@ -291,8 +291,8 @@ func (a *App) collect(ctx context.Context, p *project.Project, namespaces []stri
 
 // RunEmit は cli.hozo の op runEmit: プラグインを一つ起動して、受け持つ出力のすべてを、まとめて展開させる
 // （docs/plugin-protocol.md「起動」）。hozoc.Leaves のメソッド。どの配線からも呼ばれない内部の op で、プラグインとの境界の記述と
-// してある（docs/cli.md「手で書くもの」）: plugin を起動し（作業ディレクトリは plugin.root、マニフェストのディレクトリは
-// plugin.dir）、req を JSON にして送り、応答を hozoc.EmitResponse に読んで返す。hozoc.Spec と hozoc.OutputView は中身のない
+// してある（docs/cli.md「手で書くもの」）: plugin を起動し（WASM のファイルは plugin.wasm。サンドボックスの中で動かす）、
+// req を JSON にして送り、応答を hozoc.EmitResponse に読んで返す。hozoc.Spec と hozoc.OutputView は中身のない
 // model なので、この入口から送る要求の spec と、出力の view は空のオブジェクトになる。hozoc 自身の検査（[App.Check]）は、
 // この入口を呼ばず、internal/project が、本物の仕様を持つ要求で、同じ起動をする。
 // 起動の失敗と異常終了は proc.Crashed、応答の形の誤りは proc.MalformedOutput。
@@ -300,12 +300,11 @@ func (a *App) RunEmit(ctx context.Context, plugin hozoc.Plugin, req hozoc.EmitRe
 	if err := ctx.Err(); err != nil {
 		return hozoc.EmitResponse{}, err
 	}
-	if len(plugin.Command) == 0 {
-		return hozoc.EmitResponse{}, asProc(&hostplugin.CrashedError{Plugin: plugin.Name, ExitCode: -1, Err: errors.New("command が空")})
+	if plugin.Wasm == "" {
+		return hozoc.EmitResponse{}, asProc(&hostplugin.CrashedError{Plugin: plugin.Name, ExitCode: -1, Err: errors.New("wasm が空")})
 	}
-	manifest := &hostplugin.Manifest{Name: plugin.Name, Command: plugin.Command, Protocol: req.Protocol}
 	var resp sdk.EmitBatchResponse
-	if err := (hostplugin.Runner{Root: string(plugin.Root), Stderr: a.Stderr, Env: a.Env}).Run(manifest, string(plugin.Dir), &req, &resp); err != nil {
+	if err := (hostplugin.Runner{Stderr: a.Stderr, CacheDir: a.cacheDir}).Run(plugin.Name, string(plugin.Wasm), &req, &resp); err != nil {
 		return hozoc.EmitResponse{}, asProc(err)
 	}
 	out := hozoc.EmitResponse{Outputs: []hozoc.OutputResult{}}

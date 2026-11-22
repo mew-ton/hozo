@@ -113,8 +113,9 @@ type Options struct {
 	Overlay map[string][]byte
 	// Stderr はプラグインの標準エラーを流す先（docs/plugin-protocol.md「起動」）。nil なら os.Stderr。
 	Stderr io.Writer
-	// Env はプラグインに渡す環境変数の元。nil なら os.Environ()。
-	Env []string
+	// CacheDir は、プラグインの WASM を、機械の言葉に直したものを、覚える置き場（HOZO_CACHE_DIR の値。docs/plugin-protocol.md
+	// 「起動」）。"" なら、利用者ごとの、ふだんの置き場。
+	CacheDir string
 	// PluginPath は HOZO_PLUGIN_PATH の値（docs/plugin-protocol.md「探索」の 2）。空なら探さない。
 	PluginPath string
 	// Home はホームディレクトリ（同 3 の <ホーム>/.hozo/plugins）。空なら探さない。
@@ -124,7 +125,7 @@ type Options struct {
 	// 設定とソースを読み直すとき）と、言語サーバーの解析（docs/lsp.md「診断」）が、真にする。
 	NoPlugins bool
 	// Context は、プラグインの起動を、やめさせる口（言語サーバーの、裏の check。docs/lsp.md「プラグインの診断」）。nil なら、
-	// やめさせない。見るのは、プラグインの起動と起動の間（起動したプラグインは、止めない）。やめたら、そこで止めて、
+	// やめさせない。動いているプラグインも、その場で止まる（docs/plugin-protocol.md「起動」）。やめたら、そこで止めて、
 	// RunErr が、Context の誤り（診断には、しない）。
 	Context context.Context
 }
@@ -656,7 +657,7 @@ func (p *Project) NeedsPlugins() bool { return len(p.pluginJobs()) > 0 }
 // proc.MalformedOutput。
 func (p *Project) runPlugins(opts Options) ([]diag.Diagnostic, error) {
 	var diags []diag.Diagnostic
-	runner := hostplugin.Runner{Root: p.Root, Stderr: opts.Stderr, Env: opts.Env}
+	runner := hostplugin.Runner{Stderr: opts.Stderr, Context: opts.Context, CacheDir: opts.CacheDir}
 	seen := map[string]bool{}
 	add := func(d diag.Diagnostic) {
 		if key := pluginDiagKey(d); !seen[key] {
@@ -689,7 +690,7 @@ func (p *Project) runPlugins(opts Options) ([]diag.Diagnostic, error) {
 		}
 		req := sdk.NewEmitBatch(views, names)
 		var resp sdk.EmitBatchResponse
-		if err := runner.Run(job.plugin.Manifest, job.plugin.Dir, &req, &resp); err != nil {
+		if err := runner.Run(job.plugin.Name, job.plugin.Manifest.WasmPath(job.plugin.Dir), &req, &resp); err != nil {
 			var pe *hostplugin.PluginError
 			if errors.As(err, &pe) {
 				add(pe.Diagnostic(job.plugin.ManifestPath()))

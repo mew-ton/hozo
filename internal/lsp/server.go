@@ -28,8 +28,9 @@ type Options struct {
 	ConfigPath string
 	// Log はログの書き出し先（--log）。nil なら捨てる。標準エラーには書かない（docs/lsp.md「通信」）。
 	Log io.Writer
-	// Env はプラグイン（check を持つもの）に渡す環境変数の元。nil なら os.Environ()。
-	Env []string
+	// CacheDir は、プラグインの WASM を、機械の言葉に直したものを、覚える置き場（HOZO_CACHE_DIR の値。docs/plugin-protocol.md
+	// 「起動」）。"" なら、利用者ごとの、ふだんの置き場。
+	CacheDir string
 	// PluginPath と Home は、プラグインの探索が見るプロジェクトの外の場所（docs/plugin-protocol.md「探索」の 2 と 3:
 	// HOZO_PLUGIN_PATH の値と、ホームディレクトリ）。空なら探さない。サーバーはプロセスの環境から読まない
 	// （internal/app が渡す）。
@@ -579,7 +580,7 @@ func (s *server) loadOptions(overlay map[string][]byte, ctx context.Context) pro
 		ConfigPath: s.opts.ConfigPath,
 		Overlay:    overlay,
 		Stderr:     s.logW, // 標準エラーには書かない（docs/lsp.md「通信」）
-		Env:        s.opts.Env,
+		CacheDir:   s.opts.CacheDir,
 		PluginPath: s.opts.PluginPath,
 		Home:       s.opts.Home,
 		NoPlugins:  ctx == nil,

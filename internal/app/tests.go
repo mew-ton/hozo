@@ -188,7 +188,7 @@ func (a *App) readCoverage(ctx context.Context, p *project.Project, pl *outputPl
 		}
 		sort.Strings(req.Files)
 		var resp sdk.CoverageResponse
-		if err := (hostplugin.Runner{Root: p.Root, Stderr: a.Stderr, Env: a.Env}).Run(pg.Manifest, pg.Dir, &req, &resp); err != nil {
+		if err := (hostplugin.Runner{Stderr: a.Stderr, CacheDir: a.cacheDir}).Run(pg.Name, pg.Manifest.WasmPath(pg.Dir), &req, &resp); err != nil {
 			var pe *hostplugin.PluginError
 			if errors.As(err, &pe) {
 				d := pe.Diagnostic(p.ManifestPath(pg))

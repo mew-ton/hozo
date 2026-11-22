@@ -18,7 +18,9 @@ import (
 	"github.com/mew-ton/hozo/internal/app"
 	"github.com/mew-ton/hozo/internal/config"
 	"github.com/mew-ton/hozo/internal/diag"
+	"github.com/mew-ton/hozo/internal/fakeplugin"
 	hostplugin "github.com/mew-ton/hozo/internal/plugin"
+	"github.com/mew-ton/hozo/internal/wasmbuild"
 	sdk "github.com/mew-ton/hozo/plugin"
 )
 
@@ -132,16 +134,16 @@ func (s *sampleProject) skipIfAhead(t *testing.T, what string) {
 // standIn は、まだ動かせないトランスパイラ一つを、ファイルを返さない代役に置き換える手順。
 type standIn struct {
 	transpiler string
-	// manifest は、実装のないプラグインのマニフェスト（サンプルのルートからの相対パス）。command だけを代役のものに書き換える
-	// （語彙、requires、seams は本物のまま）。プラグインそのものがなければ ""。
+	// manifest は、実装のないプラグインのマニフェスト（サンプルのルートからの相対パス）。その wasm の場所に、代役の WASM を置く
+	// （マニフェストは、書き換えない: 語彙、requires、seams は本物のまま）。プラグインそのものがなければ ""。
 	manifest string
 	// language と requires は、プラグインそのものがないときに作る代役のマニフェストの中身: その単位の基底の言語と、基底の名前。
 	language string
 	requires []string
 }
 
-// standInCommand は、代役のプラグインの command: 要求を読み捨て、ファイルも warning も返さない（sh で動く）。
-const standInCommand = `command = ["sh", "-c", "cat >/dev/null; printf '%s' '{\"files\":[],\"warnings\":[]}'"]`
+// 代役のプラグインの中身は、にせもののプラグインの WASM（internal/fakeplugin の Place）: 要求を読み、頼まれたトランスパイラごとに、
+// ファイルも warning も返さない答えを返す。
 
 // loadSample は、サンプルの sample.json と hozo.toml を読み、足りないもの（absent、blocked）を調べる。
 func loadSample(t *testing.T, name string) *sampleProject {
@@ -250,7 +252,7 @@ func (s *sampleProject) pluginDirs() []string {
 // 代役に置き換える手順（standIns）を作る。動かせるのは、pluginDirs のどれかのプラグインのマニフェストを今の hozoc が読め、
 // そのマニフェストがその名前のトランスパイラを提供し、プラグインに実装があるとき。
 //
-// 代役は、ファイルを返さないトランスパイラ: マニフェストはあるが実装のないプラグインは、command だけを書き換える。プラグイン
+// 代役は、ファイルを返さないトランスパイラ: マニフェストはあるが実装のないプラグインは、wasm の場所に、代役を置く。プラグイン
 // そのものがなければ、その単位の（動かせる）基底に相乗りするマニフェストを作る。単位に動かせる基底がなければ、代役を置けない
 // （blocked）。
 func (s *sampleProject) findTranspilers(t *testing.T) {
@@ -305,7 +307,7 @@ func (s *sampleProject) findTranspilers(t *testing.T) {
 			continue
 		}
 		if manifest, ok := unimplemented[name]; ok {
-			s.absent[name] = fmt.Sprintf("プラグインの実装がまだない（%s に、マニフェストの command が go run で動かす Go のファイルがない）", unimplementedPlugin[name])
+			s.absent[name] = fmt.Sprintf("プラグインの実装がまだない（%s に、テストでない Go のファイルも、マニフェストの wasm のファイルもない）", unimplementedPlugin[name])
 			s.standIns = append(s.standIns, standIn{transpiler: name, manifest: manifest})
 			continue
 		}
@@ -361,33 +363,27 @@ func (s *sampleProject) absentReasons() []string {
 	return out
 }
 
-// placeStandIns は、root に写したプロジェクトに、代役を置く（tests/samples/README.md「飛ばす条件」）: 実装のないプラグインの
-// マニフェストは command を書き換え、プラグインそのものがないトランスパイラは、dir（HOZO_PLUGIN_PATH で渡すディレクトリ）に
-// 代役のプラグインを作る。
+// placeStandIns は、root に写したプロジェクトに、代役を置く（tests/samples/README.md「飛ばす条件」）: 実装のないプラグインは、
+// マニフェストの wasm の場所に、代役の WASM を置き、プラグインそのものがないトランスパイラは、dir（HOZO_PLUGIN_PATH で渡す
+// ディレクトリ）に、代役のプラグインを作る。
 func (s *sampleProject) placeStandIns(t *testing.T, root, dir string) {
 	t.Helper()
-	command := regexp.MustCompile(`(?m)^command\s*=.*$`)
 	for _, in := range s.standIns {
 		if in.manifest != "" {
 			p := filepath.Join(root, filepath.FromSlash(in.manifest))
-			data, err := os.ReadFile(p)
-			if err != nil {
-				t.Fatal(err)
+			m, diags := hostplugin.LoadManifest(p)
+			if m == nil {
+				t.Fatalf("%s を読めない: %+v", in.manifest, diags)
 			}
-			if !command.Match(data) {
-				t.Fatalf("%s に command の行がない", in.manifest)
-			}
-			if err := os.WriteFile(p, command.ReplaceAllLiteral(data, []byte(standInCommand)), 0o644); err != nil {
-				t.Fatal(err)
-			}
+			fakeplugin.Place(t, m.WasmPath(filepath.Dir(p)))
 			continue
 		}
 		quoted := make([]string, len(in.requires))
 		for i, r := range in.requires {
 			quoted[i] = fmt.Sprintf("%q", r)
 		}
-		manifest := fmt.Sprintf("# TestSamples が置いた代役（tests/samples/README.md「飛ばす条件」）。ファイルを返さない\nname = %q\n%s\nprotocol = %q\n\n[[transpiler]]\nname = %q\nlanguage = %q\nrequires = [%s]\n",
-			in.transpiler, standInCommand, hostplugin.Protocol, in.transpiler, in.language, strings.Join(quoted, ", "))
+		manifest := fmt.Sprintf("# TestSamples が置いた代役（tests/samples/README.md「飛ばす条件」）。ファイルを返さない\nname = %q\nwasm = %s\nprotocol = %q\n\n[[transpiler]]\nname = %q\nlanguage = %q\nrequires = [%s]\n",
+			in.transpiler, fakeplugin.WasmTOML, hostplugin.Protocol, in.transpiler, in.language, strings.Join(quoted, ", "))
 		p := filepath.Join(dir, in.transpiler, hostplugin.ManifestFileName)
 		if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
 			t.Fatal(err)
@@ -395,28 +391,21 @@ func (s *sampleProject) placeStandIns(t *testing.T, root, dir string) {
 		if err := os.WriteFile(p, []byte(manifest), 0o644); err != nil {
 			t.Fatal(err)
 		}
+		fakeplugin.Place(t, filepath.Join(filepath.Dir(p), fakeplugin.WasmFile))
 	}
 }
 
 // pluginImplemented は、マニフェスト m のプラグインに、動かすものがあるか。サンプルは、マニフェストと語彙と期待する出力を、
-// プラグインの実装より先に書く（docs/testing.md「サンプル」）。command が `go run …` のプラグインは、マニフェストの
-// ディレクトリ（main パッケージの置き場。docs/packages.md「plugins/<名前>」）に、テストでない Go のファイルがあれば、
-// 実装があるとする。それ以外の command（ビルド済みの実行ファイルなど）は、あるものとして起動に任せる。
+// プラグインの実装より先に書く（docs/testing.md「サンプル」）。マニフェストのディレクトリ（main パッケージの置き場。
+// docs/packages.md「plugins/<名前>」）に、テストでない Go のファイル（TestMain が、WASM にビルドする）か、マニフェストの wasm の
+// ファイルがあれば、実装があるとする。
 func pluginImplemented(t *testing.T, m *hostplugin.Manifest, dir string) bool {
 	t.Helper()
-	if len(m.Command) < 2 || m.Command[0] != "go" || m.Command[1] != "run" {
+	if wasmbuild.HasGoSources(dir) {
 		return true
 	}
-	sources, err := filepath.Glob(filepath.Join(dir, "*.go"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, f := range sources {
-		if !strings.HasSuffix(f, "_test.go") {
-			return true
-		}
-	}
-	return false
+	_, err := os.Stat(m.WasmPath(dir))
+	return err == nil
 }
 
 // skipIfBlocked は、hozoc を本物の hozo.toml で走らせるサブテストを、走らせられない理由があれば、それを名指しして飛ばす。
@@ -461,7 +450,7 @@ func (s *sampleProject) expected(t *testing.T) map[string][]byte {
 // copyInputs は、サンプルの入力を root に写す: hozo.toml、.hozo、go.mod、go.sum と、サンプルの中のプラグイン（hozo.toml の
 // plugin_dirs の下のすべて）。期待する出力（単位の out の下）と、人が書いたコードは写さない。
 // go.mod は、基底が import パスを決めるのに要る（docs/plugin-go.md「パッケージと import パス」。なければ GO-1）。その replace は
-// リポジトリへの相対パスなので、絶対パスに書き換える（root から、サンプルの中のプラグインを `go run` で動かせるように）。
+// リポジトリへの相対パスなので、絶対パスに書き換える（root で、生成したコードを、go の道具で確かめられるように）。
 func (s *sampleProject) copyInputs(t *testing.T, root string) {
 	t.Helper()
 	repo, err := filepath.Abs("..")
@@ -588,9 +577,6 @@ func (s *sampleProject) project(t *testing.T) (string, func(string) string) {
 	}
 	if len(s.standIns) == 0 {
 		return root, pluginPathEnv(plugins)
-	}
-	if _, err := exec.LookPath("sh"); err != nil {
-		t.Skip("sh がない（まだないトランスパイラの代役を動かせない）")
 	}
 	standIns := filepath.Join(tmp, "stand-ins")
 	s.placeStandIns(t, root, standIns)

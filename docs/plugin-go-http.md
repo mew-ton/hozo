@@ -12,7 +12,7 @@
 
 ```toml
 name     = "go-http"
-command  = ["go", "run", "github.com/mew-ton/hozo/plugins/go-http"]
+wasm     = "plugin.wasm"
 protocol = "0.22"
 
 [[transpiler]]

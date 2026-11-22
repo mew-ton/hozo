@@ -151,6 +151,8 @@ type CheckInput struct {
 	Format *OutputFormat `json:"format,omitempty"`
 	// プラグインを探すディレクトリ（OS のパス区切りで複数）
 	PluginPath *string `json:"pluginPath,omitempty"`
+	// プラグインの WASM を、機械の言葉に直したものを、覚える置き場
+	CacheDir *Path `json:"cacheDir,omitempty"`
 }
 
 // BuildInput は build の入力
@@ -167,6 +169,8 @@ type BuildInput struct {
 	DryRun *bool `json:"dryRun,omitempty"`
 	// プラグインを探すディレクトリ（OS のパス区切りで複数）
 	PluginPath *string `json:"pluginPath,omitempty"`
+	// プラグインの WASM を、機械の言葉に直したものを、覚える置き場
+	CacheDir *Path `json:"cacheDir,omitempty"`
 }
 
 // TestsInput は tests の入力
@@ -179,6 +183,8 @@ type TestsInput struct {
 	Coverage Path `json:"coverage"`
 	// プラグインを探すディレクトリ（OS のパス区切りで複数）
 	PluginPath *string `json:"pluginPath,omitempty"`
+	// プラグインの WASM を、機械の言葉に直したものを、覚える置き場
+	CacheDir *Path `json:"cacheDir,omitempty"`
 }
 
 // LspInput は lsp の入力
@@ -189,6 +195,8 @@ type LspInput struct {
 	Log *Path `json:"log,omitempty"`
 	// プラグインを探すディレクトリ（OS のパス区切りで複数）
 	PluginPath *string `json:"pluginPath,omitempty"`
+	// プラグインの WASM を、機械の言葉に直したものを、覚える置き場
+	CacheDir *Path `json:"cacheDir,omitempty"`
 }
 
 // EmitPlan は書き出す予定: 単位ごとにトランスパイラを呼んで集めたファイルと、そこまでの warning
@@ -205,12 +213,10 @@ type EmitPlan struct {
 // effects hozoc.OutputsSync as any -> UpToDate
 const EffectSyncOutputs runtime.Effect = "hozoc.syncOutputs"
 
-// Plugin はプラグインの起動のしかた（docs/plugin-protocol.md「起動」）。root は作業ディレクトリにするプロジェクトのルート、dir はマニフェストのディレクトリ
+// Plugin はプラグインの起動のしかた（docs/plugin-protocol.md「起動」）。wasm は、プラグインの本体（WASM）のファイル
 type Plugin struct {
-	Name    string   `json:"name"`
-	Command []string `json:"command"`
-	Dir     Path     `json:"dir"`
-	Root    Path     `json:"root"`
+	Name string `json:"name"`
+	Wasm Path   `json:"wasm"`
 }
 
 // Spec は仕様: IR の、出力に依らない部分（docs/ir.md「まとめた形」の Spec）。中身はこの仕様では書かない

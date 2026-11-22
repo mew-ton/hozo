@@ -24,16 +24,17 @@ internal/sema/         解決、型、正規化
 internal/check/        検査
 internal/config/       hozo.toml
 internal/vocab/        埋め込んだ標準の語彙
-internal/plugin/       プラグインの探索と起動
+internal/plugin/       プラグインの探索と起動（WASM の実行環境）
+internal/wasmbuild/    このリポジトリのプラグインを WASM にビルドする（テストが使う。docs/testing.md「プラグインの WASM」）
 internal/testmap/      テストの対応表の形の確かめと、実行された行との突き合わせ
-internal/fakeplugin/   テストのための、にせもののプラグイン（cmd/fakeplugin が中身。SDK を通さずに、決まった応答を返す。docs/testing.md「環境からの独立」）
+internal/fakeplugin/   テストのための、にせもののプラグイン（cmd/fakeplugin が中身。WASM にビルドして使う。SDK を通さずに、決まった応答を返す。docs/testing.md「環境からの独立」）
 internal/project/      一度の解析のすべて
 internal/app/          hozoc の葉の op と状態の単位の実装と表示
 internal/lsp/          言語サーバー（jsonrpc/ は JSON-RPC、protocol/ は LSP の型のうち使うもの）
 internal/gen/hozoc/    cli.hozo からの生成物: 入口のパッケージ（go）。inner/ は内側のパッケージ（go）、types/ は型のパッケージ（go と go-valid）、hozoctest/ はテストのパッケージ（go）、cli/ は go-cli の出力
 internal/gen/proc/     cli.hozo からの生成物: 語彙 proc の例外の型（go）
 internal/tools/        生成の道具: irschema/ と tmgrammar/（go generate）、selfgen/（make generate）
-plugins/<name>/        プラグイン。一つのディレクトリが一つの実行ファイルと hozo-plugin.toml（提供するトランスパイラの一覧を持つ）。Go なら main パッケージ、TS なら npm パッケージ
+plugins/<name>/        プラグイン。一つのディレクトリが、一つの WASM（main パッケージをビルドした plugin.wasm。リポジトリには入れない）と hozo-plugin.toml（提供するトランスパイラの一覧を持つ）
 plugins/go/            Go の基底のプラグイン（main。中身は internal/gobase/）
 plugins/go-valid/      go-valid プラグイン（main。中身は internal/govalid/）
 plugins/go-sqlite/     go-sqlite プラグイン（main。中身は internal/gosqlite/）
@@ -64,7 +65,8 @@ Go のパッケージごとの、このモジュールの中で import してい
 | `internal/project` | `internal/check`、`internal/config`、`internal/diag`、`internal/plugin`、`internal/sema`、`internal/source`、`internal/syntax`、`internal/syntax/ast`、`internal/vocab`、`ir`、`plugin` |
 | `internal/plugin` | `internal/config`、`internal/diag`、`ir`、`plugin` |
 | `internal/testmap` | `plugin` |
-| `internal/fakeplugin` | — |
+| `internal/fakeplugin` | `internal/plugin`、`internal/wasmbuild` |
+| `internal/wasmbuild` | `internal/plugin` |
 | `internal/fakeplugin/cmd/fakeplugin` | — |
 | `internal/check` | `internal/config`、`internal/diag`、`internal/source`、`ir` |
 | `internal/sema` | `internal/diag`、`internal/source`、`internal/syntax/ast`、`ir` |
@@ -114,7 +116,7 @@ Go のパッケージごとの、このモジュールの中で import してい
 - 解析（`internal/project`）は、プラグインの `emit` を起動しない。応答のファイルを集めて書き出すのは `internal/app`。言語サーバーは `internal/project` までで、プラグインの起動（`emit`）を行わない。
 - `internal/sema` は設定（`internal/config`）に依存しない。設定に関わる検査は `internal/config`、`internal/check`、`internal/project` が行う（「`internal/config`」）。
 - `internal/tools/selfgen` はこのモジュールのどのパッケージも import しない（生成物が壊れていても動くため。「自己生成の手順」）。
-- 外部のモジュールは `github.com/BurntSushi/toml` だけ（`internal/config` と `internal/plugin` が使う）。依存を最小にするため、言語サーバーの JSON-RPC も自前で書く。
+- 外部のモジュールは、二つ: `github.com/BurntSushi/toml`（`internal/config` と `internal/plugin` が使う）と、WASM の実行環境 `github.com/tetratelabs/wazero`（`internal/plugin` だけが使う。それが要る `golang.org/x/sys` が、間接に入る。`docs/plugin-protocol.md`「起動」）。依存を最小にするため、言語サーバーの JSON-RPC も自前で書く。
 - `tests/samples/` のサンプルは別のモジュール（自分の `go.mod`）なので、この表にも上の規則にも入らない。サンプルだけが使う依存は、サンプルの `go.mod` に置く（`tests/samples/README.md`「置き方」）。サンプルが自分で持つプラグインも、プラグインの規則（使えるのは `ir`、`plugin`、`plugin/golang`、`plugin/govalid`、`runtime`）に従う。
 
 ## パッケージ
@@ -556,8 +558,10 @@ func LoadManifest(path string) (*Manifest, []diag.Diagnostic)                   
 type Plugin struct { Name, Dir string; Manifest *Manifest; Mismatch []diag.Diagnostic } // 入っているプラグイン一つ。Dir は絶対パス。Mismatch は MAN-2（使うときにだけ報告する）
 type SearchEnv struct { PluginPath, Home string }                                       // 探索が見るプロジェクトの外の場所（HOZO_PLUGIN_PATH の値、ホーム）。呼ぶ側が渡す。零値なら plugin_dirs だけ
 func Discover(cfg *config.Config, env SearchEnv) ([]*Plugin, []diag.Diagnostic)         // 入っているプラグインのすべて（docs/plugin-protocol.md「探索」の順）。MAN-3 / MAN-4。プロセスの環境は読まない
-type Runner struct { Root string; Stderr io.Writer; Env []string }
-func (r Runner) Run(m *Manifest, dir string, req any, resp any) error                   // 起動して JSON をやり取り（docs/plugin-protocol.md「起動」）。resp が *sdk.EmitBatchResponse か *sdk.CoverageResponse なら応答の形も確かめる（同「応答の形」）
+func (m *Manifest) WasmPath(dir string) string                                          // マニフェストの wasm を、マニフェストのディレクトリ dir からのパスにしたもの
+type Runner struct { Stderr io.Writer; Context context.Context; CacheDir string }       // Context で、動いているプラグインを止める（止める口を持つ Context を渡した起動だけが、途中で止められる形の WASM で動き、遅い）。CacheDir は、機械の言葉に直したものの置き場（"" なら、os.UserCacheDir の下の hozo）
+func (r Runner) Run(name, wasm string, req any, resp any) error                         // WASM のファイル wasm を、サンドボックスの中で動かして、JSON をやり取り（docs/plugin-protocol.md「起動」）。name は、プラグインの名前。resp が *sdk.EmitBatchResponse か *sdk.CoverageResponse なら応答の形も確かめる（同「応答の形」）
+func MountForTest(wasm, dir string) (undo func())                                       // テストだけの口: wasm のプラグインに、dir を見せる（docs/testing.md「環境からの独立」）。テストのプロセスでなければ panic
 var ErrCrashed, ErrMalformedOutput error                                                // errors.Is で判定。*PluginError は exit 2 の code を持ち、MAN-2 / MAN-5 の診断にする
 ```
 
@@ -582,10 +586,10 @@ type Transpiler struct { Name string; Plugin *plugin.Plugin; Decl *plugin.Transp
 type Options struct {
     Root, ConfigPath string          // hozo.toml を探し始めるディレクトリと、--config / HOZO_CONFIG
     Overlay map[string][]byte        // ディスクの代わりに使う内容（言語サーバーの開いている文書）
-    Stderr io.Writer; Env []string   // プラグインの標準エラーの流し先と、プラグインに渡す環境変数の元
+    Stderr io.Writer; CacheDir string // プラグインの標準エラーの流し先と、WASM を、機械の言葉に直したものの置き場（HOZO_CACHE_DIR。"" なら、ふだんの置き場）
     PluginPath, Home string          // プラグインの探索が見るプロジェクトの外の場所（internal/plugin.SearchEnv）。空なら探さない
     NoPlugins bool                   // プラグインを、起動しない（docs/cli.md「検査」の 4 を、しない）。仕様を読み直すだけの呼び出しと、言語サーバーの解析（docs/lsp.md「プラグインの診断」）
-    Context context.Context          // プラグインの起動を、やめさせる口（言語サーバーの、裏の check）。nil なら、やめさせない。プラグインの起動と起動の間で見て、やめたら、Project.RunErr が、その誤り
+    Context context.Context          // プラグインの起動を、やめさせる口（言語サーバーの、裏の check）。nil なら、やめさせない。動いているプラグインも、その場で止まり（docs/plugin-protocol.md「起動」）、やめたら、Project.RunErr が、その誤り
 }
 func LoadWith(opts Options) *Project                                            // 解析の本体。NoConfig なら CFG-* の診断を除く
 func Load(root string, configPath string, overlay map[string][]byte) *Project   // LoadWith の短い形。プラグインは plugin_dirs だけから探し、起動しない
@@ -619,7 +623,7 @@ func Match(tests []Test, covered []sdk.CoveredFile) []Status          // tests �
 
 ### `internal/lsp`
 
-`docs/lsp.md`。`func Serve(in io.Reader, out io.Writer, opts Options) error`。`Options` は `Root`、`ConfigPath`、`Log` と、`internal/project.Options` にそのまま渡す `Env`、`PluginPath`、`Home`。`internal/lsp/jsonrpc`（`Content-Length` 付きの JSON-RPC 2.0 の読み書き）と `internal/lsp/protocol`（LSP の型のうち使うもの）は、このパッケージの中だけで使う。
+`docs/lsp.md`。`func Serve(in io.Reader, out io.Writer, opts Options) error`。`Options` は `Root`、`ConfigPath`、`Log` と、`internal/project.Options` にそのまま渡す `CacheDir`、`PluginPath`、`Home`。`internal/lsp/jsonrpc`（`Content-Length` 付きの JSON-RPC 2.0 の読み書き）と `internal/lsp/protocol`（LSP の型のうち使うもの）は、このパッケージの中だけで使う。
 
 ### `plugins/<名前>`
 
@@ -651,8 +655,8 @@ Go のプラグインは、どれも同じ形: `main` パッケージが `plugin
 
 `internal/gen/hozoc` と `internal/gen/proc`（以下、合わせて「置き場」）は `cmd/hozoc` が import するパッケージなので、hozoc がそこへ直に書くと、プラグインの不具合でコンパイルできない Go が出たときに hozoc 自身がビルドできなくなり、生成し直すこともできなくなる。そうならないように、`make generate`（`go run ./internal/tools/selfgen`）は、置き場に、コンパイルできると確かめたものしか置かない。
 
-1. 今のソース（今の置き場を含む）で `hozoc` を一時ディレクトリにビルドする。
-2. 別の一時ディレクトリに `cli.hozo`、`hozo.toml`、`go.mod`、`go.sum` を写し、プラグイン（`plugins/` の `go`、`go-valid`、`go-cli`）を `go run` で動かすのに要る `ir`、`plugin`、`plugins`、`runtime` をシンボリックリンクで足して、そこで 1 の `hozoc build` を走らせる（`tests/generated_test.go` と同じ組み立て。import パスは、`hozo.toml` の `[options.go]` の `module` から決まるので、同じになる。`go.mod` は、3 の vet とビルドのために写す）。プラグインの探索が見るプロジェクトの外の場所（`HOZO_PLUGIN_PATH`、ホーム）は空にして、生成物が実行する人の環境に左右されないようにする。
+1. 今のソース（今の置き場を含む）で `hozoc` を一時ディレクトリにビルドする。使うプラグイン（`plugins/` の `go`、`go-valid`、`go-cli`）を、WASM にビルドして、それぞれのディレクトリの `plugin.wasm` に置く（`docs/testing.md`「プラグインの WASM」）。
+2. 別の一時ディレクトリに `cli.hozo`、`hozo.toml`、`go.mod`、`go.sum` を写し、プラグインの置き場 `plugins` と、3 の vet が要る `ir`、`plugin`、`runtime` をシンボリックリンクで足して、そこで 1 の `hozoc build` を走らせる（`tests/generated_test.go` と同じ組み立て。import パスは、`hozo.toml` の `[options.go]` の `module` から決まるので、同じになる。`go.mod` は、3 の vet とビルドのために写す）。プラグインの探索が見るプロジェクトの外の場所（`HOZO_PLUGIN_PATH`、ホーム）は空にして、生成物が実行する人の環境に左右されないようにする。WASM を、機械の言葉に直したものの置き場（`HOZO_CACHE_DIR`）は、ホームを空にする前の、もとの場所を渡す（生成のたびに、直し直さないように。答えは、変わらない）。
 3. 生成した `internal/gen/hozoc/**` と `internal/gen/proc/**` を、その一時ディレクトリで `go vet` に通し、次に、リポジトリの今のものの代わりに置いたつもりで（`go build -overlay`。ディスクの上の置き場には触れない）、それを import するパッケージ（`cmd/hozoc`、`internal/app`）ごと `go build` する。
 4. 3 が通ったときだけ、置き場の中身を生成したものに置き換える（なくなったファイルは消し、同じ内容のファイルには触れない）。通らなければ何も変えず、生成したものを残した一時ディレクトリの場所を示して失敗する。
 

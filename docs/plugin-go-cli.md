@@ -10,7 +10,7 @@
 
 ```toml
 name     = "go-cli"
-command  = ["go", "run", "github.com/mew-ton/hozo/plugins/go-cli"]
+wasm     = "plugin.wasm"
 protocol = "0.22"
 
 vocabulary = ["cli.hozo"]
@@ -26,7 +26,7 @@ requires = ["go", "go-valid"]
 - 読む語彙は、`cli` の `command` / `arg` / `flag` / `env` / `required` / `default` / `exitCode`（「語彙」）。`@proc.stdio` などのほかの語彙は読まない（基底が、付いた op を人が実装する葉として出す）。
 - `go-valid` に依存するのは、解釈した入力の制約を確かめるため（「引数の解釈」）。
 - オプションはない。`[emit.options.go-cli]` にキーがあれば CLI-8。
-- `command` が `go run` なのは、このリポジトリの中で `plugin_dirs = ["plugins"]` から使うため（配布のしかたは `docs/plugin-go.md`「マニフェスト」）。
+- `wasm` の `plugin.wasm` の作り方は、ほかの Go のプラグインと同じ（`docs/plugin-go.md`「マニフェスト」）。
 
 ## 語彙
 
