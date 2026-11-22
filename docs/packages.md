@@ -131,6 +131,8 @@ Go のパッケージごとの、このモジュールの中で import してい
 
 ## パッケージ
 
+**公開のパッケージは、見本の SDK で、形は、約束しない**（`docs/decisions.md`「決めたこと」446）: プラグインを書く人に約束するのは、やり取り（`docs/plugin-protocol.md`）と、IR の JSON Schema（`schema/ir.schema.json`。版の持ち主は `docs/ir.md`「版」）。下の「（公開）」は、Go の `internal/` の外にあって、プラグインから import できる、という意味で、名前や引数を変えない、という約束ではない。
+
 ### `ir`（公開）
 
 `docs/ir.md` の型。`encoding/json` のタグはこの文書のフィールド名。`Program` / `View` と、`Type` などの判別付きユニオンは `kind` で分ける（Go では interface と `UnmarshalJSON`）。
