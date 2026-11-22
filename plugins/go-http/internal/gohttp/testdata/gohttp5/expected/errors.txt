@@ -1,9 +1,13 @@
-GOHTTP-5	app.putShape	経路の op app.putShape の本文（model app.ShapeIn のフィールド shape）の型 app.Shape が、union app.Shape を中に持つ（union の通信の上の形を、まだ決めていない）
-GOHTTP-5	app.putAlbum	経路の op app.putAlbum の本文（model app.AlbumIn のフィールド album）の型 app.Album? が、union app.Shape を中に持つ（union の通信の上の形を、まだ決めていない）
-GOHTTP-5	app.putAlbum	経路の op app.putAlbum の本文（model app.AlbumIn のフィールド byName）の型 app.ShapesByName が、union app.Shape を中に持つ（union の通信の上の形を、まだ決めていない）
-GOHTTP-5	app.putDrawing	経路の op app.putDrawing の本文（model app.DrawingIn のフィールド drawing）の型 app.Drawing が、union app.Shape を中に持つ（union の通信の上の形を、まだ決めていない）
-GOHTTP-5	app.getDrawing	経路の op app.getDrawing の結果の型 app.Drawing? が、union app.Shape を中に持つ（union の通信の上の形を、まだ決めていない）
-GOHTTP-5	app.getShapes	経路の op app.getShapes の結果の型 app.Shape[] が、union app.Shape を中に持つ（union の通信の上の形を、まだ決めていない）
-GOHTTP-5	app.clash	経路の op app.clash の例外 app.Clash の引数 value の型 app.Drawing が、union app.Shape を中に持つ（union の通信の上の形を、まだ決めていない）
-GOHTTP-5	app.refused	経路の op app.refused の例外 app.Refused の引数 shapes の型 app.Shape[]? が、union app.Shape を中に持つ（union の通信の上の形を、まだ決めていない）
-GOHTTP-5	app.refused	経路の op app.refused の例外 app.Refused の引数 album の型 app.Album が、union app.Shape を中に持つ（union の通信の上の形を、まだ決めていない）
+GOHTTP-5	app.putShape	経路の op app.putShape の本文（model app.ShapeIn のフィールド shape）の型 app.Shape が、通信に出せない union app.Shape を中に持つ: アーム Label の型 string が、フィールドを持つ model でない（通信に出せるのは、アームが、どれも、フィールドを持つ model で、アームごとに、そのアームだけが持つ、省略可能でないフィールドがある union）
+GOHTTP-5	app.putAlbum	経路の op app.putAlbum の本文（model app.AlbumIn のフィールド album）の型 app.Album? が、通信に出せない union app.Shape を中に持つ: アーム Label の型 string が、フィールドを持つ model でない（通信に出せるのは、アームが、どれも、フィールドを持つ model で、アームごとに、そのアームだけが持つ、省略可能でないフィールドがある union）
+GOHTTP-5	app.putAlbum	経路の op app.putAlbum の本文（model app.AlbumIn のフィールド byName）の型 app.ShapesByName が、通信に出せない union app.Shape を中に持つ: アーム Label の型 string が、フィールドを持つ model でない（通信に出せるのは、アームが、どれも、フィールドを持つ model で、アームごとに、そのアームだけが持つ、省略可能でないフィールドがある union）
+GOHTTP-5	app.putDrawing	経路の op app.putDrawing の本文（model app.DrawingIn のフィールド drawing）の型 app.Drawing が、通信に出せない union app.Shape を中に持つ: アーム Label の型 string が、フィールドを持つ model でない（通信に出せるのは、アームが、どれも、フィールドを持つ model で、アームごとに、そのアームだけが持つ、省略可能でないフィールドがある union）
+GOHTTP-5	app.getDrawing	経路の op app.getDrawing の結果の型 app.Drawing? が、通信に出せない union app.Shape を中に持つ: アーム Label の型 string が、フィールドを持つ model でない（通信に出せるのは、アームが、どれも、フィールドを持つ model で、アームごとに、そのアームだけが持つ、省略可能でないフィールドがある union）
+GOHTTP-5	app.getShapes	経路の op app.getShapes の結果の型 app.Shape[] が、通信に出せない union app.Shape を中に持つ: アーム Label の型 string が、フィールドを持つ model でない（通信に出せるのは、アームが、どれも、フィールドを持つ model で、アームごとに、そのアームだけが持つ、省略可能でないフィールドがある union）
+GOHTTP-5	app.getSame	経路の op app.getSame の結果の型 app.Same が、通信に出せない union app.Same を中に持つ: アーム A（app.Card）に、そのアームだけが持つ、省略可能でないフィールドがない（通信に出せるのは、アームが、どれも、フィールドを持つ model で、アームごとに、そのアームだけが持つ、省略可能でないフィールドがある union）
+GOHTTP-5	app.getEmpty	経路の op app.getEmpty の結果の型 app.Empty[] が、通信に出せない union app.Empty を中に持つ: アーム None（app.Empty.None）に、そのアームだけが持つ、省略可能でないフィールドがない（通信に出せるのは、アームが、どれも、フィールドを持つ model で、アームごとに、そのアームだけが持つ、省略可能でないフィールドがある union）
+GOHTTP-5	app.getSub	経路の op app.getSub の結果の型 app.Sub? が、通信に出せない union app.Sub を中に持つ: アーム Small（app.Card）に、そのアームだけが持つ、省略可能でないフィールドがない（通信に出せるのは、アームが、どれも、フィールドを持つ model で、アームごとに、そのアームだけが持つ、省略可能でないフィールドがある union）
+GOHTTP-5	app.getIndexed	経路の op app.getIndexed の結果の型 app.Indexed が、通信に出せない union app.Indexed を中に持つ: アーム Many の型 app.CardsByName が、フィールドを持つ model でない（通信に出せるのは、アームが、どれも、フィールドを持つ model で、アームごとに、そのアームだけが持つ、省略可能でないフィールドがある union）
+GOHTTP-5	app.clash	経路の op app.clash の例外 app.Clash の引数 value の型 app.Drawing が、通信に出せない union app.Shape を中に持つ: アーム Label の型 string が、フィールドを持つ model でない（通信に出せるのは、アームが、どれも、フィールドを持つ model で、アームごとに、そのアームだけが持つ、省略可能でないフィールドがある union）
+GOHTTP-5	app.refused	経路の op app.refused の例外 app.Refused の引数 shapes の型 app.Shape[]? が、通信に出せない union app.Shape を中に持つ: アーム Label の型 string が、フィールドを持つ model でない（通信に出せるのは、アームが、どれも、フィールドを持つ model で、アームごとに、そのアームだけが持つ、省略可能でないフィールドがある union）
+GOHTTP-5	app.refused	経路の op app.refused の例外 app.Refused の引数 album の型 app.Album が、通信に出せない union app.Shape を中に持つ: アーム Label の型 string が、フィールドを持つ model でない（通信に出せるのは、アームが、どれも、フィールドを持つ model で、アームごとに、そのアームだけが持つ、省略可能でないフィールドがある union）

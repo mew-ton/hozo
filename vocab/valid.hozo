@@ -1,6 +1,10 @@
 namespace valid {
   decorator min(value: int | float) for scalar, field;
   decorator max(value: int | float) for scalar, field;
+  /**
+   * 長さの制約。文字列（scalar か、フィールド）に付けると、文字の数に掛かる。配列のフィールドに付けると、要素の数に掛かる。
+   * 配列の要素に掛けるなら、要素の型（scalar）に付ける
+   */
   decorator length(min: int?, max: int?) for scalar, field;
   decorator pattern(regex: string) for scalar, field;
   decorator format(name: string) for scalar, field;   // "email" / "uri" / "uuid" など

@@ -35,10 +35,14 @@ namespace app {
   model Attrs { [name: string]: string; }
 
   model Form {
-    // 配列か、インデックスの model そのものに制約が付いている（省略可能でも同じ）
+    // 配列のフィールドに、length のほかの制約が付いている（省略可能でも同じ）。インデックスの model そのものに、制約が付いている
     @valid.min(1) tags: string[];
     @valid.length(max: 3) attrs: Attrs;
     @valid.min(1) later: int[]?;
+    @valid.pattern("x") @valid.format("email") words: string[];
+    // 配列のフィールドの length は、要素の数に掛かる: min も max もなければ、同じに当たる。あれば、診断にならない
+    @valid.length empty: string[];
+    @valid.length(min: 1, max: 3) few: string[];
     // フィールドの型（scalar なら元の型）に合わない
     @valid.min(1) name: string;
     @valid.length(min: 1) inner: Inner;

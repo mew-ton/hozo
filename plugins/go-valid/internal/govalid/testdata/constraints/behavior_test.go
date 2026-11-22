@@ -231,3 +231,43 @@ func TestEntryAlias(t *testing.T) {
 	expect(t, split.Input{Name: "x"})
 	expect(t, split.Input{Contact: ptr(pkgtype.Email("x"))}, "name: length", "contact: format")
 }
+
+// TestArrayCount は、配列のフィールドに付けた length: 要素の数に掛かり、違反の Constraint は count。要素の文字数の違反
+// （要素の型 Tag の length）とは、Constraint も、Path も、違う。要素（1）の後に、数（2）。
+func TestArrayCount(t *testing.T) {
+	got := violations(t, app.Tagged{Tags: []app.Tag{"ok", "", "toolong", "x"}, Notes: []string{"a", "b", "c"}, Later: []int64{1}})
+	want := []string{"tags[1]: length", "tags[2]: length", "tags: count", "notes: count", "later: count"}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("違反 = %v, want %v", got, want)
+	}
+	if got := violations(t, app.Tagged{Tags: []app.Tag{"a"}, Notes: []string{"", ""}, Later: []int64{1, 2}}); len(got) != 0 {
+		t.Errorf("合っている値の違反 = %v", got)
+	}
+	// 空の配列は、要素の数が 0
+	if got, want := violations(t, app.Tagged{Later: []int64{1, 2}}), []string{"tags: count"}; !reflect.DeepEqual(got, want) {
+		t.Errorf("空の配列の違反 = %v, want %v", got, want)
+	}
+}
+
+// TestUnionArms は、union のアームの検証: 値が当たっているアームの Validate を呼ぶ。この名前空間の model、包む型（別の名前空間の
+// model、scalar）。制約のないアームと、値のない union は、確かめない。Path に、アームの名前は入らない。
+func TestUnionArms(t *testing.T) {
+	bad := app.Deal{
+		Buyer:  app.Named{},
+		Seller: app.PartyAt{Value: pkgtype.Address{}},
+		Others: []app.Party{app.PartyMail{Value: "x"}, app.PartyAnon{}, app.PartyRaw{}, nil},
+		ByName: app.PartiesByName{"b": app.Named{}, "a": app.PartyMail{Value: "nope"}},
+	}
+	want := []string{"buyer.name: length", "seller.city: length", "others[0]: format", "byName[a]: format", "byName[b].name: length"}
+	if got := violations(t, bad); !reflect.DeepEqual(got, want) {
+		t.Errorf("違反 = %v, want %v", got, want)
+	}
+	good := app.Deal{Buyer: app.Named{Name: "n"}, Others: []app.Party{app.PartyAt{Value: pkgtype.Address{City: "c"}}}}
+	if got := violations(t, good); len(got) != 0 {
+		t.Errorf("合っている値の違反 = %v", got)
+	}
+	// 包む型も、Validate を持つ
+	if got, want := violations(t, app.PartyMail{Value: "x"}), []string{"format"}; !reflect.DeepEqual(got, want) {
+		t.Errorf("包む型の違反 = %v, want %v", got, want)
+	}
+}

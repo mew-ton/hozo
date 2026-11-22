@@ -16715,15 +16715,22 @@
           {
             "kind": "decorator",
             "name": "valid.length",
+            "description": {
+              "summary": "長さの制約。文字列（scalar か、フィールド）に付けると、文字の数に掛かる。配列のフィールドに付けると、要素の数に掛かる。\n配列の要素に掛けるなら、要素の型（scalar）に付ける",
+              "body": "長さの制約。文字列（scalar か、フィールド）に付けると、文字の数に掛かる。配列のフィールドに付けると、要素の数に掛かる。\n配列の要素に掛けるなら、要素の型（scalar）に付ける",
+              "params": [],
+              "throws": [],
+              "see": []
+            },
             "decorators": [],
             "span": {
               "file": "hozo:vocab/valid.hozo",
               "start": {
-                "line": 4,
+                "line": 8,
                 "col": 3
               },
               "end": {
-                "line": 4,
+                "line": 8,
                 "col": 60
               }
             },
@@ -16777,11 +16784,11 @@
             "span": {
               "file": "hozo:vocab/valid.hozo",
               "start": {
-                "line": 5,
+                "line": 9,
                 "col": 3
               },
               "end": {
-                "line": 5,
+                "line": 9,
                 "col": 54
               }
             },
@@ -16821,11 +16828,11 @@
             "span": {
               "file": "hozo:vocab/valid.hozo",
               "start": {
-                "line": 6,
+                "line": 10,
                 "col": 3
               },
               "end": {
-                "line": 6,
+                "line": 10,
                 "col": 52
               }
             },

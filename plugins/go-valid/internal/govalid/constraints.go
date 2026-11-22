@@ -50,7 +50,12 @@ type constraint struct {
 	regex, variable string
 	// format は format の引数。
 	format string
+	// count は、配列のフィールドに付けた length（要素の数に掛かる。違反の Constraint は count）。
+	count bool
 }
+
+// constraintCount は、配列のフィールドに付けた length の、違反の Constraint（docs/plugin-go-valid.md「制約」）。
+const constraintCount = "count"
 
 // parse は、適用 app（valid の標準の制約）を読む。core は付いた先の元の型で、coreOK が false なら、付いた先は核の型を元に
 // 持たない（model、union、array など）。subject は、メッセージに書く、付いた先（「scalar type.Email」）。
@@ -172,6 +177,9 @@ func (c constraint) condition(value string, f *file) string {
 		}
 		if c.hasMax {
 			cmps = append(cmps, fmt.Sprintf("l > %d", c.max))
+		}
+		if c.count {
+			return fmt.Sprintf("l := len(%s); %s", value, strings.Join(cmps, " || "))
 		}
 		return fmt.Sprintf("l := %s.RuneCountInString(string(%s)); %s", f.im.Add("unicode/utf8", "utf8"), value, strings.Join(cmps, " || "))
 	case validPattern:

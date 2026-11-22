@@ -452,6 +452,87 @@ func (v ItemColor) Validate() error {
 	return &runtime.ValidationError{Violations: violations}
 }
 
+// Validate は app.Tag の制約を確かめる。違反がなければ nil。
+func (v Tag) Validate() error {
+	var violations []runtime.Violation
+	if l := utf8.RuneCountInString(string(v)); l < 1 || l > 5 {
+		violations = append(violations, runtime.Violation{Path: "", Constraint: "length"})
+	}
+	if len(violations) == 0 {
+		return nil
+	}
+	return &runtime.ValidationError{Violations: violations}
+}
+
+// Validate は app.Tagged の各フィールドの制約を確かめる。違反の Path はフィールド名を . でつないだもの。
+func (m Tagged) Validate() error {
+	var violations []runtime.Violation
+	for i0, x0 := range m.Tags {
+		violations = validAppend(violations, "tags["+strconv.Itoa(i0)+"]", x0.Validate())
+	}
+	if l := len(m.Tags); l < 1 || l > 3 {
+		violations = append(violations, runtime.Violation{Path: "tags", Constraint: "count"})
+	}
+	if l := len(m.Notes); l > 2 {
+		violations = append(violations, runtime.Violation{Path: "notes", Constraint: "count"})
+	}
+	if l := len(m.Later); l < 2 {
+		violations = append(violations, runtime.Violation{Path: "later", Constraint: "count"})
+	}
+	if len(violations) == 0 {
+		return nil
+	}
+	return &runtime.ValidationError{Violations: violations}
+}
+
+// Validate は app.Named の各フィールドの制約を確かめる。違反の Path はフィールド名を . でつないだもの。
+func (m Named) Validate() error {
+	var violations []runtime.Violation
+	if l := utf8.RuneCountInString(string(m.Name)); l < 1 {
+		violations = append(violations, runtime.Violation{Path: "name", Constraint: "length"})
+	}
+	if len(violations) == 0 {
+		return nil
+	}
+	return &runtime.ValidationError{Violations: violations}
+}
+
+// Validate は union app.Party のアーム At（type.Address）の制約を確かめる。違反がなければ nil。
+func (v PartyAt) Validate() error {
+	return v.Value.Validate()
+}
+
+// Validate は union app.Party のアーム Mail（type.Email）の制約を確かめる。違反がなければ nil。
+func (v PartyMail) Validate() error {
+	return v.Value.Validate()
+}
+
+// Validate は app.Deal の各フィールドの制約を確かめる。違反の Path はフィールド名を . でつないだもの。
+func (m Deal) Validate() error {
+	var violations []runtime.Violation
+	if u0, ok := m.Buyer.(interface{ Validate() error }); ok {
+		violations = validAppend(violations, "buyer", u0.Validate())
+	}
+	if u0, ok := m.Seller.(interface{ Validate() error }); ok {
+		violations = validAppend(violations, "seller", u0.Validate())
+	}
+	for i0, x0 := range m.Others {
+		if u1, ok := x0.(interface{ Validate() error }); ok {
+			violations = validAppend(violations, "others["+strconv.Itoa(i0)+"]", u1.Validate())
+		}
+	}
+	for _, k0 := range validKeys(m.ByName) {
+		x0 := m.ByName[k0]
+		if u1, ok := x0.(interface{ Validate() error }); ok {
+			violations = validAppend(violations, "byName["+string(k0)+"]", u1.Validate())
+		}
+	}
+	if len(violations) == 0 {
+		return nil
+	}
+	return &runtime.ValidationError{Violations: violations}
+}
+
 // validAppend は err が *runtime.ValidationError なら、その違反の Path に path を前置して dst に足す。
 func validAppend(dst []runtime.Violation, path string, err error) []runtime.Violation {
 	if err == nil {

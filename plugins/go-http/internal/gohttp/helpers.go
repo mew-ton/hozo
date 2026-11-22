@@ -21,6 +21,7 @@ var helperPackages = map[string]string{
 	"context":           "context",
 	"encoding/json":     "json",
 	"errors":            "errors",
+	"fmt":               "fmt",
 	"io":                "io",
 	"net/http":          "http",
 	"net/http/httptest": "httptest",

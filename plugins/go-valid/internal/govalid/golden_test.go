@@ -136,13 +136,25 @@ func TestTargets(t *testing.T) {
 			t.Errorf("gen/app/validate.go が、%s Validate() を出した", banned)
 		}
 	}
-	// メソッドのレシーバは、Validate を持つ N の scalar と model の、ちょうどすべて（宣言順）
+	// メソッドのレシーバは、Validate を持つ N の scalar と model と、union の、包む型のアームのうち、アームの型が Validate を持つ型への
+	// ref のもの（「出力」）の、ちょうどすべて（宣言順。包む型は、union の位置に、アームの順）
 	var want, got []string
 	for _, d := range view.Program.Namespace("app").Decls {
-		switch d.(type) {
+		switch x := d.(type) {
 		case *ir.Scalar, *ir.Model:
 			if govalid.HasValidate(view.Program, d.Common().Name) {
 				want = append(want, golang.TypeName(d.Common().Name, "app"))
+			}
+		case *ir.Union:
+			for _, a := range x.Arms {
+				r, isRef := a.Type.(ir.RefType)
+				if !isRef || !govalid.HasValidate(view.Program, r.Target) {
+					continue
+				}
+				if _, isModel := view.Program.Lookup(r.Target).(*ir.Model); isModel && strings.HasPrefix(r.Target, "app.") {
+					continue // N の model のアームは、包まない
+				}
+				want = append(want, golang.TypeName(x.Name, "app")+golang.Capitalize(a.Name))
 			}
 		}
 	}
@@ -178,7 +190,7 @@ var diagnosticFixtures = []struct{ name, code string }{
 	{"govalid1", codeValidConstraint}, // 制約が元の型に合わない、length に min も max もない、pattern が RE2 でない、format の名前を知らない、配列か record そのもの
 	// GOVALID-2 は欠番（フィールドの既定値を言語からなくした。docs/plugin-go-valid.md「診断」）。番号は使い回さない
 	{"govalid3", codeValidHome},   // Validate を持つ別の名前空間の型の置き場の単位が、go-valid を並べていない
-	{"govalid4", codeValidUnion},  // フィールドの型が union で、そのアームに Validate を持つ型がある
+	{"govalid4", codeValidUnion},  // フィールドの型が union で、そのアームの型が、Validate を持つ型そのものでなく、その中に Validate を持つ型がある
 	{"govalid5", codeValidCustom}, // 標準でない valid の制約が付いている
 	{"govalid6", codeValidField},  // Validate を持つ model が、validate という名前のフィールドを持つ
 	{"govalid7", codeValidOption}, // [emit.options.go-valid] に、知らないキーがある
@@ -237,7 +249,7 @@ func TestDiagnosticPositions(t *testing.T) {
 	for name, want := range map[string][]string{
 		"govalid1": {"app.Name", "app.Wait", "app.Count", "app.Flag", "app.At", "app.Alias", "app.Half", "app.Any", "app.Look", "app.Phone", "app.Form"},
 		"govalid3": {"app.User", "app.WorkEmail"},
-		"govalid4": {"app.Holder", "app.Lists"},
+		"govalid4": {"app.Lists"},
 		"govalid5": {"app.Jan", "app.Order"},
 		"govalid6": {"app.Form", "app.Outer"},
 		"govalid7": {""},
@@ -324,5 +336,75 @@ func TestHandler(t *testing.T) {
 	}
 	if _, err := h.Import(&plugin.ImportRequest{}); err != plugin.ErrUnsupported {
 		t.Errorf("Import の err = %v, want ErrUnsupported", err)
+	}
+}
+
+// TestArrayCountAndUnionText は、配列のフィールドの length と、union のアームの検証の、出力のテキスト（docs/plugin-go-valid.md
+// 「model」の表、「出力」の、包む型の Validate）を、文書から手で書いたものと比べる。
+func TestArrayCountAndUnionText(t *testing.T) {
+	_, files := emitFixture(t, "constraints")
+	got := files["gen/app/validate.go"]
+	for _, want := range []string{
+		`// Validate は app.Tagged の各フィールドの制約を確かめる。違反の Path はフィールド名を . でつないだもの。
+func (m Tagged) Validate() error {
+	var violations []runtime.Violation
+	for i0, x0 := range m.Tags {
+		violations = validAppend(violations, "tags["+strconv.Itoa(i0)+"]", x0.Validate())
+	}
+	if l := len(m.Tags); l < 1 || l > 3 {
+		violations = append(violations, runtime.Violation{Path: "tags", Constraint: "count"})
+	}
+	if l := len(m.Notes); l > 2 {
+		violations = append(violations, runtime.Violation{Path: "notes", Constraint: "count"})
+	}
+	if l := len(m.Later); l < 2 {
+		violations = append(violations, runtime.Violation{Path: "later", Constraint: "count"})
+	}
+	if len(violations) == 0 {
+		return nil
+	}
+	return &runtime.ValidationError{Violations: violations}
+}
+`,
+		`// Validate は union app.Party のアーム At（type.Address）の制約を確かめる。違反がなければ nil。
+func (v PartyAt) Validate() error {
+	return v.Value.Validate()
+}
+
+// Validate は union app.Party のアーム Mail（type.Email）の制約を確かめる。違反がなければ nil。
+func (v PartyMail) Validate() error {
+	return v.Value.Validate()
+}
+`,
+		`// Validate は app.Deal の各フィールドの制約を確かめる。違反の Path はフィールド名を . でつないだもの。
+func (m Deal) Validate() error {
+	var violations []runtime.Violation
+	if u0, ok := m.Buyer.(interface{ Validate() error }); ok {
+		violations = validAppend(violations, "buyer", u0.Validate())
+	}
+	if u0, ok := m.Seller.(interface{ Validate() error }); ok {
+		violations = validAppend(violations, "seller", u0.Validate())
+	}
+	for i0, x0 := range m.Others {
+		if u1, ok := x0.(interface{ Validate() error }); ok {
+			violations = validAppend(violations, "others["+strconv.Itoa(i0)+"]", u1.Validate())
+		}
+	}
+	for _, k0 := range validKeys(m.ByName) {
+		x0 := m.ByName[k0]
+		if u1, ok := x0.(interface{ Validate() error }); ok {
+			violations = validAppend(violations, "byName["+string(k0)+"]", u1.Validate())
+		}
+	}
+	if len(violations) == 0 {
+		return nil
+	}
+	return &runtime.ValidationError{Violations: violations}
+}
+`,
+	} {
+		if !strings.Contains(got, want) {
+			t.Errorf("gen/app/validate.go に、手で書いたテキストがない:\n%s", want)
+		}
 	}
 }

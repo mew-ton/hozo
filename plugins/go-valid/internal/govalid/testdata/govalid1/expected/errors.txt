@@ -8,9 +8,12 @@ GOVALID-1	app.Half	@valid.min の value 0.5 は整数でないので、元の型
 GOVALID-1	app.Any	@valid.length に、min も max もない（scalar app.Any）
 GOVALID-1	app.Look	@valid.pattern の正規表現 "(?<!a)b" を、RE2 で解釈できない（scalar app.Look）: error parsing regexp: invalid named capture: `(?<!a)b`
 GOVALID-1	app.Phone	@valid.format の名前 "phone" を知らない（scalar app.Phone。知っているのは email / uri / uuid / date-time）
-GOVALID-1	app.Form	@valid.min が、配列そのもの（model app.Form のフィールド tags）に付いている（制約を付けられるのは、要素の型）
+GOVALID-1	app.Form	@valid.min が、配列（model app.Form のフィールド tags）に付いている（配列のフィールドに付けられるのは @valid.length だけで、要素の数に掛かる。要素に掛けるなら、要素の型に付ける）
 GOVALID-1	app.Form	@valid.length が、インデックスの model そのもの（model app.Form のフィールド attrs）に付いている（制約を付けられるのは、値の型）
-GOVALID-1	app.Form	@valid.min が、配列そのもの（model app.Form のフィールド later）に付いている（制約を付けられるのは、要素の型）
+GOVALID-1	app.Form	@valid.min が、配列（model app.Form のフィールド later）に付いている（配列のフィールドに付けられるのは @valid.length だけで、要素の数に掛かる。要素に掛けるなら、要素の型に付ける）
+GOVALID-1	app.Form	@valid.pattern が、配列（model app.Form のフィールド words）に付いている（配列のフィールドに付けられるのは @valid.length だけで、要素の数に掛かる。要素に掛けるなら、要素の型に付ける）
+GOVALID-1	app.Form	@valid.format が、配列（model app.Form のフィールド words）に付いている（配列のフィールドに付けられるのは @valid.length だけで、要素の数に掛かる。要素に掛けるなら、要素の型に付ける）
+GOVALID-1	app.Form	@valid.length に、min も max もない（model app.Form のフィールド empty）
 GOVALID-1	app.Form	@valid.min は、元の型が int か float の位置にだけ付けられるが、model app.Form のフィールド name は元の型が string
 GOVALID-1	app.Form	@valid.length は、元の型が string の位置にだけ付けられるが、model app.Form のフィールド inner は核の型を元に持たない
 GOVALID-1	app.Form	@valid.max は、元の型が int か float の位置にだけ付けられるが、model app.Form のフィールド nick は元の型が string

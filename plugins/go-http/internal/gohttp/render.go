@@ -236,10 +236,14 @@ func (f *file) helpers(routes []route) string {
 	validate := f.g.opts.Validate && input
 	statuses := f.g.statuses(routes)
 
+	unions := len(f.g.unions) > 0
 	var b strings.Builder
 	add := func(on bool, h helper) {
 		if !on {
 			return
+		}
+		if unions {
+			h = withUnions(h)
 		}
 		for _, p := range h.imports {
 			f.use(p)
@@ -264,6 +268,11 @@ func (f *file) helpers(routes []route) string {
 	add(input, helperOK)
 	add(validate, helperValidate)
 	add(true, helperWriteJSON)
+	if unions {
+		f.use("reflect")
+		b.WriteString(f.g.unionTable(f.im.Qualifier))
+		add(true, helperUnionCodec)
+	}
 	add(true, helperWriteResult)
 	b.WriteString(f.writeError(statuses))
 	add(len(statuses) > 0, helperThrown)

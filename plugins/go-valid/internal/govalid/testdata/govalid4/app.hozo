@@ -1,4 +1,4 @@
-// GOVALID-4: 位置は model。
+// GOVALID-4: 位置は model。アームの型が、Validate を持つ型そのもの（ref）でなく、その中に Validate を持つ型がある union。
 namespace app {
   @valid.format("email")
   scalar Email extends string;
@@ -11,6 +11,7 @@ namespace app {
   union Cards { Many: Card[]; One: CardsByName; }
   union Free { A: string; B: int; }
 
+  // アームの型が、Validate を持つ型への ref（Contact の Mail）なら、当たらない: 値が当たっているアームの検証を呼ぶ
   model Holder { contact: Contact; }
   model Lists {
     contacts: Contact[];

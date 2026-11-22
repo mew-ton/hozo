@@ -24,6 +24,7 @@ var goldenFixtures = []struct {
 	{name: "locals", covers: "名前空間のパッケージの名前が、NewHandler とハンドラの中の局所の名前や、標準ライブラリのパッケージの名前と当たるとき（「出力」。docs/plugin-go.md「パッケージと import パス」の import の名前）"},
 	{name: "uniforma", covers: "型に依らない形の確かめ（docs/testing.md「単体テスト」）の一つ目: 核の型、省略可能でないフィールド、引数のない例外、戻り値のある op"},
 	{name: "uniformb", covers: "同、二つ目: scalar、省略可能なフィールド、引数を持つ例外（一つと、二つ以上。省略可能な引数）、省略可能な戻り値の op。uniforma と同じテキストになる（TestUniform）"},
+	{name: "unions", covers: "「通信の形」の「union」（印を書かない。決め手のキーで、アームを決める。包む型は、その Value）と、「補助」の「union の読み書き」（表 httpUnions と、読み書きの補助を、二つの http.go に）", behavior: true},
 	{name: "cases", covers: "「インテグレーションテストの口」のうち、routes が使わない場合: 結果の名前が当たるとき、never を返す op、Given・Request・Then と当たる引数の名前、基底が、テストのパッケージを作らない出力"},
 }
 
@@ -521,7 +522,7 @@ func TestDiagnosticPositions(t *testing.T) {
 		"gohttp3": {"app.In"},
 		// 全体の形で受け取る model のフィールドの型は、その model の位置
 		"gohttp4":  {"app.HeaderIn", "app.QueryIn", "app.Meta", "app.Paging"},
-		"gohttp5":  {"app.putShape", "app.putAlbum", "app.putDrawing", "app.getDrawing", "app.getShapes", "app.clash", "app.refused"},
+		"gohttp5":  {"app.putShape", "app.putAlbum", "app.putDrawing", "app.getDrawing", "app.getShapes", "app.getSame", "app.getEmpty", "app.getSub", "app.getIndexed", "app.clash", "app.refused"},
 		"gohttp6":  {"app.fetch", "app.both", "app.whole"},
 		"gohttp7":  {"app.relative", "app.empty", "app.absolute", "app.byId", "app.brace"},
 		"gohttp8":  {"app.second", "app.third", "app.again"},

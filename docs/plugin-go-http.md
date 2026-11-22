@@ -58,7 +58,7 @@ N の単位の対象の op（`docs/config.md`「in」）のうち、`@http.get` 
 - 経路の op の結果の型は、省略可能な配列（`T[]?`）でも、省略可能な、インデックスの model（`Attrs?`。`docs/types.md`「インデックスの model」）でもいけない。そうなら GOHTTP-16。Go では、どちらも `nil` が「値がない」を表すので、補助は、実行時に、値がない（204）ことと、空である（200）ことを見分けられない。省略可能な model と scalar（`type.Order?`）は、結果にできる（「通信の形」の「成功の応答」）。
 - この表は、書いたものの整合の検査で、出力を変えない（どの型でも、同じ補助の呼び出しになる。「入力の読み方」）。
 - パスは、`/` で始まる、決まった文字列。`{` か `}` を含むパス（パスの中の値）は、それを入力のフィールドに結ぶ語彙がまだないので GOHTTP-7。同じメソッドとパスの組が二つあれば GOHTTP-8。
-- **JSON にできる型**: 核の型、scalar、model（インデックスの model を含む）、`optional`、`array` と、それらの組み合わせ。union（`arms`）と、union を中に持つ型は、通信の上の形をまだ決めていないので、本文（`@http.body`、`@http.bodyObj`）、結果、`@http.status` を持つ例外の引数の型のどこに現れても GOHTTP-5。
+- **JSON にできる型**: 核の型、scalar、model（インデックスの model を含む）、`optional`、`array`、通信に出せる union（「通信の形」の「union」）と、それらの組み合わせ。通信に出せない union（`arms`）と、それを中に持つ型は、本文（`@http.body`、`@http.bodyObj`）、結果、`@http.status` を持つ例外の引数の型のどこに現れても GOHTTP-5。
 
 ## 出力
 
@@ -159,6 +159,7 @@ func NewHandler(ops Ops) http.Handler {
 | `httpRequest` | 要求一つを、入力のフィールドに読む。読めなかった最初の理由を持ち、その後は何も読まない。メソッドは、使うものだけを、`header`、`query`、`body`、`headerObj`、`queryObj`、`bodyObj`、`missing`（項目がないときの扱い。ヘッダ、クエリ、本文の項目の、どの読み方も使う）、`text`（ヘッダとクエリの値を読む共通の中身）、`ok` の順。項目の形のメソッドは `header(name string, dst any, opts ...httpOption)`（`query`、`body` も同じ引数）で、`opts` を見るのは `missing` だけ |
 | `httpValidate(w http.ResponseWriter, in any, places ...httpPlace) bool` | 入力の制約を確かめる。`in` が `Validate() error` を持つかどうかを、実行時に見る（持たなければ、何もせず `true`）。違反があれば 400 を返して `false`。`validate = true` のときだけ出す |
 | `httpWriteJSON(w http.ResponseWriter, status int, v any)` | 値を JSON にして返す |
+| `httpArm`、`httpUnions`、`httpUnmarshal(data []byte, dst any) error`、`httpMarshal(v any) ([]byte, error)` と、その中身（`httpDecode`、`httpEncode`、`httpHasUnion`、`httpEmpty`） | union を、通信の形（「通信の形」の「union」）で読み書きする。経路の op の、本文、結果、例外の引数の型の中に、union が一つでもあるときだけ出す（下の「union の読み書き」） |
 | `httpWriteResult(w http.ResponseWriter, out any)` | 成功の応答。返す値があるかどうかを、実行時に見る（「通信の形」の「成功の応答」） |
 | `httpWriteError(w http.ResponseWriter, err error)` | op が返したエラーを応答にする |
 | `httpThrown[E runtime.Exception](w http.ResponseWriter, err error, status int) bool` | `err` が例外 E（値）なら、そのステータスと、例外の FQN（`E` の `HozoException()`）と、運ぶ値を返して `true`。値を運ぶ例外かどうか（例外の構造体が、引数ごとのフィールドを一つでも持つか。`docs/plugin-go.md`「exception」）は、実行時に見る。運ぶ値は、例外の値そのものの JSON（「失敗の応答」） |
@@ -195,6 +196,9 @@ func httpWriteError(w http.ResponseWriter, err error) {
 - `httpValidate` は、`Validate` が返した `*runtime.ValidationError` の違反ごとに、`Path` の先頭（入力の model のフィールド名）を、場所の一覧の通りに置き換える（項目の形のフィールド `lines` の `lines[1].quantity` は `body.lines[1].quantity` に。全体の形のフィールド `body` の `body.email` は、場所が `body` なので `body.email` のまま）。
 - `httpWriteError` は、経路の op のどれかが投げうる例外（`Op.signature.exceptions`）のうち、`@http.status(code)` を持つものを、最初に現れた順（op の宣言順、その中は `exceptions` の順）に、例外ごとに一行 `case httpThrown[<例外の型>](w, err, <code>):`。引数を持つ例外も、持たない例外も、同じ形（引数の数と型は、行を変えない）。例外の型は、その名前空間の型の置き場の入口のパッケージから import する。`@http.status` を持つ例外が一つもなければ、`switch` を書かず、いつも 500。
 - 例外は値の型で見分ける。葉の実装が例外をポインタで返せば、見分けられずに 500 になる（基底の `throw` は値で返す。`docs/plugin-go.md`「exception」）。
+- **union の読み書き**: 経路の op の、本文、結果、`@http.status` を持つ例外の引数の型の中に、union が一つでもあれば、補助の中の `json.Unmarshal(…, dst)`（`body`、`bodyObj`）を `httpUnmarshal(…, dst)` に、`json.Marshal(v)`（`httpWriteJSON`）を `httpMarshal(v)` に替え、`httpWriteJSON` の後ろに、表 `httpUnions` と、読み書きの補助を出す。一つもなければ、補助のテキストは、今までと同じ。
+  - `httpUnions` は、union の Go のインターフェースの型から、アームの並び（union の宣言の順）への表: `reflect.TypeFor[<union>](): {{typ: reflect.TypeFor[<アームの Go の型>](), keys: []string{<決め手>…}, wrap: <包む型か>}, …}`。union は、最初に現れた順（経路の宣言順、その中は、本文、結果、例外の引数の順に、型を辿った順）。アームの Go の型と、包む型かどうかは、基底の決まり（`docs/plugin-go.md`「union」）。
+  - 読み書きは、実行時に、値の Go の型を辿って決める（`reflect`）: union を中に持たない型は、`encoding/json` に、そのまま渡す。union のインターフェースは、アームの値を書き（包む型は、その `Value`）、読むときは、決め手のキーで、アームを決める。構造体は、フィールドの順に、`json` タグのとおりに（`omitempty` を含む）書き、配列、ポインタ、マップは、要素を同じに辿る。
 - 補助に、受け付けない型の値が渡ることは、GOHTTP-4 と GOHTTP-5 が先に断るので、ない（そのときの振る舞いは、決めない）。読む先を型引数にしないのは、省略可能な読む先（`**T`）と、そうでない読む先（`*T`）を、一つの関数で、型を書かずに受け取れないため（Go は、その二つの和の制約から T を推論できない）。
 
 ## 通信の形
@@ -241,9 +245,25 @@ func httpWriteError(w http.ResponseWriter, err error) {
 | `optional(T)` のフィールド | 値がなければ、キーを省く。読む側は、キーがないことと `null` を、どちらも「ない」と読む |
 | `array(T)` | 配列。読む側は、`null` も空の配列と読む（op の結果そのものが空の配列なら、必ず `[]` を返す。model の中の空の配列は、`[]` か `null`） |
 | インデックスの model への `ref` | オブジェクト。キーは、キーの型の文字列 |
-| union | 決めていない（GOHTTP-5） |
+| union（`arms`） | アームの値の JSON、そのまま。どのアームかは、書かない（下の「union」） |
 
 読む側は、知らないキーを無視する。
+
+### union
+
+`docs/decisions.md`「決めたこと」399。union（`arms`）の値は、**アームの値の JSON を、そのまま**書く。どのアームかを言うキーは、足さない。
+
+- **読む側は、構造から、アームを決める**: JSON のオブジェクトに、そのアームの**決め手**（下）のキーが、一つでもあるアーム。決め手のあるアームが、ちょうど一つでなければ（どのアームの決め手もない。二つ以上のアームの決め手がある。JSON が、オブジェクトでない）、読めない値。要求の本文なら、`body: invalid JSON`（「op を呼ぶ前の失敗」）。
+- **書く側は、迷わない**: 値が、自分のアームを持っている。
+- **省略可能な union**（`U?`）は、`optional` の行のとおり（値がなければ、キーを省く。`null` も「ない」と読む）。
+
+**通信に出せる union** は、次の二つを満たすもの。満たさない union が、本文、結果、`@http.status` を持つ例外の引数の型（の中）にあれば、GOHTTP-5。
+
+1. アームの型が、どれも、フィールドを持つ model への `ref`（その場で書いた model、別の名前空間の model を含む。インデックスの model は、含まない）。
+2. アームごとに、**決め手**が、一つ以上ある。決め手は、そのアームの model の、省略可能でないフィールドのうち、ほかのどのアームの model の、どのフィールド（省略可能なものを含む）とも、名前が違うもの。
+
+- 縛るのは、通信に出る union だけ。通信に出ない union（画面の状態の union など）は、同じ構造のアームを、名前で分けてよい: プロセスの中の値は、自分のアームを持っている。
+- 条件は、仕様だけから決まる。見分ける必要があるかは、受け取った側が判断し、要るときに、`classify` を定義して、型で分ける（`docs/check.md`「ケースの判定」の、型で決まる分類）。
 
 ### 成功の応答
 
@@ -475,6 +495,7 @@ func RunHTTP(t *testing.T, leaves server.Leaves, c HTTPCases) {
 - `@http.required` と `@http.default` は、行を変えない: 入力の値は、いつも、送る。値がない（省略可能なフィールドで、`nil` のポインタ）ときだけ、ヘッダ、クエリの項目、本文のキーを、送らない。省略可能でないフィールドの項目を送らない要求は、`Request` で作る。
 - ヘッダとクエリの値の文字列は、補助 `httpText` が、実行時に、値の型で決める（文字列はそのまま、整数は 10 進、小数は `strconv.FormatFloat(v, 'g', -1, 64)`、真偽値は `true` / `false`）。クエリは、URL のエンコードをする。
 - 本文の項目（`@http.body`）があれば、本文は、JSON のオブジェクトで、キーは、フィールドの順。項目が一つも送られなくても、`{}` を送る。本文の全体（`@http.bodyObj`）は、その model の JSON。どちらも、`Content-Type: application/json` を付ける。値の JSON は、`encoding/json` と、基底の型のタグが決める（「値の JSON」）。
+- **union が、通信に出る入口があるとき**（「補助」の「union の読み書き」と同じ条件）は、テストのパッケージの `http.go` にも、同じ表 `httpUnions` と、読み書きの補助を出し（補助の並びの最後）、本文の組み立てと、成功の応答と、例外の値の読み取りに使う。
 - 入力の値から、組み立てられない要求は、ない: 入力の model のフィールドは、どれも、六つのデコレータの一つを持ち（GOHTTP-3）、型は、その場所が受け付けるもの（GOHTTP-4、GOHTTP-5、GOHTTP-12）。
 - 送り方は、`httptest.NewRequest` と `httptest.NewRecorder` で、`handler.ServeHTTP` を、直に呼ぶ。ネットワークは、使わない。
 
@@ -498,7 +519,7 @@ func RunHTTP(t *testing.T, leaves server.Leaves, c HTTPCases) {
 
 ## 診断
 
-`emit` の応答の `errors` で返す。位置は、表に書いた宣言の FQN。
+`emit` の応答の `errors` で返す（`hozoc emit` は、どのファイルも書く前に、止まる。`hozoc check` では、まだ、出ない: `docs/open.md`「語彙とプラグイン」）。位置は、表に書いた宣言の FQN。
 
 | ID | 重さ | 意味 |
 |---|---|---|
@@ -506,7 +527,7 @@ func RunHTTP(t *testing.T, leaves server.Leaves, c HTTPCases) {
 | GOHTTP-2 | error | 経路の op の引数が、0 個でも、フィールドを持つ model 一つでもない（インデックスの model は、入力の model にできない）。位置は op |
 | GOHTTP-3 | error | 入力の model のフィールドが、要求のどこから読むかを言う六つのデコレータ（`@http.header` / `@http.query` / `@http.body` / `@http.headerObj` / `@http.queryObj` / `@http.bodyObj`）のどれも持たない、または二つ以上持つ。位置は model |
 | GOHTTP-4 | error | ヘッダかクエリから読むフィールド（全体の形なら、その model のフィールド）の型が受け付けられない（「対象」の表）。位置は、そのフィールドを持つ model（全体の形なら、全体の形で受け取る model） |
-| GOHTTP-5 | error | 本文、結果、`@http.status` を持つ例外の引数の型に、JSON にできない型（union と、union を中に持つ型）がある。位置は op |
+| GOHTTP-5 | error | 本文、結果、`@http.status` を持つ例外の引数の型（の中）に、通信に出せない union がある（「通信の形」の「union」の二つの条件）。メッセージに、union と、満たさないアームと、理由（アームの型が、フィールドを持つ model でない。決め手がない）を示す。位置は op |
 | GOHTTP-6 | error | `@http.get` の op の入力が、本文のデコレータ（`@http.body`、`@http.bodyObj`）のフィールドを持つ。位置は op |
 | GOHTTP-7 | error | パスが `/` で始まらない、または `{` か `}` を含む。位置は op |
 | GOHTTP-8 | error | 同じメソッドとパスの経路が二つある。位置は後ろの op |

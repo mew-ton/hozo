@@ -1,4 +1,3 @@
-GOVALID-4	app.Holder	model app.Holder のフィールド contact の型が union app.Contact で、そのアームに Validate を持つ型 app.Email がある（union の値の制約を確かめる形は、まだない）
-GOVALID-4	app.Lists	model app.Lists のフィールド contacts の型が union app.Contact で、そのアームに Validate を持つ型 app.Email がある（union の値の制約を確かめる形は、まだない）
-GOVALID-4	app.Lists	model app.Lists のフィールド byName の型が union app.Nested で、そのアームに Validate を持つ型 app.Email がある（union の値の制約を確かめる形は、まだない）
-GOVALID-4	app.Lists	model app.Lists のフィールド cards の型が union app.Cards で、そのアームに Validate を持つ型 app.Card がある（union の値の制約を確かめる形は、まだない）
+GOVALID-4	app.Lists	model app.Lists のフィールド byName の型が union app.Nested で、そのアーム Inner の型 app.Contact の中に Validate を持つ型 app.Email がある（アームの型が、Validate を持つ型そのものでないとき、確かめる形は、まだない）
+GOVALID-4	app.Lists	model app.Lists のフィールド cards の型が union app.Cards で、そのアーム Many の型 app.Card[] の中に Validate を持つ型 app.Card がある（アームの型が、Validate を持つ型そのものでないとき、確かめる形は、まだない）
+GOVALID-4	app.Lists	model app.Lists のフィールド cards の型が union app.Cards で、そのアーム One の型 app.CardsByName の中に Validate を持つ型 app.Card がある（アームの型が、Validate を持つ型そのものでないとき、確かめる形は、まだない）

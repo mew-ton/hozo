@@ -1,0 +1,55 @@
+// docs/plugin-go-http.md「通信の形」の「union」: 印を書かず、アームの値を、そのまま書く。読む側は、決め手のキーで、アームを決める。
+
+/** 別の名前空間の model（union のアームにすると、包む型になる） */
+namespace shape {
+  /** 円 */
+  model Circle { radius: float; label: string?; }
+  /** 四角 */
+  model Box { width: float; height: float; label: string?; }
+}
+
+namespace api {
+  /** 点。この名前空間の model（包まない） */
+  model Dot { x: int; y: int; }
+
+  /** 図形。アームは、この名前空間の model、別の名前空間の model（包む型）、その場で書いた model */
+  union Figure {
+    Dot: Dot;
+    Circle: shape.Circle;
+    Box: shape.Box;
+    Text: { text: string; size: int?; };
+  }
+
+  /** 名前ごとの図形 */
+  model FiguresByName { [name: string]: Figure; }
+
+  /** 絵。union を、フィールド、省略可能なフィールド、配列、インデックスの model の値に持つ */
+  model Drawing {
+    title: string;
+    main: Figure;
+    extra: Figure?;
+    all: Figure[];
+    named: FiguresByName;
+  }
+
+  model PutInput { @http.body figure: Figure; @http.body note: string?; }
+  /** 本文の項目と、結果が、union */
+  @http.post("/figure")
+  export fn putFigure(in: PutInput): Figure;
+
+  model DrawInput { @http.bodyObj drawing: Drawing; }
+  /** 本文の全体と、結果が、union を中に持つ model */
+  @http.post("/drawing")
+  export fn putDrawing(in: DrawInput): Drawing;
+
+  /** 結果が、union の配列 */
+  @http.get("/figures")
+  export fn figures(): Figure[];
+
+  /** 例外の引数が、union */
+  @http.status(409)
+  exception Clash(other: Figure);
+  @http.get("/clash")
+  export fn clash(): string
+    throws Clash;
+}

@@ -72,10 +72,13 @@ func (f *file) draw(targets []target) string {
 	f.taken = map[string]bool{}
 	var methods strings.Builder
 	for _, t := range targets {
-		if t.scalar != nil {
+		switch {
+		case t.scalar != nil:
 			methods.WriteString(f.scalar(t.scalar))
-		} else {
+		case t.model != nil:
 			methods.WriteString(f.model(t.model))
+		default:
+			methods.WriteString(f.wrapper(t.union, t.arm))
 		}
 	}
 	var helpers strings.Builder
@@ -153,6 +156,13 @@ func (f *file) scalar(s *ir.Scalar) string {
 	return b.String()
 }
 
+// wrapper は、union u のアーム a を包む型の Validate（docs/plugin-go-valid.md「出力」）: 中身の Validate を、そのまま返す。
+func (f *file) wrapper(u *ir.Union, a *ir.UnionArm) string {
+	v := f.local("v")
+	return fmt.Sprintf("// %s は union %s のアーム %s（%s）の制約を確かめる。違反がなければ nil。\nfunc (%s %s) %s() error {\nreturn %s.Value.%s()\n}\n\n",
+		method, u.Name, a.Name, golang.TypeDisplay(a.Type), v, f.typeName(u.Name)+golang.Capitalize(a.Name), method, v, method)
+}
+
 // violation は、制約 c 一つの検査: 値 value が違反していれば、Path が path（Go の式）の違反を足す。
 func (f *file) violation(c constraint, value, path, violations string) string {
 	return fmt.Sprintf("if %s {\n%s = append(%s, %s.Violation{Path: %s, Constraint: %s})\n}\n",
@@ -198,17 +208,22 @@ func (f *file) value(expr string, path pathExpr, t ir.Type, cons []constraint, d
 		}
 		return fmt.Sprintf("if %s != nil {\n%s}\n", expr, inner)
 	case ir.ArrayType:
-		if _, ok := f.g.validatedRef(f.g.through(x.Of)); !ok {
-			return ""
+		// 要素（1）の後に、配列のフィールドに付いた length（2。要素の数に掛かる）
+		var b strings.Builder
+		if f.g.checked(f.g.through(x.Of)) {
+			i, elem := "i"+strconv.Itoa(depth), "x"+strconv.Itoa(depth)
+			index := part{text: f.im.Add("strconv", "strconv") + ".Itoa(" + i + ")"}
+			inner := f.value(elem, path.index(index), x.Of, nil, depth+1, violations)
+			fmt.Fprintf(&b, "for %s, %s := range %s {\n%s}\n", i, elem, expr, inner)
 		}
-		i, elem := "i"+strconv.Itoa(depth), "x"+strconv.Itoa(depth)
-		index := part{text: f.im.Add("strconv", "strconv") + ".Itoa(" + i + ")"}
-		inner := f.value(elem, path.index(index), x.Of, nil, depth+1, violations)
-		return fmt.Sprintf("for %s, %s := range %s {\n%s}\n", i, elem, expr, inner)
+		for _, c := range cons {
+			b.WriteString(f.violation(c, expr, path.render(), violations))
+		}
+		return b.String()
 	case ir.RefType:
 		// インデックスの model: キーの辞書順に、値を回す（docs/plugin-go-valid.md「model」の表）
 		if idx := f.g.p.IndexOf(x); idx != nil {
-			if _, ok := f.g.validatedRef(f.g.through(idx.Value)); !ok {
+			if !f.g.checked(f.g.through(idx.Value)) {
 				return ""
 			}
 			f.usesKeys = true
@@ -218,6 +233,12 @@ func (f *file) value(expr string, path pathExpr, t ir.Type, cons []constraint, d
 		}
 	}
 	var b strings.Builder
+	if f.g.unionValidated(t) {
+		// 値が当たっているアームの値が、Validate を持てば、呼ぶ（docs/plugin-go-valid.md「model」の表の union の行）
+		f.usesAppend = true
+		u := f.local("u" + strconv.Itoa(depth))
+		fmt.Fprintf(&b, "if %s, ok := %s.(interface{ %s() error }); ok {\n%s = %s(%s, %s, %s.%s())\n}\n", u, expr, method, violations, helperAppend, violations, path.render(), u, method)
+	}
 	if _, ok := f.g.validatedRef(t); ok {
 		f.usesAppend = true
 		recv := expr

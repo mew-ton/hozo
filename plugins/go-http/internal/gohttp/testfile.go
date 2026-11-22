@@ -608,10 +608,14 @@ func (f *testFile) helpers(entries []entry) string {
 	// 全体の形は、項目の形のメソッドで、項目を一つずつ足す
 	header, query = header || headerObj, query || queryObj
 
+	unions := len(f.g.unions) > 0
 	var b strings.Builder
 	add := func(on bool, h helper) {
 		if !on {
 			return
+		}
+		if unions {
+			h = withUnions(h)
 		}
 		for _, p := range h.imports {
 			f.use(p)
@@ -634,5 +638,10 @@ func (f *testFile) helpers(entries []entry) string {
 	add(internal, testHelperWantInternal)
 	add(badRequest || thrown || internal, testHelperWantFailure)
 	add(true, testHelperWantJSON)
+	if unions {
+		f.use("reflect")
+		b.WriteString(f.g.unionTable(f.im.Qualifier))
+		add(true, helperUnionCodec)
+	}
 	return strings.TrimSuffix(b.String(), "\n")
 }

@@ -177,6 +177,10 @@ type generator struct {
 	// read は、入力の model の FQN → そのフィールドの読み方（一度だけ調べる。診断も、model ごとに一度）。
 	read map[string][]input
 
+	// unions は、通信に出る union（最初に現れた順）。unionOf は、調べた union（unions.go）。
+	unions  []*wireUnion
+	unionOf map[string]*wireUnion
+
 	errs []plugin.Diagnostic
 	seen map[string]bool
 }
@@ -448,49 +452,6 @@ func (g *generator) statuses(routes []route) []status {
 		}
 	}
 	return out
-}
-
-// checkJSON は GOHTTP-5: 型 t（what: 本文、結果、例外の引数の、どの型か）が JSON にできる型でなければ、op の位置に報告する。
-func (g *generator) checkJSON(op *ir.Op, t ir.Type, what string) {
-	if union, bad := g.unionIn(t, map[string]bool{}); bad {
-		g.errorf(codeHTTPJSON, op.Name, "経路の op %s の%s %s が、union %s を中に持つ（union の通信の上の形を、まだ決めていない）",
-			op.Name, what, golang.TypeDisplay(t), union)
-	}
-}
-
-// unionIn は、型 t の中の union（arms）の FQN（docs/plugin-go-http.md「対象」の「JSON にできる型」: 核の型、scalar、model、
-// optional、array と、それらの組み合わせのほかは、JSON にできない。model は、インデックスの model を含む）。なければ false。
-func (g *generator) unionIn(t ir.Type, visited map[string]bool) (string, bool) {
-	switch x := t.(type) {
-	case ir.OptionalType:
-		return g.unionIn(x.Of, visited)
-	case ir.ArrayType:
-		return g.unionIn(x.Of, visited)
-	case ir.CaseType:
-		return g.unionIn(x.Of, visited)
-	case ir.RefType:
-		if visited[x.Target] {
-			return "", false
-		}
-		visited[x.Target] = true
-		switch d := g.p.Lookup(x.Target).(type) {
-		case *ir.Union:
-			return d.Name, true
-		case *ir.Model:
-			for _, f := range d.Fields {
-				if u, bad := g.unionIn(f.Type, visited); bad {
-					return u, true
-				}
-			}
-			if d.Index != nil {
-				if u, bad := g.unionIn(d.Index.Key, visited); bad {
-					return u, true
-				}
-				return g.unionIn(d.Index.Value, visited)
-			}
-		}
-	}
-	return "", false
 }
 
 // checkName は GOHTTP-10: NewHandler が、N の定義のパッケージの公開の名前（docs/plugin-go.md「名前」。入口のパッケージは、その

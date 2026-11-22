@@ -43,6 +43,8 @@ func constraint(decorator string) bool {
 //  3. `@valid.*` が付いたフィールドを持つ model。
 //  4. Validate を持つ型を、フィールドの型に持つ model。フィールドの型は、optional、array と、インデックスの model の値を通して見る。
 //     インデックスの model そのものは、Validate を持たない。
+//  5. union（arms）を、フィールドの型（4 と同じに、通して見たもの）に持つ model で、その union のアームの型のどれかが、
+//     Validate を持つ型への ref であるもの（値が当たっているアームの検証を、model の Validate が呼ぶ）。
 //
 // 継承した model は、展開済みのフィールド（受け継いだデコレータを含む）で判定する。union と exception は持たない（例外の引数の型が
 // Validate を持つ型でも、例外の構造体には出さない）。
@@ -55,6 +57,20 @@ func HasValidate(p *ir.Program, typeFQN string) bool {
 	switch p.Lookup(typeFQN).(type) {
 	case *ir.Scalar, *ir.Model:
 		return validated(p)[typeFQN]
+	}
+	return false
+}
+
+// armValidated は、宣言 d が union（arms）で、そのアームの型のどれかが、Validate を持つ型（has）への ref か。
+func armValidated(d ir.Decl, has map[string]bool) bool {
+	u, ok := d.(*ir.Union)
+	if !ok || u.Variant != ir.UnionArms {
+		return false
+	}
+	for _, a := range u.Arms {
+		if r, isRef := a.Type.(ir.RefType); isRef && has[r.Target] {
+			return true
+		}
 	}
 	return false
 }
@@ -108,7 +124,11 @@ func validated(p *ir.Program) map[string]bool {
 					continue
 				}
 				for _, f := range x.Fields {
-					if r, ok := Through(p, f.Type).(ir.RefType); ok && has[r.Target] {
+					r, ok := Through(p, f.Type).(ir.RefType)
+					if !ok {
+						continue
+					}
+					if has[r.Target] || armValidated(decls[r.Target], has) {
 						has[name], changed = true, true
 						break
 					}

@@ -1,0 +1,14 @@
+# plugins/go-http の単体テストの入力（docs/testing.md「単体テスト」）: docs/plugin-go-http.md「通信の形」の「union」と、
+# 「補助」の「union の読み書き」。
+
+# 1: 別の名前空間の model（union のアームにすると、包む型になる）
+[[emit]]
+namespace   = "shape"
+transpilers = ["go"]
+out         = "gen/shape"
+
+# 2: union を、本文、結果、例外の引数に持つ経路
+[[emit]]
+namespace   = "api"
+transpilers = ["go", "go-valid", "go-http"]
+out         = "gen/api"

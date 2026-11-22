@@ -86,9 +86,15 @@ func TestHasValidate(t *testing.T) {
 			model("app.Ping", field("pong", ir.Optional(ir.Ref("app.Pong")))),
 			model("app.Pong", field("ping", ir.Optional(ir.Ref("app.Ping"))), field("n", ir.Int(), "valid.min")),
 			model("app.Loop", field("self", ir.Optional(ir.Ref("app.Loop")))),
-			// union と exception は Validate を持たない。union をフィールドに持つ model も、それだけでは持たない
+			// union と exception は Validate を持たない。
+			// 5: union をフィールドの型（通して見たもの）に持つ model は、アームの型のどれかが、Validate を持つ型への ref なら、持つ
 			&ir.Union{DeclBase: decl("app.Contact"), Variant: ir.UnionArms, Arms: []ir.UnionArm{{Name: "Mail", Type: ir.Ref("type.Email")}}},
 			model("app.Holder", field("contact", ir.Ref("app.Contact"))),
+			model("app.Holders", field("contacts", ir.Array(ir.Optional(ir.Ref("app.Contact"))))),
+			// アームの型が、ref でない（配列）か、Validate を持たない型なら、それだけでは持たない
+			&ir.Union{DeclBase: decl("app.Loose"), Variant: ir.UnionArms, Arms: []ir.UnionArm{
+				{Name: "Many", Type: ir.Array(ir.Ref("type.Email"))}, {Name: "Plain", Type: ir.Ref("type.Plain")}}},
+			model("app.LooseHolder", field("loose", ir.Ref("app.Loose"))),
 			// 例外は、引数の型が Validate を持つ型でも（scalar、model、包まれた型）、持たない
 			&ir.Exception{DeclBase: decl("app.Bad"), Params: []ir.OpParam{{Name: "value", Type: ir.Ref("app.Named")}}},
 			&ir.Exception{DeclBase: decl("app.Bad3"), Params: []ir.OpParam{
@@ -110,7 +116,7 @@ func TestHasValidate(t *testing.T) {
 		"app.Keyed": false, "app.NoCheck": false,
 		"app.Emails": false, "app.NamedLists": false, "app.ByEmail": false, "app.Tree": false, "app.Forest": false,
 		"app.Outer": true, "app.Mid": true, "app.Ping": true, "app.Pong": true, "app.Loop": false,
-		"app.Contact": false, "app.Holder": false, "app.Bad": false,
+		"app.Contact": false, "app.Holder": true, "app.Holders": true, "app.Loose": false, "app.LooseHolder": false, "app.Bad": false,
 		"app.Page.Ready": true, "app.Bad2": false, "app.Bad3": false,
 		"app.send": false, "app.send$in": false,
 		"app.Nowhere": false, "": false,

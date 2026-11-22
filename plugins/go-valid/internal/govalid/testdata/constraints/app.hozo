@@ -179,6 +179,37 @@ namespace app {
   // pattern の変数の名前が当たる（model Item のフィールド color と、scalar ItemColor）: 後ろの方に 2 を付ける
   @valid.pattern("^[a-z]+$")
   scalar ItemColor extends string;
+  // ---- 配列のフィールドの length（要素の数に掛かる。違反の Constraint は count）と、要素の制約（要素の型に付ける） ----
+
+  @valid.length(min: 1, max: 5)
+  scalar Tag extends string;
+  model Tagged {
+    // 配列: 1〜3 個。要素: 1〜5 文字（Tag の制約）。要素（1）の後に、数（2）
+    @valid.length(min: 1, max: 3) tags: Tag[];
+    // 要素が制約を持たない配列: 数だけ
+    @valid.length(max: 2) notes: string[];
+    // 省略可能な配列（Go でそのまま）
+    @valid.length(min: 2) later: int[]?;
+  }
+
+  // ---- union のアームの検証（値が当たっているアームの Validate を呼ぶ） ----
+
+  model Named { @valid.length(min: 1) name: string; }
+  /** アームは: この名前空間の model（Validate を持つ）、別の名前空間の model（包む型）、scalar（包む型）、制約のない型 */
+  union Party {
+    Named: Named;
+    At: type.Address;
+    Mail: type.Email;
+    Anon: { n: int; };
+    Raw: string;
+  }
+  model PartiesByName { [name: string]: Party; }
+  model Deal {
+    buyer: Party;
+    seller: Party?;
+    others: Party[];
+    byName: PartiesByName;
+  }
 }
 
 /** 内部の op を持つ名前空間 */

@@ -150,6 +150,14 @@ func (g *generator) validatedRef(t ir.Type) (string, bool) {
 	return r.Target, true
 }
 
+// checked は、型 t（通して見たもの）の値に、確かめるものがあるか: Validate を持つ型への ref か、アームが Validate を持つ union。
+func (g *generator) checked(t ir.Type) bool {
+	if _, ok := g.validatedRef(t); ok {
+		return true
+	}
+	return g.unionValidated(t)
+}
+
 // through は、フィールドの型を、optional、array と、インデックスの model の値を通して見た型
 // （docs/plugin-go-valid.md「Validate を持つ型」の 4）。
 func (g *generator) through(t ir.Type) ir.Type { return govalid.Through(g.p, t) }
@@ -187,10 +195,12 @@ func (g *generator) coreOf(t ir.Type) (ir.CoreName, bool) {
 	return "", false
 }
 
-// target は、Validate を出す型一つ: N の scalar か model。
+// target は、Validate を出す型一つ: N の scalar か model か、union のアームを包む型（union と、そのアーム）。
 type target struct {
 	scalar *ir.Scalar
 	model  *ir.Model
+	union  *ir.Union
+	arm    *ir.UnionArm
 }
 
 // check は、N の scalar と model を宣言順に見て、診断（GOVALID-1〜GOVALID-6）を集め、Validate を出す型を返す。
@@ -212,6 +222,12 @@ func (g *generator) check() []target {
 			g.checkModel(x)
 			if g.validated(x.Name) {
 				targets = append(targets, target{model: x})
+			}
+		case *ir.Union:
+			if x.Variant == ir.UnionArms {
+				for _, a := range g.wrappedArms(x) {
+					targets = append(targets, target{union: x, arm: a})
+				}
 			}
 		}
 	}
@@ -257,10 +273,7 @@ func (g *generator) checkModel(m *ir.Model) {
 		}
 		if t, isRef := g.through(f.Type).(ir.RefType); isRef {
 			if u, ok := g.p.Lookup(t.Target).(*ir.Union); ok && u.Variant == ir.UnionArms {
-				if arm, found := g.validatedArm(u, map[string]bool{}); found {
-					g.errorf(codeValidUnion, m.Name, "%s の型が union %s で、そのアームに %s を持つ型 %s がある（union の値の制約を確かめる形は、まだない）",
-						subject, u.Name, method, arm)
-				}
+				g.checkUnion(u, m.Name, subject)
 			} else if g.validated(t.Target) {
 				g.checkHome(t.Target, m.Name, fmt.Sprintf("%s の型 %s", subject, t.Target))
 			}
@@ -288,7 +301,18 @@ func (g *generator) fieldConstraints(f *ir.Field, subject string) (cons []constr
 			continue
 		}
 		if _, isArray := value.(ir.ArrayType); isArray {
-			problems = append(problems, fmt.Sprintf("@%s が、配列そのもの（%s）に付いている（制約を付けられるのは、要素の型）", app.Decorator, subject))
+			// 配列のフィールドに付けられるのは、length だけ: 要素の数に掛かる（docs/plugin-go-valid.md「制約」）
+			if app.Decorator != validLength {
+				problems = append(problems, fmt.Sprintf("@%s が、配列（%s）に付いている（配列のフィールドに付けられるのは @%s だけで、要素の数に掛かる。要素に掛けるなら、要素の型に付ける）", app.Decorator, subject, validLength))
+				continue
+			}
+			c, problem := parse(app, ir.CoreString, true, subject)
+			if problem != "" {
+				problems = append(problems, problem)
+				continue
+			}
+			c.count, c.name = true, constraintCount
+			cons = append(cons, c)
 			continue
 		}
 		if g.p.IndexOf(value) != nil {
@@ -318,28 +342,83 @@ func (g *generator) fieldProblems(f *ir.Field, subject, at string) []string {
 	return problems
 }
 
-// validatedArm は、union u のアームの型（optional、array、インデックスの model の値を通して見たもの。アームが union なら、その中も）に、
-// Validate を持つ型があれば、その FQN（アームの順で最初のもの）。
-func (g *generator) validatedArm(u *ir.Union, visited map[string]bool) (string, bool) {
-	if visited[u.Name] {
-		return "", false
-	}
-	visited[u.Name] = true
+// checkUnion は、model at のフィールド（subject）の型の union u の診断（docs/plugin-go-valid.md「Validate を持つ型」の、
+// union のアームの検証）: アームの型が、Validate を持つ型への ref なら、その型の置き場（GOVALID-3。包む型の Validate は、
+// union を宣言した名前空間の、定義のパッケージに出るので、その単位も）。確かめる形のないアームは GOVALID-4。
+func (g *generator) checkUnion(u *ir.Union, at, subject string) {
+	direct := false
 	for _, a := range u.Arms {
-		r, ok := g.through(a.Type).(ir.RefType)
-		if !ok {
+		if r, isRef := a.Type.(ir.RefType); isRef && g.validated(r.Target) {
+			direct = true
+			g.checkHome(r.Target, at, fmt.Sprintf("%s の型 union %s のアーム %s の型 %s", subject, u.Name, a.Name, r.Target))
 			continue
 		}
-		if g.validated(r.Target) {
-			return r.Target, true
+		if fqn, found := g.validatedIn(a.Type, map[string]bool{u.Name: true}); found {
+			g.errorf(codeValidUnion, at, "%s の型が union %s で、そのアーム %s の型 %s の中に %s を持つ型 %s がある（アームの型が、%s を持つ型そのものでないとき、確かめる形は、まだない）",
+				subject, u.Name, a.Name, golang.TypeDisplay(a.Type), method, fqn, method)
 		}
-		if inner, ok := g.p.Lookup(r.Target).(*ir.Union); ok && inner.Variant == ir.UnionArms {
-			if fqn, found := g.validatedArm(inner, visited); found {
+	}
+	if direct {
+		g.checkHome(u.Name, at, fmt.Sprintf("%s の型 union %s（アームを包む型）", subject, u.Name))
+	}
+}
+
+// validatedIn は、型 t（アームの型）の中（optional、array、インデックスの model の値を通して見たもの。union なら、そのアームも）に、
+// Validate を持つ型があれば、その FQN。
+func (g *generator) validatedIn(t ir.Type, visited map[string]bool) (string, bool) {
+	r, ok := g.through(t).(ir.RefType)
+	if !ok {
+		return "", false
+	}
+	if g.validated(r.Target) {
+		return r.Target, true
+	}
+	if inner, ok := g.p.Lookup(r.Target).(*ir.Union); ok && inner.Variant == ir.UnionArms && !visited[inner.Name] {
+		visited[inner.Name] = true
+		for _, a := range inner.Arms {
+			if fqn, found := g.validatedIn(a.Type, visited); found {
 				return fqn, true
 			}
 		}
 	}
 	return "", false
+}
+
+// wrappedArms は、N の union u の、包む型のアームのうち、Validate を出すもの（docs/plugin-go-valid.md「出力」）: アームの型が、
+// Validate を持つ型への ref で、アームの値が、包む型（u と同じ名前空間の model でない。docs/plugin-go.md「union」）。
+func (g *generator) wrappedArms(u *ir.Union) []*ir.UnionArm {
+	var out []*ir.UnionArm
+	ns := g.declNS[u.Name]
+	for i := range u.Arms {
+		r, isRef := u.Arms[i].Type.(ir.RefType)
+		if !isRef || !g.validated(r.Target) {
+			continue
+		}
+		if _, isModel := g.p.Lookup(r.Target).(*ir.Model); isModel && g.declNS[r.Target] == ns {
+			continue
+		}
+		out = append(out, &u.Arms[i])
+	}
+	return out
+}
+
+// unionValidated は、型 t が、union（arms）への ref で、そのアームの型のどれかが、Validate を持つ型への ref か
+// （docs/plugin-go-valid.md「Validate を持つ型」の 5）。
+func (g *generator) unionValidated(t ir.Type) bool {
+	r, ok := t.(ir.RefType)
+	if !ok {
+		return false
+	}
+	u, ok := g.p.Lookup(r.Target).(*ir.Union)
+	if !ok || u.Variant != ir.UnionArms {
+		return false
+	}
+	for _, a := range u.Arms {
+		if ar, isRef := a.Type.(ir.RefType); isRef && g.validated(ar.Target) {
+			return true
+		}
+	}
+	return false
 }
 
 // checkHome は GOVALID-3: Validate を持つ型 fqn が別の名前空間 M のものなら、M の型の置き場（docs/config.md「型の置き場」）の
