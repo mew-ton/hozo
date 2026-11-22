@@ -357,7 +357,7 @@ var idRowRE = regexp.MustCompile(`^\|\s*([A-Z]+-\d+)\s*\|`)
 var notTestable = map[string]string{
 	"NS-2":     "正規化で行う。診断なし（docs/check.md「名前空間」）",
 	"EFF-1":    "計算（Sig の F）で行う。診断なし（docs/check.md「状態と効果」）",
-	"THROWS-2": "計算（Sig の E）で行う。診断なし（docs/check.md「throws」）。節に書いていない例外も、多めに書いた例外も、通ることは、REL-4 の ok の例（ok_4）で確かめる",
+	"THROWS-4": "計算（Sig の E）で行う。診断なし（docs/check.md「throws」）。節に書いていない例外も、多めに書いた例外も、通ることは、REL-4 の ok の例（ok_4）で確かめる",
 	"DEC-9":    "正規化（docs/ir.md「デコレータの適用」）。診断なし",
 	"DEC-10":   "計算（手順 i の throws）。診断なし。DEC-10 の意味は DOC-1 の external の例で確かめる",
 	"BIND-3":   "計算（Call.bound）。診断なし。BIND-4 の ok の例で確かめる",

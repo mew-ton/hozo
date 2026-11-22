@@ -10,7 +10,7 @@ import (
 	"github.com/mew-ton/hozo/ir"
 )
 
-// TestWrittenThrows は、配線の op に書いた throws の節（docs/check.md「状態に触れるもの」の「節に書く要素」、「throws」の THROWS-2）:
+// TestWrittenThrows は、配線の op に書いた throws の節（docs/check.md「状態に触れるもの」の「節に書く要素」、「throws」の THROWS-4）:
 // 節に書いた例外は、計算した例外（呼び出し先の例外から、デコレータが吸収したものを除き、足したものを加えたもの）に、足される。
 // 計算した例外を、節に書いていなくても、節に、本体から出ない例外を書いていても、診断は出ない。
 func TestWrittenThrows(t *testing.T) {
@@ -63,7 +63,7 @@ func TestWrittenThrows(t *testing.T) {
 		wantCodes(t, Check(p, cfgFor("server")))
 		wantStrings(t, "E", sigOf(t, p, "server.w").Exceptions, []string{"server.X", "server.Z"})
 	})
-	t.Run("over-declared is allowed (THROWS-2)", func(t *testing.T) {
+	t.Run("over-declared is allowed (THROWS-4)", func(t *testing.T) {
 		w := wire("server.w", nil, nil, cs(call("server.a")))
 		w.Throws = []ir.ThrowsClause{throws([]string{"server.X", "server.Y", "server.W"})}
 		p := serverWith(a, w)
