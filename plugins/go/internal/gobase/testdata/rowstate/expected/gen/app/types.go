@@ -2,77 +2,59 @@
 
 package app
 
-import "github.com/mew-ton/hozo/runtime"
+import "example.com/app/gen/app/types"
 
 // Order は model app.Order。
-type Order struct {
-	Id   string `json:"id"`
-	Note string `json:"note"`
-}
+type Order = types.Order
 
 // NoOrder は exception app.NoOrder。
-type NoOrder struct{}
-
-func (NoOrder) Error() string         { return "app.NoOrder" }
-func (NoOrder) HozoException() string { return "app.NoOrder" }
-
-var _ runtime.Exception = NoOrder{}
+type NoOrder = types.NoOrder
 
 // NotAccepted は exception app.NotAccepted。
-type NotAccepted struct{}
-
-func (NotAccepted) Error() string         { return "app.NotAccepted" }
-func (NotAccepted) HozoException() string { return "app.NotAccepted" }
-
-var _ runtime.Exception = NotAccepted{}
+type NotAccepted = types.NotAccepted
 
 // NotOpen は exception app.NotOpen。
-type NotOpen struct{}
-
-func (NotOpen) Error() string         { return "app.NotOpen" }
-func (NotOpen) HozoException() string { return "app.NotOpen" }
-
-var _ runtime.Exception = NotOpen{}
+type NotOpen = types.NotOpen
 
 // EffectAccept は注文を受け付ける
 // effects app.orders.post as app.Stage.Accepted
-const EffectAccept runtime.Effect = "app.accept"
+const EffectAccept = types.EffectAccept
 
 // EffectOpen は effect app.open。
 // effects app.orders.post as app.Life.Open
-const EffectOpen runtime.Effect = "app.open"
+const EffectOpen = types.EffectOpen
 
 // EffectBring は effect app.bring。
-const EffectBring runtime.Effect = "app.bring"
+const EffectBring = types.EffectBring
 
 // EffectStart は作り始める
 // order on app.Stage.Accepted、effects app.orders.put as app.Stage.InProduction
-const EffectStart runtime.Effect = "app.start"
+const EffectStart = types.EffectStart
 
 // EffectCancel は取り消す。
 // 取り消せるのは、作り始める前だけ
 // order on app.Stage.Draft | app.Stage.Accepted、effects app.orders.put as app.Stage.Cancelled
-const EffectCancel runtime.Effect = "app.cancel"
+const EffectCancel = types.EffectCancel
 
 // EffectForceShip は effect app.forceShip。
 // effects app.orders.put as app.Stage.Shipped
-const EffectForceShip runtime.Effect = "app.forceShip"
+const EffectForceShip = types.EffectForceShip
 
 // EffectRevise は effect app.revise。
 // order on app.Stage.Accepted、effects app.orders.put as else
-const EffectRevise runtime.Effect = "app.revise"
+const EffectRevise = types.EffectRevise
 
 // EffectPatch は effect app.patch。
 // effects app.orders.put as else
-const EffectPatch runtime.Effect = "app.patch"
+const EffectPatch = types.EffectPatch
 
 // EffectRename は effect app.rename。
-const EffectRename runtime.Effect = "app.rename"
+const EffectRename = types.EffectRename
 
 // EffectDiscard は effect app.discard。
 // order on app.Life.Open、effects app.orders.delete as app.Life.Absent
-const EffectDiscard runtime.Effect = "app.discard"
+const EffectDiscard = types.EffectDiscard
 
 // EffectPurge は effect app.purge。
 // effects app.orders.delete as app.Life.Absent
-const EffectPurge runtime.Effect = "app.purge"
+const EffectPurge = types.EffectPurge

@@ -11,5 +11,7 @@
   "gen/server/servertest/hozo-tests.go.json",
   "gen/server/servertest/leaves.go",
   "gen/server/states.go",
-  "gen/server/types.go"
+  "gen/server/types.go",
+  "gen/server/types/doc.go",
+  "gen/server/types/types.go"
 ]

@@ -2,16 +2,7 @@
 
 package flat
 
-import (
-	ops2 "example.com/app/gen/more/ops"
-	ops3 "example.com/app/gen/ops"
-	ptr2 "example.com/app/gen/ptr"
-)
+import "example.com/app/gen/flat/types"
 
 // Plan は model flat.Plan。
-type Plan struct {
-	Job    ops3.Job     `json:"job"`
-	Target *ptr2.Target `json:"target,omitempty"`
-	Step   ops2.Step    `json:"step"`
-	Label  *string      `json:"label,omitempty"`
-}
+type Plan = types.Plan

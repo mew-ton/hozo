@@ -5,7 +5,7 @@ package web
 import (
 	"context"
 
-	"example.com/app/gen/api"
+	api "example.com/app/gen/api/types"
 )
 
 // Ops は、この名前空間の外から呼べる op: 仕様で export を付けた op。宣言順。New が返す。

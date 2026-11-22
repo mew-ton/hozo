@@ -2,7 +2,7 @@
 
 package ops
 
+import "example.com/app/gen/ops/types"
+
 // Job は model ops.Job。
-type Job struct {
-	Id int64 `json:"id"`
-}
+type Job = types.Job

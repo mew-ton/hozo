@@ -2,26 +2,16 @@
 
 package inner
 
-import (
-	"github.com/mew-ton/hozo/gen/stock"
-	"github.com/mew-ton/hozo/runtime"
-)
+import "github.com/mew-ton/hozo/gen/api/types"
 
 // Item は品物。id は別の名前空間 stock の型
-type Item struct {
-	Id   stock.ItemId `json:"id"`
-	Name string       `json:"name"`
-}
+type Item = types.Item
 
 // Receipt は領収書
-type Receipt struct {
-	Item Item `json:"item"`
-}
+type Receipt = types.Receipt
 
 // EffectAddItem は品物を足す
-const EffectAddItem runtime.Effect = "shop.addItem"
+const EffectAddItem = types.EffectAddItem
 
 // Report は集計
-type Report struct {
-	Count int64 `json:"count"`
-}
+type Report = types.Report

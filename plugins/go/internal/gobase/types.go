@@ -120,7 +120,7 @@ func (e *emitter) armTypes(u *ir.Union) []armType {
 
 // genTypes は定義のパッケージの types.go。中身がなければ nil。
 func (e *emitter) genTypes() *fileGen {
-	f := e.newFile(fileTypes, true)
+	f := e.newTypesFile(fileTypes)
 	any := false
 	for _, d := range e.ns.Decls {
 		if !e.typeDecl(d) {
@@ -220,9 +220,15 @@ func wrapperComment(goName, union, arm string, t ir.Type) string {
 
 // genEntryTypes は、分けた出力の入口の types.go: 内側の型の別名と、effect の定数（docs/plugin-go.md「内側のフォルダと入口」の
 // 再公開の表）。コメントは定義と同じ。再公開するものがなければ nil。
-func (e *emitter) genEntryTypes() *fileGen {
-	f := e.newFile(fileTypes, false)
-	inner := f.im.Add(e.layout.DefPath, e.layout.DefName)
+// toDef なら、定義のパッケージの types.go: 型のパッケージの再公開（同「型のパッケージ」。型のパッケージを分ける出力だけ）。
+func (e *emitter) genReexportTypes(toDef bool) *fileGen {
+	f := e.newFile(fileTypes, toDef)
+	var inner string
+	if toDef {
+		inner = f.im.Add(e.layout.TypesPath, e.layout.TypesName)
+	} else {
+		inner = f.im.Add(e.layout.DefPath, e.layout.DefName)
+	}
 	any := false
 	alias := func(c, name string) {
 		f.print(c)

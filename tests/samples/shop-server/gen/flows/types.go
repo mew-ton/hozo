@@ -2,10 +2,7 @@
 
 package flows
 
-import pkgtype "example.com/shop-server/gen/type"
+import "example.com/shop-server/gen/flows/types"
 
 // Ordered はフローの結果: できた注文と、その後の、自分の注文の一覧
-type Ordered struct {
-	Placed pkgtype.Order   `json:"placed"`
-	Listed []pkgtype.Order `json:"listed"`
-}
+type Ordered = types.Ordered

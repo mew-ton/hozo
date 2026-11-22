@@ -2,69 +2,31 @@
 
 package app
 
-import "github.com/mew-ton/hozo/runtime"
+import "example.com/app/gen/app/types"
 
 // Code は scalar app.Code。
-type Code string
+type Code = types.Code
 
 // Detail は model app.Detail。
-type Detail struct {
-	Field string  `json:"field"`
-	Hint  *string `json:"hint,omitempty"`
-}
+type Detail = types.Detail
 
 // Sub は model app.Sub。
-type Sub struct {
-	At int64 `json:"at"`
-}
+type Sub = types.Sub
 
 // Input は model app.Input。
-type Input struct {
-	Code Code `json:"code"`
-	Sub  *Sub `json:"sub,omitempty"`
-}
+type Input = types.Input
 
 // Invalid: 入力が不正
-type Invalid struct {
-	Code   Code     `json:"code"`
-	Detail Detail   `json:"detail"`
-	Tags   []string `json:"tags"`
-	At     *int64   `json:"at,omitempty"`
-}
-
-func (Invalid) Error() string         { return "app.Invalid" }
-func (Invalid) HozoException() string { return "app.Invalid" }
-
-var _ runtime.Exception = Invalid{}
+type Invalid = types.Invalid
 
 // Missing: 見つからない
-type Missing struct {
-	Id string `json:"id"`
-}
-
-func (Missing) Error() string         { return "app.Missing" }
-func (Missing) HozoException() string { return "app.Missing" }
-
-var _ runtime.Exception = Missing{}
+type Missing = types.Missing
 
 // TooMany は exception app.TooMany。
-type TooMany struct {
-	Attempts int64   `json:"attempts"`
-	Last     *Detail `json:"last,omitempty"`
-}
-
-func (TooMany) Error() string         { return "app.TooMany" }
-func (TooMany) HozoException() string { return "app.TooMany" }
-
-var _ runtime.Exception = TooMany{}
+type TooMany = types.TooMany
 
 // Plain は exception app.Plain。
-type Plain struct{}
-
-func (Plain) Error() string         { return "app.Plain" }
-func (Plain) HozoException() string { return "app.Plain" }
-
-var _ runtime.Exception = Plain{}
+type Plain = types.Plain
 
 // EffectRecord は試した回数を書く。上限を超えれば、投げる（例外を投げる効果: 引数を持つ例外と、別の名前空間の例外）
-const EffectRecord runtime.Effect = "app.record"
+const EffectRecord = types.EffectRecord

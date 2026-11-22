@@ -2,7 +2,7 @@
 
 package util
 
+import "example.com/app/gen/a/util/types"
+
 // Box は model a.util.Box。
-type Box struct {
-	X int64 `json:"x"`
-}
+type Box = types.Box

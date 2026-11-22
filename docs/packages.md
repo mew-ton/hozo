@@ -29,7 +29,7 @@ internal/testmap/      テストの対応表の形の確かめと、実行され
 internal/project/      一度の解析のすべて
 internal/app/          hozoc の葉の op と状態の単位の実装と表示
 internal/lsp/          言語サーバー（jsonrpc/ は JSON-RPC、protocol/ は LSP の型のうち使うもの）
-internal/gen/hozoc/    cli.hozo からの生成物: 入口のパッケージ（go）。inner/ は内側のパッケージ（go と go-valid）、hozoctest/ はテストのパッケージ（go）、cli/ は go-cli の出力
+internal/gen/hozoc/    cli.hozo からの生成物: 入口のパッケージ（go）。inner/ は内側のパッケージ（go）、types/ は型のパッケージ（go と go-valid）、hozoctest/ はテストのパッケージ（go）、cli/ は go-cli の出力
 internal/gen/proc/     cli.hozo からの生成物: 語彙 proc の例外の型（go）
 internal/tools/        生成の道具: irschema/ と tmgrammar/（go generate）、selfgen/（make generate）
 plugins/<name>/        プラグイン。一つのディレクトリが一つの実行ファイルと hozo-plugin.toml（提供するトランスパイラの一覧を持つ）。Go なら main パッケージ、TS なら npm パッケージ
@@ -74,7 +74,8 @@ Go のパッケージごとの、このモジュールの中で import してい
 | `internal/source` | — |
 | `internal/vocab` | `vocab` |
 | `internal/gen/hozoc` | `internal/gen/hozoc/inner` |
-| `internal/gen/hozoc/inner` | `runtime` |
+| `internal/gen/hozoc/inner` | `internal/gen/hozoc/types`、`runtime` |
+| `internal/gen/hozoc/types` | `runtime` |
 | `internal/gen/hozoc/hozoctest` | `internal/gen/hozoc`、`internal/gen/proc`、`runtime` |
 | `internal/gen/hozoc/cli` | `internal/gen/hozoc`、`internal/gen/proc`、`runtime` |
 | `internal/gen/proc` | `runtime` |
@@ -223,12 +224,15 @@ type Layout struct {                              // 一つの出力 (U, N) の�
     EntryPath, EntryName string                   // 入口のパッケージの import パスと名前
     HasInner  bool                                // 内側のフォルダを持つか（N の op に内部の op がある）
     DefDir, DefPath, DefName string               // 定義のパッケージ（HasInner なら <Dir>/inner と "inner"、そうでなければ入口と同じ）
+    HasTypes  bool                                // 型のパッケージを、分けて持つか（N が、op、read、効果、状態の宣言を持つ。同「型のパッケージ」）
+    TypesDir, TypesPath, TypesName string         // 型のパッケージ（HasTypes なら <Dir>/types と "types"、そうでなければ入口と同じ）
     TestDir, TestPath, TestName string            // テストのパッケージ（<Dir>/<EntryName>test と "<EntryName>test"。同「単体テストの口」の「テストのパッケージ」）
 }
 func LayoutOf(view *ir.View, root string) (*Layout, error)                  // この View の出力の置き場
 func HomeOf(view *ir.View, namespace, root string) (*Layout, bool, error)   // view の単位から見た、別の名前空間の型の置き場（docs/config.md「型の置き場」）。なければ false
 type Imports struct{ … }                          // 一つのファイルの import。名前の決め方は同「パッケージと import パス」
 func NewImports(view *ir.View, layout *Layout, root string, inDef bool) *Imports   // inDef は、書くファイルが定義のパッケージのものか（入口のものなら、N の型は入口の名前で修飾なし）
+func NewTypesImports(view *ir.View, layout *Layout, root string) *Imports          // 型のパッケージ（docs/plugin-go.md「型のパッケージ」）のファイルの import。N の型は、修飾なし
 func NewTestImports(view *ir.View, layout *Layout, root string) *Imports           // テストのパッケージのファイルの import。N の宣言も、入口のパッケージの名前で修飾し、その import は、いつも名前を書く
 func (*Imports) Reserve(names ...string)              // このファイルの import の名前に使わせない名前を足す（ファイルを書くトランスパイラが、関数の本体の中で決まった名前で使う識別子。
                                                       // 基底の o、ctx、err）。基底の非公開の名前 ops と ptr は、Reserve しなくても、どのファイルでも使わせない
@@ -237,7 +241,7 @@ func (*Imports) Name(pkgPath string) string           // 修飾に使う名前�
 func (*Imports) Names() []string                      // 修飾に使う名前のすべて（辞書順）。局所の名前が避ける名前
 func (*Imports) Paths() []string
 func (*Imports) Render() string                       // import のブロック
-func (*Imports) Qualifier(namespace string) string    // その名前空間の宣言を、このファイルから書くときの前置き（N なら ""。NewTestImports のものなら、N も、入口を import して `<名前>.`。別の名前空間なら置き場の入口を import して `<名前>.`）
+func (*Imports) Qualifier(namespace string) string    // その名前空間の宣言を、このファイルから書くときの前置き（N なら ""。NewTestImports のものなら、N も、入口を import して `<名前>.`。別の名前空間なら、置き場の、型のパッケージを import して `<名前>.`。NewTestImports のものなら、置き場の入口）
 func (*Imports) Canonical() *Imports                  // 同じ import を、文書の決まりの順（名前空間の FQN の辞書順）で足し直したもの。ファイルを一度作って import の集まりを知り、これで作り直すと、名前が決まりどおりになる
 func (*Imports) Err() error                           // GoType / Zero / Qualifier が、型の置き場を求められなかった名前空間があれば、その誤り
 
@@ -352,7 +356,7 @@ func ReadCoverProfile(content string) (profile *CoverProfile, recognized bool, e
 func (p *CoverProfile) Lines(name string) (lines [][2]int, measured bool)   // <import パス>/<ファイル名> の、実行された行の範囲。一行もなければ measured が false
 ```
 
-- `HomeOf` が返す、別の単位の出力の `HasInner` と `DefDir` / `DefPath` / `DefName` は、その単位の `in` を省いたものとして求めた値（`View` は、ほかの単位の `in` を持たない）。別の名前空間の型を import するのは入口のパッケージなので、import には効かない。
+- `HomeOf` が返す、別の単位の出力の `HasInner` と `DefDir` / `DefPath` / `DefName` は、その単位の `in` を省いたものとして求めた値（`View` は、ほかの単位の `in` を持たない）。別の名前空間の型を import するのは、型のパッケージ（`Layout` の `TypesDir` / `TypesPath`。`HasTypes` が偽なら、入口と同じ）で、それは、名前空間の宣言だけから決まる（`in` に依らない）ので、import には効かない。
 - `Param.Type` は、定義のパッケージの中での書き方。別の名前空間の分類の述語（`<C>Cases`）は修飾なしの名前で、書く側が `Imports.Qualifier` で修飾する。
 - 継ぎ目を宣言した相乗りは、`ShapeOf(view).Seams` のうち `Transpiler` が自分の名前のものについて、メソッドを出す。基底も同じ値から `Seams` を出すので、二つは合う。
 - 状態の単位を満たす型を出す相乗り（`go-sqlite`）は、`ShapeOf(view).States` の `Builtins`、`Reads`、`Effects` から、単位のメソッドの並びを、`ReadSignature`、`EffectSignature`、`BuiltinSignature` から、その形を求める。メソッドの名前は、`read` と効果が `MethodName(<FQN>)`、形で決まる命令が `BuiltinMethod(<操作>)`。N の `read` と効果は、どれも、ちょうど一つの単位の `Reads` / `Effects` にある（`read` は `Read.state` の単位、効果は宛先の単位。`docs/plugin-go.md`「状態の単位」の「効果の宛先の単位」）ので、ある `read` か効果がどの単位のメソッドかは、`States` を走査して求める。`Reads` と `Effects` は、単位の対象（`in`）によらず、配線が呼んでいるかにもよらない。`Builtins` だけが、単位の対象の配線が直に呼ぶ操作で決まる。

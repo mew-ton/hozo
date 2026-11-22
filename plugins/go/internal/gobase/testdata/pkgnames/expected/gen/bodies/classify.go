@@ -5,52 +5,21 @@ package bodies
 import (
 	"context"
 
-	"github.com/mew-ton/hozo/runtime"
+	"example.com/app/gen/bodies/types"
 )
 
 // Size は classify bodies.Size。
-type Size int
+type Size = types.Size
 
 const (
-	SizeBig Size = iota
-	SizeSmall
+	SizeBig   = types.SizeBig
+	SizeSmall = types.SizeSmall
 )
 
 // SizeCases は分類 bodies.Size のケースごとの述語。人が実装し、この分類を match に使う名前空間の New に渡す。
-type SizeCases interface {
-	// Big はケース Big の述語。
-	Big(ctx context.Context, v string) (bool, error)
-	// Small はケース Small の述語。
-	Small(ctx context.Context, v string) (bool, error)
-}
+type SizeCases = types.SizeCases
 
 // ClassifySize は v を bodies.Size で分類する。すべての述語を呼び、真になった数を数える。
 func ClassifySize(ctx context.Context, c SizeCases, v string) (Size, error) {
-	var hits []string
-	var kind Size
-	var first error
-	if ok, err := c.Big(ctx, v); err != nil {
-		if first == nil {
-			first = err
-		}
-	} else if ok {
-		hits = append(hits, "Big")
-		kind = SizeBig
-	}
-	if ok, err := c.Small(ctx, v); err != nil {
-		if first == nil {
-			first = err
-		}
-	} else if ok {
-		hits = append(hits, "Small")
-		kind = SizeSmall
-	}
-	if first != nil {
-		return kind, first
-	}
-	switch len(hits) {
-	case 1:
-		return kind, nil
-	}
-	return kind, &runtime.ClassificationError{Classify: "bodies.Size", Hits: hits}
+	return types.ClassifySize(ctx, c, v)
 }

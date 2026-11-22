@@ -5,7 +5,7 @@ package app
 import (
 	"context"
 
-	pkgtype "example.com/app/gen/type"
+	pkgtype "example.com/app/gen/type/types"
 )
 
 // LeavesState は状態 app.leaves（single<string>）の単位。実装は New の引数 leaves_ に渡す。

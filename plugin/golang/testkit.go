@@ -139,7 +139,7 @@ func (b *kitBuilder) kit(ns string, cfg ir.NamespaceConfig, inUnit func(*ir.Op) 
 		for _, o := range s.Ops {
 			hasInner = hasInner || !o.Exported
 		}
-		l, err := layout(ns, cfg.Dir, b.root, hasInner)
+		l, err := layout(ns, cfg.Dir, b.root, hasInner, HasFuncs(b.view.Program, ns))
 		if err != nil && b.err == nil {
 			b.err = err
 		}

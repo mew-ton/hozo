@@ -5,174 +5,61 @@ package inner
 import (
 	"context"
 
-	"github.com/mew-ton/hozo/gen/server"
-	"github.com/mew-ton/hozo/runtime"
+	"github.com/mew-ton/hozo/gen/browser/types"
+	server "github.com/mew-ton/hozo/gen/server/types"
 )
 
 // WarrantyKind は商品に適用される保証の種類。
 // ヤマダ電機の専用保証の対象となる商品は、メーカー保証があっても Yamada に分類する。
-type WarrantyKind int
+type WarrantyKind = types.WarrantyKind
 
 const (
 	// メーカーの保証書が付く
-	WarrantyKindStandard WarrantyKind = iota
+	WarrantyKindStandard = types.WarrantyKindStandard
 	// ヤマダ電機の専用保証プランを選べる
-	WarrantyKindYamada
+	WarrantyKindYamada = types.WarrantyKindYamada
 	// 保証が付かない
-	WarrantyKindNoWarranty
+	WarrantyKindNoWarranty = types.WarrantyKindNoWarranty
 )
 
 // WarrantyKindCases は分類 browser.WarrantyKind のケースごとの述語。人が実装し、この分類を match に使う名前空間の New に渡す。
-type WarrantyKindCases interface {
-	// Standard はケース Standard の述語。
-	Standard(ctx context.Context, v server.Item) (bool, error)
-	// Yamada はケース Yamada の述語。
-	Yamada(ctx context.Context, v server.Item) (bool, error)
-	// NoWarranty はケース NoWarranty の述語。
-	NoWarranty(ctx context.Context, v server.Item) (bool, error)
-}
+type WarrantyKindCases = types.WarrantyKindCases
 
 // ClassifyWarrantyKind は v を browser.WarrantyKind で分類する。すべての述語を呼び、真になった数を数える。
 func ClassifyWarrantyKind(ctx context.Context, c WarrantyKindCases, v server.Item) (WarrantyKind, error) {
-	var hits []string
-	var kind WarrantyKind
-	var first error
-	if ok, err := c.Standard(ctx, v); err != nil {
-		if first == nil {
-			first = err
-		}
-	} else if ok {
-		hits = append(hits, "Standard")
-		kind = WarrantyKindStandard
-	}
-	if ok, err := c.Yamada(ctx, v); err != nil {
-		if first == nil {
-			first = err
-		}
-	} else if ok {
-		hits = append(hits, "Yamada")
-		kind = WarrantyKindYamada
-	}
-	if ok, err := c.NoWarranty(ctx, v); err != nil {
-		if first == nil {
-			first = err
-		}
-	} else if ok {
-		hits = append(hits, "NoWarranty")
-		kind = WarrantyKindNoWarranty
-	}
-	if first != nil {
-		return kind, first
-	}
-	switch len(hits) {
-	case 1:
-		return kind, nil
-	}
-	return kind, &runtime.ClassificationError{Classify: "browser.WarrantyKind", Hits: hits}
+	return types.ClassifyWarrantyKind(ctx, c, v)
 }
 
 // CampaignKind は商品が対象のキャンペーン
-type CampaignKind int
+type CampaignKind = types.CampaignKind
 
 const (
-	CampaignKindSpring CampaignKind = iota
-	CampaignKindSummer
+	CampaignKindSpring = types.CampaignKindSpring
+	CampaignKindSummer = types.CampaignKindSummer
 	// キャンペーンの対象外
-	CampaignKindNoCampaign
+	CampaignKindNoCampaign = types.CampaignKindNoCampaign
 )
 
 // CampaignKindCases は分類 browser.CampaignKind のケースごとの述語。人が実装し、この分類を match に使う名前空間の New に渡す。
-type CampaignKindCases interface {
-	// Spring はケース Spring の述語。
-	Spring(ctx context.Context, v server.Item) (bool, error)
-	// Summer はケース Summer の述語。
-	Summer(ctx context.Context, v server.Item) (bool, error)
-	// NoCampaign はケース NoCampaign の述語。
-	NoCampaign(ctx context.Context, v server.Item) (bool, error)
-}
+type CampaignKindCases = types.CampaignKindCases
 
 // ClassifyCampaignKind は v を browser.CampaignKind で分類する。すべての述語を呼び、真になった数を数える。
 func ClassifyCampaignKind(ctx context.Context, c CampaignKindCases, v server.Item) (CampaignKind, error) {
-	var hits []string
-	var kind CampaignKind
-	var first error
-	if ok, err := c.Spring(ctx, v); err != nil {
-		if first == nil {
-			first = err
-		}
-	} else if ok {
-		hits = append(hits, "Spring")
-		kind = CampaignKindSpring
-	}
-	if ok, err := c.Summer(ctx, v); err != nil {
-		if first == nil {
-			first = err
-		}
-	} else if ok {
-		hits = append(hits, "Summer")
-		kind = CampaignKindSummer
-	}
-	if ok, err := c.NoCampaign(ctx, v); err != nil {
-		if first == nil {
-			first = err
-		}
-	} else if ok {
-		hits = append(hits, "NoCampaign")
-		kind = CampaignKindNoCampaign
-	}
-	if first != nil {
-		return kind, first
-	}
-	switch len(hits) {
-	case 1:
-		return kind, nil
-	}
-	return kind, &runtime.ClassificationError{Classify: "browser.CampaignKind", Hits: hits}
+	return types.ClassifyCampaignKind(ctx, c, v)
 }
 
 // WarrantyAvailable は保証プランを選べるか。二値の場合も、両側に名前を付ける（§10.1 の `condition WarrantyAvailable of server.Item;` は、なくした書き方）
-type WarrantyAvailable int
+type WarrantyAvailable = types.WarrantyAvailable
 
 const (
-	WarrantyAvailableAvailable WarrantyAvailable = iota
-	WarrantyAvailableUnavailable
+	WarrantyAvailableAvailable   = types.WarrantyAvailableAvailable
+	WarrantyAvailableUnavailable = types.WarrantyAvailableUnavailable
 )
 
 // WarrantyAvailableCases は分類 browser.WarrantyAvailable のケースごとの述語。人が実装し、この分類を match に使う名前空間の New に渡す。
-type WarrantyAvailableCases interface {
-	// Available はケース Available の述語。
-	Available(ctx context.Context, v server.Item) (bool, error)
-	// Unavailable はケース Unavailable の述語。
-	Unavailable(ctx context.Context, v server.Item) (bool, error)
-}
+type WarrantyAvailableCases = types.WarrantyAvailableCases
 
 // ClassifyWarrantyAvailable は v を browser.WarrantyAvailable で分類する。すべての述語を呼び、真になった数を数える。
 func ClassifyWarrantyAvailable(ctx context.Context, c WarrantyAvailableCases, v server.Item) (WarrantyAvailable, error) {
-	var hits []string
-	var kind WarrantyAvailable
-	var first error
-	if ok, err := c.Available(ctx, v); err != nil {
-		if first == nil {
-			first = err
-		}
-	} else if ok {
-		hits = append(hits, "Available")
-		kind = WarrantyAvailableAvailable
-	}
-	if ok, err := c.Unavailable(ctx, v); err != nil {
-		if first == nil {
-			first = err
-		}
-	} else if ok {
-		hits = append(hits, "Unavailable")
-		kind = WarrantyAvailableUnavailable
-	}
-	if first != nil {
-		return kind, first
-	}
-	switch len(hits) {
-	case 1:
-		return kind, nil
-	}
-	return kind, &runtime.ClassificationError{Classify: "browser.WarrantyAvailable", Hits: hits}
+	return types.ClassifyWarrantyAvailable(ctx, c, v)
 }

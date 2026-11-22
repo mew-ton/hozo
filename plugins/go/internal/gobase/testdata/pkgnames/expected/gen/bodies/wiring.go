@@ -8,7 +8,7 @@ import (
 	ctx2 "example.com/app/gen/ctx"
 	err2 "example.com/app/gen/err"
 	"example.com/app/gen/k0"
-	o2 "example.com/app/gen/o"
+	o2 "example.com/app/gen/o/types"
 	"example.com/app/gen/v0"
 )
 

@@ -5,7 +5,7 @@ package inner
 import (
 	"context"
 
-	"example.com/app/gen/gate"
+	gate "example.com/app/gen/gate/types"
 )
 
 // Ops は、この名前空間のすべての op（export の有無によらない）。宣言順。New が返す。テストは、内部の op をここから呼ぶ。

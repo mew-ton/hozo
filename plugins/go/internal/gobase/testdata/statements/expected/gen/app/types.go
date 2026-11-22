@@ -2,44 +2,28 @@
 
 package app
 
-import "github.com/mew-ton/hozo/runtime"
+import "example.com/app/gen/app/types"
 
 // Id は scalar app.Id。
-type Id string
+type Id = types.Id
 
 // Count は scalar app.Count。
-type Count int64
+type Count = types.Count
 
 // Item は model app.Item。
-type Item struct {
-	Id    Id    `json:"id"`
-	Count int64 `json:"count"`
-}
+type Item = types.Item
 
 // Counts は model app.Counts。
-type Counts map[string]int64
+type Counts = types.Counts
 
 // Shape は union app.Shape。
-type Shape interface{ isShape() }
-
-func (Item) isShape()     {}
-func (ShapeKey) isShape() {}
+type Shape = types.Shape
 
 // ShapeKey は union app.Shape のアーム Key（app.Id）を包む型。
-type ShapeKey struct{ Value Id }
+type ShapeKey = types.ShapeKey
 
 // Broken は exception app.Broken。
-type Broken struct{}
-
-func (Broken) Error() string         { return "app.Broken" }
-func (Broken) HozoException() string { return "app.Broken" }
-
-var _ runtime.Exception = Broken{}
+type Broken = types.Broken
 
 // Gone は exception app.Gone。
-type Gone struct{}
-
-func (Gone) Error() string         { return "app.Gone" }
-func (Gone) HozoException() string { return "app.Gone" }
-
-var _ runtime.Exception = Gone{}
+type Gone = types.Gone

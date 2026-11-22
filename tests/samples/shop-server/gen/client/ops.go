@@ -5,7 +5,7 @@ package client
 import (
 	"context"
 
-	"example.com/shop-server/gen/server"
+	server "example.com/shop-server/gen/server/types"
 	pkgtype "example.com/shop-server/gen/type"
 )
 

@@ -2,17 +2,10 @@
 
 package inner
 
-import "github.com/mew-ton/hozo/runtime"
+import "example.com/app/gen/gate/types"
 
 // Closed: 閉まっている
-type Closed struct{}
-
-func (Closed) Error() string         { return "gate.Closed" }
-func (Closed) HozoException() string { return "gate.Closed" }
-
-var _ runtime.Exception = Closed{}
+type Closed = types.Closed
 
 // Ticket は model gate.Ticket。
-type Ticket struct {
-	Ok bool `json:"ok"`
-}
+type Ticket = types.Ticket

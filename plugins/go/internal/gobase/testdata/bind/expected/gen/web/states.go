@@ -5,7 +5,7 @@ package web
 import (
 	"context"
 
-	"example.com/app/gen/api"
+	api "example.com/app/gen/api/types"
 )
 
 // TokenState は状態 web.token（nullable<api.Token>）の単位。実装は New の引数 token に渡す。

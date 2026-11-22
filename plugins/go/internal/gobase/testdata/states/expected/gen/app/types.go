@@ -2,49 +2,41 @@
 
 package app
 
-import "github.com/mew-ton/hozo/runtime"
+import "example.com/app/gen/app/types"
 
 // Token は scalar app.Token。
-type Token string
+type Token = types.Token
 
 // Line は model app.Line。
-type Line struct {
-	Item  string `json:"item"`
-	Count int64  `json:"count"`
-}
+type Line = types.Line
 
 // Owner は model app.Owner。
-type Owner struct {
-	Name string `json:"name"`
-}
+type Owner = types.Owner
 
 // Settings は model app.Settings。
-type Settings struct {
-	Title string `json:"title"`
-	Owner *Owner `json:"owner,omitempty"`
-}
+type Settings = types.Settings
 
 // EffectAddLine は行を足す
-const EffectAddLine runtime.Effect = "app.addLine"
+const EffectAddLine = types.EffectAddLine
 
 // EffectDropToken は effect app.dropToken。
-const EffectDropToken runtime.Effect = "app.dropToken"
+const EffectDropToken = types.EffectDropToken
 
 // EffectClearLines はカートを空にする
 // effects app.lines as HasItems -> Empty
-const EffectClearLines runtime.Effect = "app.clearLines"
+const EffectClearLines = types.EffectClearLines
 
 // EffectRefresh は effect app.refresh。
 // effects app.Sync as Stale -> Fresh
-const EffectRefresh runtime.Effect = "app.refresh"
+const EffectRefresh = types.EffectRefresh
 
 // EffectSignIn はログインする。
 // 二行目の説明。
 // effects app.SignedIn as any -> Yes
-const EffectSignIn runtime.Effect = "app.signIn"
+const EffectSignIn = types.EffectSignIn
 
 // EffectRename は effect app.rename。
-const EffectRename runtime.Effect = "app.rename"
+const EffectRename = types.EffectRename
 
 // EffectRemoveLine は effect app.removeLine。
-const EffectRemoveLine runtime.Effect = "app.removeLine"
+const EffectRemoveLine = types.EffectRemoveLine

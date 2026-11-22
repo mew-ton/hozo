@@ -5,10 +5,10 @@ package app
 import (
 	"context"
 
-	"example.com/app/gen/a/util"
-	util2 "example.com/app/gen/b/util"
-	context2 "example.com/app/gen/context"
-	pkgtype "example.com/app/gen/type"
+	util "example.com/app/gen/a/util/types"
+	util2 "example.com/app/gen/b/util/types"
+	context2 "example.com/app/gen/context/types"
+	pkgtype "example.com/app/gen/type/types"
 )
 
 // Ops は、この名前空間の外から呼べる op: 仕様で export を付けた op。宣言順。New が返す。

@@ -78,14 +78,14 @@ func TestBehavior(t *testing.T) {
 	}
 }
 
-// TestPlacement は「出力」の置き場: validate.go は、N の定義のパッケージに一つ。内部の op を持つ名前空間では内側のパッケージ
-// （inner）、持たない名前空間では入口と同じパッケージ。
+// TestPlacement は「出力」の置き場: validate.go は、N の、型のパッケージに一つ（docs/plugin-go.md「型のパッケージ」）。関数を持つ
+// 名前空間では <Dir>/types/（パッケージ types）、持たない名前空間では入口と同じパッケージ。
 func TestPlacement(t *testing.T) {
 	_, files := emitFixture(t, "constraints")
 	want := map[string]string{
 		"gen/type/validate.go":        "package pkgtype\n",
 		"gen/app/validate.go":         "package app\n",
-		"gen/split/inner/validate.go": "package inner\n",
+		"gen/split/types/validate.go": "package types\n",
 	}
 	if len(files) != len(want) {
 		t.Errorf("ファイル = %v, want %d 個", sortedPaths(files), len(want))

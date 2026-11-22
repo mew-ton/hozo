@@ -1,0 +1,77 @@
+// docs/plugin-go.md「型のパッケージ」: 二つの名前空間が、互いの型を使う（片方の型が、相手の型を使い、相手の関数が、こちらの型を使う）。
+// 型のパッケージを分けるので、import は、輪にならない。サンプル order-app の shipping と carrier の形。
+
+/** 発送。型が、carry の型を使う */
+namespace ship {
+  /** 荷物 */
+  model Parcel { weight: int; }
+  /** 送り状。運送会社のコードは、carry の scalar */
+  model Label { carrier: carry.Code; id: string; }
+
+  /** 荷物の大きさの分類（述語で決まる）。別の名前空間 desk が、この分類で分ける */
+  classify Size of Parcel {
+    Small: Parcel as Parcel;
+    Big: Parcel as Parcel;
+  }
+
+  /** 荷物を作る（人が書く） */
+  export fn pack(weight: int): Parcel;
+
+  /** 荷物を作って、送り状を買う。carry の op を呼ぶ */
+  export fn send(weight: int): Label {
+    val parcel = pack(weight);
+    return carry.book(parcel);
+  }
+}
+
+/** 運送会社。関数が、ship の型を使う */
+namespace carry {
+  /** 運送会社のコード */
+  scalar Code extends string;
+  /** 見積もり */
+  model Quote { code: Code; price: int; }
+
+  /** 荷物の重さの分類（述語で決まる。対象は、この名前空間の型） */
+  classify Tier of Quote {
+    Cheap: Quote as Quote;
+    Dear: Quote as Quote;
+  }
+
+  /** 送り状を買う。引数と戻り値が、ship の型 */
+  export fn book(parcel: ship.Parcel): ship.Label {
+    return issue(parcel);
+  }
+
+  /** 送り状を作る（人が書く） */
+  fn issue(parcel: ship.Parcel): ship.Label;
+
+  /** 見積もる（人が書く） */
+  export fn quote(parcel: ship.Parcel): Quote;
+}
+
+/** 型だけの名前空間は、型のパッケージを、分けない */
+namespace plain {
+  model Note { text: string; by: carry.Code; }
+}
+
+/**
+ * 窓口。葉を、持たない: New が受け取るのは、別の名前空間 ship の分類の述語と、ship と carry の op だけ。
+ * この出力を通す側（front）の fakes.go は、desk のパッケージを import しない（名指しするのは、ship の述語の口と、desk のテストのパッケージだけ）。
+ */
+namespace desk {
+  /** 荷物を作って、大きさで分けて、送り状を買う */
+  export fn rush(weight: int): ship.Label {
+    val parcel = ship.pack(weight);
+    return match (parcel by ship.Size) {
+      Small => carry.book(parcel);
+      Big   => carry.book(parcel);
+    }
+  }
+}
+
+/** 入口。desk の配線を、本物で通す */
+namespace front {
+  export fn hurry(weight: int): ship.Label {
+    return desk.rush(weight);
+  }
+}

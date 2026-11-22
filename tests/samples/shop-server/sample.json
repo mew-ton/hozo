@@ -8,6 +8,8 @@
         "gen/rate/types.go",
         "gen/store/doc.go",
         "gen/store/types.go",
+        "gen/store/types/doc.go",
+        "gen/store/types/types.go",
         "gen/store/ops.go",
         "gen/store/states.go",
         "gen/store/wiring.go",
@@ -20,6 +22,8 @@
         "gen/server/ops.go",
         "gen/server/inner/doc.go",
         "gen/server/inner/types.go",
+        "gen/server/types/doc.go",
+        "gen/server/types/types.go",
         "gen/server/inner/ops.go",
         "gen/server/inner/wiring.go",
         "gen/server/servertest/doc.go",
@@ -36,6 +40,8 @@
         "gen/client/clienttest/fakes.go",
         "gen/flows/doc.go",
         "gen/flows/types.go",
+        "gen/flows/types/doc.go",
+        "gen/flows/types/types.go",
         "gen/flows/ops.go",
         "gen/flows/wiring.go",
         "gen/flows/flowstest/doc.go",
@@ -43,7 +49,7 @@
       ]
     },
     "go-valid": {
-      "files": ["gen/type/validate.go", "gen/server/inner/validate.go"]
+      "files": ["gen/type/validate.go", "gen/server/types/validate.go"]
     },
     "go-sqlite": {
       "files": ["gen/store/db.go"]

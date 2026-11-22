@@ -2,5 +2,7 @@
 
 package web
 
+import "example.com/app/gen/web/types"
+
 // Locale は scalar web.Locale。
-type Locale string
+type Locale = types.Locale

@@ -14,5 +14,8 @@
   "gen/shop/shoptest/hozo-tests.go.json",
   "gen/shop/shoptest/leaves.go",
   "gen/shop/states.go",
-  "gen/shop/types.go"
+  "gen/shop/types.go",
+  "gen/shop/types/classify.go",
+  "gen/shop/types/doc.go",
+  "gen/shop/types/types.go"
 ]

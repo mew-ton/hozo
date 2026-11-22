@@ -2,5 +2,7 @@
 
 package pkgtype
 
+import "example.com/app/gen/type/types"
+
 // Token は scalar type.Token。
-type Token string
+type Token = types.Token

@@ -5,6 +5,7 @@ package inner
 import (
 	"context"
 
+	"github.com/mew-ton/hozo/gen/shop/types"
 	"github.com/mew-ton/hozo/runtime"
 )
 
@@ -89,48 +90,17 @@ func ClassifyLoggedIn(ctx context.Context, s LoggedInState) (LoggedIn, error) {
 }
 
 // LineKind は行の種類
-type LineKind int
+type LineKind = types.LineKind
 
 const (
-	LineKindSingle LineKind = iota
-	LineKindBulk
+	LineKindSingle = types.LineKindSingle
+	LineKindBulk   = types.LineKindBulk
 )
 
 // LineKindCases は分類 shop.LineKind のケースごとの述語。人が実装し、この分類を match に使う名前空間の New に渡す。
-type LineKindCases interface {
-	// Single はケース Single の述語。
-	Single(ctx context.Context, v Line) (bool, error)
-	// Bulk はケース Bulk の述語。
-	Bulk(ctx context.Context, v Line) (bool, error)
-}
+type LineKindCases = types.LineKindCases
 
 // ClassifyLineKind は v を shop.LineKind で分類する。すべての述語を呼び、真になった数を数える。
 func ClassifyLineKind(ctx context.Context, c LineKindCases, v Line) (LineKind, error) {
-	var hits []string
-	var kind LineKind
-	var first error
-	if ok, err := c.Single(ctx, v); err != nil {
-		if first == nil {
-			first = err
-		}
-	} else if ok {
-		hits = append(hits, "Single")
-		kind = LineKindSingle
-	}
-	if ok, err := c.Bulk(ctx, v); err != nil {
-		if first == nil {
-			first = err
-		}
-	} else if ok {
-		hits = append(hits, "Bulk")
-		kind = LineKindBulk
-	}
-	if first != nil {
-		return kind, first
-	}
-	switch len(hits) {
-	case 1:
-		return kind, nil
-	}
-	return kind, &runtime.ClassificationError{Classify: "shop.LineKind", Hits: hits}
+	return types.ClassifyLineKind(ctx, c, v)
 }

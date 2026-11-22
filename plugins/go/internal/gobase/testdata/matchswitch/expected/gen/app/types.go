@@ -2,62 +2,37 @@
 
 package app
 
-import "github.com/mew-ton/hozo/runtime"
+import "example.com/app/gen/app/types"
 
 // Email は scalar app.Email。
-type Email string
+type Email = types.Email
 
 // Item は model app.Item。
-type Item struct {
-	Name  string `json:"name"`
-	Price int64  `json:"price"`
-}
+type Item = types.Item
 
 // Problem は model app.Problem。
-type Problem struct {
-	Reason string `json:"reason"`
-}
+type Problem = types.Problem
 
 // Receipt は model app.Receipt。
-type Receipt struct {
-	Total int64 `json:"total"`
-}
+type Receipt = types.Receipt
 
 // Title は model app.Title。
-type Title struct {
-	Title string `json:"title"`
-}
+type Title = types.Title
 
 // Page は画面。アームの型: 宣言した model、その場の model、核の型（包む型）、省略可能（包む型）
-type Page interface{ isPage() }
-
-func (Title) isPage()     {}
-func (PageBlank) isPage() {}
-func (Problem) isPage()   {}
-func (PageCode) isPage()  {}
-func (PageNote) isPage()  {}
+type Page = types.Page
 
 // PageCode は union app.Page のアーム Code（int）を包む型。
-type PageCode struct{ Value int64 }
+type PageCode = types.PageCode
 
 // PageNote は union app.Page のアーム Note（string?）を包む型。
-type PageNote struct{ Value *string }
+type PageNote = types.PageNote
 
 // PageBlank は model app.Page.Blank。
-type PageBlank struct {
-	Hint string `json:"hint"`
-}
+type PageBlank = types.PageBlank
 
 // Result は結果
-type Result interface{ isResult() }
-
-func (Receipt) isResult() {}
-func (Problem) isResult() {}
+type Result = types.Result
 
 // Bad は exception app.Bad。
-type Bad struct{}
-
-func (Bad) Error() string         { return "app.Bad" }
-func (Bad) HozoException() string { return "app.Bad" }
-
-var _ runtime.Exception = Bad{}
+type Bad = types.Bad

@@ -2,52 +2,28 @@
 
 package inner
 
-import pkgtype "example.com/shop-server/gen/type"
+import "example.com/shop-server/gen/server/types"
 
 // Credentials はログインの本文
-type Credentials struct {
-	Email    pkgtype.Email    `json:"email"`
-	Password pkgtype.Password `json:"password"`
-}
+type Credentials = types.Credentials
 
 // LoginInput はログインの入力
-type LoginInput struct {
-	Body Credentials `json:"body"`
-}
+type LoginInput = types.LoginInput
 
 // LoginOk はログインの結果
-type LoginOk struct {
-	User  pkgtype.PublicUser `json:"user"`
-	Token pkgtype.Token      `json:"token"`
-}
+type LoginOk = types.LoginOk
 
 // AuthInput はトークンだけを運ぶ入力
-type AuthInput struct {
-	Token *pkgtype.Token `json:"token,omitempty"`
-}
+type AuthInput = types.AuthInput
 
 // GetOrdersInput は注文一覧の入力
-type GetOrdersInput struct {
-	Token *pkgtype.Token `json:"token,omitempty"`
-	// 1 から数えるページ番号
-	Page int64 `json:"page"`
-}
+type GetOrdersInput = types.GetOrdersInput
 
 // PlaceOrderInput は注文の入力
-type PlaceOrderInput struct {
-	Token *pkgtype.Token      `json:"token,omitempty"`
-	Lines []pkgtype.OrderLine `json:"lines"`
-}
+type PlaceOrderInput = types.PlaceOrderInput
 
 // OrderSummary は注文の、一行の要約
-type OrderSummary struct {
-	Id    pkgtype.OrderId `json:"id"`
-	Lines int64           `json:"lines"`
-}
+type OrderSummary = types.OrderSummary
 
 // MyPage は自分のページ
-type MyPage struct {
-	User      pkgtype.PublicUser `json:"user"`
-	Latest    *pkgtype.Order     `json:"latest,omitempty"`
-	Summaries []OrderSummary     `json:"summaries"`
-}
+type MyPage = types.MyPage

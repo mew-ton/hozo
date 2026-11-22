@@ -1,0 +1,8 @@
+{
+  "tests": [
+    {"name": "carry.issue/OK", "file": "gen/carry/carrytest/leaves.go", "lines": [52, 59]},
+    {"name": "carry.quote/OK", "file": "gen/carry/carrytest/leaves.go", "lines": [65, 72]},
+    {"name": "carry.Tier/Cheap", "file": "gen/carry/carrytest/classify.go", "lines": [26, 32]},
+    {"name": "carry.Tier/Dear", "file": "gen/carry/carrytest/classify.go", "lines": [35, 41]}
+  ]
+}

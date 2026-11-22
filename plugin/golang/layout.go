@@ -11,6 +11,9 @@ import (
 // 相乗りは、このディレクトリ名を使わない（同「相乗りのファイル」）。
 const innerDir = "inner"
 
+// typesDir は、型のパッケージのフォルダの名前で、そのパッケージの名前でもある（docs/plugin-go.md「型のパッケージ」）。
+const typesDir = "types"
+
 // testSuffix は、テストのパッケージの名前の後ろに付ける語（docs/plugin-go.md「単体テストの口」の「テストのパッケージ」）。
 const testSuffix = "test"
 
@@ -30,6 +33,12 @@ type Layout struct {
 	// DefDir、DefPath、DefName は、定義のパッケージのディレクトリ、import パス、名前。HasInner なら `<Dir>/inner`、
 	// `<EntryPath>/inner`、"inner"。そうでなければ入口と同じ。
 	DefDir, DefPath, DefName string
+	// HasTypes は、型のパッケージを、分けて持つか（docs/plugin-go.md「型のパッケージ」: N が、op、read、効果、状態の宣言を、
+	// 一つでも持つ。単位の in は、見ない）。
+	HasTypes bool
+	// TypesDir、TypesPath、TypesName は、型のパッケージのディレクトリ、import パス、名前。HasTypes なら `<Dir>/types`、
+	// `<EntryPath>/types`、"types"。そうでなければ入口と同じ。別の名前空間の出力と、相乗りのファイルは、ここを import する。
+	TypesDir, TypesPath, TypesName string
 	// TestDir、TestPath、TestName は、テストのパッケージ（docs/plugin-go.md「単体テストの口」の「テストのパッケージ」）の
 	// ディレクトリ、import パス、名前: `<Dir>/<EntryName>test`、`<EntryPath>/<EntryName>test`、`<EntryName>test`。
 	// 口が一つもない出力では、基底は、このパッケージを作らない。
@@ -44,7 +53,26 @@ func LayoutOf(view *ir.View, root string) (*Layout, error) {
 	for _, o := range ShapeOf(view).Ops {
 		hasInner = hasInner || !o.Exported
 	}
-	return layout(view.Viewer, view.Config.Dir, root, hasInner)
+	return layout(view.Viewer, view.Config.Dir, root, hasInner, HasFuncs(view.Program, view.Viewer))
+}
+
+// HasFuncs は、名前空間 namespace が、関数を持つか（docs/plugin-go.md「型のパッケージ」）: op、read、効果、状態の宣言を、一つでも
+// 持つ。単位の in は、見ない（名前空間の宣言だけから決まる）。
+func HasFuncs(p *ir.Program, namespace string) bool {
+	if p == nil {
+		return false
+	}
+	ns := p.Namespace(namespace)
+	if ns == nil {
+		return false
+	}
+	for _, d := range ns.Decls {
+		switch d.(type) {
+		case *ir.Op, *ir.Read, *ir.Effect, *ir.State:
+			return true
+		}
+	}
+	return false
 }
 
 // HomeOf は、view の単位から見た、名前空間 namespace の型の置き場（docs/config.md「型の置き場」）: view の単位自身が
@@ -83,12 +111,12 @@ func HomeOf(view *ir.View, namespace, root string) (*Layout, bool, error) {
 	for _, o := range shapeOf(view.Program, namespace, inUnit, home.Seams).Ops {
 		hasInner = hasInner || !o.Exported
 	}
-	l, err := layout(namespace, home.Dir, root, hasInner)
+	l, err := layout(namespace, home.Dir, root, hasInner, HasFuncs(view.Program, namespace))
 	return l, err == nil, err
 }
 
 // layout は、名前空間 namespace を dir（Dir(U, N)）に出力するときの置き場。
-func layout(namespace, dir, root string, hasInner bool) (*Layout, error) {
+func layout(namespace, dir, root string, hasInner, hasTypes bool) (*Layout, error) {
 	dir = path.Clean(filepath.ToSlash(dir))
 	entry, err := ImportPath(root, dir)
 	if err != nil {
@@ -100,6 +128,11 @@ func layout(namespace, dir, root string, hasInner bool) (*Layout, error) {
 	l.TestDir, l.TestPath = path.Join(dir, l.TestName), entry+"/"+l.TestName
 	if hasInner {
 		l.DefDir, l.DefPath, l.DefName = path.Join(dir, innerDir), entry+"/"+innerDir, innerDir
+	}
+	l.TypesDir, l.TypesPath, l.TypesName = l.Dir, l.EntryPath, l.EntryName
+	if hasTypes {
+		l.HasTypes = true
+		l.TypesDir, l.TypesPath, l.TypesName = path.Join(dir, typesDir), entry+"/"+typesDir, typesDir
 	}
 	return l, nil
 }

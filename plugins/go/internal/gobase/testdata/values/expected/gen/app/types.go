@@ -2,42 +2,22 @@
 
 package app
 
-import "time"
+import "example.com/app/gen/app/types"
 
 // Email は scalar app.Email。
-type Email string
+type Email = types.Email
 
 // Address は model app.Address。
-type Address struct {
-	City string   `json:"city"`
-	Zip  *string  `json:"zip,omitempty"`
-	Tags []string `json:"tags"`
-}
+type Address = types.Address
 
 // Profile は model app.Profile。
-type Profile struct {
-	Name    string   `json:"name"`
-	Address *Address `json:"address,omitempty"`
-	Nick    *string  `json:"nick,omitempty"`
-	Age     *int64   `json:"age,omitempty"`
-	Active  *bool    `json:"active,omitempty"`
-}
+type Profile = types.Profile
 
 // Account は model app.Account。
-type Account struct {
-	Id      string   `json:"id"`
-	Profile *Profile `json:"profile,omitempty"`
-	Email   Email    `json:"email"`
-}
+type Account = types.Account
 
 // Labels は model app.Labels。
-type Labels map[string]string
+type Labels = types.Labels
 
 // Options は model app.Options。
-type Options struct {
-	Limit *int64         `json:"limit,omitempty"`
-	Label *string        `json:"label,omitempty"`
-	Ratio *float64       `json:"ratio,omitempty"`
-	Wait  *time.Duration `json:"wait,omitempty"`
-	Note  *string        `json:"note,omitempty"`
-}
+type Options = types.Options

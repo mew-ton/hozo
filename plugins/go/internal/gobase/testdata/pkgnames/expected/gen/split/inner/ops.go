@@ -5,7 +5,7 @@ package inner
 import (
 	"context"
 
-	ops2 "example.com/app/gen/ops"
+	ops2 "example.com/app/gen/ops/types"
 	ptr2 "example.com/app/gen/ptr"
 )
 

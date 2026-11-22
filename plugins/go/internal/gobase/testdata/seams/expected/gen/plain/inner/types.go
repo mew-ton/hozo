@@ -2,20 +2,13 @@
 
 package inner
 
-import "github.com/mew-ton/hozo/runtime"
+import "example.com/app/gen/plain/types"
 
 // Item は model shop.Item。
-type Item struct {
-	Id string `json:"id"`
-}
+type Item = types.Item
 
 // Closed: 閉店している
-type Closed struct{}
-
-func (Closed) Error() string         { return "shop.Closed" }
-func (Closed) HozoException() string { return "shop.Closed" }
-
-var _ runtime.Exception = Closed{}
+type Closed = types.Closed
 
 // EffectAddItem は品物を足す
-const EffectAddItem runtime.Effect = "shop.addItem"
+const EffectAddItem = types.EffectAddItem

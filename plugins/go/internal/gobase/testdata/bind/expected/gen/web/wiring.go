@@ -5,7 +5,7 @@ package web
 import (
 	"context"
 
-	"example.com/app/gen/api"
+	api "example.com/app/gen/api/types"
 )
 
 // SignOut は op web.signOut。

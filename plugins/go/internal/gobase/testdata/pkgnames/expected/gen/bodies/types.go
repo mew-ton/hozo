@@ -2,12 +2,10 @@
 
 package bodies
 
+import "example.com/app/gen/bodies/types"
+
 // Inner は model bodies.Inner。
-type Inner struct {
-	Name string `json:"name"`
-}
+type Inner = types.Inner
 
 // Outer は model bodies.Outer。
-type Outer struct {
-	Inner *Inner `json:"inner,omitempty"`
-}
+type Outer = types.Outer

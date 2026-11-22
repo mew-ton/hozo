@@ -5,7 +5,7 @@ package inner
 import (
 	"context"
 
-	"github.com/mew-ton/hozo/gen/server"
+	server "github.com/mew-ton/hozo/gen/server/types"
 )
 
 // ClearToken は op browser.clearToken。

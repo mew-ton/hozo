@@ -1,0 +1,5 @@
+{
+  "tests": [
+    {"name": "gate.sorted/OK", "file": "gen/gate/gatetest/http.go", "lines": [58, 64]}
+  ]
+}

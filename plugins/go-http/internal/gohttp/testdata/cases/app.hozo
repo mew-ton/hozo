@@ -54,3 +54,42 @@ namespace plain {
     return 1;
   }
 }
+
+/** 述語で決まる分類と、葉を持つ名前空間。counter が、この分類で分ける */
+namespace parcel {
+  /** 荷物の重さ */
+  scalar Weight extends int;
+
+  /** 重さの分類（述語で決まる） */
+  classify Size of Weight {
+    Small: Weight as Weight;
+    Big: Weight as Weight;
+  }
+
+  /** 重さを量る（人が書く） */
+  export fn weigh(): Weight;
+}
+
+/**
+ * 葉を、持たない名前空間: New が受け取るのは、別の名前空間 parcel の分類の述語と、parcel の op だけ。
+ * この出力を通す側（gate）のテストのファイルは、counter のパッケージを import しない
+ * （名指しするのは、parcel の述語の口と、counter のテストのパッケージだけ）。
+ */
+namespace counter {
+  /** 量って、大きさで分ける */
+  export fn sort(): int {
+    val weight = parcel.weigh();
+    return match (weight by parcel.Size) {
+      Small => 1;
+      Big   => 2;
+    }
+  }
+}
+
+/** 入口。counter の配線を、本物で通す */
+namespace gate {
+  @http.get("/sorted")
+  export fn sorted(): int {
+    return counter.sort();
+  }
+}

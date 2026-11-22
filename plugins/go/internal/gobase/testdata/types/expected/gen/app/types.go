@@ -2,216 +2,106 @@
 
 package app
 
-import (
-	"time"
-
-	pkgtype "example.com/app/gen/type"
-	"github.com/mew-ton/hozo/runtime"
-)
+import "example.com/app/gen/app/types"
 
 // Id は識別子
-type Id string
+type Id = types.Id
 
 // AdminId は scalar app.AdminId。
-type AdminId Id
+type AdminId = types.AdminId
 
 // Count は scalar app.Count。
-type Count int64
+type Count = types.Count
 
 // Ratio は scalar app.Ratio。
-type Ratio float64
+type Ratio = types.Ratio
 
 // Flag は scalar app.Flag。
-type Flag bool
+type Flag = types.Flag
 
 // Stamp は scalar app.Stamp。
-type Stamp time.Time
+type Stamp = types.Stamp
 
 // Wait は scalar app.Wait。
-type Wait time.Duration
+type Wait = types.Wait
 
 // Day は scalar app.Day。
-type Day runtime.Date
+type Day = types.Day
 
 // Clock は scalar app.Clock。
-type Clock runtime.TimeOfDay
+type Clock = types.Clock
 
 // Counts は名前ごとの数。インデックスの model は、名前付きのマップの型
-type Counts map[string]int64
+type Counts = types.Counts
 
 // UsersById はキーが scalar で、値が省略可能な model の、インデックスの model
-type UsersById map[Id]*User
+type UsersById = types.UsersById
 
 // User は利用者。
 //
 // 二つ目の段。
-type User struct {
-	// 識別子
-	Id       Id                 `json:"id"`
-	Name     string             `json:"name"`
-	Nick     *string            `json:"nick,omitempty"`
-	Tags     []string           `json:"tags"`
-	Attrs    Counts             `json:"attrs"`
-	Born     time.Time          `json:"born"`
-	Wait     *time.Duration     `json:"wait,omitempty"`
-	Birthday runtime.Date       `json:"birthday"`
-	Wakes    *runtime.TimeOfDay `json:"wakes,omitempty"`
-	Holidays []Day              `json:"holidays"`
-	Alarm    Clock              `json:"alarm"`
-	Score    float64            `json:"score"`
-	Active   bool               `json:"active"`
-	Twice    *string            `json:"twice,omitempty"`
-	Home     pkgtype.Address    `json:"home"`
-	Homes    []pkgtype.Address  `json:"homes,omitempty"`
-}
+type User = types.User
 
 // Options は model app.Options。
-type Options struct {
-	Limit int64         `json:"limit"`
-	Label string        `json:"label"`
-	Ratio float64       `json:"ratio"`
-	Wait  time.Duration `json:"wait"`
-	On    bool          `json:"on"`
-	Id    Id            `json:"id"`
-	Note  *string       `json:"note,omitempty"`
-}
+type Options = types.Options
 
 // Public は model app.Public。
 // app.User を継承し（extends）、nick をなくした、id を変えた、extra を足したもの。app.User とは別の型で、暗黙には渡せない。
-type Public struct {
-	Id       AdminId            `json:"id"`
-	Name     string             `json:"name"`
-	Tags     []string           `json:"tags"`
-	Attrs    Counts             `json:"attrs"`
-	Born     time.Time          `json:"born"`
-	Wait     *time.Duration     `json:"wait,omitempty"`
-	Birthday runtime.Date       `json:"birthday"`
-	Wakes    *runtime.TimeOfDay `json:"wakes,omitempty"`
-	Holidays []Day              `json:"holidays"`
-	Alarm    Clock              `json:"alarm"`
-	Score    float64            `json:"score"`
-	Active   bool               `json:"active"`
-	Twice    *string            `json:"twice,omitempty"`
-	Home     pkgtype.Address    `json:"home"`
-	Homes    []pkgtype.Address  `json:"homes,omitempty"`
-	Extra    int64              `json:"extra"`
-}
+type Public = types.Public
 
 // Renamed は model app.Renamed。
 // app.User を継承し（extends）、twice、tags をなくしたもの。app.User とは別の型で、暗黙には渡せない。
-type Renamed struct {
-	// 識別子
-	Id       Id                 `json:"id"`
-	Name     string             `json:"name"`
-	Nick     *string            `json:"nick,omitempty"`
-	Attrs    Counts             `json:"attrs"`
-	Born     time.Time          `json:"born"`
-	Wait     *time.Duration     `json:"wait,omitempty"`
-	Birthday runtime.Date       `json:"birthday"`
-	Wakes    *runtime.TimeOfDay `json:"wakes,omitempty"`
-	Holidays []Day              `json:"holidays"`
-	Alarm    Clock              `json:"alarm"`
-	Score    float64            `json:"score"`
-	Active   bool               `json:"active"`
-	Home     pkgtype.Address    `json:"home"`
-	Homes    []pkgtype.Address  `json:"homes,omitempty"`
-}
+type Renamed = types.Renamed
 
 // Problem は model app.Problem。
-type Problem struct {
-	Reason string `json:"reason"`
-}
+type Problem = types.Problem
 
 // Page は画面
-type Page interface{ isPage() }
-
-func (PageReady) isPage() {}
-func (Problem) isPage()   {}
-func (PageAway) isPage()  {}
-func (PageCode) isPage()  {}
-func (PageMaybe) isPage() {}
-func (PageMany) isPage()  {}
-func (PageSub) isPage()   {}
+type Page = types.Page
 
 // PageAway は union app.Page のアーム Away（type.Address）を包む型。
-type PageAway struct{ Value pkgtype.Address }
+type PageAway = types.PageAway
 
 // PageCode は union app.Page のアーム Code（int）を包む型。
-type PageCode struct{ Value int64 }
+type PageCode = types.PageCode
 
 // PageMaybe は union app.Page のアーム Maybe（app.User?）を包む型。
-type PageMaybe struct{ Value *User }
+type PageMaybe = types.PageMaybe
 
 // PageMany は union app.Page のアーム Many（app.User[]）を包む型。
-type PageMany struct{ Value []User }
+type PageMany = types.PageMany
 
 // PageSub は union app.Page のアーム Sub（app.Shape）を包む型。
-type PageSub struct{ Value Shape }
+type PageSub = types.PageSub
 
 // PageReady は model app.Page.Ready。
-type PageReady struct {
-	Title string `json:"title"`
-}
+type PageReady = types.PageReady
 
 // Shape は union app.Shape。
-type Shape interface{ isShape() }
-
-func (Problem) isShape()      {}
-func (ShapeCounted) isShape() {}
+type Shape = types.Shape
 
 // ShapeCounted は union app.Shape のアーム Counted（app.Count）を包む型。
-type ShapeCounted struct{ Value Count }
+type ShapeCounted = types.ShapeCounted
 
 // Plain は exception app.Plain。
-type Plain struct{}
-
-func (Plain) Error() string         { return "app.Plain" }
-func (Plain) HozoException() string { return "app.Plain" }
-
-var _ runtime.Exception = Plain{}
+type Plain = types.Plain
 
 // Invalid: 入力が不正
-type Invalid struct {
-	Reason string `json:"reason"`
-	At     *int64 `json:"at,omitempty"`
-}
-
-func (Invalid) Error() string         { return "app.Invalid" }
-func (Invalid) HozoException() string { return "app.Invalid" }
-
-var _ runtime.Exception = Invalid{}
+type Invalid = types.Invalid
 
 // Wrapped は exception app.Wrapped。
-type Wrapped struct {
-	Value Problem `json:"value"`
-}
-
-func (Wrapped) Error() string         { return "app.Wrapped" }
-func (Wrapped) HozoException() string { return "app.Wrapped" }
-
-var _ runtime.Exception = Wrapped{}
+type Wrapped = types.Wrapped
 
 // LimitExceeded: 呼び出しの頻度の制限を超えた。
 // 二行目の説明。
-type LimitExceeded struct {
-	RetryAfter time.Duration   `json:"retryAfter"`
-	Home       pkgtype.Address `json:"home"`
-	UserIds    []Id            `json:"userIds"`
-}
-
-func (LimitExceeded) Error() string         { return "app.LimitExceeded" }
-func (LimitExceeded) HozoException() string { return "app.LimitExceeded" }
-
-var _ runtime.Exception = LimitExceeded{}
+type LimitExceeded = types.LimitExceeded
 
 // EffectAddUser は利用者を足す
-const EffectAddUser runtime.Effect = "app.addUser"
+const EffectAddUser = types.EffectAddUser
 
 // EffectClearUsers は effect app.clearUsers。
 // effects app.users as HasItems -> Empty
-const EffectClearUsers runtime.Effect = "app.clearUsers"
+const EffectClearUsers = types.EffectClearUsers
 
 // Receipt は model app.Receipt。
-type Receipt struct {
-	Id Id `json:"id"`
-}
+type Receipt = types.Receipt

@@ -356,6 +356,22 @@ HOZO_PLUGIN_PATH="$PWD/../../../plugins" /tmp/hozoc tests --coverage /tmp/cover.
 - **`@rate.limited` は、本体のないまま**: プラグイン `go-ratelimit` が、継ぎ目として包む例。`@server.audited` は、本体のある例で、プラグインは、要らない。
 - **インテグレーションテストの、Hozo が作るケースは、変わらない**: `audited` の本体は、例外を投げない（葉 `recordAudit` は、`throws` を持たない）。
 
+### 型のパッケージで変えたこと
+
+`docs/decisions.md`「決めたこと」402（`docs/plugin-go.md`「型のパッケージ」）。関数を持つ名前空間（`store`、`server`、`client`、`flows`）の出力は、型を、`types/` のパッケージに置く。型だけの名前空間（`type`、`rate`、`http`）の出力は、変わらない。
+
+| ファイル | 変えたこと |
+|---|---|
+| `gen/store/types/types.go`、`gen/server/types/types.go`、`gen/flows/types/types.go` | 型の定義（前の `gen/store/types.go`、`gen/server/inner/types.go`、`gen/flows/types.go` を、そのまま移した。`package types`） |
+| `gen/store/types/doc.go`、`gen/server/types/doc.go`、`gen/flows/types/doc.go` | 型のパッケージのコメント |
+| `gen/store/types.go`、`gen/server/inner/types.go`、`gen/flows/types.go` | 型のパッケージの再公開（別名と、効果の定数） |
+| `gen/server/types/validate.go` | 前の `gen/server/inner/validate.go`（`go-valid` の置き場が、型のパッケージ） |
+| `gen/client/ops.go`、`gen/client/wiring.go` | `server` の型の import が、`server "example.com/shop-server/gen/server/types"` |
+
+- **人が書いたコード（`app/`）は、変えていない。** 入口のパッケージの名前（`server.LoginInput`、`store.EffectCreateOrder`）は、同じ型を指す。
+- `client` は、自分の型を持たないので、型のパッケージも、ない。
+- 下の節と「分かったこと」が、`gen/server/inner/types.go`（型の定義）、`gen/server/inner/validate.go` と書いている所は、この節より前の形。
+
 ## 入力
 
 仕様は名前空間ごとに一つのファイル。
@@ -505,12 +521,14 @@ func (s RateSeams) <Op>RateLimited(<op の形の引数>, body func(<op の形の
 | `gen/type/doc.go` `types.go` | `go` |
 | `gen/type/validate.go` | `go-valid` |
 | `gen/rate/doc.go` `types.go` | `go` |
-| `gen/store/doc.go` `types.go` `ops.go` `states.go` `wiring.go` | `go` |
+| `gen/store/doc.go` `types.go` `ops.go` `states.go` `wiring.go` | `go`（`types.go` は、型のパッケージの再公開） |
+| `gen/store/types/doc.go` `types.go` | `go`（型のパッケージ: `store` は関数を持つので、型（ここでは、効果の定数）を、分けて置く。`docs/plugin-go.md`「型のパッケージ」） |
 | `gen/store/db.go` | `go-sqlite` |
 | `gen/store/storetest/doc.go` `fakes.go` | `go`（テストのパッケージ: `store` の、状態の単位と継ぎ目の、にせものと、`NewOps`。`docs/plugin-go.md`「テストのにせもの」） |
 | `gen/server/servertest/fakes.go` | `go`（`server` の、葉と、`mailer` の op と、継ぎ目の、にせものと、`NewOps`） |
 | `gen/server/inner/doc.go` `types.go` `ops.go` `wiring.go` | `go`（内側のパッケージ: すべての定義。`server` は内部の op を持つので、出力を二つに分ける） |
-| `gen/server/inner/validate.go` | `go-valid`（型にメソッドを足すので、定義のパッケージ） |
+| `gen/server/types/doc.go` `types.go` | `go`（型のパッケージ: `server` の型の定義。内側の `types.go` は、その再公開） |
+| `gen/server/types/validate.go` | `go-valid`（型にメソッドを足すので、型のパッケージ） |
 | `gen/server/doc.go` `types.go` `ops.go` | `go`（入口のパッケージ: 内側の再公開と、`export` の op だけの `Ops`） |
 | `gen/server/http.go` | `go-http`（入口のパッケージ） |
 | `gen/server/servertest/http.go` `hozo-tests.go-http.json` | `go-http`（テストのパッケージ: 八つの入口の、インテグレーションテストの口と、その、テストの対応表。`docs/plugin-go-http.md`「インテグレーションテストの口」） |

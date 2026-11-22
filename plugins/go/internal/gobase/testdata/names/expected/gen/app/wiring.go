@@ -5,7 +5,7 @@ package app
 import (
 	"context"
 
-	pkgtype "example.com/app/gen/type"
+	pkgtype "example.com/app/gen/type/types"
 )
 
 // Locals は op app.locals。

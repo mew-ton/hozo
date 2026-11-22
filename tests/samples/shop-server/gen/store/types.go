@@ -2,19 +2,19 @@
 
 package store
 
-import "github.com/mew-ton/hozo/runtime"
+import "example.com/shop-server/gen/store/types"
 
 // EffectCreateUser はユーザーを登録する。同じ email（か、同じ識別子）のユーザーが、もういれば、投げる
-const EffectCreateUser runtime.Effect = "store.createUser"
+const EffectCreateUser = types.EffectCreateUser
 
 // EffectCreateSession はログインセッションを作る
-const EffectCreateSession runtime.Effect = "store.createSession"
+const EffectCreateSession = types.EffectCreateSession
 
 // EffectDeleteSession はログインセッションを消す
-const EffectDeleteSession runtime.Effect = "store.deleteSession"
+const EffectDeleteSession = types.EffectDeleteSession
 
 // EffectCreateOrder は注文を作る
-const EffectCreateOrder runtime.Effect = "store.createOrder"
+const EffectCreateOrder = types.EffectCreateOrder
 
 // EffectNotifyUser はユーザーへの通知を記録する
-const EffectNotifyUser runtime.Effect = "store.notifyUser"
+const EffectNotifyUser = types.EffectNotifyUser

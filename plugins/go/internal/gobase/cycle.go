@@ -21,7 +21,7 @@ type outputKey struct {
 
 // uses は、名前空間 nsName の出力が使う、別の名前空間（docs/config.md「型の置き場」の表）を辞書順で返す。inUnit は、その出力の
 // 単位の対象の op か。
-func (e *emitter) uses(nsName string, inUnit func(*ir.Op) bool) []string {
+func (e *emitter) uses(nsName string, inUnit func(*ir.Op) bool, typesOnly bool) []string {
 	ns := e.p.Namespace(nsName)
 	if ns == nil {
 		return nil
@@ -74,6 +74,20 @@ func (e *emitter) uses(nsName string, inUnit func(*ir.Op) bool) []string {
 			for _, p := range x.Params {
 				typ(p.Type)
 			}
+		case *ir.Classify:
+			// 値の分類・op の分類は、型のパッケージに置く（状態の分類の対象は、型でない）
+			typ(x.SubjectType())
+			for _, cs := range x.Cases {
+				for _, as := range cs.As {
+					typ(as.Type)
+				}
+			}
+		}
+		if typesOnly {
+			// 型のパッケージが使うのは、ここまで（docs/plugin-go.md「型のパッケージ」）: 関数の側が使う型は、輪にならない
+			continue
+		}
+		switch x := d.(type) {
 		case *ir.State: // 2
 			typ(x.Type)
 		case *ir.Read:
@@ -86,13 +100,6 @@ func (e *emitter) uses(nsName string, inUnit func(*ir.Op) bool) []string {
 				typ(p.Type)
 				if c, _, ok := golang.PredicateNarrowing(e.p, p.Type); ok { // 6
 					decl(c)
-				}
-			}
-		case *ir.Classify:
-			typ(x.SubjectType())
-			for _, cs := range x.Cases {
-				for _, as := range cs.As {
-					typ(as.Type)
 				}
 			}
 		case *ir.Op:
@@ -186,7 +193,7 @@ func (e *emitter) edges(k outputKey) []outputKey {
 		inUnit = e.inUnit
 	}
 	var out []outputKey
-	for _, m := range e.uses(k.ns, inUnit) {
+	for _, m := range e.uses(k.ns, inUnit, true) {
 		if to, ok := e.home(k.index, m); ok {
 			out = append(out, to)
 		}
@@ -217,7 +224,7 @@ func (e *emitter) checkImportCycle() {
 					names = append(names, label(path[i]))
 				}
 				names = append(names, label(self))
-				e.errorf(codeImportCycle, "", "出力どうしの import が循環している: %s。互いに使う型を、一方か、第三の名前空間に寄せる", strings.Join(names, " → "))
+				e.errorf(codeImportCycle, "", "型のパッケージどうしの import が循環している（型と、値の分類・op の分類が、互いの名前空間の型を使う）: %s。互いに使う型を、一方か、第三の名前空間に寄せる", strings.Join(names, " → "))
 				return
 			}
 			if !visited[to] {

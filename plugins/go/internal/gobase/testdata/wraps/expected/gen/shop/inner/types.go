@@ -2,17 +2,10 @@
 
 package inner
 
-import "github.com/mew-ton/hozo/runtime"
+import "example.com/app/gen/shop/types"
 
 // Item は model shop.Item。
-type Item struct {
-	Id string `json:"id"`
-}
+type Item = types.Item
 
 // Denied: 断られた
-type Denied struct{}
-
-func (Denied) Error() string         { return "shop.Denied" }
-func (Denied) HozoException() string { return "shop.Denied" }
-
-var _ runtime.Exception = Denied{}
+type Denied = types.Denied

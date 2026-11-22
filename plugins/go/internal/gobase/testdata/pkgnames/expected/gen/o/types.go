@@ -2,7 +2,7 @@
 
 package o
 
+import "example.com/app/gen/o/types"
+
 // Thing は model o.Thing。
-type Thing struct {
-	X int64 `json:"x"`
-}
+type Thing = types.Thing

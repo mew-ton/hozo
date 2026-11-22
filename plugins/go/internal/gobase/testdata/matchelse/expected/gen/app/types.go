@@ -2,46 +2,28 @@
 
 package app
 
-import "github.com/mew-ton/hozo/runtime"
+import "example.com/app/gen/app/types"
 
 // User は model app.User。
-type User struct {
-	Name string `json:"name"`
-}
+type User = types.User
 
 // Card は model app.Card。
-type Card struct {
-	Number string `json:"number"`
-}
+type Card = types.Card
 
 // Bank は model app.Bank。
-type Bank struct {
-	Account string `json:"account"`
-}
+type Bank = types.Bank
 
 // Payment は支払いの手段。アームの型: 宣言した model 二つと、核の型（包む型）
-type Payment interface{ isPayment() }
-
-func (Card) isPayment()          {}
-func (Bank) isPayment()          {}
-func (PaymentByCode) isPayment() {}
+type Payment = types.Payment
 
 // PaymentByCode は union app.Payment のアーム ByCode（string）を包む型。
-type PaymentByCode struct{ Value string }
+type PaymentByCode = types.PaymentByCode
 
 // Result は結果。アームの型: 宣言した model と、核の型（包む型）
-type Result interface{ isResult() }
-
-func (User) isResult()       {}
-func (ResultFail) isResult() {}
+type Result = types.Result
 
 // ResultFail は union app.Result のアーム Fail（string）を包む型。
-type ResultFail struct{ Value string }
+type ResultFail = types.ResultFail
 
 // Unknown は exception app.Unknown。
-type Unknown struct{}
-
-func (Unknown) Error() string         { return "app.Unknown" }
-func (Unknown) HozoException() string { return "app.Unknown" }
-
-var _ runtime.Exception = Unknown{}
+type Unknown = types.Unknown

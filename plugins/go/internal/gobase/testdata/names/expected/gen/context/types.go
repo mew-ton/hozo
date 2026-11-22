@@ -2,7 +2,7 @@
 
 package context
 
+import "example.com/app/gen/context/types"
+
 // Info は model context.Info。
-type Info struct {
-	Z int64 `json:"z"`
-}
+type Info = types.Info

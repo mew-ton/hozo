@@ -114,16 +114,42 @@ func (e *emitter) armGoType(f *fileGen, u *ir.Union, a armType) string {
 	return f.im.Qualifier(e.declNS[u.Name]) + a.goName
 }
 
+// classifyPart は、genClassify が出す分。
+type classifyPart int
+
+const (
+	classifyAll classifyPart = iota
+	classifyTypes
+	classifyDef
+)
+
 // genClassify は定義のパッケージの classify.go。述語で決まる分類がなければ nil。
-func (e *emitter) genClassify() *fileGen {
-	cs := e.predicateClassifies()
+//
+// part は、どの分を出すか（docs/plugin-go.md「型のパッケージ」）: classifyAll は、すべての定義（型のパッケージを分けない出力）。
+// classifyTypes は、型のパッケージの分（値の分類・op の分類の定義）。classifyDef は、型のパッケージを分ける出力の、定義の
+// パッケージの分（値の分類・op の分類の再公開と、状態の分類の定義）。
+func (e *emitter) genClassify(part classifyPart) *fileGen {
+	var cs []*ir.Classify
+	for _, c := range e.predicateClassifies() {
+		if _, isState := c.SubjectStates(); part == classifyTypes && isState {
+			continue
+		}
+		cs = append(cs, c)
+	}
 	if len(cs) == 0 {
 		return nil
 	}
 	f := e.newFile(fileClassify, true)
+	if part == classifyTypes {
+		f = e.newTypesFile(fileClassify)
+	}
 	rt := func() string { return f.im.Add(runtimePath, "runtime") }
 	for _, c := range cs {
 		name := e.typeName(c.Name)
+		if _, isState := c.SubjectStates(); part == classifyDef && !isState {
+			e.reexportClassify(f, c, f.im.Add(e.layout.TypesPath, e.layout.TypesName))
+			continue
+		}
 		// 列挙の型と定数
 		f.print(e.classifyComment(c))
 		f.printf("type %s int\n\nconst (\n", name)
@@ -222,6 +248,15 @@ func (e *emitter) genEntryClassify() *fileGen {
 	f := e.newFile(fileClassify, false)
 	inner := f.im.Add(e.layout.DefPath, e.layout.DefName)
 	for _, c := range cs {
+		e.reexportClassify(f, c, inner)
+	}
+	return f
+}
+
+// reexportClassify は、分類 c 一つの再公開: 列挙の型の別名、定数、述語のインターフェースの別名、from のパッケージの判定関数を
+// 呼んで返す関数。
+func (e *emitter) reexportClassify(f *fileGen, c *ir.Classify, inner string) {
+	{
 		name := e.typeName(c.Name)
 		f.print(e.classifyComment(c))
 		f.printf("type %s = %s.%s\n\nconst (\n", name, inner, name)
@@ -235,7 +270,7 @@ func (e *emitter) genEntryClassify() *fileGen {
 			f.print(classifyFuncComment(name, c.Name, true))
 			f.printf("func Classify%s(ctx %s.Context, s %s) (%s, error) {\n\treturn %s.Classify%s(ctx, s)\n}\n\n",
 				name, f.im.Add("context", "context"), golang.StateUnitName(c.Name), name, inner, name)
-			continue
+			return
 		}
 		f.print(casesComment(name, c.Name))
 		f.printf("type %sCases = %s.%sCases\n\n", name, inner, name)
@@ -243,5 +278,4 @@ func (e *emitter) genEntryClassify() *fileGen {
 		f.printf("func Classify%s(ctx %s.Context, c %sCases, v %s) (%s, error) {\n\treturn %s.Classify%s(ctx, c, v)\n}\n\n",
 			name, f.im.Add("context", "context"), name, f.goType(c.SubjectType()), name, inner, name)
 	}
-	return f
 }

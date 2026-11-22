@@ -2,29 +2,19 @@
 
 package api
 
+import "example.com/app/gen/api/types"
+
 // Token は scalar api.Token。
-type Token string
+type Token = types.Token
 
 // GetInput は model api.GetInput。
-type GetInput struct {
-	Token *Token `json:"token,omitempty"`
-	Id    string `json:"id"`
-}
+type GetInput = types.GetInput
 
 // Auth は model api.Auth。
-type Auth struct {
-	Token  *Token  `json:"token,omitempty"`
-	Locale *string `json:"locale,omitempty"`
-}
+type Auth = types.Auth
 
 // NestedInput は model api.NestedInput。
-type NestedInput struct {
-	Auth Auth   `json:"auth"`
-	Id   string `json:"id"`
-}
+type NestedInput = types.NestedInput
 
 // Guest は model api.Guest。
-type Guest struct {
-	Token *Token `json:"token,omitempty"`
-	Id    string `json:"id"`
-}
+type Guest = types.Guest

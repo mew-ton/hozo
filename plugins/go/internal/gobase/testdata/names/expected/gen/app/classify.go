@@ -5,52 +5,21 @@ package app
 import (
 	"context"
 
-	"github.com/mew-ton/hozo/runtime"
+	"example.com/app/gen/app/types"
 )
 
 // Extra は classify app.Extra。
-type Extra int
+type Extra = types.Extra
 
 const (
-	ExtraYes Extra = iota
-	ExtraNo
+	ExtraYes = types.ExtraYes
+	ExtraNo  = types.ExtraNo
 )
 
 // ExtraCases は分類 app.Extra のケースごとの述語。人が実装し、この分類を match に使う名前空間の New に渡す。
-type ExtraCases interface {
-	// Yes はケース Yes の述語。
-	Yes(ctx context.Context, v string) (bool, error)
-	// No はケース No の述語。
-	No(ctx context.Context, v string) (bool, error)
-}
+type ExtraCases = types.ExtraCases
 
 // ClassifyExtra は v を app.Extra で分類する。すべての述語を呼び、真になった数を数える。
 func ClassifyExtra(ctx context.Context, c ExtraCases, v string) (Extra, error) {
-	var hits []string
-	var kind Extra
-	var first error
-	if ok, err := c.Yes(ctx, v); err != nil {
-		if first == nil {
-			first = err
-		}
-	} else if ok {
-		hits = append(hits, "Yes")
-		kind = ExtraYes
-	}
-	if ok, err := c.No(ctx, v); err != nil {
-		if first == nil {
-			first = err
-		}
-	} else if ok {
-		hits = append(hits, "No")
-		kind = ExtraNo
-	}
-	if first != nil {
-		return kind, first
-	}
-	switch len(hits) {
-	case 1:
-		return kind, nil
-	}
-	return kind, &runtime.ClassificationError{Classify: "app.Extra", Hits: hits}
+	return types.ClassifyExtra(ctx, c, v)
 }

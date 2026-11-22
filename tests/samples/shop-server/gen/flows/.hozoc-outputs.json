@@ -6,5 +6,7 @@
   "gen/flows/flowstest/hozo-tests.go-design.json",
   "gen/flows/ops.go",
   "gen/flows/types.go",
+  "gen/flows/types/doc.go",
+  "gen/flows/types/types.go",
   "gen/flows/wiring.go"
 ]

@@ -25,3 +25,18 @@ out         = "gen/wired"
 namespace   = "plain"
 transpilers = ["go", "go-valid", "go-http"]
 out         = "gen/plain"
+
+[[emit]]
+namespace   = "parcel"
+transpilers = ["go", "go-valid"]
+out         = "gen/parcel"
+
+[[emit]]
+namespace   = "counter"
+transpilers = ["go"]
+out         = "gen/counter"
+
+[[emit]]
+namespace   = "gate"
+transpilers = ["go", "go-valid", "go-http"]
+out         = "gen/gate"

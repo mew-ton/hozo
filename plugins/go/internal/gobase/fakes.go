@@ -248,9 +248,12 @@ func (e *emitter) genTestFakes() *fileGen {
 		taken[name] = true
 		realName[r.Name] = name
 		names = append(names, name)
-		typ := f.im.Qualifier(r.Namespace) + "Leaves"
+		// Qualifier は、import を足す。使う方の名前空間にだけ、呼ぶ（分類の述語は、分類の名前空間。葉は、その葉の名前空間）
+		var typ string
 		if r.Kind == golang.KitClassify {
 			typ = f.im.Qualifier(e.declNS[r.Classify]) + e.typeName(r.Classify) + "Cases"
+		} else {
+			typ = f.im.Qualifier(r.Namespace) + "Leaves"
 		}
 		params = append(params, name+" "+typ)
 	}

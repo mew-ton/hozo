@@ -2,297 +2,158 @@
 
 package inner
 
-import (
-	"time"
-
-	"github.com/mew-ton/hozo/runtime"
-)
+import "github.com/mew-ton/hozo/gen/server/types"
 
 // Email はメールアドレス
-type Email string
+type Email = types.Email
 
 // UserId はユーザーの識別子
-type UserId string
+type UserId = types.UserId
 
 // Token はログインセッションのトークン
-type Token string
+type Token = types.Token
 
 // Password はパスワード（平文。入力でだけ使う）
-type Password string
+type Password = types.Password
 
 // EmployeeCode は社員番号（英大文字 3 字 + 数字 5 桁。末尾はチェックディジット）
-type EmployeeCode string
+type EmployeeCode = types.EmployeeCode
 
 // UserStatus はユーザーの状態（"active" / "unverified" / "suspended"。値の集合は実装が決める）
-type UserStatus string
+type UserStatus = types.UserStatus
 
 // OrderId は注文の識別子
-type OrderId string
+type OrderId = types.OrderId
 
 // OrderStatus は注文の状態（"pending" / "paid" / "shipped" / "cancelled"。値の集合は実装が決める）
-type OrderStatus string
+type OrderStatus = types.OrderStatus
 
 // ItemId は商品の識別子
-type ItemId string
+type ItemId = types.ItemId
 
 // PlanId は保証プランの識別子
-type PlanId string
+type PlanId = types.PlanId
 
 // User は model server.User。
-type User struct {
-	Id     UserId     `json:"id"`
-	Email  Email      `json:"email"`
-	Name   string     `json:"name"`
-	Hash   string     `json:"hash"`
-	Status UserStatus `json:"status"`
-}
+type User = types.User
 
 // Session は model server.Session。
-type Session struct {
-	Token     Token     `json:"token"`
-	UserId    UserId    `json:"userId"`
-	ExpiresAt time.Time `json:"expiresAt"`
-}
+type Session = types.Session
 
 // PublicUser は model server.PublicUser。
 // server.User を継承し（extends）、hash をなくしたもの。server.User とは別の型で、暗黙には渡せない。
-type PublicUser struct {
-	Id     UserId     `json:"id"`
-	Email  Email      `json:"email"`
-	Name   string     `json:"name"`
-	Status UserStatus `json:"status"`
-}
+type PublicUser = types.PublicUser
 
 // Item は商品
-type Item struct {
-	Id    ItemId `json:"id"`
-	Name  string `json:"name"`
-	Price int64  `json:"price"`
-	// メーカー保証が付く
-	HasMakerWarranty bool `json:"hasMakerWarranty"`
-	// ヤマダ電機の専用保証の対象
-	YamadaEligible bool `json:"yamadaEligible"`
-}
+type Item = types.Item
 
 // CartLine はカートの一行
-type CartLine struct {
-	Item     Item  `json:"item"`
-	Quantity int64 `json:"quantity"`
-}
+type CartLine = types.CartLine
 
 // WarrantyLine はカートの一行に付けた保証
-type WarrantyLine struct {
-	Line CartLine `json:"line"`
-	Plan PlanId   `json:"plan"`
-}
+type WarrantyLine = types.WarrantyLine
 
 // Order は注文
-type Order struct {
-	Id       OrderId     `json:"id"`
-	UserId   UserId      `json:"userId"`
-	Status   OrderStatus `json:"status"`
-	Lines    []CartLine  `json:"lines"`
-	PlacedAt time.Time   `json:"placedAt"`
-}
+type Order = types.Order
 
 // OrderSummary は注文一覧の一行
-type OrderSummary struct {
-	Id       OrderId     `json:"id"`
-	Status   OrderStatus `json:"status"`
-	PlacedAt time.Time   `json:"placedAt"`
-}
+type OrderSummary = types.OrderSummary
 
 // Notification はユーザーへの通知
-type Notification struct {
-	UserId  UserId `json:"userId"`
-	Message string `json:"message"`
-}
+type Notification = types.Notification
 
 // PasswordReset はパスワードの再設定の依頼
-type PasswordReset struct {
-	Email     Email     `json:"email"`
-	ExpiresAt time.Time `json:"expiresAt"`
-}
+type PasswordReset = types.PasswordReset
 
 // InvalidCredentials: メールアドレスかパスワードが一致しない
-type InvalidCredentials struct{}
-
-func (InvalidCredentials) Error() string         { return "server.InvalidCredentials" }
-func (InvalidCredentials) HozoException() string { return "server.InvalidCredentials" }
-
-var _ runtime.Exception = InvalidCredentials{}
+type InvalidCredentials = types.InvalidCredentials
 
 // Violation は model server.Violation。
-type Violation struct {
-	Field      string `json:"field"`
-	Constraint string `json:"constraint"`
-}
+type Violation = types.Violation
 
 // Violations は model server.Violations。
-type Violations struct {
-	Items []Violation `json:"items"`
-}
+type Violations = types.Violations
 
 // ClientError: 入力の形式が不正（どのフィールドがどの制約に違反したかを運ぶ）
-type ClientError struct {
-	Value Violations `json:"value"`
-}
-
-func (ClientError) Error() string         { return "server.ClientError" }
-func (ClientError) HozoException() string { return "server.ClientError" }
-
-var _ runtime.Exception = ClientError{}
+type ClientError = types.ClientError
 
 // Unauthorized: 認証されていない
-type Unauthorized struct{}
-
-func (Unauthorized) Error() string         { return "server.Unauthorized" }
-func (Unauthorized) HozoException() string { return "server.Unauthorized" }
-
-var _ runtime.Exception = Unauthorized{}
+type Unauthorized = types.Unauthorized
 
 // Forbidden: 権限がない
-type Forbidden struct{}
-
-func (Forbidden) Error() string         { return "server.Forbidden" }
-func (Forbidden) HozoException() string { return "server.Forbidden" }
-
-var _ runtime.Exception = Forbidden{}
+type Forbidden = types.Forbidden
 
 // EffectCreateSession はログインセッションを作成する
-const EffectCreateSession runtime.Effect = "server.createSession"
+const EffectCreateSession = types.EffectCreateSession
 
 // LoginInput は model server.LoginInput。
-type LoginInput struct {
-	Token *Token         `json:"token,omitempty"`
-	Body  LoginInputBody `json:"body"`
-}
+type LoginInput = types.LoginInput
 
 // LoginInputBody は model server.LoginInputBody。
-type LoginInputBody struct {
-	Email    Email    `json:"email"`
-	Password Password `json:"password"`
-}
+type LoginInputBody = types.LoginInputBody
 
 // LoginOk は model server.LoginOk。
-type LoginOk struct {
-	User  PublicUser `json:"user"`
-	Token Token      `json:"token"`
-}
+type LoginOk = types.LoginOk
 
 // NotVerified は exception server.NotVerified。
-type NotVerified struct{}
-
-func (NotVerified) Error() string         { return "server.NotVerified" }
-func (NotVerified) HozoException() string { return "server.NotVerified" }
-
-var _ runtime.Exception = NotVerified{}
+type NotVerified = types.NotVerified
 
 // Suspended は exception server.Suspended。
-type Suspended struct{}
-
-func (Suspended) Error() string         { return "server.Suspended" }
-func (Suspended) HozoException() string { return "server.Suspended" }
-
-var _ runtime.Exception = Suspended{}
+type Suspended = types.Suspended
 
 // AlreadyLoggedIn は exception server.AlreadyLoggedIn。
-type AlreadyLoggedIn struct{}
-
-func (AlreadyLoggedIn) Error() string         { return "server.AlreadyLoggedIn" }
-func (AlreadyLoggedIn) HozoException() string { return "server.AlreadyLoggedIn" }
-
-var _ runtime.Exception = AlreadyLoggedIn{}
+type AlreadyLoggedIn = types.AlreadyLoggedIn
 
 // CancelInput は注文の取り消しの入力
-type CancelInput struct {
-	OrderId OrderId `json:"orderId"`
-}
+type CancelInput = types.CancelInput
 
 // OrderInput は注文の入力
-type OrderInput struct {
-	UserId UserId     `json:"userId"`
-	Lines  []CartLine `json:"lines"`
-}
+type OrderInput = types.OrderInput
 
 // EffectRefund は返金する（注文の状態を返金済みにする）
-const EffectRefund runtime.Effect = "server.refund"
+const EffectRefund = types.EffectRefund
 
 // EffectCreateOrder は注文を作成する
-const EffectCreateOrder runtime.Effect = "server.createOrder"
+const EffectCreateOrder = types.EffectCreateOrder
 
 // EffectNotifyUser はユーザーに通知する
-const EffectNotifyUser runtime.Effect = "server.notifyUser"
+const EffectNotifyUser = types.EffectNotifyUser
 
 // RefundPending: 返金の処理は受け付けたが、完了の確認が取れない
-type RefundPending struct{}
-
-func (RefundPending) Error() string         { return "server.RefundPending" }
-func (RefundPending) HozoException() string { return "server.RefundPending" }
-
-var _ runtime.Exception = RefundPending{}
+type RefundPending = types.RefundPending
 
 // NotificationFailed: 通知を送れなかった
-type NotificationFailed struct{}
-
-func (NotificationFailed) Error() string         { return "server.NotificationFailed" }
-func (NotificationFailed) HozoException() string { return "server.NotificationFailed" }
-
-var _ runtime.Exception = NotificationFailed{}
+type NotificationFailed = types.NotificationFailed
 
 // EffectSendResetMail は再設定メールを送る
-const EffectSendResetMail runtime.Effect = "server.sendResetMail"
+const EffectSendResetMail = types.EffectSendResetMail
 
 // RateLimited: 同じアドレスに短時間で送りすぎた
-type RateLimited struct{}
-
-func (RateLimited) Error() string         { return "server.RateLimited" }
-func (RateLimited) HozoException() string { return "server.RateLimited" }
-
-var _ runtime.Exception = RateLimited{}
+type RateLimited = types.RateLimited
 
 // EffectDeleteSession はログインセッションを削除する
-const EffectDeleteSession runtime.Effect = "server.deleteSession"
+const EffectDeleteSession = types.EffectDeleteSession
 
 // LogoutInput は model server.LogoutInput。
-type LogoutInput struct {
-	Token *Token `json:"token,omitempty"`
-}
+type LogoutInput = types.LogoutInput
 
 // MeInput は自分の情報を取る入力
-type MeInput struct {
-	Token *Token `json:"token,omitempty"`
-}
+type MeInput = types.MeInput
 
 // GetOrdersInput は注文一覧の入力
-type GetOrdersInput struct {
-	Token *Token `json:"token,omitempty"`
-	// 1 から数えるページ番号
-	Page int64 `json:"page"`
-	// 絞り込む状態。省略すればすべて
-	Status *OrderStatus `json:"status,omitempty"`
-}
+type GetOrdersInput = types.GetOrdersInput
 
 // GetItemInput は商品を取る入力
-type GetItemInput struct {
-	Id ItemId `json:"id"`
-}
+type GetItemInput = types.GetItemInput
 
 // AddToCartInput はカートに入れる入力
-type AddToCartInput struct {
-	Token *Token `json:"token,omitempty"`
-	Item  Item   `json:"item"`
-}
+type AddToCartInput = types.AddToCartInput
 
 // EffectAddCartLine はカートに一行足す
-const EffectAddCartLine runtime.Effect = "server.addCartLine"
+const EffectAddCartLine = types.EffectAddCartLine
 
 // AttachWarrantyInput は保証を付ける入力
-type AttachWarrantyInput struct {
-	Token *Token   `json:"token,omitempty"`
-	Line  CartLine `json:"line"`
-	Plan  PlanId   `json:"plan"`
-}
+type AttachWarrantyInput = types.AttachWarrantyInput
 
 // EffectAttachWarrantyToLine はカートの一行に保証を付ける
-const EffectAttachWarrantyToLine runtime.Effect = "server.attachWarrantyToLine"
+const EffectAttachWarrantyToLine = types.EffectAttachWarrantyToLine

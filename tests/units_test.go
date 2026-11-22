@@ -49,11 +49,14 @@ func TestUnitsCorpus(t *testing.T) {
 	}
 
 	t.Run("config.md 単位/同じ名前空間の二つの単位は、別の out に独立に出力する", func(t *testing.T) {
-		// 単位 2（gen/api）と単位 3（gen/batch）は、どちらも shop。shop は内部の op を持つので、定義は内側のフォルダ inner
-		// （docs/plugin-go.md「内側のフォルダと入口」）。それぞれが自分の型をすべて持ち、同じ名前空間を出力する別の単位の
+		// 単位 2（gen/api）と単位 3（gen/batch）は、どちらも shop。shop は関数を持つので、型は、型のパッケージ types
+		// （docs/plugin-go.md「型のパッケージ」）。内部の op も持つので、定義は内側のフォルダ inner（同「内側のフォルダと入口」）で、
+		// 内側は、型のパッケージを、入口は、内側を、再公開する。それぞれが自分の型をすべて持ち、同じ名前空間を出力する別の単位の
 		// パッケージは import しない
 		for _, dir := range []string{"gen/api", "gen/batch"} {
-			want(t, dir+"/inner/types.go", []string{"type Item struct {", "type Receipt struct {", "type Report struct {"}, []string{"gen/api", "gen/batch"})
+			other := map[string]string{"gen/api": "gen/batch", "gen/batch": "gen/api"}[dir]
+			want(t, dir+"/types/types.go", []string{"package types", "type Item struct {", "type Receipt struct {", "type Report struct {"}, []string{"gen/api", "gen/batch"})
+			want(t, dir+"/inner/types.go", []string{"type Item = types.Item", "type Report = types.Report", dir + "/types\""}, []string{other})
 			want(t, dir+"/types.go", []string{"type Item = inner.Item", "type Report = inner.Report"}, nil)
 		}
 		for _, dir := range []string{"gen/stock", "gen/api", "gen/batch", "gen/admin"} {
@@ -84,11 +87,12 @@ func TestUnitsCorpus(t *testing.T) {
 	})
 	t.Run("config.md 型の置き場/単位をまたぐ import は一方向で、置き場は設定の順で最初の単位", func(t *testing.T) {
 		// shop（gen/api、gen/batch）→ stock（gen/stock）: Item.id の型 stock.ItemId。複製しない
-		want(t, "gen/api/inner/types.go", []string{`"github.com/mew-ton/hozo/gen/stock"`, "stock.ItemId"}, []string{"type ItemId string"})
-		want(t, "gen/batch/inner/types.go", []string{`"github.com/mew-ton/hozo/gen/stock"`}, []string{"type ItemId string"})
-		// shop.admin（gen/admin）→ shop: shop を出力する単位は 2（gen/api）と 3（gen/batch）。設定の順で最初の 2 の、入口のパッケージを
-		// import する（内側は import しない）
-		want(t, "gen/admin/inner/ops.go", []string{`shop "github.com/mew-ton/hozo/gen/api"`, "item shop.Item"}, []string{"gen/batch", "gen/api/inner"})
+		// stock も、関数を持つので、import するのは、その、型のパッケージ
+		want(t, "gen/api/types/types.go", []string{`stock "github.com/mew-ton/hozo/gen/stock/types"`, "stock.ItemId"}, []string{"type ItemId string", `"github.com/mew-ton/hozo/gen/stock"`})
+		want(t, "gen/batch/types/types.go", []string{`stock "github.com/mew-ton/hozo/gen/stock/types"`}, []string{"type ItemId string"})
+		// shop.admin（gen/admin）→ shop: shop を出力する単位は 2（gen/api）と 3（gen/batch）。設定の順で最初の 2 の、型のパッケージを
+		// import する（入口も、内側も、import しない）
+		want(t, "gen/admin/inner/ops.go", []string{`shop "github.com/mew-ton/hozo/gen/api/types"`, "item shop.Item"}, []string{"gen/batch", "gen/api/inner", `"github.com/mew-ton/hozo/gen/api"`})
 		// stock は誰も import しない
 		for p, content := range got {
 			if strings.HasPrefix(p, "gen/stock/") && (strings.Contains(string(content), "gen/api") || strings.Contains(string(content), "gen/batch")) {

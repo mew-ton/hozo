@@ -5,7 +5,7 @@ package front
 import (
 	"context"
 
-	"example.com/app/gen/shop"
+	shop "example.com/app/gen/shop/types"
 )
 
 // Order は op front.order。

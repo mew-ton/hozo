@@ -2,59 +2,49 @@
 
 package inner
 
-import "github.com/mew-ton/hozo/runtime"
+import "github.com/mew-ton/hozo/gen/shop/types"
 
 // Token はログインセッションのトークン
-type Token string
+type Token = types.Token
 
 // Line は model shop.Line。
-type Line struct {
-	Item  string `json:"item"`
-	Count int64  `json:"count"`
-}
+type Line = types.Line
 
 // Order は model shop.Order。
-type Order struct {
-	Id string `json:"id"`
-}
+type Order = types.Order
 
 // EffectAddLine はカートに行を足す
-const EffectAddLine runtime.Effect = "shop.addLine"
+const EffectAddLine = types.EffectAddLine
 
 // EffectRename は店の名前を変える
-const EffectRename runtime.Effect = "shop.rename"
+const EffectRename = types.EffectRename
 
 // EffectRemoveToken は手元のトークンを消す
-const EffectRemoveToken runtime.Effect = "shop.removeToken"
+const EffectRemoveToken = types.EffectRemoveToken
 
 // EffectPlaceOrder は注文を確定する
 // effects shop.Checkout as Shopping -> Ordered
-const EffectPlaceOrder runtime.Effect = "shop.placeOrder"
+const EffectPlaceOrder = types.EffectPlaceOrder
 
 // EffectStartOver は買い物をやり直す
 // effects shop.Checkout as any -> Shopping
-const EffectStartOver runtime.Effect = "shop.startOver"
+const EffectStartOver = types.EffectStartOver
 
 // EffectTouchCheckout は進み具合を記録し直す
 // effects shop.Checkout as Shopping, Ordered -> any
-const EffectTouchCheckout runtime.Effect = "shop.touchCheckout"
+const EffectTouchCheckout = types.EffectTouchCheckout
 
 // EffectSignIn はログインする
 // effects shop.LoggedIn as any -> LoggedIn
-const EffectSignIn runtime.Effect = "shop.signIn"
+const EffectSignIn = types.EffectSignIn
 
 // EffectClearCart はカートを空にする
 // effects shop.carts as HasItems -> Empty
-const EffectClearCart runtime.Effect = "shop.clearCart"
+const EffectClearCart = types.EffectClearCart
 
 // EffectSaveToken はトークンを保存する
 // effects shop.token as None -> Some
-const EffectSaveToken runtime.Effect = "shop.saveToken"
+const EffectSaveToken = types.EffectSaveToken
 
 // EmptyCart: カートが空
-type EmptyCart struct{}
-
-func (EmptyCart) Error() string         { return "shop.EmptyCart" }
-func (EmptyCart) HozoException() string { return "shop.EmptyCart" }
-
-var _ runtime.Exception = EmptyCart{}
+type EmptyCart = types.EmptyCart

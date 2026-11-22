@@ -5,183 +5,59 @@ package app
 import (
 	"context"
 
+	"example.com/app/gen/app/types"
 	"github.com/mew-ton/hozo/runtime"
 )
 
 // Stage は述語で決まる値の分類: 判定の口を持つ
-type Stage int
+type Stage = types.Stage
 
 const (
-	StageDraft Stage = iota
-	StageSent
-	StageDone
+	StageDraft = types.StageDraft
+	StageSent  = types.StageSent
+	StageDone  = types.StageDone
 )
 
 // StageCases は分類 app.Stage のケースごとの述語。人が実装し、この分類を match に使う名前空間の New に渡す。
-type StageCases interface {
-	// Draft はケース Draft の述語。
-	Draft(ctx context.Context, v Order) (bool, error)
-	// Sent はケース Sent の述語。
-	Sent(ctx context.Context, v Order) (bool, error)
-	// Done はケース Done の述語。
-	Done(ctx context.Context, v Order) (bool, error)
-}
+type StageCases = types.StageCases
 
 // ClassifyStage は v を app.Stage で分類する。すべての述語を呼び、真になった数を数える。
 func ClassifyStage(ctx context.Context, c StageCases, v Order) (Stage, error) {
-	var hits []string
-	var kind Stage
-	var first error
-	if ok, err := c.Draft(ctx, v); err != nil {
-		if first == nil {
-			first = err
-		}
-	} else if ok {
-		hits = append(hits, "Draft")
-		kind = StageDraft
-	}
-	if ok, err := c.Sent(ctx, v); err != nil {
-		if first == nil {
-			first = err
-		}
-	} else if ok {
-		hits = append(hits, "Sent")
-		kind = StageSent
-	}
-	if ok, err := c.Done(ctx, v); err != nil {
-		if first == nil {
-			first = err
-		}
-	} else if ok {
-		hits = append(hits, "Done")
-		kind = StageDone
-	}
-	if first != nil {
-		return kind, first
-	}
-	switch len(hits) {
-	case 1:
-		return kind, nil
-	}
-	return kind, &runtime.ClassificationError{Classify: "app.Stage", Hits: hits}
+	return types.ClassifyStage(ctx, c, v)
 }
 
 // Life は述語で決まる値の分類で、ない側のケースを持つ: 例を求めるのは、Open と Closed だけ
-type Life int
+type Life = types.Life
 
 const (
-	LifeOpen Life = iota
-	LifeClosed
-	LifeAbsent
+	LifeOpen   = types.LifeOpen
+	LifeClosed = types.LifeClosed
+	LifeAbsent = types.LifeAbsent
 )
 
 // LifeCases は分類 app.Life のケースごとの述語。人が実装し、この分類を match に使う名前空間の New に渡す。
-type LifeCases interface {
-	// Open はケース Open の述語。
-	Open(ctx context.Context, v *Order) (bool, error)
-	// Closed はケース Closed の述語。
-	Closed(ctx context.Context, v *Order) (bool, error)
-}
+type LifeCases = types.LifeCases
 
 // ClassifyLife は v を app.Life で分類する。すべての述語を呼び、真になった数を数える。
 func ClassifyLife(ctx context.Context, c LifeCases, v *Order) (Life, error) {
-	var hits []string
-	var kind Life
-	var first error
-	if v != nil {
-		if ok, err := c.Open(ctx, v); err != nil {
-			if first == nil {
-				first = err
-			}
-		} else if ok {
-			hits = append(hits, "Open")
-			kind = LifeOpen
-		}
-	}
-	if v != nil {
-		if ok, err := c.Closed(ctx, v); err != nil {
-			if first == nil {
-				first = err
-			}
-		} else if ok {
-			hits = append(hits, "Closed")
-			kind = LifeClosed
-		}
-	}
-	if v == nil {
-		hits = append(hits, "Absent")
-		kind = LifeAbsent
-	}
-	if first != nil {
-		return kind, first
-	}
-	switch len(hits) {
-	case 1:
-		return kind, nil
-	}
-	return kind, &runtime.ClassificationError{Classify: "app.Life", Hits: hits}
+	return types.ClassifyLife(ctx, c, v)
 }
 
 // Lookup は述語で決まる op の分類: 判定の口を持つ（例の型は、op の戻り値の型）
-type Lookup int
+type Lookup = types.Lookup
 
 const (
-	LookupHit Lookup = iota
-	LookupStale
-	LookupMiss
+	LookupHit   = types.LookupHit
+	LookupStale = types.LookupStale
+	LookupMiss  = types.LookupMiss
 )
 
 // LookupCases は分類 app.Lookup のケースごとの述語。人が実装し、この分類を match に使う名前空間の New に渡す。
-type LookupCases interface {
-	// Hit はケース Hit の述語。
-	Hit(ctx context.Context, v *Order) (bool, error)
-	// Stale はケース Stale の述語。
-	Stale(ctx context.Context, v *Order) (bool, error)
-	// Miss はケース Miss の述語。
-	Miss(ctx context.Context, v *Order) (bool, error)
-}
+type LookupCases = types.LookupCases
 
 // ClassifyLookup は v を app.Lookup で分類する。すべての述語を呼び、真になった数を数える。
 func ClassifyLookup(ctx context.Context, c LookupCases, v *Order) (Lookup, error) {
-	var hits []string
-	var kind Lookup
-	var first error
-	if v != nil {
-		if ok, err := c.Hit(ctx, v); err != nil {
-			if first == nil {
-				first = err
-			}
-		} else if ok {
-			hits = append(hits, "Hit")
-			kind = LookupHit
-		}
-	}
-	if v != nil {
-		if ok, err := c.Stale(ctx, v); err != nil {
-			if first == nil {
-				first = err
-			}
-		} else if ok {
-			hits = append(hits, "Stale")
-			kind = LookupStale
-		}
-	}
-	if ok, err := c.Miss(ctx, v); err != nil {
-		if first == nil {
-			first = err
-		}
-	} else if ok {
-		hits = append(hits, "Miss")
-		kind = LookupMiss
-	}
-	if first != nil {
-		return kind, first
-	}
-	switch len(hits) {
-	case 1:
-		return kind, nil
-	}
-	return kind, &runtime.ClassificationError{Classify: "app.Lookup", Hits: hits}
+	return types.ClassifyLookup(ctx, c, v)
 }
 
 // Backlog は述語で決まる状態の分類: 判定の口を持たない

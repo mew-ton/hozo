@@ -49,6 +49,8 @@ func TestLayoutOf(t *testing.T) {
 	}
 	want := Layout{Namespace: "type", Dir: "gen/type", EntryPath: "example.com/app/gen/type", EntryName: "pkgtype",
 		DefDir: "gen/type", DefPath: "example.com/app/gen/type", DefName: "pkgtype",
+		// 型だけの名前空間は、型のパッケージを、分けない（docs/plugin-go.md「型のパッケージ」）: 入口と同じ
+		TypesDir: "gen/type", TypesPath: "example.com/app/gen/type", TypesName: "pkgtype",
 		TestDir: "gen/type/pkgtypetest", TestPath: "example.com/app/gen/type/pkgtypetest", TestName: "pkgtypetest"}
 	if *l != want {
 		t.Errorf("型だけの名前空間: %+v, want %+v", *l, want)
@@ -63,6 +65,8 @@ func TestLayoutOf(t *testing.T) {
 	l, _ = LayoutOf(v, root)
 	want = Layout{Namespace: "server", Dir: "gen/server", EntryPath: "example.com/app/gen/server", EntryName: "server", HasInner: true,
 		DefDir: "gen/server/inner", DefPath: "example.com/app/gen/server/inner", DefName: "inner",
+		// 関数（op）を持つ名前空間は、型のパッケージを、分ける
+		HasTypes: true, TypesDir: "gen/server/types", TypesPath: "example.com/app/gen/server/types", TypesName: "types",
 		TestDir: "gen/server/servertest", TestPath: "example.com/app/gen/server/servertest", TestName: "servertest"}
 	if *l != want {
 		t.Errorf("内部の op を持つ: %+v, want %+v", *l, want)

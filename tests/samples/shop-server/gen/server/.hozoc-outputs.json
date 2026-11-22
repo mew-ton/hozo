@@ -4,7 +4,6 @@
   "gen/server/inner/doc.go",
   "gen/server/inner/ops.go",
   "gen/server/inner/types.go",
-  "gen/server/inner/validate.go",
   "gen/server/inner/wiring.go",
   "gen/server/ops.go",
   "gen/server/ratelimit.go",
@@ -15,5 +14,8 @@
   "gen/server/servertest/http.go",
   "gen/server/servertest/leaves.go",
   "gen/server/servertest/seams.go",
-  "gen/server/types.go"
+  "gen/server/types.go",
+  "gen/server/types/doc.go",
+  "gen/server/types/types.go",
+  "gen/server/types/validate.go"
 ]

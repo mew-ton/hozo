@@ -14,5 +14,8 @@
   "gen/browser/inner/wiring.go",
   "gen/browser/ops.go",
   "gen/browser/states.go",
-  "gen/browser/types.go"
+  "gen/browser/types.go",
+  "gen/browser/types/classify.go",
+  "gen/browser/types/doc.go",
+  "gen/browser/types/types.go"
 ]

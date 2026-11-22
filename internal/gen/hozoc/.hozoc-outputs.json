@@ -11,9 +11,11 @@
   "internal/gen/hozoc/inner/ops.go",
   "internal/gen/hozoc/inner/states.go",
   "internal/gen/hozoc/inner/types.go",
-  "internal/gen/hozoc/inner/validate.go",
   "internal/gen/hozoc/inner/wiring.go",
   "internal/gen/hozoc/ops.go",
   "internal/gen/hozoc/states.go",
-  "internal/gen/hozoc/types.go"
+  "internal/gen/hozoc/types.go",
+  "internal/gen/hozoc/types/doc.go",
+  "internal/gen/hozoc/types/types.go",
+  "internal/gen/hozoc/types/validate.go"
 ]

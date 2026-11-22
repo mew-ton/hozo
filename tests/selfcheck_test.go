@@ -75,7 +75,7 @@ func TestSelfEmitDryRun(t *testing.T) {
 	if len(committed) == 0 || strings.Join(written, "\n") != strings.Join(committed, "\n") {
 		t.Errorf("書く予定のファイルが、コミット済みの生成物と違う:\n予定:\n  %s\nコミット済み:\n  %s", strings.Join(written, "\n  "), strings.Join(committed, "\n  "))
 	}
-	for _, want := range []string{"internal/gen/hozoc/cli/cli.go", "internal/gen/hozoc/inner/validate.go", "internal/gen/hozoc/ops.go", "internal/gen/proc/types.go"} {
+	for _, want := range []string{"internal/gen/hozoc/cli/cli.go", "internal/gen/hozoc/types/validate.go", "internal/gen/hozoc/ops.go", "internal/gen/proc/types.go"} {
 		if _, ok := before[want]; !ok {
 			t.Errorf("%s がコミットされていない", want)
 		}

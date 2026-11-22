@@ -6,7 +6,7 @@ import (
 	"context"
 
 	"github.com/mew-ton/hozo/gen/browser/inner"
-	"github.com/mew-ton/hozo/gen/server"
+	server "github.com/mew-ton/hozo/gen/server/types"
 )
 
 // WarrantyKind は商品に適用される保証の種類。

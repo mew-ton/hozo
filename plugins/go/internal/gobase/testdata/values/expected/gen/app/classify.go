@@ -5,52 +5,21 @@ package app
 import (
 	"context"
 
-	"github.com/mew-ton/hozo/runtime"
+	"example.com/app/gen/app/types"
 )
 
 // Size は大きさ（述語で決まる分類。ケースで絞り込んだ型 Address on Size.Big を作るため）
-type Size int
+type Size = types.Size
 
 const (
-	SizeBig Size = iota
-	SizeSmall
+	SizeBig   = types.SizeBig
+	SizeSmall = types.SizeSmall
 )
 
 // SizeCases は分類 app.Size のケースごとの述語。人が実装し、この分類を match に使う名前空間の New に渡す。
-type SizeCases interface {
-	// Big はケース Big の述語。
-	Big(ctx context.Context, v Address) (bool, error)
-	// Small はケース Small の述語。
-	Small(ctx context.Context, v Address) (bool, error)
-}
+type SizeCases = types.SizeCases
 
 // ClassifySize は v を app.Size で分類する。すべての述語を呼び、真になった数を数える。
 func ClassifySize(ctx context.Context, c SizeCases, v Address) (Size, error) {
-	var hits []string
-	var kind Size
-	var first error
-	if ok, err := c.Big(ctx, v); err != nil {
-		if first == nil {
-			first = err
-		}
-	} else if ok {
-		hits = append(hits, "Big")
-		kind = SizeBig
-	}
-	if ok, err := c.Small(ctx, v); err != nil {
-		if first == nil {
-			first = err
-		}
-	} else if ok {
-		hits = append(hits, "Small")
-		kind = SizeSmall
-	}
-	if first != nil {
-		return kind, first
-	}
-	switch len(hits) {
-	case 1:
-		return kind, nil
-	}
-	return kind, &runtime.ClassificationError{Classify: "app.Size", Hits: hits}
+	return types.ClassifySize(ctx, c, v)
 }

@@ -2,51 +2,31 @@
 
 package app
 
-import "github.com/mew-ton/hozo/runtime"
+import "example.com/app/gen/app/types"
 
 // Order は model app.Order。
-type Order struct {
-	Id   string `json:"id"`
-	Note string `json:"note"`
-}
+type Order = types.Order
 
 // Busy は exception app.Busy。
-type Busy struct{}
-
-func (Busy) Error() string         { return "app.Busy" }
-func (Busy) HozoException() string { return "app.Busy" }
-
-var _ runtime.Exception = Busy{}
+type Busy = types.Busy
 
 // Rejected は exception app.Rejected。
-type Rejected struct {
-	Reason string `json:"reason"`
-}
-
-func (Rejected) Error() string         { return "app.Rejected" }
-func (Rejected) HozoException() string { return "app.Rejected" }
-
-var _ runtime.Exception = Rejected{}
+type Rejected = types.Rejected
 
 // Gone は exception app.Gone。
-type Gone struct{}
-
-func (Gone) Error() string         { return "app.Gone" }
-func (Gone) HozoException() string { return "app.Gone" }
-
-var _ runtime.Exception = Gone{}
+type Gone = types.Gone
 
 // EffectClose は effect app.close。
-const EffectClose runtime.Effect = "app.close"
+const EffectClose = types.EffectClose
 
 // EffectDiscard は effect app.discard。
-const EffectDiscard runtime.Effect = "app.discard"
+const EffectDiscard = types.EffectDiscard
 
 // EffectRestock は effect app.restock。
-const EffectRestock runtime.Effect = "app.restock"
+const EffectRestock = types.EffectRestock
 
 // EffectKeep は effect app.keep。
-const EffectKeep runtime.Effect = "app.keep"
+const EffectKeep = types.EffectKeep
 
 // EffectCloseAll は effect app.closeAll。
-const EffectCloseAll runtime.Effect = "app.closeAll"
+const EffectCloseAll = types.EffectCloseAll

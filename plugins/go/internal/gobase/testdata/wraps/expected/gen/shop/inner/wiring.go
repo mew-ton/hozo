@@ -5,7 +5,7 @@ package inner
 import (
 	"context"
 
-	"example.com/app/gen/gate"
+	gate "example.com/app/gen/gate/types"
 	"github.com/mew-ton/hozo/runtime"
 )
 

@@ -1,0 +1,7 @@
+{
+  "tests": [
+    {"name": "ship.pack/OK", "file": "gen/ship/shiptest/leaves.go", "lines": [37, 44]},
+    {"name": "ship.Size/Small", "file": "gen/ship/shiptest/classify.go", "lines": [26, 32]},
+    {"name": "ship.Size/Big", "file": "gen/ship/shiptest/classify.go", "lines": [35, 41]}
+  ]
+}

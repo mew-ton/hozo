@@ -2,15 +2,10 @@
 
 package stock
 
-import "github.com/mew-ton/hozo/runtime"
+import "github.com/mew-ton/hozo/gen/stock/types"
 
 // ItemId は品物の識別子
-type ItemId string
+type ItemId = types.ItemId
 
 // Short: 在庫が足りない
-type Short struct{}
-
-func (Short) Error() string         { return "stock.Short" }
-func (Short) HozoException() string { return "stock.Short" }
-
-var _ runtime.Exception = Short{}
+type Short = types.Short

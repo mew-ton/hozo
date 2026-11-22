@@ -5,7 +5,7 @@ package front
 import (
 	"context"
 
-	"example.com/app/gen/shop"
+	shop "example.com/app/gen/shop/types"
 )
 
 // Ops は、この名前空間の外から呼べる op: 仕様で export を付けた op。宣言順。New が返す。

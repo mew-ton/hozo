@@ -396,10 +396,13 @@ func (f *testFile) reals() (params, names []string) {
 			name += "_"
 		}
 		taken[name] = true
-		typ := f.im.Qualifier(r.Namespace) + "Leaves"
+		// Qualifier は、import を足す。使う方の名前空間にだけ、呼ぶ
+		var typ string
 		if r.Kind == golang.KitClassify {
 			ns := f.g.declNS[r.Classify]
 			typ = f.im.Qualifier(ns) + golang.TypeName(r.Classify, ns) + "Cases"
+		} else {
+			typ = f.im.Qualifier(r.Namespace) + "Leaves"
 		}
 		params = append(params, name+" "+typ)
 		names = append(names, name)

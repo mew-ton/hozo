@@ -6,7 +6,7 @@ import (
 	"context"
 
 	"github.com/mew-ton/hozo/gen/page"
-	"github.com/mew-ton/hozo/gen/server"
+	server "github.com/mew-ton/hozo/gen/server/types"
 )
 
 // TokenState は状態 browser.token（nullable<server.Token>）の単位。実装は New の引数 token に渡す。

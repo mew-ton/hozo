@@ -8,5 +8,7 @@
   "gen/store/storetest/hozo-tests.go.json",
   "gen/store/storetest/seams.go",
   "gen/store/types.go",
+  "gen/store/types/doc.go",
+  "gen/store/types/types.go",
   "gen/store/wiring.go"
 ]

@@ -11,5 +11,7 @@
   "gen/api/shoptest/hozo-tests.go.json",
   "gen/api/shoptest/leaves.go",
   "gen/api/states.go",
-  "gen/api/types.go"
+  "gen/api/types.go",
+  "gen/api/types/doc.go",
+  "gen/api/types/types.go"
 ]

@@ -1,0 +1,28 @@
+# plugins/go の単体テストの入力（docs/testing.md「単体テスト」）: docs/plugin-go.md「型のパッケージ」。
+# 二つの名前空間が、互いの型を使う: ship の型が carry の型を使い、carry の関数が ship の型を使う。
+
+[[emit]]
+namespace   = "ship"
+transpilers = ["go"]
+out         = "gen/ship"
+
+[[emit]]
+namespace   = "carry"
+transpilers = ["go"]
+out         = "gen/carry"
+
+# 型だけの名前空間（型のパッケージを、分けない）
+[[emit]]
+namespace   = "plain"
+transpilers = ["go"]
+out         = "gen/plain"
+
+[[emit]]
+namespace   = "desk"
+transpilers = ["go"]
+out         = "gen/desk"
+
+[[emit]]
+namespace   = "front"
+transpilers = ["go"]
+out         = "gen/front"

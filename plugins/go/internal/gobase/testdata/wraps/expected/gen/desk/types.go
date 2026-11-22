@@ -2,15 +2,10 @@
 
 package desk
 
-import "github.com/mew-ton/hozo/runtime"
+import "example.com/app/gen/desk/types"
 
 // EffectLight は灯りを点ける
-const EffectLight runtime.Effect = "desk.light"
+const EffectLight = types.EffectLight
 
 // Down: 机の側で、落ちた
-type Down struct{}
-
-func (Down) Error() string         { return "desk.Down" }
-func (Down) HozoException() string { return "desk.Down" }
-
-var _ runtime.Exception = Down{}
+type Down = types.Down

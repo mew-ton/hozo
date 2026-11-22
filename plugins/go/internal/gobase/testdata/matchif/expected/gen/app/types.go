@@ -2,40 +2,22 @@
 
 package app
 
-import "github.com/mew-ton/hozo/runtime"
+import "example.com/app/gen/app/types"
 
 // Token は scalar app.Token。
-type Token string
+type Token = types.Token
 
 // User は model app.User。
-type User struct {
-	Name string  `json:"name"`
-	Nick *string `json:"nick,omitempty"`
-}
+type User = types.User
 
 // Line は model app.Line。
-type Line struct {
-	Item string `json:"item"`
-}
+type Line = types.Line
 
 // Input は model app.Input。
-type Input struct {
-	User *User  `json:"user,omitempty"`
-	Id   string `json:"id"`
-}
+type Input = types.Input
 
 // Missing は exception app.Missing。
-type Missing struct{}
-
-func (Missing) Error() string         { return "app.Missing" }
-func (Missing) HozoException() string { return "app.Missing" }
-
-var _ runtime.Exception = Missing{}
+type Missing = types.Missing
 
 // Denied は exception app.Denied。
-type Denied struct{}
-
-func (Denied) Error() string         { return "app.Denied" }
-func (Denied) HozoException() string { return "app.Denied" }
-
-var _ runtime.Exception = Denied{}
+type Denied = types.Denied

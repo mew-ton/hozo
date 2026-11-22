@@ -5,5 +5,7 @@
   "gen/stock/stocktest/fakes.go",
   "gen/stock/stocktest/hozo-tests.go.json",
   "gen/stock/stocktest/leaves.go",
-  "gen/stock/types.go"
+  "gen/stock/types.go",
+  "gen/stock/types/doc.go",
+  "gen/stock/types/types.go"
 ]

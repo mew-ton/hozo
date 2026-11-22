@@ -5,7 +5,7 @@ package shop
 import (
 	"context"
 
-	"example.com/app/gen/gate"
+	gate "example.com/app/gen/gate/types"
 	"example.com/app/gen/shop/inner"
 )
 

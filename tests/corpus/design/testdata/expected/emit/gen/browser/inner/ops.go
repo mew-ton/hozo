@@ -5,7 +5,7 @@ package inner
 import (
 	"context"
 
-	"github.com/mew-ton/hozo/gen/server"
+	server "github.com/mew-ton/hozo/gen/server/types"
 )
 
 // Ops は、この名前空間のすべての op（export の有無によらない）。宣言順。New が返す。テストは、内部の op をここから呼ぶ。

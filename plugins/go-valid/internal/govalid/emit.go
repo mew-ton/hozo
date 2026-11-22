@@ -73,7 +73,7 @@ func Emit(req *plugin.EmitRequest, root string) ([]plugin.File, []plugin.Diagnos
 	if err != nil {
 		return nil, nil, err
 	}
-	return []plugin.File{{Path: path.Join(layout.DefDir, FileName), Content: content}}, nil, nil
+	return []plugin.File{{Path: path.Join(layout.TypesDir, FileName), Content: content}}, nil, nil
 }
 
 func viewerOf(view *ir.View) string {

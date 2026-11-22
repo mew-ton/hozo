@@ -2,7 +2,7 @@
 
 package app
 
-import "github.com/mew-ton/hozo/runtime"
+import "example.com/app/gen/app/types"
 
 // EffectStore は effect app.store。
-const EffectStore runtime.Effect = "app.store"
+const EffectStore = types.EffectStore

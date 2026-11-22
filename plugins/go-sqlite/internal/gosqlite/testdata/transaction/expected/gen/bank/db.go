@@ -11,7 +11,7 @@ import (
 	"reflect"
 	"slices"
 
-	"example.com/app/gen/audit"
+	audit "example.com/app/gen/audit/types"
 	"example.com/app/gen/kinds"
 	"github.com/mew-ton/hozo/runtime"
 )

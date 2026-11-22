@@ -11,5 +11,7 @@
   "gen/batch/shoptest/hozo-tests.go.json",
   "gen/batch/shoptest/leaves.go",
   "gen/batch/states.go",
-  "gen/batch/types.go"
+  "gen/batch/types.go",
+  "gen/batch/types/doc.go",
+  "gen/batch/types/types.go"
 ]

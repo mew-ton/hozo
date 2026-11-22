@@ -263,6 +263,17 @@ func (e *emitter) typeName(fqn string) string { return golang.TypeName(fqn, e.de
 // checkInnerDir は GO-4: 内側のフォルダ inner が、同じ単位が出力する子の名前空間 N.inner の出力先と重なる。
 // 位置は、名前空間の最初の内部の op。
 func (e *emitter) checkInnerDir() {
+	if e.layout.HasTypes {
+		// 型のパッケージ types と、子の名前空間 N.types（docs/plugin-go.md「型のパッケージ」）
+		child := e.view.Viewer + ".types"
+		for _, c := range e.view.Namespaces[child] {
+			if c.Index == e.view.Config.Index {
+				e.errorf(codeInnerDir, "", "名前空間 %s は関数を持つので、型を、型のパッケージのフォルダ %s に置くが、同じ単位（%d 番目の [[emit]]）が出力する子の名前空間 %s の出力先と重なる",
+					e.view.Viewer, e.layout.TypesDir, c.Index, child)
+				break
+			}
+		}
+	}
 	if !e.layout.HasInner {
 		return
 	}
@@ -321,15 +332,29 @@ func (e *emitter) build() []plugin.File {
 	}
 	def := e.layout.DefDir
 	add(def, e.genDoc(true))
-	add(def, e.genTypes())
-	add(def, e.genOps())
-	add(def, e.genStates())
-	add(def, e.genClassify())
+	if e.layout.HasTypes {
+		// 型のパッケージ（docs/plugin-go.md「型のパッケージ」）と、定義のパッケージの、その再公開
+		types, classify := e.genTypes(), e.genClassify(classifyTypes)
+		if types != nil || classify != nil {
+			add(e.layout.TypesDir, e.genTypesDoc())
+		}
+		add(e.layout.TypesDir, types)
+		add(e.layout.TypesDir, classify)
+		add(def, e.genReexportTypes(true))
+		add(def, e.genOps())
+		add(def, e.genStates())
+		add(def, e.genClassify(classifyDef))
+	} else {
+		add(def, e.genTypes())
+		add(def, e.genOps())
+		add(def, e.genStates())
+		add(def, e.genClassify(classifyAll))
+	}
 	add(def, e.genWiring())
 	if e.layout.HasInner {
 		entry := e.layout.Dir
 		add(entry, e.genDoc(false))
-		add(entry, e.genEntryTypes())
+		add(entry, e.genReexportTypes(false))
 		add(entry, e.genEntryOps())
 		add(entry, e.genEntryStates())
 		add(entry, e.genEntryClassify())
@@ -368,10 +393,12 @@ type fileGen struct {
 	inDef bool
 	// inTest は、テストのパッケージのファイルか（docs/plugin-go.md「単体テストの口」）。
 	inTest bool
-	pkg    string
-	doc    string // パッケージのコメント（doc.go だけ）
-	im     *golang.Imports
-	body   strings.Builder
+	// inTypes は、型のパッケージのファイルか（docs/plugin-go.md「型のパッケージ」）。
+	inTypes bool
+	pkg     string
+	doc     string // パッケージのコメント（doc.go だけ）
+	im      *golang.Imports
+	body    strings.Builder
 	// usesPtr は、このファイルが補助 ptr を使ったか（wiring.go だけが使う。docs/plugin-go.md「値」）。
 	usesPtr bool
 }
@@ -389,6 +416,30 @@ func (e *emitter) newFile(name string, inDef bool) *fileGen {
 		f.im.Reserve(bodyNames...)
 		e.imports[f.key] = f.im
 	}
+	return f
+}
+
+// newTypesFile は、型の定義のファイル name（types.go、classify.go）を作り始める: 型のパッケージを分ける出力（Layout.HasTypes）では、
+// 型のパッケージのファイル。分けない出力では、定義のパッケージのファイル（newFile(name, true) と同じ）。
+func (e *emitter) newTypesFile(name string) *fileGen {
+	if !e.layout.HasTypes {
+		return e.newFile(name, true)
+	}
+	f := &fileGen{e: e, name: name, inDef: true, inTypes: true, pkg: e.layout.TypesName, key: "types/" + name}
+	f.im = e.imports[f.key]
+	if f.im == nil {
+		f.im = golang.NewTypesImports(e.view, e.layout, e.root)
+		f.im.Reserve(bodyNames...)
+		e.imports[f.key] = f.im
+	}
+	return f
+}
+
+// genTypesDoc は、型のパッケージの doc.go（docs/plugin-go.md「型のパッケージ」）。
+func (e *emitter) genTypesDoc() *fileGen {
+	f := e.newTypesFile(fileDoc)
+	f.doc = fmt.Sprintf("// Package types は名前空間 %s の型: 別の名前空間の出力は、ここを import する。使う側は入口のパッケージ %s を import する（入口は、同じ型を、同じ名前で持つ）。\n",
+		e.view.Viewer, e.layout.EntryPath)
 	return f
 }
 
@@ -448,6 +499,9 @@ func (f *fileGen) render() (string, bool) {
 func (f *fileGen) dir() string {
 	if f.inTest {
 		return f.e.layout.TestDir
+	}
+	if f.inTypes {
+		return f.e.layout.TypesDir
 	}
 	if f.inDef {
 		return f.e.layout.DefDir

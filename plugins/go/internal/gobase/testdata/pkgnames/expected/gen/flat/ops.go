@@ -6,7 +6,7 @@ import (
 	"context"
 
 	ops2 "example.com/app/gen/more/ops"
-	ops3 "example.com/app/gen/ops"
+	ops3 "example.com/app/gen/ops/types"
 	ptr2 "example.com/app/gen/ptr"
 )
 

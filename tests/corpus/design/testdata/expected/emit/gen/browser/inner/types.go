@@ -2,99 +2,61 @@
 
 package inner
 
-import (
-	"time"
-
-	"github.com/mew-ton/hozo/gen/server"
-	"github.com/mew-ton/hozo/runtime"
-)
+import "github.com/mew-ton/hozo/gen/browser/types"
 
 // EffectTransitionToLogin はログイン画面へ遷移する
-const EffectTransitionToLogin runtime.Effect = "browser.transitionToLogin"
+const EffectTransitionToLogin = types.EffectTransitionToLogin
 
 // EffectTransitionToForbidden は権限がないことを示す画面へ遷移する
-const EffectTransitionToForbidden runtime.Effect = "browser.transitionToForbidden"
+const EffectTransitionToForbidden = types.EffectTransitionToForbidden
 
 // PosInt は 1 以上の整数
-type PosInt int64
+type PosInt = types.PosInt
 
 // OfflineCacheMiss: ネットワークに失敗し、キャッシュにも前回の結果がない
-type OfflineCacheMiss struct{}
-
-func (OfflineCacheMiss) Error() string         { return "browser.OfflineCacheMiss" }
-func (OfflineCacheMiss) HozoException() string { return "browser.OfflineCacheMiss" }
-
-var _ runtime.Exception = OfflineCacheMiss{}
+type OfflineCacheMiss = types.OfflineCacheMiss
 
 // EffectRemoveToken は手元のトークンを消す
-const EffectRemoveToken runtime.Effect = "browser.removeToken"
+const EffectRemoveToken = types.EffectRemoveToken
 
 // EffectTransitionToPayment は支払い画面へ遷移する
-const EffectTransitionToPayment runtime.Effect = "browser.transitionToPayment"
+const EffectTransitionToPayment = types.EffectTransitionToPayment
 
 // OrdersQuery は model browser.OrdersQuery。
-type OrdersQuery struct {
-	Page   PosInt              `json:"page"`
-	Status *server.OrderStatus `json:"status,omitempty"`
-}
+type OrdersQuery = types.OrdersQuery
 
 // Unavailable は一時的に表示できない
-type Unavailable struct{}
+type Unavailable = types.Unavailable
 
 // OrdersUnavailable は注文一覧を一時的に表示できない
-type OrdersUnavailable struct{}
+type OrdersUnavailable = types.OrdersUnavailable
 
 // OrderRow は注文一覧の一行の表示
-type OrderRow struct {
-	Id       server.OrderId     `json:"id"`
-	Status   server.OrderStatus `json:"status"`
-	PlacedAt time.Time          `json:"placedAt"`
-}
+type OrderRow = types.OrderRow
 
 // OrderPage は union browser.OrderPage。
-type OrderPage interface{ isOrderPage() }
-
-func (OrderPageReady) isOrderPage()    {}
-func (OrderPageEmpty) isOrderPage()    {}
-func (OrdersUnavailable) isOrderPage() {}
+type OrderPage = types.OrderPage
 
 // OrderPageReady は model browser.OrderPage.Ready。
-type OrderPageReady struct {
-	UserName string     `json:"userName"`
-	Orders   []OrderRow `json:"orders"`
-}
+type OrderPageReady = types.OrderPageReady
 
 // OrderPageEmpty は model browser.OrderPage.Empty。
-type OrderPageEmpty struct {
-	UserName string `json:"userName"`
-}
+type OrderPageEmpty = types.OrderPageEmpty
 
 // EffectTransitionToOrders は注文一覧の既定の URL に置き換える
-const EffectTransitionToOrders runtime.Effect = "browser.transitionToOrders"
+const EffectTransitionToOrders = types.EffectTransitionToOrders
 
 // ProfilePage は union browser.ProfilePage。
-type ProfilePage interface{ isProfilePage() }
-
-func (ProfilePageReady) isProfilePage() {}
-func (Unavailable) isProfilePage()      {}
+type ProfilePage = types.ProfilePage
 
 // ProfilePageReady は model browser.ProfilePage.Ready。
-type ProfilePageReady struct {
-	UserName string `json:"userName"`
-}
+type ProfilePageReady = types.ProfilePageReady
 
 // ProductQuery は商品ページの query（/product?id=...）
-type ProductQuery struct {
-	Id server.ItemId `json:"id"`
-}
+type ProductQuery = types.ProductQuery
 
 // ProductPage は union browser.ProductPage。
-type ProductPage interface{ isProductPage() }
-
-func (ProductPageReady) isProductPage() {}
-func (Unavailable) isProductPage()      {}
+type ProductPage = types.ProductPage
 
 // ProductPageReady は model browser.ProductPage.Ready。
-type ProductPageReady struct {
-	Item server.Item `json:"item"`
-}
+type ProductPageReady = types.ProductPageReady

@@ -23,6 +23,8 @@ type Imports struct {
 	layout *Layout
 	root   string
 	inDef  bool
+	// inTypes は、書くファイルが、型のパッケージ（docs/plugin-go.md「型のパッケージ」）のものか。
+	inTypes bool
 	// outside は、書くファイルが、出力の外のパッケージ（テストのパッケージ）のものか。そのとき、N の宣言も、入口のパッケージで修飾する。
 	outside bool
 
@@ -51,6 +53,12 @@ func NewImports(view *ir.View, layout *Layout, root string, inDef bool) *Imports
 	return &Imports{view: view, layout: layout, root: root, inDef: inDef}
 }
 
+// NewTypesImports は、view の出力の、型のパッケージ（docs/plugin-go.md「型のパッケージ」）の、一つのファイルの import を作る。
+// N の型は、修飾なしの名前になる。型のパッケージを分けない出力（Layout.HasTypes が偽）では、NewImports(…, true) と同じ。
+func NewTypesImports(view *ir.View, layout *Layout, root string) *Imports {
+	return &Imports{view: view, layout: layout, root: root, inDef: true, inTypes: true}
+}
+
 // NewTestImports は、view の出力の、テストのパッケージ（docs/plugin-go.md「単体テストの口」の「テストのパッケージ」）の、一つの
 // ファイルの import を作る。テストのパッケージは、N の入口のパッケージを import するので、N の型も、入口のパッケージの名前で
 // 修飾する（Qualifier(N) が、入口を import して `<名前>.` を返す）。その import は、名前がパスの最後の要素と同じでも、名前を書く
@@ -75,6 +83,10 @@ func (im *Imports) init() {
 	if im.layout != nil && im.layout.HasInner && !im.inDef {
 		// 入口のファイルでは、inner は内側のパッケージの名前（「標準ライブラリ、runtime、inner の名前は変えない」）
 		im.names[innerDir] = im.layout.DefPath
+	}
+	if im.layout != nil && im.layout.HasTypes && !im.inTypes && !im.outside {
+		// 定義と入口のファイルでは、types は、型のパッケージの名前（inner と同じに、変えない）
+		im.names[typesDir] = im.layout.TypesPath
 	}
 }
 
@@ -192,7 +204,7 @@ func (im *Imports) Render() string {
 // その後に、名前空間のパッケージを、名前空間の FQN の辞書順に。名前が当たれば、後の方に 2、3、… が付く。
 // ファイルを一度作って import の集まりを知り、返った Imports で作り直せば、名前は、足した順（型を書いた順）によらない。
 func (im *Imports) Canonical() *Imports {
-	out := &Imports{view: im.view, layout: im.layout, root: im.root, inDef: im.inDef, outside: im.outside, declNS: im.declNS, homes: im.homes,
+	out := &Imports{view: im.view, layout: im.layout, root: im.root, inDef: im.inDef, inTypes: im.inTypes, outside: im.outside, declNS: im.declNS, homes: im.homes,
 		reserved: append([]string(nil), im.reserved...)}
 	out.init()
 	var plain, spaces []string
@@ -239,8 +251,14 @@ func (im *Imports) Qualifier(namespace string) string {
 		return ""
 	}
 	im.init()
-	name := im.Add(home.EntryPath, home.EntryName)
-	im.nsOf[home.EntryPath] = namespace
+	// 別の名前空間の型と分類は、型のパッケージから（docs/plugin-go.md「パッケージと import パス」）。テストのパッケージのファイルは、
+	// 入口から（入口は、型のすべての別名を持つ）
+	pkgPath := home.TypesPath
+	if im.outside {
+		pkgPath = home.EntryPath
+	}
+	name := im.Add(pkgPath, home.EntryName)
+	im.nsOf[pkgPath] = namespace
 	return name + "."
 }
 

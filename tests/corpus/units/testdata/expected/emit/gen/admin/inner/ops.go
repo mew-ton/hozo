@@ -5,7 +5,7 @@ package inner
 import (
 	"context"
 
-	shop "github.com/mew-ton/hozo/gen/api"
+	shop "github.com/mew-ton/hozo/gen/api/types"
 )
 
 // Ops は、この名前空間のすべての op（export の有無によらない）。宣言順。New が返す。テストは、内部の op をここから呼ぶ。
