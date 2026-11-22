@@ -3,6 +3,7 @@ package gohttp
 import (
 	"fmt"
 	"go/format"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -53,6 +54,14 @@ type entry struct {
 	hasOK  bool // 正常のケースがある（never を返す op には、ない）
 	hasBad bool // op を呼ぶ前の失敗のケースがある
 	groups []group
+	// caught は、受ける道（docs/check.md「入口ごとの、求めるケース」の「受ける道」）: 例外の名前（group.name と同じ決まり）と、出どころ。
+	caught []caught
+}
+
+// caught は、受ける道一つ: 出どころが投げた例外を、流れの中の catch が受けて、正常に終わる。name は、例外の名前。
+type caught struct {
+	name string
+	source
 }
 
 // humanCase は、人か AI が書くケース一つ（<Op>HTTPCases のメソッド）: 名前と、コメントの文。
@@ -76,11 +85,16 @@ func (e *entry) human() []humanCase {
 			if s.made {
 				continue
 			}
-			if s.Kind == golang.SourceUnknown {
+			if s.Kind == ir.SourceUnknown {
 				out = append(out, humanCase{s.method, s.method + " は、例外 " + g.exception + " を投げるケース: " + what + "。"})
 				continue
 			}
 			out = append(out, humanCase{s.method, s.method + " は、例外 " + g.exception + " を、" + s.Label + " が投げるケース: " + what + "。"})
+		}
+	}
+	for _, c := range e.caught {
+		if !c.made {
+			out = append(out, humanCase{c.method, c.method + " は、" + c.Label + " が投げた例外 " + c.Exception + " を、流れの中で受けて、正常に終わるケース: 成功の応答。"})
 		}
 	}
 	return out
@@ -131,7 +145,7 @@ func (g *generator) tests(e *entry) {
 			break
 		}
 	}
-	sources := golang.ThrowSources(g.p, g.kit, e.op.Name)
+	sources := golang.ThrowSources(g.view, g.kit, e.op.Name)
 	seen := map[string]bool{}
 	for _, fqn := range e.op.Signature.Exceptions {
 		x, ok := g.p.Lookup(fqn).(*ir.Exception)
@@ -163,6 +177,39 @@ func (g *generator) tests(e *entry) {
 		for j := range gr.sources {
 			gr.sources[j].method = gr.name + gr.sources[j].Ident
 		}
+	}
+	// 受ける道: 正常のケースがある入口だけ（受けて終われば、正常の応答）。例外の名前は、宣言の名前（当たれば、名前空間を前に付ける）
+	if e.hasOK {
+		list := golang.CaughtSources(g.view, g.kit, e.op.Name)
+		names := map[string]string{} // 例外の名前 → FQN（当たるかを見る）
+		clash := map[string]bool{}
+		for _, s := range list {
+			name := golang.TypeName(s.Exception, g.declNS[s.Exception])
+			if prev, ok := names[name]; ok && prev != s.Exception {
+				clash[name] = true
+			}
+			names[name] = s.Exception
+		}
+		for _, s := range list {
+			name := golang.TypeName(s.Exception, g.declNS[s.Exception])
+			if clash[name] {
+				var prefix string
+				for _, seg := range strings.Split(g.declNS[s.Exception], ".") {
+					prefix += golang.Capitalize(seg)
+				}
+				name = prefix + name
+			}
+			made := s.Made && (len(s.Steps) == 0 || g.kit.HasFakes())
+			e.caught = append(e.caught, caught{name: name, source: source{ThrowSource: s, made: made, method: "Caught" + name + s.Ident}})
+		}
+		// 同じ例外の名前のものを、続けて並べる（例外の名前が、テストの名前の段。順は、その名前が、最初に出た順）
+		first := map[string]int{}
+		for i, c := range e.caught {
+			if _, ok := first[c.name]; !ok {
+				first[c.name] = i
+			}
+		}
+		sort.SliceStable(e.caught, func(i, j int) bool { return first[e.caught[i].name] < first[e.caught[j].name] })
 	}
 }
 
@@ -430,6 +477,13 @@ func (f *testFile) run(entries []entry) string {
 		b.WriteString("// ケースごとに、新しく、流れを組み立て、入力を要求に組み立てて送り、応答が、そのケースのものであること\n" +
 			"// （ステータスと、本文の形）を確かめてから、Then を呼ぶ。\n")
 	}
+	for i := range entries {
+		if len(entries[i].caught) > 0 {
+			// 受ける道を持つ入口が、一つでもあるときだけ、その名前を言う
+			b.WriteString("// 受ける道（流れの中の catch が、例外を受けて、正常に終わる道）は、出どころごとに、<op の FQN>/caught/<例外>/<出どころ>。\n")
+			break
+		}
+	}
 	fmt.Fprintf(&b, "func %s(%s) {\n", runName, strings.Join(append(append([]string{"t *" + testing + ".T"}, params...), "c "+casesName), ", "))
 	for i := range entries {
 		e := &entries[i]
@@ -496,13 +550,36 @@ func (f *testFile) run(entries []entry) string {
 					return f.written(e, s.method, want, head)
 				}
 			}
-			if len(gr.sources) == 1 && gr.sources[0].Kind == golang.SourceUnknown {
+			if len(gr.sources) == 1 && gr.sources[0].Kind == ir.SourceUnknown {
 				test(gr.name, one(&gr.sources[0]))
 				continue
 			}
 			fmt.Fprintf(&b, "t.Run(%s, func(t *%s.T) {\n", strconv.Quote(gr.name), testing)
 			for si := range gr.sources {
 				test(gr.sources[si].Label, one(&gr.sources[si]))
+			}
+			b.WriteString("})\n")
+		}
+		if len(e.caught) > 0 {
+			// 受ける道: <op の FQN>/caught/<例外>/<出どころ>。応答は、正常のケースのもの
+			fmt.Fprintf(&b, "t.Run(\"caught\", func(t *%s.T) {\n", testing)
+			for ci := 0; ci < len(e.caught); {
+				cj := ci
+				for cj < len(e.caught) && e.caught[cj].name == e.caught[ci].name {
+					cj++
+				}
+				fmt.Fprintf(&b, "t.Run(%s, func(t *%s.T) {\n", strconv.Quote(e.caught[ci].name), testing)
+				for k := ci; k < cj; k++ {
+					c := &e.caught[k]
+					test(c.Label, func(head string) string {
+						if c.made {
+							return f.madeCaught(e, &c.source, head)
+						}
+						return f.written(e, c.method, f.wantOK(e), head)
+					})
+				}
+				b.WriteString("})\n")
+				ci = cj
 			}
 			b.WriteString("})\n")
 		}
@@ -555,25 +632,51 @@ func (f *testFile) made(s *source, want, head string) string {
 	case len(s.Steps) == 0:
 		fmt.Fprintf(&b, "res, _ := %sk, nil)\n", head)
 	default:
-		fmt.Fprintf(&b, "res, _ := %sk, func(f *Fakes) {\n", head)
-		for _, st := range s.Steps {
-			at := "f." + strings.Join(st.Path, ".")
-			switch st.Verb {
-			case golang.StepThrows:
-				ns := f.g.declNS[st.Exception]
-				fmt.Fprintf(&b, "%s.Throws(%s%s{})\n", at, f.im.Qualifier(ns), golang.TypeName(st.Exception, ns))
-			case golang.StepReturnsNone:
-				fmt.Fprintf(&b, "%s.Returns(nil)\n", at)
-			case golang.StepReturnsBool:
-				fmt.Fprintf(&b, "%s.Returns(%t)\n", at, st.Bool)
-			case golang.StepIs:
-				ns := f.g.declNS[st.Classify]
-				fmt.Fprintf(&b, "%s.Is(%s%s)\n", at, f.im.Qualifier(ns), golang.CaseConst(golang.TypeName(st.Classify, ns), st.Case))
-			}
-		}
+		fmt.Fprintf(&b, "res, _ := %sk, func(f *Fakes) {\n%s", head, f.steps(s))
 		b.WriteString("})\n")
 	}
 	b.WriteString(want)
+	return b.String()
+}
+
+// steps は、出どころ s の Steps を、にせものに言う行（一つずつ）にしたもの。
+func (f *testFile) steps(s *source) string {
+	var b strings.Builder
+	for _, st := range s.Steps {
+		at := "f." + strings.Join(st.Path, ".")
+		switch st.Verb {
+		case golang.StepThrows:
+			ns := f.g.declNS[st.Exception]
+			fmt.Fprintf(&b, "%s.Throws(%s%s{})\n", at, f.im.Qualifier(ns), golang.TypeName(st.Exception, ns))
+		case golang.StepReturnsNone:
+			fmt.Fprintf(&b, "%s.Returns(nil)\n", at)
+		case golang.StepReturnsBool:
+			fmt.Fprintf(&b, "%s.Returns(%t)\n", at, st.Bool)
+		case golang.StepIs:
+			ns := f.g.declNS[st.Classify]
+			fmt.Fprintf(&b, "%s.Is(%s%s)\n", at, f.im.Qualifier(ns), golang.CaseConst(golang.TypeName(st.Classify, ns), st.Case))
+		}
+	}
+	return b.String()
+}
+
+// madeCaught は、Hozo が作る、受ける道のテストの中: 正常のケースの用意の後に、にせものに言い、応答が、正常のケースのもので
+// あることを確かめる。Then は、呼ばない（正常のケースの確かめは、受ける道では、成り立つとは、限らない）。
+func (f *testFile) madeCaught(e *entry, s *source, head string) string {
+	var b strings.Builder
+	b.WriteString("k := cases.OK()\n")
+	switch {
+	case !f.g.kit.HasFakes():
+		fmt.Fprintf(&b, "res := %sk)\n", head)
+	case len(s.Steps) == 0:
+		fmt.Fprintf(&b, "res, _ := %sk, nil)\n", head)
+	default:
+		fmt.Fprintf(&b, "res, _ := %sk, func(f *Fakes) {\n%s})\n", head, f.steps(s))
+	}
+	if e.hasValue() {
+		fmt.Fprintf(&b, "var got %s\n", golang.GoType(e.op.Returns, f.im))
+	}
+	b.WriteString(f.wantOK(e))
 	return b.String()
 }
 

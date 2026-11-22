@@ -13,7 +13,7 @@
 ```toml
 name     = "go-http"
 command  = ["go", "run", "github.com/mew-ton/hozo/plugins/go-http"]
-protocol = "0.20"
+protocol = "0.21"
 
 [[transpiler]]
 name     = "go-http"
@@ -448,27 +448,34 @@ func RunHTTP(t *testing.T, leaves server.Leaves, c HTTPCases) {
 
 ### 必要なケース
 
-入口ごとに、次のテストを、この順に走らせる。数えるのは、ハンドラが、その経路から返しうる応答の種類（「通信の形」の「成功の応答」「失敗の応答」）で、例外は、出どころごと（`docs/ide-chain.md`「テストの規約」の「インテグレーションテストの作り直し」）。
+入口ごとに、次のテストを、この順に走らせる。数えるのは、ハンドラが、その経路から返しうる応答の種類（「通信の形」の「成功の応答」「失敗の応答」）で、例外は、出どころごと（`docs/ide-chain.md`「テストの規約」の「インテグレーションテストの作り直し」）。出どころと、受ける道は、本体が求めたもの（`View.entries`。`docs/check.md`「入口ごとの、求めるケース」）を読む。
 
 | 結果 | テストの名前 | ある op | ケースを書くのは | 走らせる側が確かめること |
 |---|---|---|---|---|
 | 正常 | `<op>/OK` | `never` を返す op のほかの、どの op にも | 人か AI（口のメソッド `OK`） | 成功の応答。値を返さない op: 204 で、本文なし。値を返す op: 200 と、`Content-Type: application/json` と、結果の型に読める JSON（`null` でない）。結果が、Go でポインタになる省略可能な型（`type.Order?`）なら、204 で本文なし、でもよい（`got` は `nil`） |
 | op を呼ぶ前の失敗 | `<op>/BadRequest` | 入力の model が、本文のデコレータ（`@http.body`、`@http.bodyObj`）のフィールドか、`@http.required` の付いたフィールドを、一つでも持つ op | 人か AI（口のメソッド `BadRequest`） | 400、`error` が `http.BadRequest`、`value` に、`message`（空でない文字列）と `violations`（配列） |
-| 例外（出どころごと） | `<op>/<例外の名前>/<出どころ>` | op が投げうる例外（`Op.signature.exceptions` の順）の、出どころごと（`golang.ThrowSources` の順） | Hozo が作れる出どころ: Hozo。作れない出どころ: 人か AI（口のメソッド `<例外の名前><出どころの名前>`） | `@http.status(n)` を持つ例外: n、`error` が、例外の FQN。`value` は、引数を持つ例外なら、例外の型に読めるオブジェクトで、持たない例外なら、ない。持たない例外: 500 と `{"error":"internal"}` |
+| 例外（出どころごと） | `<op>/<例外の名前>/<出どころ>` | op が投げうる例外（`Op.signature.exceptions` の順）の、出どころごと（`Entry.sources` の順） | Hozo が作れる出どころ: Hozo。作れない出どころ: 人か AI（口のメソッド `<例外の名前><出どころの名前>`） | `@http.status(n)` を持つ例外: n、`error` が、例外の FQN。`value` は、引数を持つ例外なら、例外の型に読めるオブジェクトで、持たない例外なら、ない。持たない例外: 500 と `{"error":"internal"}` |
 | 例外（出どころが、見つからない） | `<op>/<例外の名前>` | 流れを辿っても、投げるものが見つからない例外（読む者のないデコレータが運ぶ例外など） | 人か AI（口のメソッド `<例外の名前>`） | 同じ |
+| 受ける道（出どころごと） | `<op>/caught/<例外の名前>/<出どころ>` | 正常のケースがある op の、受ける道ごと（`Entry.caught`。同じ例外の名前のものを、続けて並べ、その中は、`Entry.caught` の順） | Hozo が作れる道: Hozo。作れない道: 人か AI（口のメソッド `Caught<例外の名前><出どころの名前>`） | 成功の応答（「正常」の行と同じ） |
 
-- **出どころ**と、**Hozo が作れるか**は、`golang.ThrowSources`（`docs/packages.md`「`plugin/golang`（公開）」）で求める。決まりの持ち主は、`docs/ide-chain.md`「テストの規約」の「インテグレーションテストの作り直し」の「Hozo が作る、例外のケース」。
-- **出どころの書き方**:
+- **出どころ**と、**Hozo が作れるか**は、`golang.ThrowSources` と `golang.CaughtSources`（`docs/packages.md`「`plugin/golang`（公開）」）で読む。出どころの決まりの持ち主は、`docs/check.md`「入口ごとの、求めるケース」。Hozo が作れるかの決まりの持ち主は、`docs/plugin-go.md`「テストのにせもの」の「求めるケースを、にせものに当てる」。
+- **Hozo が作るのは**、作れる出どころ（`ThrowSource.Made`）で、op に、正常のケースがあり、にせものに言うことがあるなら、その出力が `fakes.go` を持つもの。
+- **テストの名前の `<出どころ>`** は、出どころの名前（`EntrySource.label`。`docs/check.md`「入口ごとの、求めるケース」の「出どころ」）。
+- **口のメソッドの `<出どころの名前>`**（`ThrowSource.Ident`）:
 
-| 出どころ | テストの名前の `<出どころ>` | 口のメソッドの `<出どころの名前>` |
-|---|---|---|
-| 葉の op、効果、外の仕組みの op、`never` を返す op | その FQN（`server.requireFresh`、`mailer.send`） | メソッドの名前（`RequireFresh`、`Send`） |
-| 配線の `match` の、`throw` のアーム | `<配線の op の FQN>.<ケース>`（`server.sessionOf.LoggedOut`）。アームが、二つ以上のケースを受けるなら、`+` でつなぐ | op のメソッドの名前と、ケースの名前を、先頭大文字でつないだもの（`SessionOfLoggedOut`） |
-| 継ぎ目（op に付いたデコレータ） | `<op の FQN>@<デコレータの FQN>`（`server.login@rate.limited`） | 継ぎ目のメソッドの名前（`LoginRateLimited`） |
+| 出どころの種類（`EntrySource.kind`） | 口のメソッドの `<出どころの名前>` |
+|---|---|
+| `leaf`、`effect`、`external`、`never` | メソッドの名前（`server.requireFresh` → `RequireFresh`、`mailer.send` → `Send`） |
+| `boundary`、`decorator` | 継ぎ目のメソッドの名前と同じ形（`docs/plugin-go.md`「名前」）: op の名前と、デコレータの FQN のセグメントを、先頭大文字でつないだもの（`server.login@rate.limited` → `LoginRateLimited`） |
+| `arm`（`match` のアーム） | op のメソッドの名前と、ケースの名前を、先頭大文字でつないだもの（`server.sessionOf.LoggedOut` → `SessionOfLoggedOut`）。デコレータの本体の中なら、op の名前の後ろに、デコレータの FQN のセグメント |
+| `arm`（`catch` のブロックの `throw 例外`） | 同じ形で、ケースの名前の前に `Catch`（`server.pay.catch.Lost` → `PayCatchLost`） |
 
 - **例外の名前**は、基底と同じ決まり（`docs/plugin-go.md`「単体テストの口」の「葉の op」の「結果の名前」）: 宣言の名前。その op の中で、名前が当たる例外（別の名前空間の、同じ名前の例外。例外 `OK`、`BadRequest`）は、名前空間のセグメントを先頭大文字にして、前に付ける。
-- **`t.Run` の重ね方**: op、結果（`OK`、`BadRequest`、例外の名前）、例外なら、出どころ。出どころが見つからない例外は、例外の名前の段が、テスト。
+- **`t.Run` の重ね方**: op、結果（`OK`、`BadRequest`、例外の名前）、例外なら、出どころ。出どころが見つからない例外は、例外の名前の段が、テスト。受ける道は、op、`caught`、例外の名前、出どころ。
+- **受ける道の、例外の名前**は、同じ決まりで、当たるかは、その op の、受ける道の例外どうしで見る。
+- **`RunHTTP` のコメント**（「口の形」の例の三行）には、受ける道を持つ入口が、一つでもあれば、最後に、一行を足す: `// 受ける道（流れの中の catch が、例外を受けて、正常に終わる道）は、出どころごとに、<op の FQN>/caught/<例外>/<出どころ>。`
 - **Hozo が作るケース**は、正常のケース（`cases.OK()`）を取り、その `Given` の後に、`force` で、にせものに言う（`ThrowSources` の `Steps` を、順に、一行ずつ）。確かめるのは、応答が、その例外のものであること。`Then` は、呼ばない。
+- **Hozo が作る、受ける道のケース**も、同じ作り方。確かめるのは、応答が、成功の応答であること。`Then` は、呼ばない（正常のケースの確かめが、受ける道でも成り立つとは、限らない）。
 
 | `Steps` の種類 | Go の一行 |
 |---|---|

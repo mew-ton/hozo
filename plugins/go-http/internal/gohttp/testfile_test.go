@@ -316,6 +316,9 @@ func TestHTTPMadeCases(t *testing.T) {
 	_, files := emitFixture(t, "routes")
 	content := files["gen/flow/flowtest/http.go"]
 	for _, want := range []string{
+		// 受ける道を持つ入口があるので、RunHTTP のコメントが、その名前を言う
+		"// 受ける道（流れの中の catch が、例外を受けて、正常に終わる道）は、出どころごとに、<op の FQN>/caught/<例外>/<出どころ>。\n" +
+			"func RunHTTP(t *testing.T, leaves flow.Leaves, hours flow.HoursCases, size flow.SizeCases, c HTTPCases) {\n",
 		// 人が書いたもの（分類の述語）を、位置引数で受け取り、組み立てに渡す
 		"func RunHTTP(t *testing.T, leaves flow.Leaves, hours flow.HoursCases, size flow.SizeCases, c HTTPCases) {\n",
 		"return call.send(t, flow.NewHandler(NewOps(f, leaves, hours, size)), k.Request), f\n",
@@ -351,6 +354,50 @@ func TestHTTPMadeCases(t *testing.T) {
 			"\t\t\t\t})\n" +
 			"\t\t\t\thttpWantThrown[flow.Shut](t, res, 503)\n" +
 			"\t\t\t})\n",
+		// 受ける道: try の中の葉のにせものが、投げ、catch が受ける。応答は、成功の応答。Then は、呼ばない
+		"\t\tt.Run(\"caught\", func(t *testing.T) {\n" +
+			"\t\t\tt.Run(\"Undelivered\", func(t *testing.T) {\n" +
+			"\t\t\t\tt.Run(\"flow.notify\", func(t *testing.T) {\n" +
+			"\t\t\t\t\tk := cases.OK()\n" +
+			"\t\t\t\t\tres, _ := send(t, k, func(f *Fakes) {\n" +
+			"\t\t\t\t\t\tf.Leaves.Notify.Throws(flow.Undelivered{})\n" +
+			"\t\t\t\t\t})\n" +
+			"\t\t\t\t\thttpWantResult(t, res, nil)\n" +
+			"\t\t\t\t})\n" +
+			"\t\t\t})\n" +
+			"\t\t})\n",
+		// 人が書く、受ける道（同じ出どころを、try の外でも呼ぶ）: 口のメソッド Caught<例外の名前><出どころの名前> のケースを、送り、
+		// 成功の応答を確かめて、Then を呼ぶ
+		"\t\tt.Run(\"caught\", func(t *testing.T) {\n" +
+			"\t\t\tt.Run(\"Undelivered\", func(t *testing.T) {\n" +
+			"\t\t\t\tt.Run(\"flow.notify\", func(t *testing.T) {\n" +
+			"\t\t\t\t\tk := cases.CaughtUndeliveredNotify()\n" +
+			"\t\t\t\t\tres, f := send(t, k, nil)\n" +
+			"\t\t\t\t\thttpWantResult(t, res, nil)\n" +
+			"\t\t\t\t\tif k.Then != nil {\n" +
+			"\t\t\t\t\t\tk.Then(t, res, f)\n" +
+			"\t\t\t\t\t}\n" +
+			"\t\t\t\t})\n" +
+			"\t\t\t})\n" +
+			"\t\t})\n",
+		// 相手の入口（流れの端）のにせものが、相手の op の例外を投げる
+		"\t\t\tt.Run(\"bare.touch\", func(t *testing.T) {\n" +
+			"\t\t\t\tk := cases.OK()\n" +
+			"\t\t\t\tres, _ := send(t, k, func(f *Fakes) {\n" +
+			"\t\t\t\t\tf.Bare.Touch.Throws(bare.Unknown{})\n" +
+			"\t\t\t\t})\n" +
+			"\t\t\t\thttpWantInternal(t, res)\n" +
+			"\t\t\t})\n",
+		// 相手の境界で起きる例外（@http.post の outer throws）: 同じにせものが、投げる。出どころの名前は、<op>@<デコレータ>
+		"\t\tt.Run(\"ServerError\", func(t *testing.T) {\n" +
+			"\t\t\tt.Run(\"bare.touch@http.post\", func(t *testing.T) {\n" +
+			"\t\t\t\tk := cases.OK()\n" +
+			"\t\t\t\tres, _ := send(t, k, func(f *Fakes) {\n" +
+			"\t\t\t\t\tf.Bare.Touch.Throws(http2.ServerError{})\n" +
+			"\t\t\t\t})\n" +
+			"\t\t\t\thttpWantInternal(t, res)\n" +
+			"\t\t\t})\n" +
+			"\t\t})\n",
 	} {
 		if !strings.Contains(content, want) {
 			t.Errorf("gen/flow/flowtest/http.go に、次がない:\n%s\n----\n%s", want, content)
@@ -367,7 +414,22 @@ func TestHTTPMadeCases(t *testing.T) {
 	if got := strings.Join(caseMethods(t, content, "ShelveHTTPCases"), " "); got != "OK BadRequest" {
 		t.Errorf("ShelveHTTPCases のメソッド = %s, want OK BadRequest（デコレータの本体の例外のケースも、口にない）", got)
 	}
-	for _, name := range []string{"TestFlowHTTPCases/flow.add/OK", "TestFlowHTTPCases/flow.add/BadRequest",
+	if got := strings.Join(caseMethods(t, content, "AnnounceHTTPCases"), " "); got != "OK BadRequest" {
+		t.Errorf("AnnounceHTTPCases のメソッド = %s, want OK BadRequest（受ける道のケースは、口にない）", got)
+	}
+	if got := strings.Join(caseMethods(t, content, "ReannounceHTTPCases"), " "); got != "OK BadRequest CaughtUndeliveredNotify" {
+		t.Errorf("ReannounceHTTPCases のメソッド = %s, want OK BadRequest CaughtUndeliveredNotify（Hozo が作れない、受ける道のケースは、口に出る）", got)
+	}
+	if got := strings.Join(caseMethods(t, content, "RelayHTTPCases"), " "); got != "OK" {
+		t.Errorf("RelayHTTPCases のメソッド = %s, want OK（相手の入口と、その境界の例外のケースは、口にない）", got)
+	}
+	for _, name := range []string{"TestFlowHTTPCases/flow.announce/OK", "TestFlowHTTPCases/flow.announce/BadRequest",
+		"TestFlowHTTPCases/flow.announce/caught/Undelivered/flow.notify",
+		"TestFlowHTTPCases/flow.reannounce/OK", "TestFlowHTTPCases/flow.reannounce/BadRequest",
+		"TestFlowHTTPCases/flow.reannounce/Undelivered/flow.notify", "TestFlowHTTPCases/flow.reannounce/caught/Undelivered/flow.notify",
+		"TestFlowHTTPCases/flow.relay/OK", "TestFlowHTTPCases/flow.relay/Unknown/bare.touch",
+		"TestFlowHTTPCases/flow.relay/ServerError/bare.touch@http.post", "TestFlowHTTPCases/flow.relay/NetworkError/bare.touch@http.post",
+		"TestFlowHTTPCases/flow.add/OK", "TestFlowHTTPCases/flow.add/BadRequest",
 		"TestFlowHTTPCases/flow.add/TooBig/flow.add.Big", "TestFlowHTTPCases/flow.add/Taken/flow.addItem",
 		"TestFlowHTTPCases/flow.shelve/OK", "TestFlowHTTPCases/flow.shelve/BadRequest",
 		"TestFlowHTTPCases/flow.shelve/Jammed/flow.checkDoor", "TestFlowHTTPCases/flow.shelve/Shut/flow.shelve@flow.opened.Late",

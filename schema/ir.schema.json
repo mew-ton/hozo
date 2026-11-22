@@ -650,7 +650,7 @@
           "const": "check"
         },
         "protocol": {
-          "const": "0.20"
+          "const": "0.21"
         },
         "view": {
           "$ref": "#/$defs/View"
@@ -872,7 +872,7 @@
           "type": "array"
         },
         "protocol": {
-          "const": "0.20"
+          "const": "0.21"
         }
       },
       "required": [
@@ -1417,7 +1417,7 @@
           "const": "emit"
         },
         "protocol": {
-          "const": "0.20"
+          "const": "0.21"
         },
         "transpiler": {
           "type": "string"
@@ -1462,6 +1462,168 @@
         "warnings"
       ],
       "type": "object"
+    },
+    "Entry": {
+      "additionalProperties": false,
+      "description": "入口の op 一つの、求めるケース（docs/ir.md「その名前空間から見た IR」の Entry、docs/check.md「入口ごとの、求めるケース」）。",
+      "properties": {
+        "blocked": {
+          "type": "string"
+        },
+        "caught": {
+          "items": {
+            "$ref": "#/$defs/EntrySource"
+          },
+          "type": "array"
+        },
+        "normal": {
+          "type": "boolean"
+        },
+        "op": {
+          "type": "string"
+        },
+        "sources": {
+          "items": {
+            "$ref": "#/$defs/EntrySource"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "op",
+        "normal",
+        "blocked",
+        "sources",
+        "caught"
+      ],
+      "type": "object"
+    },
+    "EntrySource": {
+      "additionalProperties": false,
+      "description": "例外の出どころ一つか、受ける道一つ（docs/ir.md「その名前空間から見た IR」の EntrySource）。why が \"\" なら、steps の差し替えで、入れる。",
+      "properties": {
+        "cases": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "catch": {
+          "type": "boolean"
+        },
+        "decorator": {
+          "type": "string"
+        },
+        "exception": {
+          "type": "string"
+        },
+        "kind": {
+          "$ref": "#/$defs/EntrySourceKind"
+        },
+        "label": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "steps": {
+          "items": {
+            "$ref": "#/$defs/EntryStep"
+          },
+          "type": "array"
+        },
+        "why": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "exception",
+        "kind",
+        "label",
+        "name",
+        "decorator",
+        "cases",
+        "catch",
+        "steps",
+        "why"
+      ],
+      "type": "object"
+    },
+    "EntrySourceKind": {
+      "description": "出どころの種類（docs/check.md「入口ごとの、求めるケース」の「出どころ」の表）。",
+      "enum": [
+        "leaf",
+        "effect",
+        "external",
+        "boundary",
+        "decorator",
+        "arm",
+        "never",
+        "unknown"
+      ],
+      "type": "string"
+    },
+    "EntryStep": {
+      "additionalProperties": false,
+      "description": "差し替えに言うこと一つ（docs/ir.md「その名前空間から見た IR」の EntryStep）。via は、相手のある出力までに通った名前空間。",
+      "properties": {
+        "case": {
+          "type": "string"
+        },
+        "decorator": {
+          "type": "string"
+        },
+        "exception": {
+          "type": "string"
+        },
+        "kind": {
+          "$ref": "#/$defs/EntryTargetKind"
+        },
+        "name": {
+          "type": "string"
+        },
+        "verb": {
+          "$ref": "#/$defs/EntryStepVerb"
+        },
+        "via": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "via",
+        "verb",
+        "kind",
+        "name",
+        "decorator",
+        "exception",
+        "case"
+      ],
+      "type": "object"
+    },
+    "EntryStepVerb": {
+      "description": "差し替えに言うことの種類（docs/ir.md「その名前空間から見た IR」の EntryStep.verb）。",
+      "enum": [
+        "throws",
+        "none",
+        "is"
+      ],
+      "type": "string"
+    },
+    "EntryTargetKind": {
+      "description": "差し替える相手の種類（docs/ir.md「その名前空間から見た IR」の EntryStep.kind）。",
+      "enum": [
+        "leaf",
+        "effect",
+        "read",
+        "state",
+        "op",
+        "decorator",
+        "classify"
+      ],
+      "type": "string"
     },
     "Exception": {
       "additionalProperties": false,
@@ -1648,7 +1810,7 @@
           "type": "string"
         },
         "protocol": {
-          "const": "0.20"
+          "const": "0.21"
         }
       },
       "required": [
@@ -2468,7 +2630,7 @@
           "type": "array"
         },
         "version": {
-          "const": "0.20"
+          "const": "0.21"
         }
       },
       "required": [
@@ -3396,6 +3558,12 @@
         "config": {
           "$ref": "#/$defs/NamespaceConfig"
         },
+        "entries": {
+          "items": {
+            "$ref": "#/$defs/Entry"
+          },
+          "type": "array"
+        },
         "files": {
           "items": {
             "type": "string"
@@ -3421,7 +3589,7 @@
           "$ref": "#/$defs/Program"
         },
         "version": {
-          "const": "0.20"
+          "const": "0.21"
         },
         "viewer": {
           "type": "string"
@@ -3434,7 +3602,8 @@
         "files",
         "namespaces",
         "program",
-        "ops"
+        "ops",
+        "entries"
       ],
       "type": "object"
     },

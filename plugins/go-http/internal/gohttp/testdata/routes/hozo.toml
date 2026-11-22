@@ -37,3 +37,9 @@ validate = true
 namespace   = "flow"
 transpilers = ["go", "go-valid", "go-http"]
 out         = "gen/flow"
+
+# 6: 語彙 http の型と例外の置き場（flow.relay が、相手の入口 bare.touch を呼ぶので、境界の例外 http.ServerError、http.NetworkError を書く）
+[[emit]]
+namespace   = "http"
+transpilers = ["go"]
+out         = "gen/http"

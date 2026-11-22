@@ -1,5 +1,5 @@
 {
-  "version": "0.20",
+  "version": "0.21",
   "viewer": "api",
   "config": {
     "index": 1,
@@ -74,7 +74,7 @@
     ]
   },
   "program": {
-    "version": "0.20",
+    "version": "0.21",
     "namespaces": [
       {
         "name": "",
@@ -16984,6 +16984,94 @@
       }
     ]
   },
+  "entries": [
+    {
+      "op": "api.getUser",
+      "normal": true,
+      "blocked": "",
+      "sources": [
+        {
+          "exception": "api.NotFound",
+          "kind": "leaf",
+          "label": "api.getUser",
+          "name": "api.getUser",
+          "decorator": "",
+          "cases": [],
+          "catch": false,
+          "steps": [
+            {
+              "via": [],
+              "verb": "throws",
+              "kind": "leaf",
+              "name": "api.getUser",
+              "decorator": "",
+              "exception": "api.NotFound",
+              "case": ""
+            }
+          ],
+          "why": ""
+        },
+        {
+          "exception": "api.Unauthorized",
+          "kind": "decorator",
+          "label": "api.getUser@api.requiresAuth",
+          "name": "api.getUser",
+          "decorator": "api.requiresAuth",
+          "cases": [],
+          "catch": false,
+          "steps": [
+            {
+              "via": [],
+              "verb": "throws",
+              "kind": "decorator",
+              "name": "api.getUser",
+              "decorator": "api.requiresAuth",
+              "exception": "api.Unauthorized",
+              "case": ""
+            }
+          ],
+          "why": ""
+        }
+      ],
+      "caught": []
+    },
+    {
+      "op": "api.login",
+      "normal": true,
+      "blocked": "",
+      "sources": [
+        {
+          "exception": "api.Invalid",
+          "kind": "leaf",
+          "label": "api.issue",
+          "name": "api.issue",
+          "decorator": "",
+          "cases": [],
+          "catch": false,
+          "steps": [
+            {
+              "via": [],
+              "verb": "throws",
+              "kind": "leaf",
+              "name": "api.issue",
+              "decorator": "",
+              "exception": "api.Invalid",
+              "case": ""
+            }
+          ],
+          "why": ""
+        }
+      ],
+      "caught": []
+    },
+    {
+      "op": "api.logout",
+      "normal": true,
+      "blocked": "",
+      "sources": [],
+      "caught": []
+    }
+  ],
   "ops": {
     "api.arrivedName": {
       "exceptions": [

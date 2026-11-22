@@ -3,19 +3,46 @@
 package clienttest
 
 import (
+	"context"
+
 	client "example.com/shop-server/gen/client"
 	"example.com/shop-server/gen/server"
-	"example.com/shop-server/gen/server/servertest"
+	pkgtype "example.com/shop-server/gen/type"
+	"github.com/mew-ton/hozo/runtime"
 )
+
+// ServerOpsFake は、名前空間 server の、入口の op（client.ServerOps）のにせもの。メソッドごとに、フィールド一つ。
+// 言われていないメソッドは、零値を返す。
+type ServerOpsFake struct {
+	Login      runtime.Fake[struct{ In server.LoginInput }, server.LoginOk]
+	GetOrders  runtime.Fake[struct{ In server.GetOrdersInput }, []pkgtype.Order]
+	PlaceOrder runtime.Fake[struct{ In server.PlaceOrderInput }, pkgtype.Order]
+}
+
+// serverOpsFake は、ServerOpsFake を、client.ServerOps にする。
+type serverOpsFake struct{ f *ServerOpsFake }
+
+var _ client.ServerOps = serverOpsFake{}
+
+func (o serverOpsFake) Login(ctx context.Context, in server.LoginInput) (server.LoginOk, error) {
+	return o.f.Login.Call(struct{ In server.LoginInput }{in}, nil)
+}
+
+func (o serverOpsFake) GetOrders(ctx context.Context, in server.GetOrdersInput) ([]pkgtype.Order, error) {
+	return o.f.GetOrders.Call(struct{ In server.GetOrdersInput }{in}, nil)
+}
+
+func (o serverOpsFake) PlaceOrder(ctx context.Context, in server.PlaceOrderInput) (pkgtype.Order, error) {
+	return o.f.PlaceOrder.Call(struct{ In server.PlaceOrderInput }{in}, nil)
+}
 
 // Fakes は、名前空間 client の、テストの中の組み立て（NewOps）に使う、にせもの。フィールドは、New の引数の順。零値のまま、使える。
 type Fakes struct {
-	// Server は、名前空間 server の出力（gen/server）の、にせもの。その配線は、本物を通す。
-	Server servertest.Fakes
+	// Server は、名前空間 server の、入口の op のにせもの（相手の入口は、流れの端: その先は、通さない）。
+	Server ServerOpsFake
 }
 
 // NewOps は、にせもの f の上に、名前空間 client の Ops を組み立てる: 配線は、本物。流れの端と、継ぎ目は、にせもの。
-// 人が書いたもの（serverLeaves）は、引数で受け取り、にせものが包む。
-func NewOps(f *Fakes, serverLeaves server.Leaves) client.Ops {
-	return client.New(servertest.NewOps(&f.Server, serverLeaves))
+func NewOps(f *Fakes) client.Ops {
+	return client.New(serverOpsFake{&f.Server})
 }

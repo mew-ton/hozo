@@ -5,7 +5,6 @@ package flowstest
 import (
 	"example.com/shop-server/gen/client/clienttest"
 	flows "example.com/shop-server/gen/flows"
-	"example.com/shop-server/gen/server"
 )
 
 // Fakes は、名前空間 flows の、テストの中の組み立て（NewOps）に使う、にせもの。フィールドは、New の引数の順。零値のまま、使える。
@@ -15,7 +14,6 @@ type Fakes struct {
 }
 
 // NewOps は、にせもの f の上に、名前空間 flows の Ops を組み立てる: 配線は、本物。流れの端と、継ぎ目は、にせもの。
-// 人が書いたもの（clientServerLeaves）は、引数で受け取り、にせものが包む。
-func NewOps(f *Fakes, clientServerLeaves server.Leaves) flows.Ops {
-	return flows.New(clienttest.NewOps(&f.Client, clientServerLeaves))
+func NewOps(f *Fakes) flows.Ops {
+	return flows.New(clienttest.NewOps(&f.Client))
 }

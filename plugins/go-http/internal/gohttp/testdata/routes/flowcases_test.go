@@ -9,6 +9,14 @@
 //   - flow.shelve/Shut/flow.shelve@flow.opened.Late: デコレータの本体の match の、throw のアーム。判定のにせものが、Late だと言う
 //     （本物の述語 hoursCases は、番 "day" を Open と言う）。
 //   - flow.shelve/Taken/flow.addItem: デコレータの本体の proceed() の先（op の中身）の、effect fn が投げる例外。
+//   - flow.announce/caught/Undelivered/flow.notify: 受ける道。try の中の葉 notify のにせものが、投げ、catch が受けて、成功の応答になる
+//     （本物の葉 notify は、投げない）。
+//   - flow.reannounce/Undelivered/flow.notify: try の外の notify が投げる道。葉のにせものが、投げる（どの呼び出しでも）。
+//   - flow.reannounce/caught/Undelivered/flow.notify: 人が書く、受ける道（口のメソッド CaughtUndeliveredNotify）。同じ葉を、try の外でも
+//     呼ぶので、Hozo は、作れない。本物の葉 notify が、品物 "second" の、二度目の呼び出しでだけ、投げる。
+//   - flow.relay/Unknown/bare.touch: 相手の入口 bare.touch（流れの端）のにせものが、相手の op の例外を投げる。
+//   - flow.relay/ServerError/bare.touch@http.post、flow.relay/NetworkError/bare.touch@http.post: 相手の境界で起きる例外
+//     （@http.post の outer throws）。同じにせものが、投げる。
 package behavior
 
 import (
@@ -41,10 +49,28 @@ type flowLeaves struct{}
 func (flowLeaves) Duty(context.Context) (flow.Item, error) { return flow.Item{Id: "day"}, nil }
 func (flowLeaves) CheckDoor(context.Context) error         { return nil }
 
+// notifyCalls は、葉 notify が、品物 "second" で呼ばれた回数（受ける道のケースが、Given で、0 に戻す）。
+var notifyCalls int
+
+// Notify は、届く。品物 "second" の、二度目の呼び出しでだけ、届かない（人が書く、受ける道のケースが、使う）。
+// NoteFailure は、何もしない（呼ばれたことは、にせものが覚える）。
+func (flowLeaves) Notify(_ context.Context, item flow.Item) error {
+	if item.Id == "second" {
+		if notifyCalls++; notifyCalls == 2 {
+			return flow.Undelivered{}
+		}
+	}
+	return nil
+}
+func (flowLeaves) NoteFailure(context.Context, flow.Item) error { return nil }
+
 type (
-	flowCases   struct{}
-	addCases    struct{}
-	shelveCases struct{}
+	flowCases       struct{}
+	addCases        struct{}
+	shelveCases     struct{}
+	announceCases   struct{}
+	reannounceCases struct{}
+	relayCases      struct{}
 )
 
 var _ flowtest.HTTPCases = flowCases{}
@@ -92,6 +118,66 @@ func (shelveCases) OK() flowtest.ShelveHTTPCase {
 
 func (shelveCases) BadRequest() flowtest.ShelveHTTPCase {
 	return flowtest.ShelveHTTPCase{Request: func(r *http.Request) { r.Body = io.NopCloser(strings.NewReader("{")) }}
+}
+
+func (flowCases) Announce() flowtest.AnnounceHTTPCases { return announceCases{} }
+
+// OK: 葉 notify が届くので、catch には、入らない（noteFailure は、呼ばれない）。
+func (announceCases) OK() flowtest.AnnounceHTTPCase {
+	return flowtest.AnnounceHTTPCase{
+		In: flow.AddInput{Item: flow.Item{Id: "pen"}},
+		Then: func(t *testing.T, _ *httptest.ResponseRecorder, f *flowtest.Fakes) {
+			if n := len(f.Leaves.Notify.Calls); n != 1 {
+				t.Errorf("notify の呼び出し = %d 回（期待は、一度）", n)
+			}
+			if n := len(f.Leaves.NoteFailure.Calls); n != 0 {
+				t.Errorf("noteFailure の呼び出し = %d 回（期待は、なし）", n)
+			}
+		},
+	}
+}
+
+func (announceCases) BadRequest() flowtest.AnnounceHTTPCase {
+	return flowtest.AnnounceHTTPCase{Request: func(r *http.Request) { r.Body = io.NopCloser(strings.NewReader("{")) }}
+}
+
+func (flowCases) Reannounce() flowtest.ReannounceHTTPCases { return reannounceCases{} }
+
+func (reannounceCases) OK() flowtest.ReannounceHTTPCase {
+	return flowtest.ReannounceHTTPCase{In: flow.AddInput{Item: flow.Item{Id: "pen"}}}
+}
+
+func (reannounceCases) BadRequest() flowtest.ReannounceHTTPCase {
+	return flowtest.ReannounceHTTPCase{Request: func(r *http.Request) { r.Body = io.NopCloser(strings.NewReader("{")) }}
+}
+
+// CaughtUndeliveredNotify: try の中の notify（二度目の呼び出し）だけが、投げる。catch が受けて、noteFailure を呼び、成功の応答になる。
+func (reannounceCases) CaughtUndeliveredNotify() flowtest.ReannounceHTTPCase {
+	return flowtest.ReannounceHTTPCase{
+		In:    flow.AddInput{Item: flow.Item{Id: "second"}},
+		Given: func(*flowtest.Fakes) { notifyCalls = 0 },
+		Then: func(t *testing.T, _ *httptest.ResponseRecorder, f *flowtest.Fakes) {
+			if n := len(f.Leaves.Notify.Calls); n != 2 {
+				t.Errorf("notify の呼び出し = %d 回（期待は、二度）", n)
+			}
+			if n := len(f.Leaves.NoteFailure.Calls); n != 1 {
+				t.Errorf("noteFailure の呼び出し = %d 回（期待は、一度: catch が、受けた）", n)
+			}
+		},
+	}
+}
+
+func (flowCases) Relay() flowtest.RelayHTTPCases { return relayCases{} }
+
+// OK: 相手の入口 bare.touch は、にせもの（言われていなければ、零値を返す）。一度、呼ばれる。
+func (relayCases) OK() flowtest.RelayHTTPCase {
+	return flowtest.RelayHTTPCase{
+		Then: func(t *testing.T, _ *httptest.ResponseRecorder, f *flowtest.Fakes) {
+			if n := len(f.Bare.Touch.Calls); n != 1 {
+				t.Errorf("bare.touch の呼び出し = %d 回（期待は、一度）", n)
+			}
+		},
+	}
 }
 
 func TestFlowHTTPCases(t *testing.T) {

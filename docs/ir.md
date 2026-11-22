@@ -21,7 +21,7 @@ TypeScript 風の記法で書く。`?` は省略可（JSON での扱いは「JSO
 
 ```ts
 interface Program {
-  version: "0.20";                 // この文書の版。Program か View の構造が変わったら上げる（「版」）
+  version: "0.21";                 // この文書の版。Program か View の構造が変わったら上げる（「版」）
   namespaces: Namespace[];        // グローバルは name "" の Namespace として先頭に置く
   binds: Bind[];
 }
@@ -519,7 +519,7 @@ interface Bind {
 
 ```ts
 interface View {
-  version: "0.20";
+  version: "0.21";
   viewer: string;                 // 見る側の名前空間の FQN
   config: NamespaceConfig;        // この View の単位での viewer の設定
   files: string[];                // この View の単位の in に合ったユーザーのファイルと、読み込んだすべての語彙のファイル
@@ -531,7 +531,40 @@ interface View {
                                                  // トランスパイラが別の名前空間（と別の単位）の言語と出力先を知るため
   program: Program;               // 全体そのまま（各 op の signature は op 自身の名前空間から見たもの）。
                                   // ただし下の params が合成する model を、viewer の Namespace.decls の末尾に足してある
+  entries: Entry[];               // 入口ごとの、求めるケース（docs/check.md「入口ごとの、求めるケース」）。入口の op の宣言順。なければ []
   ops: Record<string, ViewedSignature>;   // FQN → viewer から見た関数の型。すべての op について
+}
+
+interface Entry {                 // 入口の op 一つの、求めるケース
+  op: string;                     // 入口の op の FQN
+  normal: boolean;                // 正常の結果が、あるか（never を返す op には、ない）
+  blocked: string;                // 流れを辿れない理由（docs/check.md 同「流れ」）。辿れたなら ""。"" でなければ、sources と caught は []
+  sources: EntrySource[];         // 例外の出どころ（同「出どころ」。順は、同「並び」）
+  caught: EntrySource[];          // 受ける道（同「受ける道」）
+}
+
+interface EntrySource {           // 出どころ一つ（Entry.sources）か、受ける道一つ（Entry.caught）
+  exception: string;              // 例外の FQN（受ける道なら、受けられる例外）
+  kind: "leaf" | "effect" | "external" | "boundary" | "decorator" | "arm" | "never" | "unknown";   // 同「出どころ」の表
+  label: string;                  // 出どころの名前（同「出どころ」）。unknown は ""
+  name: string;                   // 宣言の FQN。leaf・external・never・boundary: その op。effect: その効果。
+                                  // decorator: デコレータの付いた op。arm: アームのある配線の op。unknown は ""
+  decorator: string;              // boundary と decorator: デコレータの FQN。デコレータの本体の中の arm: そのデコレータ。ほかは ""
+  cases: string[];                // arm: アームが受けるケース（catch の、アームでない throw は []）。ほかは []
+  catch: boolean;                 // arm が、catch のブロックの throw か
+  steps: EntryStep[];             // 入らせる方法（同「入らせる方法」）: 正常のケースの用意に足す、差し替えに言うこと。道の順。
+                                  // [] は、何も言わなくても、届く。why が "" のときだけ、意味を持つ
+  why: string;                    // 差し替えでは、入れない理由（日本語の句）。入れるなら ""
+}
+
+interface EntryStep {             // 差し替えに言うこと一つ
+  via: string[];                  // 相手のある出力まで、入口の名前空間から、通す出力を通った名前空間の FQN（通った順）。入口の出力の中なら []
+  verb: "throws" | "none" | "is"; // 例外 exception を投げる / 「ない」（か、空の並び）を返す / 分類の判定が、ケース case だと言う
+  kind: "leaf" | "effect" | "read" | "state" | "op" | "decorator" | "classify";   // 相手の種類。op は、流れの端の op
+  name: string;                   // 相手の FQN。decorator は、デコレータの付いた op の FQN。classify は、分類の FQN
+  decorator: string;              // kind が decorator: デコレータの FQN。ほかは ""
+  exception: string;              // verb が throws: 例外の FQN。ほかは ""
+  case: string;                   // verb が is: ケースの名前。ほかは ""
 }
 
 interface NamespaceConfig {       // 単位 U での名前空間 N の設定
@@ -565,7 +598,8 @@ interface ViewedSignature extends Signature {   // Signature は Sig(O, viewer)
 - `ops` の `Signature` は `docs/check.md`「計算」の Sig(O, viewer)。viewer が op の名前空間と同じなら `Program` の `signature` と一致する。`reads` と `pure` は viewer によらず、`Program` の `signature` と同じ値。
 - `ops` は、`export` の有無によらずすべての op を持つ。viewer が呼べる op かどうかは `Op.exported` と名前空間から分かる（`docs/check.md`「export」）。
 - `params` に反映する `bind` は `viewer` の名前空間の `Bind` だけ（`bind` は呼び出す側の宣言。§5.3）。
-- `viewer` が同じなら、`config`・`files` 以外は単位によらず同じ。
+- `viewer` が同じなら、`config`・`files`・`entries` 以外は単位によらず同じ。
+- `entries` は、単位ごとに違いうる: 単位の対象の op と、通す出力が、単位で決まる（`docs/check.md`「入口ごとの、求めるケース」の「入口」「流れ」）。`Entry`・`EntrySource`・`EntryStep` のフィールドは、どれも、省かない（値がなければ、`""` か `[]`）。
 
 ## JSON
 
@@ -577,10 +611,11 @@ interface ViewedSignature extends Signature {   // Signature は Sig(O, viewer)
 
 ## 版
 
-`Program.version` と `View.version` は同じ値で、どちらかの構造か、プラグインとのやり取りの形（`docs/plugin-protocol.md`「要求と応答」）が変わったら上げる。IR が決めている名前のうち、プラグインが、その値で出力を分けるもの（核の型の名前、標準の分類のケースの名前）が変わったときも、上げる。今の版は `"0.20"`。構造もやり取りの形も同じで、値の意味だけが変わる決定では、上げない: 配線の op の `Op.carried` が空でないことがあり、その `Signature` が運ばれたものを含むこと（`docs/decisions.md`「決めたこと」149）は、0.6 の中にある。
+`Program.version` と `View.version` は同じ値で、どちらかの構造か、プラグインとのやり取りの形（`docs/plugin-protocol.md`「要求と応答」）が変わったら上げる。IR が決めている名前のうち、プラグインが、その値で出力を分けるもの（核の型の名前、標準の分類のケースの名前）が変わったときも、上げる。今の版は `"0.21"`。構造もやり取りの形も同じで、値の意味だけが変わる決定では、上げない: 配線の op の `Op.carried` が空でないことがあり、その `Signature` が運ばれたものを含むこと（`docs/decisions.md`「決めたこと」149）は、0.6 の中にある。
 
 | 版 | 変わったこと |
 |---|---|
+| 0.21 | `View.entries`（`Entry`、`EntrySource`、`EntryStep`）を足した: 入口ごとの、求めるケースを、本体が求めて、プラグインに渡す（`docs/check.md`「入口ごとの、求めるケース」、`docs/decisions.md`「決めたこと」409） |
 | 0.20 | 配線の文（`Statement`）に `try`（`Catch`）と `throw` を足した。`Match.subject` に `caught`。アームの本体の `throw` に `caught`（`throw e`）。`Classify.subject` に `exception`、`Classify.cases[]` に `exceptions` と `rest`（例外の分類）（`docs/check.md`「例外を受ける」「例外の分類」。`docs/decisions.md`「決めたこと」419、422）。`View` とやり取りの形は 0.19 のまま |
 | 0.19 | `Decorator.external` をなくし、`Decorator.outerThrows`（節 `outer throws`）と、`Decorator.entry`、`Decorator.hint`（核の印 `@entry`、`@hint`）を足した（`docs/grammar.md`「decorator の宣言」。`docs/decisions.md`「決めたこと」407、408、420） |
 | 0.18 | `Decorator.fn` と `Decorator.body` を足した（関数に付けるデコレータ `decorator fn` と、その本体。`docs/grammar.md`「decorator の宣言」「デコレータの本体」、`docs/decisions.md`「決めたこと」392〜394）。`Callee` に `proceed` を足した（デコレータの本体の `proceed()`）。`View` とやり取りの形は 0.17 と同じ |

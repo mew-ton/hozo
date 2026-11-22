@@ -666,6 +666,25 @@ func sampleView() *View {
 			},
 		},
 		Program: p,
+		// 入口ごとの、求めるケース（docs/check.md「入口ごとの、求めるケース」）: 形を確かめるための、手で組んだもの
+		Entries: []Entry{
+			{Op: "browser.open", Normal: true,
+				Sources: []EntrySource{
+					{Exception: "server.Unauthorized", Kind: SourceExternal, Label: "server.page", Name: "server.page",
+						Steps: []EntryStep{{Verb: StepThrows, Kind: StepOp, Name: "server.page", Exception: "server.Unauthorized"}}},
+					{Exception: "browser.Stale", Kind: SourceArm, Label: "browser.open@browser.guarded.Shut", Name: "browser.open", Decorator: "browser.guarded",
+						Cases: []string{"Shut"}, Steps: []EntryStep{
+							{Via: []string{"store"}, Verb: StepNone, Kind: StepRead, Name: "store.first"},
+							{Verb: StepIs, Kind: StepClassify, Name: "browser.Gate", Case: "Shut"}}},
+					{Exception: "browser.Limited", Kind: SourceDecorator, Label: "browser.open@rate.limited", Name: "browser.open", Decorator: "rate.limited",
+						Steps: []EntryStep{{Verb: StepThrows, Kind: StepDecorator, Name: "browser.open", Decorator: "rate.limited", Exception: "browser.Limited"}}},
+					{Exception: "browser.Lost", Kind: SourceUnknown, Why: "出どころが、流れの中に、見つからない"},
+				},
+				Caught: []EntrySource{
+					{Exception: "store.Missing", Kind: SourceLeaf, Label: "store.pick", Name: "store.pick", Why: "同じ出どころが、受ける文の外でも、呼ばれる"},
+				}},
+			{Op: "browser.sync", Blocked: "名前空間 store を出力する、基底 go の単位が、二つ以上ある"},
+		},
 		Ops: map[string]*ViewedSignature{
 			"server.page": {
 				Signature: Signature{Exceptions: []string{"server.Unauthorized"}},

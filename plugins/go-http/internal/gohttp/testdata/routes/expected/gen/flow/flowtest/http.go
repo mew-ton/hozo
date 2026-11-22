@@ -11,7 +11,9 @@ import (
 	"reflect"
 	"testing"
 
+	"example.com/app/gen/bare"
 	flow "example.com/app/gen/flow"
+	http2 "example.com/app/gen/http"
 	"github.com/mew-ton/hozo/runtime"
 )
 
@@ -55,16 +57,78 @@ type ShelveHTTPCase struct {
 	Then func(t *testing.T, res *httptest.ResponseRecorder, f *Fakes)
 }
 
+// AnnounceHTTPCases は、入口 flow.announce（POST /flow/notices）の、人か AI が書くケース。メソッドごとに、一つ。
+type AnnounceHTTPCases interface {
+	// OK は、正常に終わるケース: 成功の応答。
+	OK() AnnounceHTTPCase
+	// BadRequest は、op を呼ぶ前に、要求を断るケース: 400 と http.BadRequest。
+	BadRequest() AnnounceHTTPCase
+}
+
+// AnnounceHTTPCase は、入口 flow.announce の、ケース一つ: 入力と、流れの端が返す値と、足りない確かめ。
+type AnnounceHTTPCase struct {
+	// In は、入力。走らせる側が、要求に組み立てる。
+	In flow.AddInput
+	// Given は、要求を送る前に、にせものに、流れの端が返す値を言う（nil なら、呼ばない）。
+	Given func(f *Fakes)
+	// Request は、組み立てた要求を、送る前に、手直しする（nil なら、呼ばない）。入力の値では作れない要求に使う。
+	Request func(r *http.Request)
+	// Then は、応答が、そのケースのものだと確かめた後に、呼ばれる（nil なら、呼ばない）。res は、応答、f は、にせもの（覚えた呼び出しを、確かめる）。
+	Then func(t *testing.T, res *httptest.ResponseRecorder, f *Fakes)
+}
+
+// ReannounceHTTPCases は、入口 flow.reannounce（POST /flow/renotices）の、人か AI が書くケース。メソッドごとに、一つ。
+type ReannounceHTTPCases interface {
+	// OK は、正常に終わるケース: 成功の応答。
+	OK() ReannounceHTTPCase
+	// BadRequest は、op を呼ぶ前に、要求を断るケース: 400 と http.BadRequest。
+	BadRequest() ReannounceHTTPCase
+	// CaughtUndeliveredNotify は、flow.notify が投げた例外 flow.Undelivered を、流れの中で受けて、正常に終わるケース: 成功の応答。
+	CaughtUndeliveredNotify() ReannounceHTTPCase
+}
+
+// ReannounceHTTPCase は、入口 flow.reannounce の、ケース一つ: 入力と、流れの端が返す値と、足りない確かめ。
+type ReannounceHTTPCase struct {
+	// In は、入力。走らせる側が、要求に組み立てる。
+	In flow.AddInput
+	// Given は、要求を送る前に、にせものに、流れの端が返す値を言う（nil なら、呼ばない）。
+	Given func(f *Fakes)
+	// Request は、組み立てた要求を、送る前に、手直しする（nil なら、呼ばない）。入力の値では作れない要求に使う。
+	Request func(r *http.Request)
+	// Then は、応答が、そのケースのものだと確かめた後に、呼ばれる（nil なら、呼ばない）。res は、応答、f は、にせもの（覚えた呼び出しを、確かめる）。
+	Then func(t *testing.T, res *httptest.ResponseRecorder, f *Fakes)
+}
+
+// RelayHTTPCases は、入口 flow.relay（POST /flow/relay）の、人か AI が書くケース。メソッドごとに、一つ。
+type RelayHTTPCases interface {
+	// OK は、正常に終わるケース: 成功の応答。
+	OK() RelayHTTPCase
+}
+
+// RelayHTTPCase は、入口 flow.relay の、ケース一つ: 流れの端が返す値と、足りない確かめ。
+type RelayHTTPCase struct {
+	// Given は、要求を送る前に、にせものに、流れの端が返す値を言う（nil なら、呼ばない）。
+	Given func(f *Fakes)
+	// Request は、組み立てた要求を、送る前に、手直しする（nil なら、呼ばない）。入力の値では作れない要求に使う。
+	Request func(r *http.Request)
+	// Then は、応答が、そのケースのものだと確かめた後に、呼ばれる（nil なら、呼ばない）。res は、応答、f は、にせもの（覚えた呼び出しを、確かめる）。
+	Then func(t *testing.T, res *httptest.ResponseRecorder, f *Fakes)
+}
+
 // HTTPCases は、@http.get / @http.post の付いた op の、インテグレーションテストのケース。入口ごとに、メソッド一つ（宣言順）。
 // メソッドが一つでも足りない値は、RunHTTP に渡すところでコンパイルできない。
 type HTTPCases interface {
 	Add() AddHTTPCases
 	Shelve() ShelveHTTPCases
+	Announce() AnnounceHTTPCases
+	Reannounce() ReannounceHTTPCases
+	Relay() RelayHTTPCases
 }
 
 // RunHTTP は、入口ごと、結果ごとに、テストを走らせる。テストの名前は、<op の FQN>/<結果>。例外は、出どころごとに、<op の FQN>/<例外>/<出どころ>。
 // ケースごとに、新しいにせものの上に、流れを組み立て（NewOps）、入力を要求に組み立てて送り、応答が、そのケースのものであること
 // （ステータスと、本文の形）を確かめてから、Then を呼ぶ。口にない、例外のケースは、正常のケースの用意の後に、にせものに、例外を起こさせる。
+// 受ける道（流れの中の catch が、例外を受けて、正常に終わる道）は、出どころごとに、<op の FQN>/caught/<例外>/<出どころ>。
 func RunHTTP(t *testing.T, leaves flow.Leaves, hours flow.HoursCases, size flow.SizeCases, c HTTPCases) {
 	t.Run("flow.add", func(t *testing.T) {
 		cases := c.Add()
@@ -170,6 +234,149 @@ func RunHTTP(t *testing.T, leaves flow.Leaves, hours flow.HoursCases, size flow.
 					f.Hours.Is(flow.HoursLate)
 				})
 				httpWantThrown[flow.Shut](t, res, 503)
+			})
+		})
+	})
+	t.Run("flow.announce", func(t *testing.T) {
+		cases := c.Announce()
+		send := func(t *testing.T, k AnnounceHTTPCase, force func(f *Fakes)) (*httptest.ResponseRecorder, *Fakes) {
+			f := new(Fakes)
+			if k.Given != nil {
+				k.Given(f)
+			}
+			if force != nil {
+				force(f)
+			}
+			call := httpCall{method: "POST", path: "/flow/notices"}
+			call.bodyObj(k.In.Item)
+			return call.send(t, flow.NewHandler(NewOps(f, leaves, hours, size)), k.Request), f
+		}
+		t.Run("OK", func(t *testing.T) {
+			k := cases.OK()
+			res, f := send(t, k, nil)
+			httpWantResult(t, res, nil)
+			if k.Then != nil {
+				k.Then(t, res, f)
+			}
+		})
+		t.Run("BadRequest", func(t *testing.T) {
+			k := cases.BadRequest()
+			res, f := send(t, k, nil)
+			httpWantBadRequest(t, res)
+			if k.Then != nil {
+				k.Then(t, res, f)
+			}
+		})
+		t.Run("caught", func(t *testing.T) {
+			t.Run("Undelivered", func(t *testing.T) {
+				t.Run("flow.notify", func(t *testing.T) {
+					k := cases.OK()
+					res, _ := send(t, k, func(f *Fakes) {
+						f.Leaves.Notify.Throws(flow.Undelivered{})
+					})
+					httpWantResult(t, res, nil)
+				})
+			})
+		})
+	})
+	t.Run("flow.reannounce", func(t *testing.T) {
+		cases := c.Reannounce()
+		send := func(t *testing.T, k ReannounceHTTPCase, force func(f *Fakes)) (*httptest.ResponseRecorder, *Fakes) {
+			f := new(Fakes)
+			if k.Given != nil {
+				k.Given(f)
+			}
+			if force != nil {
+				force(f)
+			}
+			call := httpCall{method: "POST", path: "/flow/renotices"}
+			call.bodyObj(k.In.Item)
+			return call.send(t, flow.NewHandler(NewOps(f, leaves, hours, size)), k.Request), f
+		}
+		t.Run("OK", func(t *testing.T) {
+			k := cases.OK()
+			res, f := send(t, k, nil)
+			httpWantResult(t, res, nil)
+			if k.Then != nil {
+				k.Then(t, res, f)
+			}
+		})
+		t.Run("BadRequest", func(t *testing.T) {
+			k := cases.BadRequest()
+			res, f := send(t, k, nil)
+			httpWantBadRequest(t, res)
+			if k.Then != nil {
+				k.Then(t, res, f)
+			}
+		})
+		t.Run("Undelivered", func(t *testing.T) {
+			t.Run("flow.notify", func(t *testing.T) {
+				k := cases.OK()
+				res, _ := send(t, k, func(f *Fakes) {
+					f.Leaves.Notify.Throws(flow.Undelivered{})
+				})
+				httpWantInternal(t, res)
+			})
+		})
+		t.Run("caught", func(t *testing.T) {
+			t.Run("Undelivered", func(t *testing.T) {
+				t.Run("flow.notify", func(t *testing.T) {
+					k := cases.CaughtUndeliveredNotify()
+					res, f := send(t, k, nil)
+					httpWantResult(t, res, nil)
+					if k.Then != nil {
+						k.Then(t, res, f)
+					}
+				})
+			})
+		})
+	})
+	t.Run("flow.relay", func(t *testing.T) {
+		cases := c.Relay()
+		send := func(t *testing.T, k RelayHTTPCase, force func(f *Fakes)) (*httptest.ResponseRecorder, *Fakes) {
+			f := new(Fakes)
+			if k.Given != nil {
+				k.Given(f)
+			}
+			if force != nil {
+				force(f)
+			}
+			call := httpCall{method: "POST", path: "/flow/relay"}
+			return call.send(t, flow.NewHandler(NewOps(f, leaves, hours, size)), k.Request), f
+		}
+		t.Run("OK", func(t *testing.T) {
+			k := cases.OK()
+			res, f := send(t, k, nil)
+			httpWantResult(t, res, nil)
+			if k.Then != nil {
+				k.Then(t, res, f)
+			}
+		})
+		t.Run("Unknown", func(t *testing.T) {
+			t.Run("bare.touch", func(t *testing.T) {
+				k := cases.OK()
+				res, _ := send(t, k, func(f *Fakes) {
+					f.Bare.Touch.Throws(bare.Unknown{})
+				})
+				httpWantInternal(t, res)
+			})
+		})
+		t.Run("ServerError", func(t *testing.T) {
+			t.Run("bare.touch@http.post", func(t *testing.T) {
+				k := cases.OK()
+				res, _ := send(t, k, func(f *Fakes) {
+					f.Bare.Touch.Throws(http2.ServerError{})
+				})
+				httpWantInternal(t, res)
+			})
+		})
+		t.Run("NetworkError", func(t *testing.T) {
+			t.Run("bare.touch@http.post", func(t *testing.T) {
+				k := cases.OK()
+				res, _ := send(t, k, func(f *Fakes) {
+					f.Bare.Touch.Throws(http2.NetworkError{})
+				})
+				httpWantInternal(t, res)
 			})
 		})
 	})
@@ -298,6 +505,14 @@ func httpWantThrown[E runtime.Exception](t *testing.T, res *httptest.ResponseRec
 	}
 	if err := json.Unmarshal(raw, &e); err != nil {
 		t.Fatalf("want a value readable as %s, got %s: %v", e.HozoException(), raw, err)
+	}
+}
+
+// httpWantInternal は、応答 res が、中身を出さない失敗であることを確かめる: 500、error が internal、value はない。
+func httpWantInternal(t *testing.T, res *httptest.ResponseRecorder) {
+	t.Helper()
+	if raw := httpWantFailure(t, res, http.StatusInternalServerError, "internal"); raw != nil {
+		t.Fatalf("want no value, got %s", raw)
 	}
 }
 

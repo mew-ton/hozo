@@ -190,7 +190,11 @@ func (e *emitter) genTestFakes() *fileGen {
 			for _, fqn := range d.Ops {
 				ms = append(ms, e.opMethod(f, e.op(fqn), reserved))
 			}
-			e.genFakeType(f, p.Fake, "名前空間 "+p.FQN+" の op", entry+d.TypeName, "メソッドごとに、フィールド一つ", zero, false, ms, reserved, nil)
+			what := "名前空間 " + p.FQN + " の op"
+			if p.Entry {
+				what = "名前空間 " + p.FQN + " の、入口の op"
+			}
+			e.genFakeType(f, p.Fake, what, entry+d.TypeName, "メソッドごとに、フィールド一つ", zero, false, ms, reserved, nil)
 		case golang.KitSeams:
 			var ms []fakeMethod
 			bodies := map[string]string{}
@@ -223,7 +227,11 @@ func (e *emitter) genTestFakes() *fileGen {
 		case golang.KitClassify:
 			f.printf("\t// %s は、分類 %s の述語のにせもの。言われていなければ、本物の述語を呼ぶ。\n\t%s %s\n", p.Field, p.FQN, p.Field, p.Fake)
 		case golang.KitExternal:
-			f.printf("\t// %s は、名前空間 %s（単位がない）の op のにせもの。\n\t%s %s\n", p.Field, p.FQN, p.Field, p.Fake)
+			if p.Entry {
+				f.printf("\t// %s は、名前空間 %s の、入口の op のにせもの（相手の入口は、流れの端: その先は、通さない）。\n\t%s %s\n", p.Field, p.FQN, p.Field, p.Fake)
+			} else {
+				f.printf("\t// %s は、名前空間 %s（単位がない）の op のにせもの。\n\t%s %s\n", p.Field, p.FQN, p.Field, p.Fake)
+			}
 		case golang.KitUnit:
 			f.printf("\t// %s は、名前空間 %s の出力（%s）の、にせもの。その配線は、本物を通す。\n\t%s %s.Fakes\n", p.Field, p.FQN, p.Unit.Dir, p.Field, testPkg(p.Unit))
 		case golang.KitSeams:

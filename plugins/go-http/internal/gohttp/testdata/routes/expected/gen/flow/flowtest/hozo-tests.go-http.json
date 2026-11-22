@@ -1,13 +1,24 @@
 {
   "tests": [
-    {"name": "flow.add/OK", "file": "gen/flow/flowtest/http.go", "lines": [84, 89]},
-    {"name": "flow.add/BadRequest", "file": "gen/flow/flowtest/http.go", "lines": [92, 97]},
-    {"name": "flow.add/Taken/flow.addItem", "file": "gen/flow/flowtest/http.go", "lines": [101, 105]},
-    {"name": "flow.add/TooBig/flow.add.Big", "file": "gen/flow/flowtest/http.go", "lines": [110, 114]},
-    {"name": "flow.shelve/OK", "file": "gen/flow/flowtest/http.go", "lines": [133, 138]},
-    {"name": "flow.shelve/BadRequest", "file": "gen/flow/flowtest/http.go", "lines": [141, 146]},
-    {"name": "flow.shelve/Jammed/flow.checkDoor", "file": "gen/flow/flowtest/http.go", "lines": [150, 154]},
-    {"name": "flow.shelve/Taken/flow.addItem", "file": "gen/flow/flowtest/http.go", "lines": [159, 163]},
-    {"name": "flow.shelve/Shut/flow.shelve@flow.opened.Late", "file": "gen/flow/flowtest/http.go", "lines": [168, 172]}
+    {"name": "flow.add/OK", "file": "gen/flow/flowtest/http.go", "lines": [148, 153]},
+    {"name": "flow.add/BadRequest", "file": "gen/flow/flowtest/http.go", "lines": [156, 161]},
+    {"name": "flow.add/Taken/flow.addItem", "file": "gen/flow/flowtest/http.go", "lines": [165, 169]},
+    {"name": "flow.add/TooBig/flow.add.Big", "file": "gen/flow/flowtest/http.go", "lines": [174, 178]},
+    {"name": "flow.shelve/OK", "file": "gen/flow/flowtest/http.go", "lines": [197, 202]},
+    {"name": "flow.shelve/BadRequest", "file": "gen/flow/flowtest/http.go", "lines": [205, 210]},
+    {"name": "flow.shelve/Jammed/flow.checkDoor", "file": "gen/flow/flowtest/http.go", "lines": [214, 218]},
+    {"name": "flow.shelve/Taken/flow.addItem", "file": "gen/flow/flowtest/http.go", "lines": [223, 227]},
+    {"name": "flow.shelve/Shut/flow.shelve@flow.opened.Late", "file": "gen/flow/flowtest/http.go", "lines": [232, 236]},
+    {"name": "flow.announce/OK", "file": "gen/flow/flowtest/http.go", "lines": [255, 260]},
+    {"name": "flow.announce/BadRequest", "file": "gen/flow/flowtest/http.go", "lines": [263, 268]},
+    {"name": "flow.announce/caught/Undelivered/flow.notify", "file": "gen/flow/flowtest/http.go", "lines": [273, 277]},
+    {"name": "flow.reannounce/OK", "file": "gen/flow/flowtest/http.go", "lines": [297, 302]},
+    {"name": "flow.reannounce/BadRequest", "file": "gen/flow/flowtest/http.go", "lines": [305, 310]},
+    {"name": "flow.reannounce/Undelivered/flow.notify", "file": "gen/flow/flowtest/http.go", "lines": [314, 318]},
+    {"name": "flow.reannounce/caught/Undelivered/flow.notify", "file": "gen/flow/flowtest/http.go", "lines": [324, 329]},
+    {"name": "flow.relay/OK", "file": "gen/flow/flowtest/http.go", "lines": [348, 353]},
+    {"name": "flow.relay/Unknown/bare.touch", "file": "gen/flow/flowtest/http.go", "lines": [357, 361]},
+    {"name": "flow.relay/ServerError/bare.touch@http.post", "file": "gen/flow/flowtest/http.go", "lines": [366, 370]},
+    {"name": "flow.relay/NetworkError/bare.touch@http.post", "file": "gen/flow/flowtest/http.go", "lines": [375, 379]}
   ]
 }

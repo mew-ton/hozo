@@ -93,6 +93,7 @@ func Views(p *ir.Program, cfg *config.Config, units []Unit) []map[string]*ir.Vie
 			for k, list := range namespaces {
 				v.Namespaces[k] = append([]ir.NamespaceConfig(nil), list...)
 			}
+			v.Entries = viewEntries(&v)
 			views[i][viewer] = &v
 		}
 	}

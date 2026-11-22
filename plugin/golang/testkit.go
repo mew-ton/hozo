@@ -55,6 +55,8 @@ type KitParam struct {
 	Fake string
 	// Unit は、KitUnit のとき、本物を通す出力。
 	Unit *TestKit
+	// Entry は、KitExternal が、通す出力のある名前空間の、入口の op の並びか（呼ぶ op が、どれも、入口。相手の入口は、流れの端）。
+	Entry bool
 }
 
 // KitReal は、NewOps が受け取る、人が書いたもの一つ。
@@ -190,9 +192,12 @@ func (b *kitBuilder) kit(ns string, cfg ir.NamespaceConfig, inUnit func(*ir.Op) 
 	for _, d := range s.Deps {
 		name := next()
 		unit, n := b.throughUnit(cfg, d.Namespace)
+		// 呼ぶ op が、どれも、入口（@entry のデコレータを持つ op）の名前空間は、相手の入口の並びで、流れの端: 通す出力があっても、
+		// にせものにする（docs/plugin-go.md「テストのにせもの」の「流れの端」）
+		entry := n == 1 && allEntries(p, d.Ops)
 		switch {
-		case n == 0:
-			k.Params = append(k.Params, KitParam{Kind: KitExternal, Param: name, Field: FieldName(name), FQN: d.Namespace, Fake: d.TypeName + "Fake"})
+		case n == 0 || entry:
+			k.Params = append(k.Params, KitParam{Kind: KitExternal, Param: name, Field: FieldName(name), FQN: d.Namespace, Fake: d.TypeName + "Fake", Entry: entry})
 		case unit == nil:
 			if k.Blocked == "" {
 				k.Blocked = "名前空間 " + d.Namespace + " を出力する、基底 " + cfg.Base + " の単位が、二つ以上ある"
@@ -231,6 +236,26 @@ func (b *kitBuilder) kit(ns string, cfg ir.NamespaceConfig, inUnit func(*ir.Op) 
 		}
 	}
 	return k
+}
+
+// allEntries は、op の並び ops が、空でなく、どれも、入口のデコレータ（@entry）を持つか。
+func allEntries(p *ir.Program, ops []string) bool {
+	for _, fqn := range ops {
+		o, _ := p.Lookup(fqn).(*ir.Op)
+		if o == nil {
+			return false
+		}
+		entry := false
+		for i := range o.Decorators {
+			if dec, ok := p.Lookup(o.Decorators[i].Decorator).(*ir.Decorator); ok && dec.Entry {
+				entry = true
+			}
+		}
+		if !entry {
+			return false
+		}
+	}
+	return len(ops) > 0
 }
 
 // TestFakeNames は、view の出力 (U, N) の fakes.go の、公開の名前（docs/plugin-go.md「テストのにせもの」）: にせものの型（New の引数の順）、

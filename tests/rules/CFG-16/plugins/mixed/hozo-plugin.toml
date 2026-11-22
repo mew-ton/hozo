@@ -1,7 +1,7 @@
 # CFG-16 のための fixture: 基底 go に相乗りするが、言語が違うトランスパイラ ts-on-go
 name     = "mixed"
 command  = ["true"]
-protocol = "0.20"
+protocol = "0.21"
 
 [[transpiler]]
 name     = "ts-on-go"

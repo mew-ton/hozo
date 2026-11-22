@@ -18,7 +18,7 @@
 ```toml
 name     = "go-sqlite"
 command  = ["go", "run", "github.com/mew-ton/hozo/plugins/go-sqlite"]
-protocol = "0.20"
+protocol = "0.21"
 
 [[transpiler]]
 name     = "go-sqlite"

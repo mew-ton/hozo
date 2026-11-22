@@ -134,6 +134,9 @@ var enums = map[reflect.Type][]string{
 	typeOf[ir.EffectState]():     {"prevented", "kept", "unknown"},
 	typeOf[ir.DecidedBy]():       {"type", "predicate"},
 	typeOf[ir.NarrowBy]():        {"presence", "variant", "predicate", "else", "none"},
+	typeOf[ir.EntrySourceKind](): {"leaf", "effect", "external", "boundary", "decorator", "arm", "never", "unknown"},
+	typeOf[ir.EntryStepVerb]():   {"throws", "none", "is"},
+	typeOf[ir.EntryTargetKind](): {"leaf", "effect", "read", "state", "op", "decorator", "classify"},
 }
 
 // specials は MarshalJSON が構造体の形を出さない型。手で書いたスキーマを $defs に置く。
@@ -254,6 +257,12 @@ var descriptions = map[string]string{
 	"BindTarget":           "bind の対象（docs/ir.md「bind」）。deep は `**`。",
 	"View":                 "その名前空間から見た IR（docs/ir.md「その名前空間から見た IR」）。トランスパイラに渡すもの。単位と名前空間の組ごとに一つ。",
 	"NamespaceConfig":      "単位での一つの名前空間の設定（docs/ir.md「その名前空間から見た IR」）。index は何番目の [[emit]] か、base は単位の基底、options は単位のオプション（トランスパイラの名前 → テーブル）、seams は単位の継ぎ目（デコレータの FQN → 宣言したトランスパイラ）。",
+	"Entry":                "入口の op 一つの、求めるケース（docs/ir.md「その名前空間から見た IR」の Entry、docs/check.md「入口ごとの、求めるケース」）。",
+	"EntrySource":          "例外の出どころ一つか、受ける道一つ（docs/ir.md「その名前空間から見た IR」の EntrySource）。why が \"\" なら、steps の差し替えで、入れる。",
+	"EntrySourceKind":      "出どころの種類（docs/check.md「入口ごとの、求めるケース」の「出どころ」の表）。",
+	"EntryStep":            "差し替えに言うこと一つ（docs/ir.md「その名前空間から見た IR」の EntryStep）。via は、相手のある出力までに通った名前空間。",
+	"EntryStepVerb":        "差し替えに言うことの種類（docs/ir.md「その名前空間から見た IR」の EntryStep.verb）。",
+	"EntryTargetKind":      "差し替える相手の種類（docs/ir.md「その名前空間から見た IR」の EntryStep.kind）。",
 	"ViewedSignature":      "viewer から見た op の関数の型（docs/ir.md「その名前空間から見た IR」）。",
 	"EmitRequest":          "direction \"emit\" の要求（docs/plugin-protocol.md「emit」）。transpiler は起動するトランスパイラの名前。",
 	"EmitResponse":         "\"emit\" の応答（docs/plugin-protocol.md「emit」）。errors が一つでもあれば書き出さない。",

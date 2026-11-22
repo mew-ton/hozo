@@ -66,6 +66,31 @@ func TestTestKitDeps(t *testing.T) {
 		t.Errorf("TestFakeNames = %s", s)
 	}
 
+	// 通す出力のある名前空間でも、呼ぶ op が、どれも、入口（@entry のデコレータを持つ op）なら、流れの端: 相手の入口の並びを、
+	// にせものにする（「流れの端」の、相手の入口）。その出力の葉は、受け取らない
+	v = kitView()
+	v.Namespaces["store"] = []ir.NamespaceConfig{conf(2, "gen/store")}
+	served := &ir.Decorator{DeclBase: base("store.served", "store.hozo"), Fn: true, Entry: true, Targets: []ir.DecoratorTarget{ir.TargetOp}}
+	v.Program.Namespaces[1].Decls = append(v.Program.Namespaces[1].Decls, served)
+	find := v.Program.Lookup("store.find").(*ir.Op)
+	find.Decorators = append(find.Decorators, ir.Application{Decorator: "store.served"})
+	k, err = TestKitOf(v, "")
+	if err != nil || k.Blocked != "" {
+		t.Fatalf("TestKitOf = %+v, %v", k, err)
+	}
+	if store = k.Params[2]; store.Kind != KitExternal || !store.Entry || store.Field != "Store" || store.Fake != "StoreOpsFake" || store.Unit != nil {
+		t.Errorf("呼ぶ op が、どれも入口の名前空間: %+v", store)
+	}
+	if len(k.Reals) != 1 {
+		t.Errorf("Reals = %+v", k.Reals)
+	}
+	// 入口でない op も呼ぶなら、本物で通す
+	wire := v.Program.Lookup("app.wire").(*ir.Op)
+	wire.Body.Statements = append(wire.Body.Statements, call("store.pick"))
+	if k, _ = TestKitOf(v, ""); k.Params[2].Kind != KitUnit {
+		t.Errorf("入口でない op も呼ぶ名前空間を、通していない: %+v", k.Params[2])
+	}
+
 	// 同じ基底の単位が、二つ: 通す出力を、選ばない。組み立てを作れず、fakes.go を持たない
 	v = kitView()
 	v.Namespaces["store"] = []ir.NamespaceConfig{conf(2, "gen/store"), conf(3, "gen/storemem")}

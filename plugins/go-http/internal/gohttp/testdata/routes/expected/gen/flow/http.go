@@ -14,8 +14,11 @@ import (
 
 // NewHandler は ops を net/http のハンドラにする。@http.get / @http.post の付いた op ごとに経路を一つ持つ。
 //
-//	POST /flow/items  flow.add
-//	POST /flow/shelf  flow.shelve
+//	POST /flow/items      flow.add
+//	POST /flow/shelf      flow.shelve
+//	POST /flow/notices    flow.announce
+//	POST /flow/renotices  flow.reannounce
+//	POST /flow/relay      flow.relay
 func NewHandler(ops Ops) http.Handler {
 	mux := http.NewServeMux()
 
@@ -43,6 +46,45 @@ func NewHandler(ops Ops) http.Handler {
 			return
 		}
 		if err := ops.Shelve(r.Context(), in); err != nil {
+			httpWriteError(w, err)
+			return
+		}
+		httpWriteResult(w, nil)
+	})
+
+	// flow.announce
+	mux.HandleFunc("POST /flow/notices", func(w http.ResponseWriter, r *http.Request) {
+		var in AddInput
+		req := httpRequest{r: r}
+		req.bodyObj(&in.Item)
+		if !req.ok(w) {
+			return
+		}
+		if err := ops.Announce(r.Context(), in); err != nil {
+			httpWriteError(w, err)
+			return
+		}
+		httpWriteResult(w, nil)
+	})
+
+	// flow.reannounce
+	mux.HandleFunc("POST /flow/renotices", func(w http.ResponseWriter, r *http.Request) {
+		var in AddInput
+		req := httpRequest{r: r}
+		req.bodyObj(&in.Item)
+		if !req.ok(w) {
+			return
+		}
+		if err := ops.Reannounce(r.Context(), in); err != nil {
+			httpWriteError(w, err)
+			return
+		}
+		httpWriteResult(w, nil)
+	})
+
+	// flow.relay
+	mux.HandleFunc("POST /flow/relay", func(w http.ResponseWriter, r *http.Request) {
+		if err := ops.Relay(r.Context()); err != nil {
 			httpWriteError(w, err)
 			return
 		}

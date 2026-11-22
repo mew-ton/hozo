@@ -8,7 +8,6 @@ import (
 	browser "github.com/mew-ton/hozo/gen/browser"
 	"github.com/mew-ton/hozo/gen/page"
 	"github.com/mew-ton/hozo/gen/server"
-	"github.com/mew-ton/hozo/gen/server/servertest"
 	"github.com/mew-ton/hozo/runtime"
 )
 
@@ -211,6 +210,46 @@ func (o warrantyKindCasesFake) NoWarranty(ctx context.Context, v server.Item) (b
 	return o.impl.NoWarranty(ctx, v)
 }
 
+// ServerOpsFake は、名前空間 server の、入口の op（browser.ServerOps）のにせもの。メソッドごとに、フィールド一つ。
+// 言われていないメソッドは、零値を返す。
+type ServerOpsFake struct {
+	Logout         runtime.FakeVoid[struct{ In server.LogoutInput }]
+	GetMe          runtime.Fake[struct{ In server.MeInput }, server.PublicUser]
+	GetOrders      runtime.Fake[struct{ In server.GetOrdersInput }, []server.OrderSummary]
+	GetItem        runtime.Fake[struct{ In server.GetItemInput }, server.Item]
+	AddToCart      runtime.Fake[struct{ In server.AddToCartInput }, server.CartLine]
+	AttachWarranty runtime.Fake[struct{ In server.AttachWarrantyInput }, server.WarrantyLine]
+}
+
+// serverOpsFake は、ServerOpsFake を、browser.ServerOps にする。
+type serverOpsFake struct{ f *ServerOpsFake }
+
+var _ browser.ServerOps = serverOpsFake{}
+
+func (o serverOpsFake) Logout(ctx context.Context, in server.LogoutInput) error {
+	return o.f.Logout.Call(struct{ In server.LogoutInput }{in}, nil)
+}
+
+func (o serverOpsFake) GetMe(ctx context.Context, in server.MeInput) (server.PublicUser, error) {
+	return o.f.GetMe.Call(struct{ In server.MeInput }{in}, nil)
+}
+
+func (o serverOpsFake) GetOrders(ctx context.Context, in server.GetOrdersInput) ([]server.OrderSummary, error) {
+	return o.f.GetOrders.Call(struct{ In server.GetOrdersInput }{in}, nil)
+}
+
+func (o serverOpsFake) GetItem(ctx context.Context, in server.GetItemInput) (server.Item, error) {
+	return o.f.GetItem.Call(struct{ In server.GetItemInput }{in}, nil)
+}
+
+func (o serverOpsFake) AddToCart(ctx context.Context, in server.AddToCartInput) (server.CartLine, error) {
+	return o.f.AddToCart.Call(struct{ In server.AddToCartInput }{in}, nil)
+}
+
+func (o serverOpsFake) AttachWarranty(ctx context.Context, in server.AttachWarrantyInput) (server.WarrantyLine, error) {
+	return o.f.AttachWarranty.Call(struct{ In server.AttachWarrantyInput }{in}, nil)
+}
+
 // Fakes は、名前空間 browser の、テストの中の組み立て（NewOps）に使う、にせもの。フィールドは、New の引数の順。零値のまま、使える。
 type Fakes struct {
 	// Leaves は、葉のにせもの。言われていない葉は、本物を呼ぶ。
@@ -225,12 +264,12 @@ type Fakes struct {
 	WarrantyAvailable WarrantyAvailableCasesFake
 	// WarrantyKind は、分類 browser.WarrantyKind の述語のにせもの。言われていなければ、本物の述語を呼ぶ。
 	WarrantyKind WarrantyKindCasesFake
-	// Server は、名前空間 server の出力（gen/server）の、にせもの。その配線は、本物を通す。
-	Server servertest.Fakes
+	// Server は、名前空間 server の、入口の op のにせもの（相手の入口は、流れの端: その先は、通さない）。
+	Server ServerOpsFake
 }
 
 // NewOps は、にせもの f の上に、名前空間 browser の Ops を組み立てる: 配線は、本物。流れの端と、継ぎ目は、にせもの。
-// 人が書いたもの（leaves、warrantyAvailable、warrantyKind、serverLeaves）は、引数で受け取り、にせものが包む。
-func NewOps(f *Fakes, leaves browser.Leaves, warrantyAvailable browser.WarrantyAvailableCases, warrantyKind browser.WarrantyKindCases, serverLeaves server.Leaves) browser.Ops {
-	return browser.New(leavesFake{&f.Leaves, leaves}, tokenStateFake{&f.Token}, queryStateFake{&f.Query}, locationStateFake{&f.Location}, warrantyAvailableCasesFake{&f.WarrantyAvailable, warrantyAvailable}, warrantyKindCasesFake{&f.WarrantyKind, warrantyKind}, servertest.NewOps(&f.Server, serverLeaves))
+// 人が書いたもの（leaves、warrantyAvailable、warrantyKind）は、引数で受け取り、にせものが包む。
+func NewOps(f *Fakes, leaves browser.Leaves, warrantyAvailable browser.WarrantyAvailableCases, warrantyKind browser.WarrantyKindCases) browser.Ops {
+	return browser.New(leavesFake{&f.Leaves, leaves}, tokenStateFake{&f.Token}, queryStateFake{&f.Query}, locationStateFake{&f.Location}, warrantyAvailableCasesFake{&f.WarrantyAvailable, warrantyAvailable}, warrantyKindCasesFake{&f.WarrantyKind, warrantyKind}, serverOpsFake{&f.Server})
 }

@@ -333,11 +333,13 @@ type KitParam struct {
     FQN   string                                  // 状態、分類、別の名前空間の FQN
     Fake  string                                  // にせものの型の名前（KitUnit なら ""）
     Unit  *TestKit                                // KitUnit のとき、本物を通す出力
+    Entry bool                                    // KitExternal が、通す出力のある名前空間の、入口の op の並びか（docs/plugin-go.md「テストのにせもの」の「別の名前空間」）
 }
-func ThrowSources(p *ir.Program, kit *TestKit, entry string) []ThrowSource   // kit の出力の op entry が投げうる例外の、出どころ（docs/ide-chain.md「テストの規約」の「インテグレーションテストの作り直し」）。例外の順、その中は、辿った順
+func ThrowSources(view *ir.View, kit *TestKit, entry string) []ThrowSource   // view の出力の入口 entry の、例外の出どころ（View.entries の、その入口の sources の順）を、kit のにせものに当てたもの（docs/plugin-go.md「テストのにせもの」の「求めるケースを、にせものに当てる」）。入口が View.entries になければ nil
+func CaughtSources(view *ir.View, kit *TestKit, entry string) []ThrowSource  // 同じ入口の、受ける道（View.entries の caught の順）
 type ThrowSource struct {
-    Exception string                              // 例外の FQN
-    Kind  SourceKind                              // SourceLeaf、SourceEffect、SourceExternal、SourceSeam、SourceArm、SourceNever、SourceUnknown（出どころが、見つからない）
+    Exception string                              // 例外の FQN（受ける道なら、受けられる例外）
+    Kind  ir.EntrySourceKind                      // 出どころの種類（docs/ir.md「その名前空間から見た IR」の EntrySource.kind）
     Label, Ident string                           // テストの名前の <出どころ> と、口のメソッドの名前の、出どころの部分
     Made  bool                                    // Hozo が、ケースを作れるか
     Steps []FakeStep                              // 作れるとき、正常のケースの用意の後に、にせものに言うこと（順に）

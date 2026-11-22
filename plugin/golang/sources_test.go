@@ -8,63 +8,61 @@ import (
 	"github.com/mew-ton/hozo/ir"
 )
 
-// このファイルは、ThrowSources（docs/ide-chain.md「テストの規約」の「インテグレーションテストの作り直し」の「Hozo が作る、例外のケース」）:
-// 入口から辿れる、例外の出どころの一覧と、Hozo が作れるかの判定。IR は、手で組む（Signature.exceptions は、検査が計算したものを、
-// 書き写す）。
+// このファイルは、ThrowSources と CaughtSources（docs/plugin-go.md「テストのにせもの」の「求めるケースを、にせものに当てる」）:
+// 本体が求めたケース（View.entries）を、Go のにせものに当てる。出どころを求めること（docs/check.md「入口ごとの、求めるケース」）は、
+// 本体のテスト（internal/check/entries_test.go）が確かめるので、ここでは、IR も、View.entries も、手で組む。
 
-// valCall は `val name = <op>(args…);`。args は、引数の名前（呼ぶ先の引数と、同じ名前の値を渡す）。
-func valCall(name, opFQN string, args ...string) ir.Statement {
-	c := ir.Call{Callee: ir.OpCallee{Op: opFQN}}
-	for _, a := range args {
-		c.Args = append(c.Args, ir.CallArg{Param: a, Value: ir.NameAtom{Path: []string{a}}})
-	}
-	return ir.ValStmt{Name: name, Expr: ir.CallExpr{Call: c}}
+// mapView は、app（単位 1）が、store（単位 2。葉 pick を持つ）と、mailer（単位がない）と、api（単位 3。呼ぶ op は、入口）の op を
+// 呼ぶ仕様の、app の View。app.run は、継ぎ目のデコレータ app.limited を持つ。View.entries は、テストが足す。
+func mapView() *ir.View {
+	add := effect("app.addItem", ir.BuiltinTarget{State: "app.items", Operation: ir.OpPost}, param("v", ir.String()))
+	add.Throws = []string{"app.Taken"}
+	served := &ir.Decorator{DeclBase: base("api.served", "api.hozo"), Fn: true, Entry: true, Targets: []ir.DecoratorTarget{ir.TargetOp},
+		OuterThrows: []ir.ThrowsClause{{Exceptions: []string{"api.Down"}}}}
+	limited := &ir.Decorator{DeclBase: base("app.limited", "app.hozo"), Fn: true, Targets: []ir.DecoratorTarget{ir.TargetOp},
+		Throws: []ir.ThrowsClause{{Exceptions: []string{"app.Limited"}}}}
+	v := viewOf("app",
+		namespace("app",
+			exception("app.Rejected"), exception("app.Taken"), exception("app.Limited"),
+			limited,
+			state("app.items", ir.Array(ir.String())),
+			add,
+			read("app.first", "app.items", ir.Optional(ir.String())),
+			classify("app.Size", ir.TypeSubject{Type: ir.String()}, ir.DecidedByPredicate, "Big", "Small"),
+			classify("app.Sync", ir.StatesSubject{States: []string{"app.items"}}, ir.DecidedByPredicate, "UpToDate", "OutOfDate"),
+			with(op("app.leaf", nil), throwing("app.Rejected")),
+			with(op("app.run", nil, param("v", ir.String())), decorated("app.limited"), wired(
+				ir.ValStmt{Name: "x", Expr: ir.CallExpr{Call: ir.Call{Callee: ir.ReadCallee{Read: "app.first"}}}},
+				ir.MatchStmt{Match: ir.Match{Subject: ir.ValueSubject{Atom: ir.NameAtom{Path: []string{"v"}}}, Classify: "app.Size", Arms: []ir.MatchArm{
+					{Cases: []string{"Small"}, Body: ir.CallExpr{Call: ir.Call{Callee: ir.EffectCallee{Effect: ir.NamedEffect{Effect: "app.addItem"}}}}},
+					{Cases: []string{"Big"}, Body: ir.ThrowBody{Exception: "app.Rejected"}},
+				}}},
+				matchBy("app.Sync", armCall("app.leaf", "UpToDate"), ir.MatchArm{Cases: []string{"OutOfDate"}, Body: ir.ThrowBody{Exception: "app.Rejected"}}),
+				call("store.find"), call("mailer.send"), call("api.submit"),
+			)),
+		),
+		namespace("store",
+			exception("store.Missing"),
+			with(op("store.pick", nil), throwing("store.Missing")),
+			with(op("store.find", nil), wired(call("store.pick"))),
+		),
+		namespace("mailer", exception("mailer.Undelivered"), with(op("mailer.send", nil), throwing("mailer.Undelivered"))),
+		namespace("api", exception("api.Down"), exception("api.Refused"), served,
+			with(op("api.submit", nil), decorated("api.served"), throwing("api.Refused"))),
+	)
+	v.Config.Seams["app.limited"] = "go-ratelimit"
+	v.Namespaces["store"] = []ir.NamespaceConfig{conf(2, "gen/store")}
+	v.Namespaces["api"] = []ir.NamespaceConfig{conf(3, "gen/api")}
+	return v
 }
 
-func valRead(name, readFQN string) ir.Statement {
-	return ir.ValStmt{Name: name, Expr: ir.CallExpr{Call: ir.Call{Callee: ir.ReadCallee{Read: readFQN}}}}
-}
-
-// matchOn は `match (subject by classify) { arms }`。subject が "" なら、状態の分類での match（`match by classify`）。
-func matchOn(subject, classifyFQN string, arms ...ir.MatchArm) ir.Statement {
-	m := ir.Match{Subject: ir.ClassifyOwnedSubject{}, Classify: classifyFQN, Arms: arms}
-	if subject != "" {
-		m.Subject = ir.ValueSubject{Atom: ir.NameAtom{Path: strings.Split(subject, ".")}}
-	}
-	return ir.MatchStmt{Match: m}
-}
-
-func armThrow(exception string, cases ...string) ir.MatchArm {
-	return ir.MatchArm{Cases: cases, Body: ir.ThrowBody{Exception: exception}}
-}
-
-func armEffect(effectFQN string, cases ...string) ir.MatchArm {
-	return ir.MatchArm{Cases: cases, Body: ir.CallExpr{Call: ir.Call{Callee: ir.EffectCallee{Effect: ir.NamedEffect{Effect: effectFQN}}}}}
-}
-
-func armAtom(cases ...string) ir.MatchArm {
-	return ir.MatchArm{Cases: cases, Body: ir.AtomExpr{Atom: ir.NameAtom{Path: []string{"v"}}}}
-}
-
-// neverOp は、never を返す op: throws の例外を、いつも投げる。
-func neverOp(fqn, exception string) *ir.Op {
-	o := with(op(fqn, ir.Never()), throwing(exception))
-	o.Throws = []ir.ThrowsClause{{Exceptions: []string{exception}}}
-	return o
-}
-
-// sourcesOf は、入口 entry の出どころを、一行ずつの文字列にする: `<例外> <出どころ> made|human <にせものに言うこと>`。
-func sourcesOf(t *testing.T, v *ir.View, entry string) []string {
-	t.Helper()
-	kit, err := TestKitOf(v, "")
-	if err != nil || kit.Blocked != "" {
-		t.Fatalf("TestKitOf: %v, Blocked = %q", err, kit.Blocked)
-	}
+// mapped は、出どころの並びを、一行ずつの文字列にする: `<例外> <出どころ> <口の名前の部分> made|human <にせものに言うこと か 理由>`。
+func mapped(list []ThrowSource) []string {
 	var out []string
-	for _, s := range ThrowSources(v.Program, kit, entry) {
-		line := s.Exception + " " + s.Label + " human"
+	for _, s := range list {
+		line := s.Exception + " " + s.Label + " " + s.Ident + " human " + s.Why
 		if s.Made {
-			line = s.Exception + " " + s.Label + " made"
+			line = s.Exception + " " + s.Label + " " + s.Ident + " made"
 		}
 		for _, st := range s.Steps {
 			at := strings.Join(st.Path, ".")
@@ -91,169 +89,123 @@ func wantSources(t *testing.T, got []string, want ...string) {
 	}
 }
 
-// 述語で決まる分類の match の、throw のアームは、判定のにせもので、入らせる（アームの表の 3）。決め手が、入口の入力でも、作れる。
-// throw でないアームが、一つだけなら、その中の出どころに、何もしなくても届く（表の 1）: effect fn が投げる例外は、端のにせものが投げる。
-func TestThrowSourcesPredicateAndEffect(t *testing.T) {
-	add := effect("app.addItem", ir.BuiltinTarget{State: "app.items", Operation: ir.OpPost}, param("v", ir.String()))
-	add.Throws = []string{"app.Taken"}
-	v := viewOf("app", namespace("app",
-		exception("app.Rejected"), exception("app.Taken"),
-		state("app.items", ir.Array(ir.String())),
-		add,
-		classify("app.Size", ir.TypeSubject{Type: ir.String()}, ir.DecidedByPredicate, "Big", "Small"),
-		with(op("app.add", nil, param("v", ir.String())), throwing("app.Rejected", "app.Taken"),
-			wired(matchOn("v", "app.Size", armEffect("app.addItem", "Small"), armThrow("app.Rejected", "Big")))),
-	))
-	wantSources(t, sourcesOf(t, v, "app.add"),
-		"app.Rejected app.add.Big made Size.Is(app.Size.Big)",
-		"app.Taken app.addItem made Items.AddItem.Throws(app.Taken)")
-}
-
-// 状態の分類の述語で決まる match の、throw のアームは、状態の単位のにせものの述語で、入らせる: そのケースだけ、真。
-func TestThrowSourcesStatePredicate(t *testing.T) {
-	v := viewOf("app", namespace("app",
-		exception("app.Stale"),
-		state("app.items", ir.Array(ir.String())),
-		classify("app.Sync", ir.StatesSubject{States: []string{"app.items"}}, ir.DecidedByPredicate, "UpToDate", "OutOfDate"),
-		op("app.leaf", nil),
-		with(op("app.run", nil), throwing("app.Stale"),
-			wired(matchOn("", "app.Sync", armCall("app.leaf", "UpToDate"), armThrow("app.Stale", "OutOfDate")))),
-	))
-	wantSources(t, sourcesOf(t, v, "app.run"),
-		"app.Stale app.run.OutOfDate made Sync.UpToDate.Returns(false) Sync.OutOfDate.Returns(true)")
-}
-
-// 道の上の、値が要るアームで、throw でないアームが、ほかにもあれば、その中の出どころは、作れない（表の 4）。一つだけなら、作れる（表の 1）。
-// 値がないことで入るアームは、値の出どころ（read）が、「ない」を返す（表の 2）。
-func TestThrowSourcesPathArms(t *testing.T) {
-	build := func(arms ...ir.MatchArm) *ir.View {
-		return viewOf("app", namespace("app",
-			exception("app.Bad"), exception("app.Missing"),
-			state("app.items", ir.Array(ir.String())),
-			read("app.itemById", "app.items", ir.Optional(ir.String())),
-			with(op("app.check", nil, param("v", ir.String())), throwing("app.Bad")),
-			with(op("app.run", nil), throwing("app.Bad", "app.Missing"),
-				wired(valRead("v", "app.itemById"), matchOn("v", ir.ClassifyNullable, arms...))),
-		))
+func kitOf(t *testing.T, v *ir.View) *TestKit {
+	t.Helper()
+	kit, err := TestKitOf(v, "")
+	if err != nil || kit.Blocked != "" {
+		t.Fatalf("TestKitOf: %v, Blocked = %q", err, kit.Blocked)
 	}
-	// Some => check(v)（throw でないアームは、これ一つ）、None => throw Missing
-	wantSources(t, sourcesOf(t, build(armCall("app.check", ir.CaseSome), armThrow("app.Missing", ir.CaseNone)), "app.run"),
-		"app.Bad app.check made Leaves.Check.Throws(app.Bad)",
-		"app.Missing app.run.None made Items.ItemById.Returns(nil)")
-	// Some => check(v)、None => v（throw でないアームが、二つ）: Some は、値が要るので、入らせられない
-	got := sourcesOf(t, build(armCall("app.check", ir.CaseSome), armAtom(ir.CaseNone)), "app.run")
-	if len(got) != 2 || got[0] != "app.Bad app.check human" || got[1] != "app.Missing  human" {
-		t.Errorf("値が要るアームの中の出どころ = %q（期待は、作れない app.check と、出どころの見つからない app.Missing）", got)
+	return kit
+}
+
+func throwsStep(kind ir.EntryTargetKind, name, exception string, via ...string) ir.EntryStep {
+	return ir.EntryStep{Via: via, Verb: ir.StepThrows, Kind: kind, Name: name, Exception: exception}
+}
+
+// 差し替えに言うこと（ir.EntryStep）の、相手の種類ごとに、Fakes の、どのフィールドに、何を言うか（docs/plugin-go.md「テストのにせもの」の
+// 「求めるケースを、にせものに当てる」の表）。
+func TestThrowSourcesSteps(t *testing.T) {
+	v := mapView()
+	seam := throwsStep(ir.StepDecorator, "app.run", "app.Limited")
+	seam.Decorator = "app.limited"
+	v.Entries = []ir.Entry{{Op: "app.run", Sources: []ir.EntrySource{
+		// 葉: 葉のにせものが、投げる
+		{Exception: "app.Rejected", Kind: ir.SourceLeaf, Label: "app.leaf", Name: "app.leaf", Steps: []ir.EntryStep{throwsStep(ir.StepLeaf, "app.leaf", "app.Rejected")}},
+		// 効果: それを持つ状態の単位のにせものが、投げる
+		{Exception: "app.Taken", Kind: ir.SourceEffect, Label: "app.addItem", Name: "app.addItem", Steps: []ir.EntryStep{throwsStep(ir.StepEffect, "app.addItem", "app.Taken")}},
+		// 値の分類の述語が、ケースを言う。その前に、read が「ない」を返す
+		{Exception: "app.Rejected", Kind: ir.SourceArm, Label: "app.run.Big", Name: "app.run", Cases: []string{"Big"}, Steps: []ir.EntryStep{
+			{Verb: ir.StepNone, Kind: ir.StepRead, Name: "app.first"},
+			{Verb: ir.StepIs, Kind: ir.StepClassify, Name: "app.Size", Case: "Big"},
+		}},
+		// 状態の分類の述語: そのケースだけ、真
+		{Exception: "app.Rejected", Kind: ir.SourceArm, Label: "app.run.OutOfDate", Name: "app.run", Cases: []string{"OutOfDate"}, Steps: []ir.EntryStep{
+			{Verb: ir.StepIs, Kind: ir.StepClassify, Name: "app.Sync", Case: "OutOfDate"},
+		}},
+		// 状態を、じかに読む値が、ない
+		{Exception: "app.Rejected", Kind: ir.SourceArm, Label: "app.run.Absent", Name: "app.run", Cases: []string{"Absent"}, Steps: []ir.EntryStep{
+			{Verb: ir.StepNone, Kind: ir.StepState, Name: "app.items"},
+		}},
+		// 本体のないデコレータ: 継ぎ目のにせものが、投げる
+		{Exception: "app.Limited", Kind: ir.SourceDecorator, Label: "app.run@app.limited", Name: "app.run", Decorator: "app.limited", Steps: []ir.EntryStep{seam}},
+		// 通す出力（store）の中の葉: Fakes のフィールド Store の先
+		{Exception: "store.Missing", Kind: ir.SourceLeaf, Label: "store.pick", Name: "store.pick", Steps: []ir.EntryStep{throwsStep(ir.StepLeaf, "store.pick", "store.Missing", "store")}},
+		// 流れの端の op（単位のない名前空間）
+		{Exception: "mailer.Undelivered", Kind: ir.SourceExternal, Label: "mailer.send", Name: "mailer.send", Steps: []ir.EntryStep{throwsStep(ir.StepOp, "mailer.send", "mailer.Undelivered")}},
+		// 流れの端の op（相手の入口）と、その境界
+		{Exception: "api.Refused", Kind: ir.SourceExternal, Label: "api.submit", Name: "api.submit", Steps: []ir.EntryStep{throwsStep(ir.StepOp, "api.submit", "api.Refused")}},
+		{Exception: "api.Down", Kind: ir.SourceBoundary, Label: "api.submit@api.served", Name: "api.submit", Decorator: "api.served", Steps: []ir.EntryStep{throwsStep(ir.StepOp, "api.submit", "api.Down")}},
+		// never を返す op: 届けば、投げる（言うことが、ない）
+		{Exception: "app.Rejected", Kind: ir.SourceNever, Label: "app.fail", Name: "app.fail"},
+	}}}
+	wantSources(t, mapped(ThrowSources(v, kitOf(t, v), "app.run")),
+		"app.Rejected app.leaf Leaf made Leaves.Leaf.Throws(app.Rejected)",
+		"app.Taken app.addItem AddItem made Items.AddItem.Throws(app.Taken)",
+		"app.Rejected app.run.Big RunBig made Items.First.Returns(nil) Size.Is(app.Size.Big)",
+		"app.Rejected app.run.OutOfDate RunOutOfDate made Sync.UpToDate.Returns(false) Sync.OutOfDate.Returns(true)",
+		"app.Rejected app.run.Absent RunAbsent made Items.Get.Returns(nil)",
+		"app.Limited app.run@app.limited RunAppLimited made Seams.RunAppLimited.Throws(app.Limited)",
+		"store.Missing store.pick Pick made Store.Leaves.Pick.Throws(store.Missing)",
+		"mailer.Undelivered mailer.send Send made Mailer.Send.Throws(mailer.Undelivered)",
+		"api.Refused api.submit Submit made Api.Submit.Throws(api.Refused)",
+		"api.Down api.submit@api.served SubmitApiServed made Api.Submit.Throws(api.Down)",
+		"app.Rejected app.fail Fail made",
+	)
+	// View.entries にない入口は、nil
+	if got := ThrowSources(v, kitOf(t, v), "app.leaf"); got != nil {
+		t.Errorf("View.entries にない入口: %+v", got)
 	}
 }
 
-// never を返す op は、届けば、投げる（にせものに、何も言わない）。途中で受けられて、入口まで伝わらない例外は、出どころに数えない。
-// 同じ葉を、二か所から呼んでも、出どころは、一つ。
-func TestThrowSourcesNeverCaughtAndShared(t *testing.T) {
-	v := viewOf("app", namespace("app",
-		exception("app.Boom"), exception("app.Caught"), exception("app.Bad"),
-		neverOp("app.fail", "app.Boom"),
-		with(op("app.leaf", nil), throwing("app.Bad", "app.Caught")),
-		// inner は、Caught を受ける（計算した例外に、Caught がない）
-		with(op("app.inner", nil), throwing("app.Bad"), wired(call("app.leaf"))),
-		with(op("app.other", nil), throwing("app.Bad", "app.Caught"), wired(call("app.leaf"))),
-		with(op("app.run", nil), throwing("app.Bad", "app.Boom"), wired(call("app.inner"), call("app.inner"), call("app.fail"))),
-		with(op("app.both", nil), throwing("app.Bad", "app.Caught"), wired(call("app.inner"), call("app.other"))),
-	))
-	// run: 葉 leaf は、inner を通して、二度呼ばれるが、出どころは、一つ。Caught は、inner が受けるので、数えない
-	wantSources(t, sourcesOf(t, v, "app.run"),
-		"app.Bad app.leaf made Leaves.Leaf.Throws(app.Bad)",
-		"app.Boom app.fail made")
-	// both: Caught は、other を通る道でだけ、入口まで伝わる
-	wantSources(t, sourcesOf(t, v, "app.both"),
-		"app.Bad app.leaf made Leaves.Leaf.Throws(app.Bad)",
-		"app.Caught app.leaf made Leaves.Leaf.Throws(app.Caught)")
-}
-
-// TestThrowSourcesDecoratorBody は、本体のあるデコレータ（docs/plugin-go.md「本体のあるデコレータ」）: 本物を通すので、本体を、
-// 配線として辿る。本体の throw のアームは、出どころ（<op の FQN>@<デコレータの FQN>.<ケース>）。proceed() の所で、内側（op の中身）へ
-// 進む。proceed() の後ろの呼び出しが投げる例外も、出どころ。
-func TestThrowSourcesDecoratorBody(t *testing.T) {
-	// decorator fn guarded() { match (by Gate) { Open => proceed(); Shut => throw Closed; } }（Gate は、状態の分類の述語）
-	guarded := &ir.Decorator{DeclBase: base("a.guarded", "a.hozo"), Fn: true, Targets: []ir.DecoratorTarget{ir.TargetOp},
-		Body: &ir.Wiring{Statements: []ir.Statement{
-			matchOn("", "a.Gate",
-				ir.MatchArm{Cases: []string{"Open"}, Body: ir.CallExpr{Call: ir.Call{Callee: ir.ProceedCallee{}}}},
-				armThrow("a.Closed", "Shut")),
-		}}}
-	// decorator fn noted() { proceed(); note(); }（note は、Failed を投げうる葉）
-	noted := &ir.Decorator{DeclBase: base("a.noted", "a.hozo"), Fn: true, Targets: []ir.DecoratorTarget{ir.TargetOp},
-		Body: &ir.Wiring{Statements: []ir.Statement{
-			ir.CallStmt{Call: ir.Call{Callee: ir.ProceedCallee{}}},
-			call("a.note"),
-		}}}
-	v := viewOf("a", namespace("a",
-		exception("a.Closed"), exception("a.Failed"), exception("a.Broken"),
-		state("a.door", ir.String()),
-		classify("a.Gate", ir.StatesSubject{States: []string{"a.door"}}, ir.DecidedByPredicate, "Open", "Shut"),
-		guarded, noted,
-		with(op("a.note", nil), internal(), throwing("a.Failed")),
-		with(op("a.work", nil), internal(), throwing("a.Broken")),
-		with(op("a.entry", nil), decorated("a.guarded", "a.noted"), wired(call("a.work")), throwing("a.Closed", "a.Broken", "a.Failed")),
-	))
-	wantSources(t, sourcesOf(t, v, "a.entry"),
-		// 本体の throw のアーム: 状態の分類の述語のにせものが、Shut だけを真にする
-		"a.Closed a.entry@a.guarded.Shut made Gate.Open.Returns(false) Gate.Shut.Returns(true)",
-		// proceed() の先（op の中身）の葉
-		"a.Broken a.work made Leaves.Work.Throws(a.Broken)",
-		// proceed() の後ろで、デコレータの本体が呼ぶ葉
-		"a.Failed a.note made Leaves.Note.Throws(a.Failed)",
+// 本体が「入れない」と言った出どころは、その理由のまま、作れない。本体が「入れる」と言っても、Go のにせものに言えなければ、作れない
+// （理由は、ここが言う）。
+func TestThrowSourcesNotMade(t *testing.T) {
+	v := mapView()
+	// 継ぎ目を、単位の設定から外す: デコレータ app.limited の継ぎ目が、ない
+	delete(v.Config.Seams, "app.limited")
+	seam := throwsStep(ir.StepDecorator, "app.run", "app.Limited")
+	seam.Decorator = "app.limited"
+	v.Entries = []ir.Entry{{Op: "app.run", Sources: []ir.EntrySource{
+		{Exception: "app.Rejected", Kind: ir.SourceLeaf, Label: "app.leaf", Name: "app.leaf", Why: "決め手が、入口の入力"},
+		{Exception: "app.Limited", Kind: ir.SourceDecorator, Label: "app.run@app.limited", Name: "app.run", Decorator: "app.limited", Steps: []ir.EntryStep{seam}},
+		// 本物で通している名前空間（store）の op は、にせものにできない
+		{Exception: "store.Missing", Kind: ir.SourceExternal, Label: "store.find", Name: "store.find", Steps: []ir.EntryStep{throwsStep(ir.StepOp, "store.find", "store.Missing")}},
+		// 通していない名前空間の中
+		{Exception: "api.Refused", Kind: ir.SourceLeaf, Label: "api.inner", Name: "api.inner", Steps: []ir.EntryStep{throwsStep(ir.StepLeaf, "api.inner", "api.Refused", "api")}},
+		{Exception: "app.Taken", Kind: ir.SourceUnknown, Why: "出どころが、見つからない"},
+	}}}
+	wantSources(t, mapped(ThrowSources(v, kitOf(t, v), "app.run")),
+		"app.Rejected app.leaf Leaf human 決め手が、入口の入力",
+		"app.Limited app.run@app.limited RunAppLimited human デコレータ app.limited の継ぎ目が、この単位にない",
+		"store.Missing store.find Find human 名前空間 store を、本物で通しているので、op store.find を、にせものにできない",
+		"api.Refused api.inner Inner human 名前空間 api を、本物で通していない",
+		"app.Taken   human 出どころが、見つからない",
 	)
 }
 
-// tryCatch は `try { body } catch (e) { handler }`。
-func tryCatch(body []ir.Statement, handler ...ir.Statement) ir.Statement {
-	never := false
-	if n := len(handler); n > 0 {
-		_, never = handler[n-1].(ir.ThrowStmt)
-	}
-	return ir.TryStmt{Body: body, Catch: ir.Catch{Name: "e", Body: handler, Never: never}}
-}
-
-// 例外を受ける文（docs/ide-chain.md「Hozo が作る、例外のケース」の「例外を受ける文」）: try のブロックの中の出どころは、catch が
-// 受けるので、数えない。throw e は、try の中の出どころを、そのまま、出どころにする（作れるかも、そのまま）。受けた例外の match の
-// アームの throw e は、そのアームが受けるケースの例外だけ。catch のブロックの中の、ほかの出どころ（呼び出し、throw 例外）は、作れない。
-func TestThrowSourcesTry(t *testing.T) {
-	failure := classify("app.Failure", ir.ExceptionSubject{}, ir.DecidedByType, "Soft", "Hard")
-	failure.Cases[0].Exceptions = []string{"app.Refused"}
-	failure.Cases[1].Rest = true
-	rethrow := ir.ThrowStmt{Throw: ir.ThrowBody{Caught: "e"}}
-	caught := func(arms ...ir.MatchArm) ir.Statement {
-		return ir.MatchStmt{Match: ir.Match{Subject: ir.CaughtSubject{Name: "e"}, Classify: "app.Failure", Arms: arms}}
-	}
-	send := []ir.Statement{call("app.send")}
-	build := func(entry *ir.Op) *ir.View {
-		return viewOf("app", namespace("app",
-			exception("app.Refused"), exception("app.Broken"), exception("app.Other"), failure,
-			with(op("app.send", nil), throwing("app.Refused", "app.Broken")),
-			with(op("app.note", nil), throwing("app.Other")),
-			entry,
-		))
-	}
-	// 受けて、何もしない: 入口は、例外を持たない
-	wantSources(t, sourcesOf(t, build(with(op("app.run", nil), wired(tryCatch(send)))), "app.run"))
-	// 受けて、葉を呼んで、投げ直す: try の中の出どころが、そのまま。catch の中の呼び出しは、作れない
-	wantSources(t, sourcesOf(t, build(with(op("app.run", nil), throwing("app.Refused", "app.Broken", "app.Other"),
-		wired(tryCatch(send, call("app.note"), rethrow)))), "app.run"),
-		"app.Refused app.send made Leaves.Send.Throws(app.Refused)",
-		"app.Broken app.send made Leaves.Send.Throws(app.Broken)",
-		"app.Other app.note human")
-	// 分類して受ける: Soft（Refused）は、受けて終わり、Hard（残り: Broken）だけを、投げ直す
-	wantSources(t, sourcesOf(t, build(with(op("app.run", nil), throwing("app.Broken", "app.Other"),
-		wired(tryCatch(send, caught(armCall("app.note", "Soft"), ir.MatchArm{Cases: []string{"Hard"}, Body: ir.ThrowBody{Caught: "e"}}))))), "app.run"),
-		"app.Broken app.send made Leaves.Send.Throws(app.Broken)",
-		"app.Other app.note human")
-	// 別の例外に替える: 出どころは <op>.catch で、作れない
-	wantSources(t, sourcesOf(t, build(with(op("app.run", nil), throwing("app.Other"),
-		wired(tryCatch(send, ir.ThrowStmt{Throw: ir.ThrowBody{Exception: "app.Other"}})))), "app.run"),
-		"app.Other app.run.catch human")
-	// try のブロックの外で、同じ例外を投げる呼び出しは、ふつうの出どころ（try の中の分は、数えない）
-	wantSources(t, sourcesOf(t, build(with(op("app.run", nil), throwing("app.Other"),
-		wired(tryCatch([]ir.Statement{call("app.note")}), call("app.note")))), "app.run"),
-		"app.Other app.note made Leaves.Note.Throws(app.Other)")
+// アームの出どころの、口のメソッドの名前の部分: 配線の op の名前（デコレータの本体の中なら、デコレータの名前を続ける）に、catch の中なら
+// Catch、その後ろに、ケースの名前。受ける道（View.entries の caught）も、同じ当て方。
+func TestSourceIdentAndCaught(t *testing.T) {
+	v := mapView()
+	v.Entries = []ir.Entry{{Op: "app.run",
+		Sources: []ir.EntrySource{
+			{Exception: "app.Rejected", Kind: ir.SourceArm, Label: "app.run@app.guarded.Shut", Name: "app.run", Decorator: "app.guarded", Cases: []string{"Shut"}},
+			{Exception: "app.Rejected", Kind: ir.SourceArm, Label: "app.run.catch", Name: "app.run", Catch: true},
+			{Exception: "app.Rejected", Kind: ir.SourceArm, Label: "app.run.catch.Lost.Late", Name: "app.run", Catch: true, Cases: []string{"Lost", "Late"}},
+		},
+		Caught: []ir.EntrySource{
+			{Exception: "mailer.Undelivered", Kind: ir.SourceExternal, Label: "mailer.send", Name: "mailer.send", Steps: []ir.EntryStep{throwsStep(ir.StepOp, "mailer.send", "mailer.Undelivered")}},
+			{Exception: "store.Missing", Kind: ir.SourceLeaf, Label: "store.pick", Name: "store.pick", Why: "同じ出どころが、受ける文の外でも、呼ばれる"},
+		},
+	}}
+	kit := kitOf(t, v)
+	wantSources(t, mapped(ThrowSources(v, kit, "app.run")),
+		"app.Rejected app.run@app.guarded.Shut RunAppGuardedShut made",
+		"app.Rejected app.run.catch RunCatch made",
+		"app.Rejected app.run.catch.Lost.Late RunCatchLostLate made",
+	)
+	wantSources(t, mapped(CaughtSources(v, kit, "app.run")),
+		"mailer.Undelivered mailer.send Send made Mailer.Send.Throws(mailer.Undelivered)",
+		"store.Missing store.pick Pick human 同じ出どころが、受ける文の外でも、呼ばれる",
+	)
 }

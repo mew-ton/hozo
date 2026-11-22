@@ -290,4 +290,43 @@ namespace flow {
   export fn shelve(in: AddInput) {
     addItem(in.item);
   }
+
+  // 受ける道（docs/check.md「入口ごとの、求めるケース」の「受ける道」）: try の中の葉 notify が投げた例外を、catch が受けて、
+  // 正常に終わる。Hozo が、そのケース（flow.announce/caught/Undelivered/flow.notify）を作る。announce は、例外を投げない
+  exception Undelivered;
+
+  /** 知らせる。届かなければ Undelivered（人が書く） */
+  fn notify(item: Item): throws Undelivered;
+  /** 届かなかったことを、残す（人が書く） */
+  fn noteFailure(item: Item);
+
+  @http.post("/flow/notices")
+  export fn announce(in: AddInput) {
+    try {
+      notify(in.item);
+    } catch (e) {
+      noteFailure(in.item);
+    }
+  }
+
+  // 人が書く、受ける道: 同じ葉 notify を、try の外でも呼ぶので、差し替えでは、受ける道だけを、通せない。ケースは、口のメソッド
+  // CaughtUndeliveredNotify に出る。try の外の notify が投げる道（flow.reannounce/Undelivered/flow.notify）は、Hozo が作る
+  @http.post("/flow/renotices")
+  export fn reannounce(in: AddInput):
+    throws Undelivered
+  {
+    notify(in.item);
+    try {
+      notify(in.item);
+    } catch (e) {
+      noteFailure(in.item);
+    }
+  }
+
+  // 相手の入口（別の名前空間の、入口のデコレータを持つ op）を呼ぶ入口: 相手は、流れの端で、にせもの（docs/check.md 同「流れ」）。
+  // 相手の op が投げる例外（bare.Unknown）と、相手の境界で起きる例外（@http.post の outer throws）の出どころを、相手のにせものが、投げる
+  @http.post("/flow/relay")
+  export fn relay() {
+    bare.touch();
+  }
 }

@@ -1,5 +1,5 @@
 {
-  "version": "0.20",
+  "version": "0.21",
   "viewer": "browser",
   "config": {
     "index": 1,
@@ -115,7 +115,7 @@
     ]
   },
   "program": {
-    "version": "0.20",
+    "version": "0.21",
     "namespaces": [
       {
         "name": "",
@@ -3984,6 +3984,122 @@
       }
     ]
   },
+  "entries": [
+    {
+      "op": "browser.open",
+      "normal": true,
+      "blocked": "",
+      "sources": [
+        {
+          "exception": "server.Unauthorized",
+          "kind": "external",
+          "label": "server.page",
+          "name": "server.page",
+          "decorator": "",
+          "cases": [],
+          "catch": false,
+          "steps": [
+            {
+              "via": [],
+              "verb": "throws",
+              "kind": "op",
+              "name": "server.page",
+              "decorator": "",
+              "exception": "server.Unauthorized",
+              "case": ""
+            }
+          ],
+          "why": ""
+        },
+        {
+          "exception": "browser.Stale",
+          "kind": "arm",
+          "label": "browser.open@browser.guarded.Shut",
+          "name": "browser.open",
+          "decorator": "browser.guarded",
+          "cases": [
+            "Shut"
+          ],
+          "catch": false,
+          "steps": [
+            {
+              "via": [
+                "store"
+              ],
+              "verb": "none",
+              "kind": "read",
+              "name": "store.first",
+              "decorator": "",
+              "exception": "",
+              "case": ""
+            },
+            {
+              "via": [],
+              "verb": "is",
+              "kind": "classify",
+              "name": "browser.Gate",
+              "decorator": "",
+              "exception": "",
+              "case": "Shut"
+            }
+          ],
+          "why": ""
+        },
+        {
+          "exception": "browser.Limited",
+          "kind": "decorator",
+          "label": "browser.open@rate.limited",
+          "name": "browser.open",
+          "decorator": "rate.limited",
+          "cases": [],
+          "catch": false,
+          "steps": [
+            {
+              "via": [],
+              "verb": "throws",
+              "kind": "decorator",
+              "name": "browser.open",
+              "decorator": "rate.limited",
+              "exception": "browser.Limited",
+              "case": ""
+            }
+          ],
+          "why": ""
+        },
+        {
+          "exception": "browser.Lost",
+          "kind": "unknown",
+          "label": "",
+          "name": "",
+          "decorator": "",
+          "cases": [],
+          "catch": false,
+          "steps": [],
+          "why": "出どころが、流れの中に、見つからない"
+        }
+      ],
+      "caught": [
+        {
+          "exception": "store.Missing",
+          "kind": "leaf",
+          "label": "store.pick",
+          "name": "store.pick",
+          "decorator": "",
+          "cases": [],
+          "catch": false,
+          "steps": [],
+          "why": "同じ出どころが、受ける文の外でも、呼ばれる"
+        }
+      ]
+    },
+    {
+      "op": "browser.sync",
+      "normal": false,
+      "blocked": "名前空間 store を出力する、基底 go の単位が、二つ以上ある",
+      "sources": [],
+      "caught": []
+    }
+  ],
   "ops": {
     "server.findUser": {
       "exceptions": [

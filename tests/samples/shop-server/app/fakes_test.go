@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"example.com/shop-server/gen/flows/flowstest"
+	pkghttp "example.com/shop-server/gen/http"
 	"example.com/shop-server/gen/server"
 	"example.com/shop-server/gen/server/servertest"
 	pkgtype "example.com/shop-server/gen/type"
@@ -128,19 +129,17 @@ func TestFakesThrow(t *testing.T) {
 	})
 }
 
-// TestFakesFlow は、にせものの上の、フロー: flowstest.NewOps が、flows、client、server、store の配線を、重ねる。
-// ログインして、注文し、一覧を見るまでが、DB なしで通る。端が返す値は、read ごとに、一つ（呼び出しごとには、変えられない）。
+// TestFakesFlow は、にせものの上の、フロー: flowstest.NewOps が、flows と client の配線（本物）を、重ねる。client が呼ぶ server の op は、
+// 相手の入口で、流れの端（docs/plugin-go.md「テストのにせもの」の「別の名前空間」）: にせものが、言った値を返し、server の中は、
+// 通らない。ログインして、注文し、一覧を見るまでが、サーバーなしで通る。
 func TestFakesFlow(t *testing.T) {
 	f := new(flowstest.Fakes)
 	s := &f.Client.Server
-	alice := leafAlice
-	session := leafSession
-	s.Store.Users.UserByEmail.Returns(&alice)
-	s.Store.Sessions.SessionByToken.Returns(&session)
-	listed := []pkgtype.Order{{Id: "order-1", UserId: "u1"}}
-	s.Store.Orders.OrdersOfUser.Returns(listed)
+	s.Login.Returns(server.LoginOk{Token: "token-1"})
+	s.PlaceOrder.Returns(pkgtype.Order{Id: "order-1", UserId: "u1"})
+	s.GetOrders.Returns([]pkgtype.Order{{Id: "order-1", UserId: "u1"}})
 
-	got, err := flowstest.NewOps(f, fakeLeaves()).SignInAndOrder(context.Background(), "alice@example.com", "password123",
+	got, err := flowstest.NewOps(f).SignInAndOrder(context.Background(), "alice@example.com", "password123",
 		[]pkgtype.OrderLine{{Item: "apple", Quantity: 2}})
 	if err != nil {
 		t.Fatalf("signInAndOrder: %v", err)
@@ -148,13 +147,32 @@ func TestFakesFlow(t *testing.T) {
 	if got.Placed.Id != "order-1" || len(got.Listed) != 1 {
 		t.Errorf("signInAndOrder = %+v（期待は、注文 order-1 と、一件の一覧）", got)
 	}
-	if n := len(s.Seams.LoginRateLimited.Calls); n != 1 {
-		t.Errorf("継ぎ目 login@rate.limited の呼び出し = %d 回（期待は、一度）", n)
+	if calls := s.Login.Calls; len(calls) != 1 || calls[0].In.Body.Email != "alice@example.com" {
+		t.Errorf("server.login の呼び出し = %+v（期待は、alice@example.com で、一度）", calls)
 	}
-	if n := len(s.Store.Sessions.CreateSession.Calls); n != 1 {
-		t.Errorf("createSession の呼び出し = %d 回（期待は、一度）", n)
+	if calls := s.PlaceOrder.Calls; len(calls) != 1 || calls[0].In.Token == nil || *calls[0].In.Token != "token-1" {
+		t.Errorf("server.placeOrder の呼び出し = %+v（期待は、ログインが返したトークン token-1 で、一度）", calls)
 	}
-	if n := len(s.Store.Orders.CreateOrder.Calls); n != 1 {
-		t.Errorf("createOrder の呼び出し = %d 回（期待は、一度）", n)
+	if calls := s.GetOrders.Calls; len(calls) != 1 || calls[0].In.Token == nil || *calls[0].In.Token != "token-1" {
+		t.Errorf("server.getOrders の呼び出し = %+v（期待は、トークン token-1 で、一度）", calls)
+	}
+}
+
+// TestFakesFlowThrow は、相手の入口の境界で起きる例外（@http.post の outer throws: http.NetworkError）を、相手の入口のにせもので
+// 起こす: フローは、その例外で終わり、その先の op は、呼ばれない。
+func TestFakesFlowThrow(t *testing.T) {
+	f := new(flowstest.Fakes)
+	s := &f.Client.Server
+	s.Login.Returns(server.LoginOk{Token: "token-1"})
+	s.PlaceOrder.Throws(pkghttp.NetworkError{})
+
+	_, err := flowstest.NewOps(f).SignInAndOrder(context.Background(), "alice@example.com", "password123",
+		[]pkgtype.OrderLine{{Item: "apple", Quantity: 2}})
+	var want pkghttp.NetworkError
+	if !errors.As(err, &want) {
+		t.Fatalf("signInAndOrder = %v（期待は http.NetworkError）", err)
+	}
+	if n := len(s.GetOrders.Calls); n != 0 {
+		t.Errorf("server.getOrders の呼び出し = %d 回（期待は、なし: 注文で、止まっている）", n)
 	}
 }

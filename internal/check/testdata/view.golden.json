@@ -1,5 +1,5 @@
 {
-  "version": "0.20",
+  "version": "0.21",
   "viewer": "browser",
   "config": {
     "index": 2,
@@ -68,7 +68,7 @@
     ]
   },
   "program": {
-    "version": "0.20",
+    "version": "0.21",
     "namespaces": [
       {
         "name": "http",
@@ -1227,6 +1227,7 @@
       }
     ]
   },
+  "entries": [],
   "ops": {
     "browser.clearToken": {
       "exceptions": [],

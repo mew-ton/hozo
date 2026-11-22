@@ -1,6 +1,6 @@
 name     = "go-design"
 command  = ["go", "run", "github.com/mew-ton/hozo/plugins/go-design"]
-protocol = "0.20"
+protocol = "0.21"
 
 # 提供するトランスパイラは一つ。Go の基底 go に相乗りする（docs/plugin-go-design.md「マニフェスト」）
 [[transpiler]]
