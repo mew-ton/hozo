@@ -260,6 +260,32 @@ export function options(request: EmitRequest): Record<string, unknown> {
 }
 
 /**
+ * direction "check" を、emit と同じ検査で答える（docs/plugin-protocol.md「check」の「emit が errors で返す誤りは、check でも
+ * 返す」。Go の plugin.CheckByEmit に当たる）。Handler の check が、これを呼ぶ: transpilers は、そのプラグインが提供する
+ * トランスパイラの名前。
+ *
+ * request.view.config.transpilers（その単位の transpilers。書かれた順）のうち、transpilers にあるものごとに、同じ View で
+ * handler.emit を呼び、応答の errors を、severity が "error" の diagnostics にして、その順に並べる。files と warnings は、
+ * 捨てる（warning は、emit のときにだけ出る）。handler が emit を持たなければ UnsupportedDirectionError。
+ */
+export async function checkByEmit(handler: Handler, transpilers: string[], request: CheckRequest): Promise<CheckResponse> {
+  if (handler.emit === undefined) {
+    throw new UnsupportedDirectionError("check: the handler has no emit");
+  }
+  const diagnostics: CheckResponse["diagnostics"] = [];
+  for (const transpiler of request.view?.config?.transpilers ?? []) {
+    if (!transpilers.includes(transpiler)) {
+      continue;
+    }
+    const response = await handler.emit({ protocol: request.protocol, direction: "emit", transpiler, view: request.view });
+    for (const e of response?.errors ?? []) {
+      diagnostics.push({ severity: "error", code: e.code, at: e.at, message: e.message });
+    }
+  }
+  return { diagnostics };
+}
+
+/**
  * FQN fqn が view.viewer の名前空間の宣言で、この View の単位の対象か（docs/config.md「in」）: 宣言の span.file が
  * view.files にある。viewer の宣言でなければ false（Go の ir.View.InUnit と同じ）。
  */

@@ -92,6 +92,9 @@ type Options struct {
 	// Home はホームディレクトリ（同 3 の <ホーム>/.hozo/plugins）。空なら探さない。
 	// このパッケージは PluginPath も Home もプロセスの環境から読まない。hozoc と言語サーバーが渡す（internal/app）。
 	Home string
+	// NoPluginChecks は、プラグインの check（docs/cli.md「check」の 4）を、起動しない。仕様を読むだけの呼び出し（出力を集める前の
+	// 読み直し。プラグインの誤りは、emit の応答の errors で返る）と、言語サーバー（docs/lsp.md「診断」）が、真にする。
+	NoPluginChecks bool
 }
 
 // Load は root から hozo.toml を探して（configPath があればそれを読んで）プロジェクトを解析する
@@ -172,10 +175,13 @@ func LoadWith(opts Options) *Project {
 		diags = append(diags, checker.CheckHomes(p.Sema.Program, p.Config, p.checkUnits())...)
 	}
 
-	// 4. プラグインの check（docs/cli.md「check」の 4）
-	pds, err := p.runPluginChecks(opts)
-	diags = append(diags, pds...)
-	p.RunErr = err
+	// 4. プラグインの check（docs/cli.md「check」の 4）。1〜3 に error があれば、起動しない: View は、検査を通っていない仕様のもので、
+	// トランスパイラの検査は、それを前提にしていない（docs/plugin-protocol.md「check」）
+	if errs, _ := diag.Count(diags); errs == 0 && !opts.NoPluginChecks {
+		pds, err := p.runPluginChecks(opts)
+		diags = append(diags, pds...)
+		p.RunErr = err
+	}
 
 	p.Diags = p.finish(diags)
 	return p
@@ -551,52 +557,68 @@ func (p *Project) covered(unit int) []string {
 func (p *Project) Covered(unit int) []string { return p.covered(unit) }
 
 // runPluginChecks は、使うプラグインのうち [check] enabled のものに direction "check" を送り、返った診断を足す
-// （docs/cli.md「check」の 4、docs/plugin-protocol.md「起動」「check」）。プラグインと名前空間の組ごとに一回で、
-// 相手の名前空間は、そのプラグインのトランスパイラを書いた単位が出力するもの。渡す view は、その単位のうち設定の順で
-// 最初のもの。protocol の合わないプラグイン（MAN-2）は起動しない。
+// （docs/cli.md「check」の 4、docs/plugin-protocol.md「起動」「check」）。プラグインと、出力（単位と、その単位が出力する
+// 名前空間の組）の組ごとに一回で、相手の出力は、そのプラグインのトランスパイラを書いた単位のもの。渡す view は、その出力のもの
+// （emit が、同じ出力に渡すものと同じ）。順序は、単位の設定の順、名前空間の IR の順、transpilers に書いた順。
+// 重さ、code、位置、メッセージが、すべて同じ診断は、最初の一つだけを残す（同じ名前空間を、二つの単位が出力しているとき）。
+// protocol の合わないプラグイン（MAN-2）は起動しない。
 // code "protocol" / "unsupported" の応答は MAN-2 / MAN-5 の診断。proc.Crashed / proc.MalformedOutput なら
 // そこで止めて、その誤りを返す。
 func (p *Project) runPluginChecks(opts Options) ([]diag.Diagnostic, error) {
 	var diags []diag.Diagnostic
 	var views []map[string]*ir.View
 	runner := hostplugin.Runner{Root: p.Root, Stderr: opts.Stderr, Env: opts.Env}
-	type pair struct {
-		plugin *hostplugin.Plugin
-		ns     string
-	}
-	done := map[pair]bool{}
+	seen := map[string]bool{}
 	for i := range p.Units {
-		for _, t := range p.Units[i].Transpilers {
-			pl := t.Plugin
-			if !pl.Manifest.Check.Enabled || len(pl.Mismatch) > 0 {
-				continue
-			}
-			if views == nil {
-				views = p.Views()
-			}
-			for _, ns := range p.covered(i) {
-				view := views[i][ns]
-				if view == nil || done[pair{pl, ns}] {
+		for _, ns := range p.covered(i) {
+			called := map[*hostplugin.Plugin]bool{} // 一つの出力に、同じプラグインの二つのトランスパイラを書いていても、一回
+			for _, t := range p.Units[i].Transpilers {
+				pl := t.Plugin
+				if !pl.Manifest.Check.Enabled || len(pl.Mismatch) > 0 || called[pl] {
 					continue
 				}
-				done[pair{pl, ns}] = true
+				if views == nil {
+					views = p.Views()
+				}
+				view := views[i][ns]
+				if view == nil {
+					continue
+				}
+				called[pl] = true
 				req := sdk.CheckRequest{Protocol: hostplugin.Protocol, Direction: "check", View: view}
 				var resp sdk.CheckResponse
 				if err := runner.Run(pl.Manifest, pl.Dir, &req, &resp); err != nil {
 					var pe *hostplugin.PluginError
 					if errors.As(err, &pe) {
-						diags = append(diags, pe.Diagnostic(pl.ManifestPath()))
+						d := pe.Diagnostic(pl.ManifestPath())
+						if key := pluginDiagKey(d); !seen[key] {
+							seen[key] = true
+							diags = append(diags, d)
+						}
 						continue
 					}
 					return diags, err
 				}
 				for _, d := range resp.Diagnostics {
-					diags = append(diags, p.PluginDiagnostic(pl.Name, d))
+					pd := p.PluginDiagnostic(pl.Name, d)
+					if key := pluginDiagKey(pd); !seen[key] {
+						seen[key] = true
+						diags = append(diags, pd)
+					}
 				}
 			}
 		}
 	}
 	return diags, nil
+}
+
+// pluginDiagKey は、プラグインの診断を、同じものかどうかで比べる鍵: 重さ、code、位置、メッセージ。
+func pluginDiagKey(d diag.Diagnostic) string {
+	pos := d.File
+	if d.Span != nil {
+		pos = fmt.Sprintf("%d:%d:%d", d.Span.File, d.Span.Start, d.Span.End)
+	}
+	return fmt.Sprintf("%d\x00%s\x00%s\x00%s", d.Severity, d.Code, pos, d.Message)
 }
 
 // PluginDiagnostic はプラグインが返した診断（docs/plugin-protocol.md「check」の diagnostics、「emit」の errors）を

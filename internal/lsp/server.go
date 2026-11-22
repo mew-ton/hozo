@@ -516,6 +516,8 @@ func (s *server) reanalyze() {
 		Env:        s.opts.Env,
 		PluginPath: s.opts.PluginPath,
 		Home:       s.opts.Home,
+		// プラグインの check は、起動しない（docs/lsp.md「診断」）: 起動は、打鍵ごとの解析には、遅い
+		NoPluginChecks: true,
 	})
 	s.fileIDs = make(map[string]source.FileID, s.proj.Files.Len())
 	for i := 0; i < s.proj.Files.Len(); i++ {

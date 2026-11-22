@@ -178,9 +178,12 @@ func Main(h Handler) int
 func Run(h Handler, in io.Reader, out, errOut io.Writer) int   // Main の中身。テスト用
 // 実装しない方向と、Emit で知らない Transpiler は ErrUnsupported を返す。Main は docs/plugin-protocol.md「起動」の code "unsupported" で終わる
 var ErrUnsupported error
+// direction "check" を、emit と同じ検査で答える（docs/plugin-protocol.md「check」）。Handler の Check が呼ぶ。transpilers は、そのプラグインの
+// トランスパイラの名前。req.View.Config.Transpilers のうち、transpilers にあるものごとに h.Emit を呼び、Errors を、severity が "error" の Diagnostics にする
+func CheckByEmit(h Handler, transpilers []string, req *CheckRequest) (*CheckResponse, error)
 ```
 
-`Select`、`Wrap`、`EmitResponse.Select` はなくした（`docs/plugin-protocol.md`「選択をなくしたこと」）。TS の SDK（`sdk/ts`）も同じ: `select` の型をなくし、`options(request)` を足す。
+`Select`、`Wrap`、`EmitResponse.Select` はなくした（`docs/plugin-protocol.md`「選択をなくしたこと」）。TS の SDK（`sdk/ts`）も同じ: `select` の型をなくし、`options(request)` を足す。`CheckByEmit` に当たるのは、`checkByEmit(handler, transpilers, request)`。
 
 ### `plugin/golang`（公開）
 
@@ -568,6 +571,7 @@ type Options struct {
     Overlay map[string][]byte        // ディスクの代わりに使う内容（言語サーバーの開いている文書）
     Stderr io.Writer; Env []string   // プラグインの標準エラーの流し先と、プラグインに渡す環境変数の元
     PluginPath, Home string          // プラグインの探索が見るプロジェクトの外の場所（internal/plugin.SearchEnv）。空なら探さない
+    NoPluginChecks bool              // プラグインの check（docs/cli.md「check」の 4）を、起動しない。仕様を読み直すだけの呼び出しと、言語サーバー（docs/lsp.md「診断」）
 }
 func LoadWith(opts Options) *Project                                            // 解析の本体。NoConfig なら CFG-* の診断を除く
 func Load(root string, configPath string, overlay map[string][]byte) *Project   // LoadWith の短い形。プラグインは plugin_dirs だけから探す

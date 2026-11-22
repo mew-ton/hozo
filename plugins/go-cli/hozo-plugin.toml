@@ -9,3 +9,6 @@ vocabulary = ["cli.hozo"]       # cli の語彙はこのプラグインが提供
 name     = "go-cli"
 language = "go"
 requires = ["go", "go-valid"]
+
+[check]
+enabled = true                  # emit が errors で返す誤りを、検査の段（hozoc check）でも返す（docs/plugin-protocol.md「check」）

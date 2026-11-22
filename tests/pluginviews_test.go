@@ -57,7 +57,9 @@ func TestPluginViewFixtures(t *testing.T) {
 			rel = dir // サンプルの中のプラグインの入力は、tests/ からの相対パスのまま
 		}
 		t.Run(filepath.ToSlash(rel), func(t *testing.T) {
-			p := project.LoadWith(project.Options{Root: dir, PluginPath: repoPlugins(t) + samplePluginPath(t, dir)})
+			// プラグインの check は、起動しない: ここで要るのは View だけで、入力には、プラグインが診断を返すための仕様もある
+			// （その診断が、hozoc check で出ることは、TestPluginDiagnosticsAtCheck）
+			p := project.LoadWith(project.Options{Root: dir, PluginPath: repoPlugins(t) + samplePluginPath(t, dir), NoPluginChecks: true})
 			if n, _ := diag.Count(p.Diags); n > 0 {
 				var b strings.Builder
 				for _, d := range p.Diags {

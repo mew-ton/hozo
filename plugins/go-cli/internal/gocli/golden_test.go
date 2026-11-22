@@ -493,8 +493,9 @@ func TestHandler(t *testing.T) {
 	if _, err := h.Emit(&plugin.EmitRequest{Transpiler: TranspilerName}); err == nil {
 		t.Error("View のない要求で、エラーにならない")
 	}
-	if _, err := h.Check(&plugin.CheckRequest{}); err != plugin.ErrUnsupported {
-		t.Errorf("Check の err = %v, want ErrUnsupported", err)
+	// Check は、emit と同じ検査で答える（TestCheckMatchesEmit）。View のない要求は、誤り
+	if _, err := h.Check(&plugin.CheckRequest{}); err == nil || errors.Is(err, plugin.ErrUnsupported) {
+		t.Errorf("View のない Check の err = %v（期待は、unsupported でない誤り）", err)
 	}
 	if _, err := h.Import(&plugin.ImportRequest{}); err != plugin.ErrUnsupported {
 		t.Errorf("Import の err = %v, want ErrUnsupported", err)
@@ -534,8 +535,8 @@ func TestProtocol(t *testing.T) {
 	if want := `{"files":[],"warnings":[],"errors":[{"code":"CLI-6","at":"app.hidden","message":`; !strings.HasPrefix(out, want) {
 		t.Errorf("応答 = %s\nwant 先頭が %s", out, want)
 	}
-	// 実装しない direction
-	for _, dir := range []string{"check", "import"} {
+	// 実装しない direction（check は、emit と同じ検査で答える: TestCheckMatchesEmit）
+	for _, dir := range []string{"import"} {
 		var o, e bytes.Buffer
 		code := plugin.Run(Handler{}, strings.NewReader(`{"protocol":"`+ir.Version+`","direction":"`+dir+`"}`), &o, &e)
 		if code != 2 || !strings.Contains(o.String(), `"code":"unsupported"`) {

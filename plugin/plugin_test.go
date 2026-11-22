@@ -240,6 +240,55 @@ func TestCheck(t *testing.T) {
 	}
 }
 
+// TestCheckByEmit は、direction "check" を、emit と同じ検査で答える道（docs/plugin-protocol.md「check」）: 単位の transpilers の
+// うち、そのプラグインのものごとに、同じ View で Emit を呼び、errors を、severity が "error" の diagnostics にする。
+// warnings と files は、返さない。単位にない自分のトランスパイラと、ほかのプラグインのトランスパイラは、呼ばない。
+func TestCheckByEmit(t *testing.T) {
+	var calls []string
+	h := &fake{emit: func(r *EmitRequest) (*EmitResponse, error) {
+		calls = append(calls, r.Transpiler)
+		if r.Direction != "emit" || r.Protocol != ir.Version || r.View == nil || r.View.Viewer != "hozoc" {
+			t.Errorf("emit の要求 = %+v", r)
+		}
+		return &EmitResponse{
+			Files:    []File{{Path: "gen/x.go", Content: "package x"}},
+			Warnings: []Warning{{Message: "w"}},
+			Errors:   []Diagnostic{{Code: "X-1", At: "hozoc." + r.Transpiler, Message: "e"}},
+		}, nil
+	}}
+	h.check = func(r *CheckRequest) (*CheckResponse, error) {
+		// このプラグインのトランスパイラは cli、go、lost（lost は、単位に書かれていない）。順は、単位の transpilers の順（go、cli）
+		return CheckByEmit(h, []string{"cli", "go", "lost"}, r)
+	}
+	code, out, _ := run(t, h, fmt.Sprintf(`{"protocol":%q,"direction":"check","view":%s}`, ir.Version, viewJSON("hozoc")))
+	if code != 0 {
+		t.Fatalf("code = %d", code)
+	}
+	want := `{"diagnostics":[{"severity":"error","code":"X-1","at":"hozoc.go","message":"e"},{"severity":"error","code":"X-1","at":"hozoc.cli","message":"e"}]}` + "\n"
+	if out != want {
+		t.Errorf("stdout = %s\nwant %s", out, want)
+	}
+	if got := strings.Join(calls, ","); got != "go,cli" {
+		t.Errorf("Emit を呼んだトランスパイラ = %s（期待は go,cli）", got)
+	}
+
+	// errors のない応答は、空の diagnostics
+	h.emit = func(*EmitRequest) (*EmitResponse, error) {
+		return &EmitResponse{Warnings: []Warning{{Message: "w"}}}, nil
+	}
+	if code, out, _ := run(t, h, fmt.Sprintf(`{"protocol":%q,"direction":"check","view":%s}`, ir.Version, viewJSON("hozoc"))); code != 0 || out != "{\"diagnostics\":[]}\n" {
+		t.Errorf("code = %d, stdout = %s", code, out)
+	}
+	// Emit の誤りは、そのまま返す。View のない要求は、誤り
+	h.emit = func(*EmitRequest) (*EmitResponse, error) { return nil, errors.New("boom") }
+	if _, err := CheckByEmit(h, []string{"go"}, &CheckRequest{View: &ir.View{Config: ir.NamespaceConfig{Transpilers: []string{"go"}}}}); err == nil || err.Error() != "boom" {
+		t.Errorf("err = %v（期待は boom）", err)
+	}
+	if _, err := CheckByEmit(h, []string{"go"}, &CheckRequest{}); err == nil {
+		t.Error("View のない要求で、誤りにならない")
+	}
+}
+
 func TestCheckEmptyDiagnostics(t *testing.T) {
 	h := &fake{check: func(r *CheckRequest) (*CheckResponse, error) { return &CheckResponse{}, nil }}
 	code, out, _ := run(t, h, fmt.Sprintf(`{"protocol":%q,"direction":"check","view":%s}`, ir.Version, viewJSON("browser")))

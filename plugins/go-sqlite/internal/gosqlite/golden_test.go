@@ -1,6 +1,7 @@
 package gosqlite
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -342,8 +343,9 @@ func TestHandler(t *testing.T) {
 	if _, err := h.Emit(other); err == nil {
 		t.Error("知らない transpiler で、エラーにならない")
 	}
-	if _, err := h.Check(&plugin.CheckRequest{}); err != plugin.ErrUnsupported {
-		t.Errorf("Check の err = %v, want ErrUnsupported", err)
+	// Check は、emit と同じ検査で答える（TestCheckMatchesEmit）。View のない要求は、誤り
+	if _, err := h.Check(&plugin.CheckRequest{}); err == nil || errors.Is(err, plugin.ErrUnsupported) {
+		t.Errorf("View のない Check の err = %v（期待は、unsupported でない誤り）", err)
 	}
 	if _, err := h.Import(&plugin.ImportRequest{}); err != plugin.ErrUnsupported {
 		t.Errorf("Import の err = %v, want ErrUnsupported", err)

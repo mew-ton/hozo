@@ -10,3 +10,6 @@ language = "go"
 requires = ["go"]
 # @db.transaction は継ぎ目: 基底が、付いた op を二層で出し、このトランスパイラが、その中身（DbSeams）を出す（同「トランザクション」）
 seams    = ["db.transaction"]
+
+[check]
+enabled = true                  # emit が errors で返す誤りを、検査の段（hozoc check）でも返す（docs/plugin-protocol.md「check」）

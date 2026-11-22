@@ -45,7 +45,10 @@ capabilities: `textDocumentSync: { openClose: true, change: Full, save: { includ
 | `Data` | `data`（コードアクションが使う） |
 | 位置のない診断（`hozo.toml` の誤り） | `hozo.toml` の 1 行 1 列。ファイルもないものは `hozo.toml` の URI に付ける |
 
-`hozoc check` と同じ `internal/check` の呼び出しなので、同じ入力に同じ診断が出る（`docs/testing.md`「言語サーバーと check の一致」）。言語サーバーだけが出す診断は一つ:
+`hozoc check` と同じ `internal/check` の呼び出しなので、同じ入力に同じ診断が出る（`docs/testing.md`「言語サーバーと check の一致」）。違いは、二つ。
+
+- **プラグインの check の診断（`docs/cli.md`「check」の 4。GOHTTP-5 など、トランスパイラが返す誤り）は、言語サーバーは、出さない。** プラグインの起動は、打鍵ごとの解析には、遅い: サンプル `shop-server`（プラグインの起動が 13 回。開発中のマニフェストの `go run`）で、解析が、5 ミリ秒から、1.7 秒になる（実測）。その診断は、`hozoc check` で出る。言語サーバーで、いつ出すか（保存のときだけ、など）は、決めていない（`docs/open.md`「文書と道具」）。
+- 言語サーバーだけが出す診断が、一つある:
 
 | ID | 重さ | 意味 |
 |---|---|---|

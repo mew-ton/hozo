@@ -25,7 +25,7 @@ unsupported = []                # 意味を保てない記法（デコレータ�
 seams       = []                # 継ぎ目を要るデコレータの FQN（docs/config.md「継ぎ目」）。例: ["rate.limited"]。省略時は []
 
 [check]
-enabled = false                 # true なら hozoc check / emit で direction "check" を呼ぶ。テーブルごと省けば false
+enabled = false                 # true なら hozoc check / emit で direction "check" を呼ぶ。テーブルごと省けば false。トランスパイラを持つプラグインは true にして、emit の errors を、検査の段でも返す（「check」）
 
 [import]
 formats = []                    # 取り込める形式の名前。空なら import を持たない。テーブルごと省けば []
@@ -75,7 +75,7 @@ enabled = false                 # true なら hozoc tests で direction "coverag
 - 標準入力に要求の JSON を一つ書いて閉じる。標準出力から応答の JSON を一つ読む。標準エラーは hozoc の標準エラーに、各行の先頭に `[<プラグイン名>] ` を付けて流す。
 - `emit` は、出力（単位と、その単位が出力する名前空間の組。`docs/config.md`「in」）と、その単位のトランスパイラの組ごとに一回起動する。順序は、単位の設定の順、名前空間の IR の順、`transpilers` に書いた順。一つのプラグインの二つのトランスパイラを同じ単位に書けば、そのプラグインを二回起動する。
 - **起動は互いに独立。** どのトランスパイラも、受け取るのは同じ出力の `View` だけで、ほかのトランスパイラの応答（ファイル、warning）は受け取らない。相乗りは、基底の応答を見ずに、基底と同じファイルの置き場と名前を自分で求める（「相乗りが基底の形を知る方法」）。`transpilers` に書いた順は、起動の順と診断の並びにだけ効き、書き出すファイルを変えない。
-- `check` は、使うプラグイン（「探索」）のうち `[check] enabled` のものを、プラグインと名前空間の組ごとに一回起動する。相手の名前空間は、そのプラグインのトランスパイラを書いた単位が出力するもの。渡す `view` は、その単位のうち設定の順で最初のもの。
+- `check` は、使うプラグイン（「探索」）のうち `[check] enabled` のものを、プラグインと、出力（単位と、その単位が出力する名前空間の組）の組ごとに一回起動する。相手の出力は、そのプラグインのトランスパイラを書いた単位のもの。渡す `view` は、その出力のもの（`emit` が、同じ出力に渡すものと、同じ）。順序は、単位の設定の順、名前空間の IR の順、`transpilers` に書いた順で、最初に現れたプラグインから。仕様と設定の検査（`docs/cli.md`「check」の 1〜3）に、error が一つでもあれば、起動しない（「check」）。
 - `coverage` は、`hozoc tests` が、プラグインごとに、多くて一回起動する。相手と、渡すものは「coverage」。
 - 並列には起動しない（診断の順序を決定的にするため）。
 
@@ -148,7 +148,11 @@ enabled = false                 # true なら hozoc tests で direction "coverag
 - `severity` は `"error"` か `"warning"`。`code` はプラグインが決める（語彙に固有の規則の ID。`docs/requirements.md`「検査の規則の一覧」の PAGE-1 / PAGE-2 など）。
 - `at` は FQN（その宣言の位置に付ける）か `"file:line:col"`。どちらでもなければ（省いたときも）位置なしで報告する。
 - `check` の診断のメッセージには名前を付けない（`code` がプラグインの規則を示す）。`emit` の `warnings` にはトランスパイラの名前を付ける。
-- `check` はトランスパイラごとではなくプラグインごとの処理で、要求は `transpiler` を持たない。
+- `check` はトランスパイラごとではなくプラグインごとの処理で、要求は `transpiler` を持たない。プラグインは、`view.config.transpilers`（その単位の `transpilers`）から、自分のトランスパイラを見つける。
+- **`emit` が `errors` で返す誤りは、`check` でも返す**（`docs/decisions.md`「決めたこと」404）: トランスパイラが、その入力を変換できない理由（`emit` の `errors`）は、仕様と設定だけから決まるので、検査の段でも分かる。プラグインは、渡された出力について、`view.config.transpilers` にある自分のトランスパイラごとに、`emit` と同じ検査をして、`errors` を、`severity` が `"error"` の `diagnostics` として返す。`hozoc check` が通った仕様は、`hozoc emit` で、プラグインの `errors` に止められない。二つの SDK が、この答え方を持つ（`docs/packages.md`「`plugin`（公開）」の `CheckByEmit`）。
+- `emit` の `warnings` は、`check` では返さない: `hozoc emit` は、`check` の後に `emit` を呼ぶので、返せば、同じ warning が、二度、出る。
+- **起動するのは、仕様と設定の検査（`docs/cli.md`「check」の 1〜3）に、error がないときだけ。** error があれば、`View` は、検査を通っていない仕様のもので、トランスパイラの検査は、それを前提にしていない。先の error を直してから、プラグインの診断が出る。
+- **同じ診断は、一度だけ報告する。** 同じ名前空間を、二つの単位が出力していれば、同じプラグインが、出力ごとに、二度、呼ばれる。重さ、`code`、位置、メッセージが、すべて同じ診断は、hozoc が、最初の一つだけを残す。
 
 ### coverage
 

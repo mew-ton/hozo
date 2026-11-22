@@ -9,6 +9,7 @@ import {
   PROTOCOL,
   UnsupportedDirectionError,
   calledOp,
+  checkByEmit,
   directEffects,
   directReads,
   effectWrites,
@@ -124,6 +125,41 @@ test("check: writes diagnostics and exits 0", async () => {
   assert.deepEqual(JSON.parse(r.stdout), {
     diagnostics: [{ severity: "warning", code: "T-1", at: "browser", message: "m" }],
   });
+});
+
+// checkByEmit（docs/plugin-protocol.md「check」）: 単位の transpilers のうち、そのプラグインのものごとに、同じ View で emit を呼び、
+// errors を、severity が "error" の diagnostics にする。warnings と files は、返さない。Go の plugin.CheckByEmit と同じ。
+test("checkByEmit: answers check with the errors of emit, in the order of the unit's transpilers", async () => {
+  const calls: string[] = [];
+  const handler: Handler = {
+    emit: async (req) => {
+      calls.push(req.transpiler);
+      assert.equal(req.direction, "emit");
+      assert.equal(req.view.viewer, view.viewer);
+      return {
+        files: [{ path: "gen/x.go", content: "package x" }],
+        warnings: [{ at: "", message: "w" }],
+        errors: [{ code: "X-1", at: `browser.${req.transpiler}`, message: "e" }],
+      };
+    },
+    // このプラグインのトランスパイラは go-cli、go、lost（lost は、単位に書かれていない）。順は、単位の transpilers の順（go、go-cli）
+    check: (req) => checkByEmit(handler, ["go-cli", "go", "lost"], req),
+  };
+  const r = await exec(handler, { protocol: PROTOCOL, direction: "check", view });
+  assert.equal(r.code, 0);
+  assert.deepEqual(JSON.parse(r.stdout), {
+    diagnostics: [
+      { severity: "error", code: "X-1", at: "browser.go", message: "e" },
+      { severity: "error", code: "X-1", at: "browser.go-cli", message: "e" },
+    ],
+  });
+  assert.deepEqual(calls, ["go", "go-cli"]);
+});
+
+test("checkByEmit: no errors is an empty list; a handler without emit is unsupported", async () => {
+  const clean: Handler = { emit: async () => ({ files: [], warnings: [{ at: "", message: "w" }] }) };
+  assert.deepEqual(await checkByEmit(clean, ["go"], { protocol: PROTOCOL, direction: "check", view }), { diagnostics: [] });
+  await assert.rejects(checkByEmit({}, ["go"], { protocol: PROTOCOL, direction: "check", view }), UnsupportedDirectionError);
 });
 
 // coverage（docs/plugin-protocol.md「coverage」）: 応答の files と lines は、空でも [] で出る。実装しなければ unsupported。

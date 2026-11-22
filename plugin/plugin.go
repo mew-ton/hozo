@@ -148,6 +148,40 @@ type CheckResponse struct {
 	Diagnostics []Diagnostic `json:"diagnostics"`
 }
 
+// CheckByEmit は、direction "check" を、emit と同じ検査で答える（docs/plugin-protocol.md「check」の「emit が errors で返す誤りは、
+// check でも返す」）。Handler の Check が、これを呼ぶ: transpilers は、そのプラグインが提供するトランスパイラの名前。
+//
+// req.View.Config.Transpilers（その単位の transpilers。書かれた順）のうち、transpilers にあるものごとに、同じ View で h.Emit を呼び、
+// 応答の Errors を、Severity が "error" の Diagnostics にして、その順に並べる。Files と Warnings は、捨てる（warning は、emit の
+// ときにだけ出る）。h.Emit が誤りを返せば、その誤りを返す。
+func CheckByEmit(h Handler, transpilers []string, req *CheckRequest) (*CheckResponse, error) {
+	if req == nil || req.View == nil {
+		return nil, errors.New("check: request has no view")
+	}
+	provided := map[string]bool{}
+	for _, name := range transpilers {
+		provided[name] = true
+	}
+	out := &CheckResponse{Diagnostics: []Diagnostic{}}
+	for _, name := range req.View.Config.Transpilers {
+		if !provided[name] {
+			continue
+		}
+		resp, err := h.Emit(&EmitRequest{Protocol: req.Protocol, Direction: "emit", Transpiler: name, View: req.View})
+		if err != nil {
+			return nil, err
+		}
+		if resp == nil {
+			continue
+		}
+		for _, d := range resp.Errors {
+			d.Severity = "error"
+			out.Diagnostics = append(out.Diagnostics, d)
+		}
+	}
+	return out, nil
+}
+
 // ImportRequest は direction "import" の要求（docs/plugin-protocol.md「import」）。
 // Format はマニフェストの [import].formats の一つ。
 type ImportRequest struct {

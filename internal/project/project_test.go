@@ -4,6 +4,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -24,10 +25,12 @@ func repoPlugins(t *testing.T) string {
 	return abs
 }
 
-// loadCorpus は dir のプロジェクトを、リポジトリの plugins/ を HOZO_PLUGIN_PATH にして解析する。
+// loadCorpus は dir のプロジェクトを、リポジトリの plugins/ を HOZO_PLUGIN_PATH にして解析する。プラグインの check は、起動しない:
+// ここのテストが見るのは、読み込みと設定で、プラグインの起動（開発中のマニフェストの `go run`）は、写したコーパス（go.mod のない
+// 一時ディレクトリ）では、動かない。check の起動は、TestPluginCheck と TestPluginCheckPerOutput が、代役のプラグインで確かめる。
 func loadCorpus(t *testing.T, dir, configPath string, overlay map[string][]byte) *Project {
 	t.Helper()
-	return LoadWith(Options{Root: dir, ConfigPath: configPath, Overlay: overlay, PluginPath: repoPlugins(t)})
+	return LoadWith(Options{Root: dir, ConfigPath: configPath, Overlay: overlay, PluginPath: repoPlugins(t), NoPluginChecks: true})
 }
 
 // codes は診断のコードの列。
@@ -378,7 +381,8 @@ func TestPluginCheck(t *testing.T) {
 		t.Errorf("Units[1].Files = %v", files)
 	}
 
-	// check はプラグインと名前空間の組ごとに一回: 同じ名前空間の単位が二つあっても、診断は一度だけ（docs/plugin-protocol.md「起動」）
+	// check は、プラグインと出力の組ごとに一回（TestPluginCheckPerOutput）。同じ名前空間の単位が二つあって、同じ診断が、二度
+	// 返っても、報告は一度だけ（docs/plugin-protocol.md「check」）
 	write(t, filepath.Join(dir, "hozo.toml"), config("chk")+unit("server", "gen/server2", "chk"))
 	p = Load(dir, "", nil)
 	if n := strings.Count(text(p), "warning[CHK-1]"); n != 1 {
@@ -401,6 +405,57 @@ func TestPluginCheck(t *testing.T) {
 	p = Load(dir, "", nil)
 	if p.RunErr == nil {
 		t.Fatal("RunErr = nil, want proc.Crashed")
+	}
+}
+
+// TestPluginCheckPerOutput は、プラグインの check の、相手と回数（docs/plugin-protocol.md「起動」「check」）:
+// プラグインと、出力（単位と名前空間の組）の組ごとに一回で、渡す view は、その出力のもの。仕様の検査に error があれば、起動しない。
+// Options.NoPluginChecks でも、起動しない。
+func TestPluginCheckPerOutput(t *testing.T) {
+	if _, err := exec.LookPath("sh"); err != nil {
+		t.Skip("sh がない")
+	}
+	dir := t.TempDir()
+	write(t, filepath.Join(dir, "a.hozo"), "namespace a {\n  fn f();\n}\nnamespace b {\n  fn g();\n}\n")
+	// 呼ばれるたびに、要求の view の viewer と、単位の番号（view.config.index）を、ルートの calls に一行書く
+	script := filepath.Join(dir, "plugins", "chk", "run.sh")
+	write(t, script, `sed -n 's/.*"viewer":"\([a-z]*\)","config":{"index":\([0-9]*\).*/\1 \2/p' >> calls
+echo >> calls
+printf '{"diagnostics":[]}'
+`)
+	m := "name = \"chk\"\ncommand = [\"sh\", " + strconv.Quote(script) + "]\nprotocol = \"0.18\"\n\n[check]\nenabled = true\n" +
+		"\n[[transpiler]]\nname = \"chk\"\nlanguage = \"go\"\n\n[[transpiler]]\nname = \"chk2\"\nlanguage = \"go\"\nrequires = [\"chk\"]\n"
+	write(t, filepath.Join(dir, "plugins", "chk", "hozo-plugin.toml"), m)
+	calls := func() string {
+		data, err := os.ReadFile(filepath.Join(dir, "calls"))
+		if err != nil {
+			return ""
+		}
+		_ = os.Remove(filepath.Join(dir, "calls"))
+		return strings.Join(strings.Fields(strings.ReplaceAll(string(data), " ", ":")), ",")
+	}
+
+	// 単位は三つ: a を二つの単位に（一つは、同じプラグインのトランスパイラを二つ並べる）、b を一つに
+	write(t, filepath.Join(dir, "hozo.toml"), pluginDirs+unit("a", "gen/a1", "chk", "chk2")+unit("a", "gen/a2", "chk")+unit("b", "gen/b", "chk"))
+	p := Load(dir, "", nil)
+	if p.RunErr != nil || p.Errors() != 0 {
+		t.Fatalf("RunErr = %v\n%s", p.RunErr, text(p))
+	}
+	if got, want := calls(), "a:1,a:2,b:3"; got != want {
+		t.Errorf("check の呼び出し = %q（期待は %q: 出力ごとに一回。同じプラグインの二つのトランスパイラを並べた単位でも、一回）", got, want)
+	}
+
+	// NoPluginChecks: 起動しない
+	p = LoadWith(Options{Root: dir, NoPluginChecks: true})
+	if got := calls(); got != "" || p.Errors() != 0 {
+		t.Errorf("NoPluginChecks なのに、check を呼んだ: %q\n%s", got, text(p))
+	}
+
+	// 仕様の検査に error があれば、起動しない（warning だけなら、起動する: TestPluginCheck）
+	write(t, filepath.Join(dir, "bad.hozo"), "namespace a {\n  fn h(): Missing;\n}\n")
+	p = Load(dir, "", nil)
+	if got := calls(); got != "" || p.Errors() == 0 || p.RunErr != nil {
+		t.Errorf("仕様に error があるのに、check を呼んだ: %q（errors = %d, RunErr = %v）", got, p.Errors(), p.RunErr)
 	}
 }
 

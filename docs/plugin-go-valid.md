@@ -17,7 +17,12 @@ protocol = "0.18"
 name     = "go-valid"
 language = "go"
 requires = ["go"]
+
+[check]
+enabled = true
 ```
+
+`[check]` は、`emit` が `errors` で返す誤りを、検査の段（`hozoc check`）でも返すためのもの（`docs/plugin-protocol.md`「check」）。
 
 - 読む語彙は、標準の `valid`（`min` / `max` / `length` / `pattern` / `format`）。語彙は提供しない。
 - オプションはない。`[emit.options.go-valid]` にキーがあれば GOVALID-7。
@@ -142,7 +147,7 @@ func CheckFormat(name, v string) bool                   // "email" / "uri" / "uu
 
 ## 診断
 
-`emit` の応答の `errors` で返す。
+`emit` の応答の `errors` で返し、同じものを、検査の段（direction `check`）でも返す（`docs/plugin-protocol.md`「check」）。
 
 | ID | 重さ | 意味 |
 |---|---|---|

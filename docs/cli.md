@@ -381,7 +381,7 @@ out         = "internal/gen/proc"
 1. `hozo.toml` を読み、入っているプラグインのマニフェストを探して読み、各単位の `transpilers` の名前をトランスパイラに解決する（`docs/config.md`「置き場と探し方」「単位」、`docs/plugin-protocol.md`「探索」）。探索が見るプロジェクトの外の場所は、入力の `pluginPath`（`HOZO_PLUGIN_PATH`）と、`cmd/hozoc` が渡すホームディレクトリ（「手で書くもの」）。`hozo.toml` がなければ設定なしで進む（作業ディレクトリをルートにし、`sources` は既定。プラグインは探さない）。設定とマニフェストの error は、CFG-16 なら `LanguageMismatch`、それ以外は `ConfigInvalid`（`docs/config.md`「診断」、`docs/plugin-protocol.md`「診断」）。
 2. 標準の語彙、使うプラグイン（`docs/plugin-protocol.md`「探索」）の語彙、`sources` のファイルの順に読み、解析する（`docs/grammar.md`）。`in` は読むファイルを変えない（`docs/config.md`「in」）。
 3. 解決（`docs/resolve.md`）、正規化（`docs/ir.md`）、計算と検査（`docs/check.md`）を行う。
-4. 使うプラグインのうち `[check] enabled` のものに `direction: "check"` を送り（相手と回数は `docs/plugin-protocol.md`「起動」）、返った診断を足す。プラグインの異常終了は `proc.Crashed` / `proc.MalformedOutput`。
+4. 1〜3 に error が一つもなければ、使うプラグインのうち `[check] enabled` のものに `direction: "check"` を送り（相手と回数は `docs/plugin-protocol.md`「起動」）、返った診断を足す（同じ診断は、一度だけ。同「check」）。トランスパイラが `emit` で返す誤り（GOHTTP-5 など）は、ここで出る（`docs/decisions.md`「決めたこと」404）。プラグインの異常終了は `proc.Crashed` / `proc.MalformedOutput`。
 5. error が一つでもあれば例外（値は error と warning のすべて）。設定かマニフェストの error（CFG-*、MAN-*）が一つでもあれば `ConfigInvalid`、ただしそれがすべて CFG-16 なら `LanguageMismatch`。それ以外は `CheckFailed`。error がなければ `CheckResult`（warning）。
 
 構文エラーのあるファイルも、読めた宣言は解決・検査に進める。診断の順序は `docs/diagnostics.md`。

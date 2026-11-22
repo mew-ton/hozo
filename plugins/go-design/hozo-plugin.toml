@@ -7,3 +7,6 @@ protocol = "0.18"
 name     = "go-design"
 language = "go"
 requires = ["go"]
+
+[check]
+enabled = true                  # emit が errors で返す誤りを、検査の段（hozoc check）でも返す（docs/plugin-protocol.md「check」）

@@ -21,7 +21,12 @@ language = "go"
 
 [coverage]
 enabled = true
+
+[check]
+enabled = true
 ```
+
+`[check]` は、`emit` が `errors` で返す誤りを、検査の段（`hozoc check`）でも返すためのもの（`docs/plugin-protocol.md`「check」）。
 
 - 提供するトランスパイラは `go` の一つ。`requires` を持たない（基底）。言語 `go` を定める。
 - `[coverage] enabled`: `hozoc tests` が渡すカバレッジのファイルを読む（「カバレッジを読む」）。
@@ -1524,7 +1529,7 @@ func (f *FakeVoid[A]) Call(args A, impl func() error) error
 
 ## 診断
 
-`emit` の応答の `errors` で返す（どれも error の診断になり、`CheckFailed`。`docs/plugin-protocol.md`「emit」）。位置は、表に書いた宣言の FQN。
+`emit` の応答の `errors` で返し、同じものを、検査の段（direction `check`）でも返す（どれも error の診断になり、`CheckFailed`。`docs/plugin-protocol.md`「emit」「check」）。位置は、表に書いた宣言の FQN。
 
 | ID | 重さ | 意味 |
 |---|---|---|

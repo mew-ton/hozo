@@ -35,7 +35,7 @@ const (
 	codeRateCollision = "GORATE-2" // 公開の名前が当たる
 )
 
-// Handler は go-ratelimit の plugin.Handler。emit だけを実装する。
+// Handler は go-ratelimit の plugin.Handler。emit と、emit と同じ検査で答える check を実装する。
 type Handler struct {
 	// Getenv は環境変数を引く関数。nil なら os.Getenv。HOZO_PROJECT_ROOT（docs/plugin-protocol.md「起動」）を、型のパッケージの
 	// import パスを求めるルートに使う。空なら作業ディレクトリ（= プロジェクトのルート）。
@@ -64,9 +64,10 @@ func (h Handler) Emit(req *plugin.EmitRequest) (*plugin.EmitResponse, error) {
 	return Emit(req, root)
 }
 
-// Check は実装しない（語彙に固有の検査はない）。
-func (Handler) Check(*plugin.CheckRequest) (*plugin.CheckResponse, error) {
-	return nil, plugin.ErrUnsupported
+// Check は、emit と同じ検査をして、emit が errors で返す誤りを、検査の段でも返す（docs/plugin-protocol.md「check」、
+// docs/decisions.md「決めたこと」404）。warning は、emit のときにだけ出る。
+func (h Handler) Check(req *plugin.CheckRequest) (*plugin.CheckResponse, error) {
+	return plugin.CheckByEmit(h, []string{TranspilerName}, req)
 }
 
 // Import は実装しない。

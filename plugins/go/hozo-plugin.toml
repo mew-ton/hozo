@@ -8,3 +8,6 @@ language = "go"
 
 [coverage]
 enabled = true
+
+[check]
+enabled = true                  # emit が errors で返す誤りを、検査の段（hozoc check）でも返す（docs/plugin-protocol.md「check」）
