@@ -99,11 +99,11 @@ CI で `go generate ./...` と `sdk/ts` の `npm run generate` と `make generat
 - `internal/app` の `tests` の手順（`docs/cli.md`「tests」）: sh で動く小さなプラグインで、すべて走った、走っていないテストの名指し（TESTS-1。測っていないファイルの文面を含む）、置き場の出力がない・違う（TESTS-2）、カバレッジのファイルを開けない・基底のプラグインが `[coverage] enabled` でない・`recognized: false`（TESTS-3）、対応表が一つもない、対応表の形の誤り（PLG-4。`emit` でも）、text と json の表示、終了コード。
 - `internal/tools/selfgen`: コンパイルできない生成物を置き場に置かないこと（`docs/packages.md`「自己生成の手順」）。
 - `plugins/go-cli`: CLI-* の各条件と、引数の解釈の各規則（`docs/plugin-go-cli.md`「引数の解釈」）。
-- `internal/lsp`: `hozo.toml` のないワークスペースで LSP-1 が出ること。プラグインの診断（`docs/lsp.md`「プラグインの診断」。`plugincheck_test.go`。プラグインは、`sh` で動く、にせもので、待たせる・進ませるを、テストが決める）: 開いたときと、保存したときに、裏で走り、終わったら、足されて出ること。解析（`initialized`、`didChange`）では、起動しないこと。走っている間も、ホバーと解析が、待たされないこと。古い答えが、出ないこと。中身が変われば消え、戻れば、起動し直さずに、また出ること。error があれば、起動しないこと。ファイルの監視の知らせで、走ること（同じ中身なら、走らないこと）。異常終了で、LSP-2 が出て、動き続けること。終わるときに、走っている check を、待つこと。ほかのテストのサーバーは、リポジトリの `plugins/` の代役（マニフェストと語彙は同じで、起動するのは、診断を返さない `sh`）を見る。
+- `internal/lsp`: `hozo.toml` のないワークスペースで LSP-1 が出ること。プラグインの診断（`docs/lsp.md`「プラグインの診断」。`plugincheck_test.go`。プラグインは、`sh` で動く、にせもので、待たせる・進ませるを、テストが決める）: クライアントが、許していなければ（既定。許しとして読めない `initializationOptions` を含む）、開いても、保存しても、外でファイルが変わっても、起動しないこと。動いている間に、許しがなくなれば、プラグインの診断が消え（走っている check の答えも、出ない）、その後は、起動しないこと。与えられれば、走ること（同 「許し」）。以下は、許されているとき: 開いたときと、保存したときに、裏で走り、終わったら、足されて出ること。解析（`initialized`、`didChange`）では、起動しないこと。走っている間も、ホバーと解析が、待たされないこと。古い答えが、出ないこと。中身が変われば消え、戻れば、起動し直さずに、また出ること。error があれば、起動しないこと。ファイルの監視の知らせで、走ること（同じ中身なら、走らないこと）。異常終了で、LSP-2 が出て、動き続けること。終わるときに、走っている check を、待つこと。ほかのテストのサーバーは、リポジトリの `plugins/` の代役（マニフェストと語彙は同じで、起動するのは、診断を返さない `sh`）を見る。
 
 ## CI
 
-`.github/workflows/ci.yml`: `go build ./...`、`go vet ./...`、`go test ./...`、生成物の一致。`sdk/ts` と `editors/vscode` は Node 22 で `npm ci && npm test`。
+`.github/workflows/ci.yml`: `go build ./...`、`go vet ./...`、`go test ./...`、生成物の一致。`sdk/ts` と `editors/vscode` は Node 22 で、`npm ci`、ビルド（`npm run build`。`sdk/ts` は、その前に `npm run generate` と、差分がないこと）、`npm test`。`editors/vscode` のテストのうち、`test/trust.test.js` は、ビルドした `out/trust.js` を読む（`docs/editors.md`「VS Code 拡張」）。
 
 - **実行は、同時に一つだけ。** `main` への push と、どの PR の実行も、一つの組（`concurrency` の `group: ci`）に入れる。新しい実行が始まると、動いている実行と、待っている実行は、止まる（`cancel-in-progress`）。止められた実行は、緑ではない。
 

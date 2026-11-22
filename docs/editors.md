@@ -13,13 +13,19 @@ editors/vscode/
   syntaxes/hozo.tmLanguage.json
   syntaxes/generate.go         go generate の置き場（internal/tools/tmgrammar を呼ぶ）
   src/extension.ts             クライアント
-  test/                        TextMate の文法のテスト（vscode-textmate で実物の .hozo を字句に分ける）
+  src/trust.ts                 プラグインを起動してよいかを決める関数（vscode に依らない）
+  test/                        TextMate の文法のテスト（vscode-textmate で実物の .hozo を字句に分ける）と、package.json の宣言と src/trust.ts のテスト
 ```
 
 - 言語 ID は `hozo`、拡張子 `.hozo`。
 - クライアントは `vscode-languageclient` で `hozoc lsp` を起動する。`hozoc` の場所は設定 `hozo.hozocPath`（既定は `PATH` の `hozoc`）。見つからなければ、エラーの通知と、設定を開くボタン。バイナリの同梱と取得は段階 4 の後。
 - `hozo:` スキーム（`docs/ir.md`「Program」の `Span.file`）の `TextDocumentContentProvider` を登録し、要求 `hozo/vocabulary` で内容を取る（`docs/lsp.md`「プロジェクト」）。
 - 設定 `hozo.trace.server`（LSP の通信のログ）。
+- **プラグインを起動してよいと、言語サーバーに言うのは、ワークスペースが信頼されていて、設定 `hozo.pluginChecks` が入のときだけ**（`docs/decisions.md`「決めたこと」412。口は `docs/lsp.md`「プラグインの診断」の「許し」）。
+  - 設定 `hozo.pluginChecks`（既定は、入）: 信頼したワークスペースでも、エディタからの、プラグインの check を、切れる。
+  - 起動のとき、`vscode.workspace.isTrusted` と、設定から決めて、`initializationOptions` に渡す。
+  - 動いている間に、ワークスペースが信頼されたとき（`onDidGrantWorkspaceTrust`）と、設定 `hozo.pluginChecks` が変わったときは、`workspace/didChangeConfiguration` で、渡し直す（サーバーは、起動し直さない）。
+  - `package.json` の `capabilities.untrustedWorkspaces` は `limited`: 信頼していないワークスペースでは、シンタックスハイライトと、hozoc 自身の診断・定義へジャンプ・ホバーは働き、プラグインの診断は、出ない。設定 `hozo.hozocPath` は、`restrictedConfigurations` に入れる: 信頼していないワークスペースの設定（`.vscode/settings.json`）が、起動する実行ファイルを、決められない。
 - 言語の知識（キーワード、検査）は持たない。
 
 ## TextMate の文法

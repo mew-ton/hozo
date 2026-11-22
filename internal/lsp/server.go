@@ -350,6 +350,11 @@ func (s *server) handleNotification(m *jsonrpc.Message) (exit bool) {
 	case protocol.MethodDidChangeWatchedFiles:
 		s.reanalyze()
 		s.requestPluginChecks(false)
+	case protocol.MethodDidChangeConfiguration:
+		var p protocol.DidChangeConfigurationParams
+		if err = m.UnmarshalParams(&p); err == nil {
+			s.didChangeConfiguration(p)
+		}
 	}
 	if err != nil {
 		s.log.Printf("%s: bad params: %v", m.Method, err)
@@ -394,8 +399,16 @@ func (s *server) initialize(m *jsonrpc.Message) {
 	if w := params.Capabilities.Workspace; w != nil && w.DidChangeWatchedFiles != nil {
 		s.dynamicWatch = w.DidChangeWatchedFiles.DynamicRegistration
 	}
+	// プラグインを起動してよいかは、クライアントが言う（docs/lsp.md「プラグインの診断」の「許し」）。言われなければ、起動しない
+	if len(params.InitializationOptions) > 0 {
+		allowed, ok := pluginChecksOption(params.InitializationOptions)
+		if !ok && string(params.InitializationOptions) != "null" {
+			s.log.Printf("initialize: initializationOptions に、真偽値の pluginChecks がない（プラグインは、起動しない）")
+		}
+		s.checks.allowed = allowed
+	}
 	s.initialized = true
-	s.log.Printf("initialize: root=%s encoding=%s", s.root, s.enc)
+	s.log.Printf("initialize: root=%s encoding=%s pluginChecks=%v", s.root, s.enc, s.checks.allowed)
 	s.reply(m.ID, protocol.InitializeResult{
 		Capabilities: protocol.ServerCapabilities{
 			PositionEncoding: string(s.enc),

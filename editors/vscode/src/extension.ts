@@ -9,6 +9,7 @@ import {
   ServerOptions,
   TransportKind,
 } from 'vscode-languageclient/node';
+import { configurationParams, initializationOptions, PLUGIN_CHECKS } from './trust';
 
 /** 語彙の仮想文書の URI スキーム（docs/ir.md「Program」の Span.file、docs/lsp.md「プロジェクト」）。 */
 const VOCABULARY_SCHEME = 'hozo';
@@ -33,7 +34,18 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       if (e.affectsConfiguration(`${CONFIG_SECTION}.hozocPath`)) {
         await stopClient();
         await startClient();
+        return;
       }
+      if (e.affectsConfiguration(`${CONFIG_SECTION}.${PLUGIN_CHECKS}`)) {
+        await sendPluginChecksPermission();
+      }
+    }),
+  );
+
+  // 後から、ワークスペースが信頼されたら、プラグインを起動してよい、と言い直す（docs/editors.md「VS Code 拡張」）
+  context.subscriptions.push(
+    vscode.workspace.onDidGrantWorkspaceTrust(async () => {
+      await sendPluginChecksPermission();
     }),
   );
 
@@ -68,6 +80,8 @@ async function startClient(): Promise<void> {
       fileEvents: vscode.workspace.createFileSystemWatcher('**/{hozo.toml,*.hozo}'),
     },
     outputChannel: output,
+    // プラグインを起動してよいのは、ワークスペースが信頼されていて、設定が入のときだけ（docs/lsp.md「プラグインの診断」の「許し」）
+    initializationOptions: initializationOptions(vscode.workspace.isTrusted, pluginChecksSetting()),
   };
 
   const c = new LanguageClient(CONFIG_SECTION, 'Hozo Language Server', serverOptions, clientOptions);
@@ -78,6 +92,22 @@ async function startClient(): Promise<void> {
     output?.appendLine(`hozoc lsp の起動に失敗: ${String(err)}`);
     await notifyMissing(hozocPath, String(err));
   }
+}
+
+/** 設定 hozo.pluginChecks の値（未設定なら undefined）。 */
+function pluginChecksSetting(): unknown {
+  return vscode.workspace.getConfiguration(CONFIG_SECTION).get<boolean>(PLUGIN_CHECKS);
+}
+
+/** 動いている言語サーバーに、今の許しを、渡し直す（サーバーは、起動し直さない）。 */
+async function sendPluginChecksPermission(): Promise<void> {
+  if (!client) {
+    return;
+  }
+  await client.sendNotification(
+    'workspace/didChangeConfiguration',
+    configurationParams(vscode.workspace.isTrusted, pluginChecksSetting()),
+  );
 }
 
 async function stopClient(): Promise<void> {

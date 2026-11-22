@@ -175,9 +175,20 @@ func (c *testClient) result(method string, params any, v any) {
 // 発行は initialized の処理の中で同期的に送られるので、次の要求の応答が来るまでの通知がそのすべて。
 func (c *testClient) initialize(root string, caps protocol.ClientCapabilities) (protocol.InitializeResult, map[string][]protocol.Diagnostic) {
 	c.t.Helper()
+	return c.initializeWith(root, caps, "")
+}
+
+// initializeWith は、initialize に、initializationOptions（JSON の文面。"" なら、付けない）を付けて送る
+// （docs/lsp.md「プラグインの診断」の「許し」）。
+func (c *testClient) initializeWith(root string, caps protocol.ClientCapabilities, options string) (protocol.InitializeResult, map[string][]protocol.Diagnostic) {
+	c.t.Helper()
 	rootURI := fileURI(root)
+	params := protocol.InitializeParams{RootURI: &rootURI, Capabilities: caps}
+	if options != "" {
+		params.InitializationOptions = json.RawMessage(options)
+	}
 	var res protocol.InitializeResult
-	c.result(protocol.MethodInitialize, protocol.InitializeParams{RootURI: &rootURI, Capabilities: caps}, &res)
+	c.result(protocol.MethodInitialize, params, &res)
 	c.notify(protocol.MethodInitialized, struct{}{})
 	return res, c.syncDiagnostics()
 }

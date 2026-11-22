@@ -96,6 +96,15 @@ enabled = false                 # true なら hozoc tests で direction "coverag
 
 プラグインは利用者が入れ、`hozo.toml` にそのトランスパイラの名前を書いて選んだコードで、hozoc と同じユーザーの権限で動く子プロセス。protoc のプラグインと同じ信頼モデルで、サンドボックスも、応答の `files` 以外のファイルの変化の検出も行わない。hozoc が確かめるのは応答だけ（「応答の形」、PLG-1、PLG-2、CFG-5）。IR の取得と出力の書き込みを標準入出力に限るのは、プラグインを単純に書けるようにするための約束で、強制ではない（Go のトランスパイラは、import パスを求めるために `go.mod` を読む。`docs/plugin-go.md`「配置」）。
 
+**起動する、きっかけ**（`docs/decisions.md`「決めたこと」404、405、412）。プラグインを探す場所の一つ目は、プロジェクトの中（「探索」の 1）なので、起動するコマンド（マニフェストの `command`）は、リポジトリの中身が、決められる。hozoc が、プラグインを起動するのは、次のときだけ。
+
+| きっかけ | 起動するか |
+|---|---|
+| `hozoc emit`、`hozoc check`、`hozoc tests` | する。コマンドを打つことが、走らせる意思 |
+| 言語サーバー（`hozoc lsp`） | クライアントが、許したときだけ（`docs/lsp.md`「プラグインの診断」の「許し」）。既定は、しない |
+
+サンドボックスの中で動かすことは、決まっているが、まだ、ない（`docs/decisions.md`「決めたこと」413）。
+
 ## 要求と応答
 
 すべての要求は `protocol`（`docs/ir.md` の `version` と同じ値。`view.version` とも等しい）と `direction` を持つ。プラグインは `protocol` が合わなければ `code: "protocol"`、`direction` を実装していなければ（`emit` なら、要求の `transpiler` を実装していなければ）`code: "unsupported"` の `error` を返して終了コード 2 で終わる。`protocol` を先に確かめる。「合わない」は、プラグインが話す版と同じ文字列でないことで、`protocol` がない、`null`、文字列でない場合を含む。文字列でない `direction` は、実装していない `direction` と同じ。要求が JSON のオブジェクトとして読めなければ、応答を書かずに終了コード 1 で終わる（hozoc からは `proc.Crashed`）。二つの SDK はこの読み方を同じ表（`plugin/testdata/request_head.json`）でテストする。

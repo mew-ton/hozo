@@ -4,11 +4,13 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"os"
 	"strconv"
 	"time"
 
 	"github.com/mew-ton/hozo/internal/diag"
+	"github.com/mew-ton/hozo/internal/lsp/protocol"
 	"github.com/mew-ton/hozo/internal/project"
 	"github.com/mew-ton/hozo/internal/source"
 )
@@ -19,6 +21,9 @@ import (
 
 // pluginChecks は、裏で走らせる、プラグインの check の状態。
 type pluginChecks struct {
+	// allowed は、クライアントが、プラグインを起動してよい、と言っているか（docs/lsp.md「プラグインの診断」の「許し」）。
+	// 既定は、偽: どのきっかけでも、起動しない。
+	allowed bool
 	// content は、直近の解析の中身（fingerprint）。
 	content string
 	// answer は、最後に終わった check の答え（プラグインの check まで済んだ解析）。answerOf は、その中身。出すのは、
@@ -97,7 +102,7 @@ func (s *server) contentChanged(content string) {
 // 「走らせないとき」）: hozo.toml があり、hozoc 自身の診断に error がなく、使うプラグインに、[check] enabled のものがある。
 func (s *server) needsPluginChecks() bool {
 	p := s.proj
-	if p == nil || p.NoConfig {
+	if !s.checks.allowed || p == nil || p.NoConfig {
 		return false
 	}
 	if errs, _ := diag.Count(p.Diags); errs > 0 {
@@ -170,6 +175,9 @@ func (s *server) pluginCheckDone(r checkResult) {
 	c.cancel = nil
 	if r.canceled {
 		s.log.Printf("plugin check: canceled")
+	} else if !c.allowed {
+		// 走り終えた後に、許しがなくなった: 答えは、使わない
+		s.log.Printf("plugin check: 許されていないので、答えを捨てる")
 	} else {
 		if r.proj.RunErr != nil {
 			s.log.Printf("plugin check: %v", r.proj.RunErr)
@@ -203,4 +211,57 @@ func (s *server) stopPluginChecks() {
 		c.running = false
 	}
 	close(c.quit)
+}
+
+// pluginChecksOption は、JSON のオブジェクト raw の、項目 pluginChecks（真偽値）を読む（docs/lsp.md「プラグインの診断」の
+// 「許し」）。項目がない、真偽値でない、raw がオブジェクトでない、は ok が偽。
+func pluginChecksOption(raw json.RawMessage) (allowed, ok bool) {
+	var obj map[string]json.RawMessage
+	if err := json.Unmarshal(raw, &obj); err != nil || obj == nil {
+		return false, false
+	}
+	v, has := obj["pluginChecks"]
+	if !has {
+		return false, false
+	}
+	if err := json.Unmarshal(v, &allowed); err != nil || string(v) == "null" {
+		return false, false
+	}
+	return allowed, true
+}
+
+// setPluginChecksAllowed は、許しを変える。与えられたら、今の中身について、プラグインの check を求める。なくなったら、
+// 走っている check を、やめさせ、待たせている check と、覚えている答えを、捨てて、診断を、hozoc 自身のものだけで、出し直す。
+func (s *server) setPluginChecksAllowed(allowed bool) {
+	c := &s.checks
+	if c.allowed == allowed {
+		return
+	}
+	c.allowed = allowed
+	s.log.Printf("plugin check: allowed=%v", allowed)
+	if allowed {
+		if s.proj != nil {
+			s.requestPluginChecks(false)
+		}
+		return
+	}
+	if c.running {
+		c.cancel()
+	}
+	c.queued = nil
+	c.answer, c.answerOf = nil, ""
+	if s.proj != nil && !s.shutdown {
+		s.publishAll()
+	}
+}
+
+// didChangeConfiguration は、settings.hozo.pluginChecks が、真偽値なら、許しを、その値に変える。なければ、変えない。
+func (s *server) didChangeConfiguration(p protocol.DidChangeConfigurationParams) {
+	var settings map[string]json.RawMessage
+	if err := json.Unmarshal(p.Settings, &settings); err != nil || settings == nil {
+		return
+	}
+	if allowed, ok := pluginChecksOption(settings["hozo"]); ok {
+		s.setPluginChecksAllowed(allowed)
+	}
 }

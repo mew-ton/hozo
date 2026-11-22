@@ -19,6 +19,15 @@
   "activationEvents": [
     "onLanguage:hozo"
   ],
+  "capabilities": {
+    "untrustedWorkspaces": {
+      "supported": "limited",
+      "description": "信頼していないワークスペースでは、プラグインを起動しません（プラグインの診断は出ません）。シンタックスハイライトと、hozoc 自身の診断・定義へのジャンプ・ホバーは働きます。",
+      "restrictedConfigurations": [
+        "hozo.hozocPath"
+      ]
+    }
+  },
   "main": "./out/extension.js",
   "contributes": {
     "languages": [
@@ -48,6 +57,11 @@
           "type": "string",
           "default": "hozoc",
           "description": "言語サーバーとして起動する hozoc の場所。既定は PATH の hozoc。"
+        },
+        "hozo.pluginChecks": {
+          "type": "boolean",
+          "default": true,
+          "description": "ファイルを開いたときと保存したときに、プラグインの検査を走らせて、その診断を出す。信頼していないワークスペースでは、この設定によらず、走らせない。"
         },
         "hozo.trace.server": {
           "type": "string",

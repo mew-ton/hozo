@@ -16,7 +16,7 @@
 
 | 要求 | 振る舞い |
 |---|---|
-| `initialize` | `rootUri`（なければ `workspaceFolders` の先頭）をワークスペースにし、下の「プロジェクト」を作る。capabilities を返す |
+| `initialize` | `rootUri`（なければ `workspaceFolders` の先頭）をワークスペースにし、下の「プロジェクト」を作る。`initializationOptions` から、プラグインを起動してよいかを読む（「プラグインの診断」の「許し」）。capabilities を返す |
 | `initialized` | 開いているファイルがなくても、プロジェクト全体の診断を一度発行する |
 | `shutdown` / `exit` | 終了。`lsp` の op は値を返さず例外も持たないので、終了コードは常に 0 |
 
@@ -57,8 +57,9 @@ capabilities: `textDocumentSync: { openClose: true, change: Full, save: { includ
 
 ### プラグインの診断
 
-`docs/decisions.md`「決めたこと」405。プラグインの check（`docs/cli.md`「check」の 4）は、プラグインを起動するので、解析より、桁が違って遅い: サンプル `shop-server`（プラグインの起動が 13 回。開発中のマニフェストの `go run`）で、解析が 5 ミリ秒、プラグインの check を足すと 1.7 秒（実測）。なので、解析と、分ける。
+`docs/decisions.md`「決めたこと」405、412。プラグインの check（`docs/cli.md`「check」の 4）は、プラグインを起動するので、解析より、桁が違って遅い: サンプル `shop-server`（プラグインの起動が 13 回。開発中のマニフェストの `go run`）で、解析が 5 ミリ秒、プラグインの check を足すと 1.7 秒（実測）。なので、解析と、分ける。
 
+- **プラグインを起動するのは、クライアントが、許したときだけ**（同 412。下の「許し」）。既定は、許していない: プラグインは、どのきっかけでも、起動せず、出るのは、hozoc 自身の診断だけ。この見出しの、ほかの決まりは、許されているときのもの。
 - **解析（「プロジェクト」の、解析し直し）は、プラグインを起動しない。** hozoc 自身の診断を、すぐ出す。
 - **プラグインの check は、裏で走らせる。** 走っている間も、要求（ホバー、定義へジャンプ、次の解析）は、待たない。終わったら、hozoc 自身の診断に、プラグインの診断を足したもの（`hozoc check` と同じ診断）を、出し直す。
 - **走らせるきっかけ**は、解析の中身（下の「中身」）が、ディスクに書かれたと分かるとき:
@@ -69,7 +70,7 @@ capabilities: `textDocumentSync: { openClose: true, change: Full, save: { includ
 | `didOpen`、`workspace/didChangeWatchedFiles` | 今の中身の、プラグインの診断を、まだ持っていないとき（同じ中身の check が、走っていれば、それを待つ） |
 | `didChange`（打鍵）、`didClose`、`initialized` | 走らせない |
 
-- **走らせないとき**: `hozo.toml` がない。hozoc 自身の診断に、error がある（`docs/plugin-protocol.md`「check」: 検査を通っていない仕様では、起動しない）。使うプラグインに、`[check] enabled` のものがない。
+- **走らせないとき**: クライアントが、許していない（「許し」）。`hozo.toml` がない。hozoc 自身の診断に、error がある（`docs/plugin-protocol.md`「check」: 検査を通っていない仕様では、起動しない）。使うプラグインに、`[check] enabled` のものがない。
 - **中身**は、解析が読んだ、すべてのファイル（ユーザーのファイル、語彙のファイル）と、`hozo.toml` の内容。開いている文書は、エディタの中の内容（「プロジェクト」の `Overlay`）で、保存していなくても、それを読む。プラグインの check も、同じものを読む。
 - **プラグインの診断は、それを求めた中身と、今の中身が同じ間だけ、出す。** 中身が変わったら（保存の後に、編集した。別の保存が来た）、プラグインの診断は、消える（hozoc 自身の診断だけに戻る）: 位置が、ずれた診断を、残さない。クライアントが、診断の位置を、編集に合わせて動かすことは、当てにしない。中身が、もとに戻れば（編集を、取り消した）、また出す。
 - **裏の check は、一度に一つ。** 走っている間に、中身が変わったら、走っている check を、やめさせる（プラグインの起動と起動の間で、止まる。起動したプラグインは、止めない）。やめさせた check の答えは、使わない。次の check は、前の check が終わってから、始める。待たせるのは、最後に求めた一つだけ。
@@ -78,9 +79,25 @@ capabilities: `textDocumentSync: { openClose: true, change: Full, save: { includ
 - **プラグインの check が、最後まで走らなかったとき**（異常終了、形の違う応答）は、そこまでに返った診断と、LSP-2 を出す。サーバーは、止まらない。誤りは、ログにも残す。
 - **終わるとき**（`exit`、入力の終わり）は、走っている check を、やめさせて、それが止まるのを待つ（起動中のプラグイン一つが、終わるまで。5 秒で、待つのをやめる）。
 
-- **クライアントに、足すものは、ない。** `didSave` は、capabilities の `save`（「ライフサイクル」）で、送られる。VS Code 拡張（`docs/editors.md`）も、変えない。
+- **`didSave` のために、クライアントに、足すものは、ない。** capabilities の `save`（「ライフサイクル」）で、送られる。
 
 決めていないこと（`docs/open.md`「文書と道具」）: 打つのを止めてから、少し後に、走らせる形。起動したプラグインを、途中で止めること。プラグインの check の速さ。
+
+#### 許し
+
+`docs/decisions.md`「決めたこと」412。プラグインは、利用者と同じ権限で動く、任意のコードで、起動するコマンドは、プロジェクトの中のマニフェストが、決められる（`docs/plugin-protocol.md`「信頼の前提」）。エディタで、ファイルを開いただけで、それが動かないように、プラグインを起動してよいかは、クライアントが、言う。
+
+| 口 | 形 | いつ |
+|---|---|---|
+| `initialize` の `initializationOptions` | `{ "pluginChecks": true }` | 起動のとき |
+| 通知 `workspace/didChangeConfiguration` の `settings` | `{ "hozo": { "pluginChecks": true } }` | 動いている間に、変わったとき |
+
+- **既定は、許していない。** `initializationOptions` がない、`pluginChecks` がない、真偽値でない、は、どれも、許していない、と読む（誤りには、しない。真偽値でなければ、ログに残す）。
+- **`workspace/didChangeConfiguration`** は、`settings.hozo.pluginChecks` が、真偽値のときだけ、許しを、その値に変える。なければ、変えない。ほかの項目は、読まない。
+- **許しが、与えられたとき**: 今の中身について、プラグインの check を、求める（`didOpen` と同じ条件: 今の中身の診断を、まだ持っていないとき）。
+- **許しが、なくなったとき**: 走っている check を、やめさせ、待たせている check を、捨てる。覚えている答えも、捨てて、診断を、hozoc 自身のものだけで、出し直す（プラグインの診断と、LSP-2 が、消える）。その後に届いた、裏の check の答えは、使わない。
+- **VS Code 拡張**が、いつ、許すかは、`docs/editors.md`「VS Code 拡張」。
+- **ほかのクライアント**から `hozoc lsp` を使うときは、プロジェクトを信頼しているときに、起動の設定で、`initializationOptions` に `{ "pluginChecks": true }` を渡す。渡さなければ、プラグインの診断は、出ない（`hozoc check` では、出る）。
 
 ## 定義へジャンプ
 

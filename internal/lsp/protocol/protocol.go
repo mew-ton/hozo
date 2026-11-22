@@ -7,22 +7,23 @@ import "encoding/json"
 
 // メソッド名。
 const (
-	MethodInitialize            = "initialize"
-	MethodInitialized           = "initialized"
-	MethodShutdown              = "shutdown"
-	MethodExit                  = "exit"
-	MethodCancelRequest         = "$/cancelRequest"
-	MethodDidOpen               = "textDocument/didOpen"
-	MethodDidChange             = "textDocument/didChange"
-	MethodDidClose              = "textDocument/didClose"
-	MethodDidSave               = "textDocument/didSave"
-	MethodDidChangeWatchedFiles = "workspace/didChangeWatchedFiles"
-	MethodPublishDiagnostics    = "textDocument/publishDiagnostics"
-	MethodDefinition            = "textDocument/definition"
-	MethodHover                 = "textDocument/hover"
-	MethodDocumentSymbol        = "textDocument/documentSymbol"
-	MethodRegisterCapability    = "client/registerCapability"
-	MethodLogMessage            = "window/logMessage"
+	MethodInitialize             = "initialize"
+	MethodInitialized            = "initialized"
+	MethodShutdown               = "shutdown"
+	MethodExit                   = "exit"
+	MethodCancelRequest          = "$/cancelRequest"
+	MethodDidOpen                = "textDocument/didOpen"
+	MethodDidChange              = "textDocument/didChange"
+	MethodDidClose               = "textDocument/didClose"
+	MethodDidSave                = "textDocument/didSave"
+	MethodDidChangeWatchedFiles  = "workspace/didChangeWatchedFiles"
+	MethodDidChangeConfiguration = "workspace/didChangeConfiguration"
+	MethodPublishDiagnostics     = "textDocument/publishDiagnostics"
+	MethodDefinition             = "textDocument/definition"
+	MethodHover                  = "textDocument/hover"
+	MethodDocumentSymbol         = "textDocument/documentSymbol"
+	MethodRegisterCapability     = "client/registerCapability"
+	MethodLogMessage             = "window/logMessage"
 	// MethodVocabulary は hozoc 独自の要求（docs/lsp.md「プロジェクト」）。`hozo:` の URI の内容を返す。
 	MethodVocabulary = "hozo/vocabulary"
 )
@@ -111,6 +112,8 @@ type InitializeParams struct {
 	RootURI          *string            `json:"rootUri"`
 	Capabilities     ClientCapabilities `json:"capabilities"`
 	WorkspaceFolders []WorkspaceFolder  `json:"workspaceFolders,omitempty"`
+	// InitializationOptions は、サーバーごとの設定（docs/lsp.md「プラグインの診断」の「許し」）。形は、読む側が確かめる。
+	InitializationOptions json.RawMessage `json:"initializationOptions,omitempty"`
 }
 
 // InitializeResult は initialize の result。
@@ -198,6 +201,12 @@ const (
 type FileEvent struct {
 	URI  string         `json:"uri"`
 	Type FileChangeType `json:"type"`
+}
+
+// DidChangeConfigurationParams は workspace/didChangeConfiguration の params。settings の形は、読む側が確かめる
+// （docs/lsp.md「プラグインの診断」の「許し」）。
+type DidChangeConfigurationParams struct {
+	Settings json.RawMessage `json:"settings"`
 }
 
 // DidChangeWatchedFilesParams は workspace/didChangeWatchedFiles の params。

@@ -1,6 +1,7 @@
 package lsp
 
 import (
+	"encoding/json"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -112,6 +113,24 @@ func (p *pluginProject) save(c *testClient, text string) {
 	c.notify(protocol.MethodDidSave, protocol.DidSaveTextDocumentParams{TextDocument: textDoc(p.uri)})
 }
 
+// allowed は、プラグインを起動してよい、と言って、initialize する（docs/lsp.md「プラグインの診断」の「許し」）。
+func (p *pluginProject) allowed(c *testClient) (protocol.InitializeResult, map[string][]protocol.Diagnostic) {
+	c.t.Helper()
+	return c.initializeWith(p.root, protocol.ClientCapabilities{}, `{"pluginChecks": true}`)
+}
+
+// allow は、動いている間に、許しを変える（workspace/didChangeConfiguration）。
+func (p *pluginProject) allow(c *testClient, on bool) {
+	c.notify(protocol.MethodDidChangeConfiguration, protocol.DidChangeConfigurationParams{
+		Settings: json.RawMessage(`{"hozo": {"pluginChecks": ` + strconv.FormatBool(on) + `}}`),
+	})
+}
+
+// watched は、a.hozo が、エディタの外で変わった、と知らせる（workspace/didChangeWatchedFiles）。
+func (p *pluginProject) watched(c *testClient) {
+	c.notify(protocol.MethodDidChangeWatchedFiles, protocol.DidChangeWatchedFilesParams{Changes: []protocol.FileEvent{{URI: p.uri, Type: protocol.FileChanged}}})
+}
+
 // pluginCheckStarts は、サーバーが、裏の check を始めた回数（ログの行を数える）。
 func (c *testClient) pluginCheckStarts() int {
 	return strings.Count(c.logBuf.String(), "plugin check: start")
@@ -151,7 +170,7 @@ func TestPluginDiagnosticsOnOpen(t *testing.T) {
 	p := newPluginProject(t, pluginSpec)
 	p.gate()
 	c := startServer(t, Options{})
-	_, byURI := c.initialize(p.root, protocol.ClientCapabilities{})
+	_, byURI := p.allowed(c)
 	if !hasCode(byURI[p.uri], "REL-2") || hasCode(byURI[p.uri], "CHK-1") {
 		t.Fatalf("initialized の診断 = %v（期待は、hozoc 自身の REL-2 だけ）", codes(byURI[p.uri]))
 	}
@@ -211,7 +230,7 @@ func TestPluginDiagnosticsOnOpen(t *testing.T) {
 func TestPluginDiagnosticsOnSave(t *testing.T) {
 	p := newPluginProject(t, pluginSpec)
 	c := startServer(t, Options{})
-	c.initialize(p.root, protocol.ClientCapabilities{})
+	p.allowed(c)
 	p.open(c, pluginSpec)
 	if msg, _ := c.waitPlugin(p.uri, nil); msg != "run 1" {
 		t.Fatalf("開いた後の CHK-1 = %q", msg)
@@ -232,7 +251,7 @@ func TestPluginDiagnosticsOnSave(t *testing.T) {
 func TestNoPluginCheckDiagnostics(t *testing.T) {
 	p := newPluginProject(t, pluginSpec)
 	c := startServer(t, Options{})
-	_, byURI := c.initialize(p.root, protocol.ClientCapabilities{})
+	_, byURI := p.allowed(c)
 	for u, ds := range byURI {
 		if hasCode(ds, "CHK-1") {
 			t.Errorf("%s: プラグインの check の診断が出ている: %+v", u, ds)
@@ -262,7 +281,7 @@ func TestPluginCheckDoesNotBlock(t *testing.T) {
 	p := newPluginProject(t, pluginSpec)
 	p.gate()
 	c := startServer(t, Options{})
-	c.initialize(p.root, protocol.ClientCapabilities{})
+	p.allowed(c)
 	p.open(c, pluginSpec)
 	p.waitCalls(1) // プラグインは、起動して、待たされている
 
@@ -288,7 +307,7 @@ func TestStalePluginDiagnosticsDropped(t *testing.T) {
 	p := newPluginProject(t, pluginSpec)
 	p.gate()
 	c := startServer(t, Options{})
-	c.initialize(p.root, protocol.ClientCapabilities{})
+	p.allowed(c)
 	p.open(c, pluginSpec)
 	p.waitCalls(1) // 一つ目が、待たされている
 
@@ -329,7 +348,7 @@ func TestStalePluginDiagnosticsDropped(t *testing.T) {
 func TestPluginDiagnosticsFollowContent(t *testing.T) {
 	p := newPluginProject(t, pluginSpec)
 	c := startServer(t, Options{})
-	c.initialize(p.root, protocol.ClientCapabilities{})
+	p.allowed(c)
 	p.open(c, pluginSpec)
 	if msg, _ := c.waitPlugin(p.uri, nil); msg != "run 1" {
 		t.Fatalf("開いた後の CHK-1 = %q", msg)
@@ -353,7 +372,7 @@ func TestPluginDiagnosticsFollowContent(t *testing.T) {
 func TestPluginCheckSkippedOnErrors(t *testing.T) {
 	p := newPluginProject(t, pluginSpecBroken)
 	c := startServer(t, Options{})
-	_, byURI := c.initialize(p.root, protocol.ClientCapabilities{})
+	_, byURI := p.allowed(c)
 	if !hasCode(byURI[p.uri], "RES-1") {
 		t.Fatalf("initialized の診断 = %v（期待は RES-1）", codes(byURI[p.uri]))
 	}
@@ -388,10 +407,8 @@ func TestPluginCheckSkippedOnErrors(t *testing.T) {
 func TestPluginCheckOnWatchedFiles(t *testing.T) {
 	p := newPluginProject(t, pluginSpecBroken)
 	c := startServer(t, Options{})
-	c.initialize(p.root, protocol.ClientCapabilities{})
-	watched := func() {
-		c.notify(protocol.MethodDidChangeWatchedFiles, protocol.DidChangeWatchedFilesParams{Changes: []protocol.FileEvent{{URI: p.uri, Type: protocol.FileChanged}}})
-	}
+	p.allowed(c)
+	watched := func() { p.watched(c) }
 
 	// 開いていないファイルが、外で、直った
 	p.gate()
@@ -423,7 +440,7 @@ func TestPluginCheckCrash(t *testing.T) {
 	p := newPluginProject(t, pluginSpec)
 	writeFile(t, filepath.Join(p.dir, "crash"), "")
 	c := startServer(t, Options{})
-	c.initialize(p.root, protocol.ClientCapabilities{})
+	p.allowed(c)
 	p.open(c, pluginSpec)
 	configURI := fileURI(filepath.Join(p.root, "hozo.toml"))
 	ds := c.waitDiagnostics(configURI)
@@ -456,7 +473,7 @@ func TestPluginCheckExit(t *testing.T) {
 	p := newPluginProject(t, pluginSpec)
 	p.gate()
 	c := startServer(t, Options{})
-	c.initialize(p.root, protocol.ClientCapabilities{})
+	p.allowed(c)
 	p.open(c, pluginSpec)
 	p.waitCalls(1)
 	if r := c.call(protocol.MethodShutdown, nil); r.Error != nil {
@@ -483,11 +500,156 @@ func TestPluginCheckExit(t *testing.T) {
 	p.gate()
 	t.Cleanup(p.release) // テストの後に、待っているプラグインを、終わらせる
 	c = startServer(t, Options{})
-	c.initialize(p.root, protocol.ClientCapabilities{})
+	p.allowed(c)
 	p.open(c, pluginSpec)
 	p.waitCalls(1)
 	c.shutdown() // exit の後、waitTimeout までに、Serve が戻らなければ、失敗
 	if !strings.Contains(c.logBuf.String(), "待ちきれなかった") {
 		t.Errorf("待つのをやめたことが、ログにない:\n%s", c.logBuf.String())
+	}
+}
+
+// TestPluginChecksNeedPermission は、クライアントが許していなければ（既定）、プラグインの check の、どのきっかけ（開く、保存、
+// 外でファイルが変わる）でも、プラグインを起動しないこと（docs/lsp.md「プラグインの診断」の「許し」）。出るのは、hozoc 自身の
+// 診断だけ。異常終了するプラグインでも、LSP-2 は、出ない（起動しないので）。許しとして読めない initializationOptions も、
+// 許していない、と読む。
+func TestPluginChecksNeedPermission(t *testing.T) {
+	for _, tc := range []struct{ name, options string }{
+		{"なし", ""},
+		{"偽", `{"pluginChecks": false}`},
+		{"項目がない", `{"other": true}`},
+		{"真偽値でない", `{"pluginChecks": "yes"}`},
+		{"オブジェクトでない", `7`},
+		{"null", `null`},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			p := newPluginProject(t, pluginSpec)
+			writeFile(t, filepath.Join(p.dir, "crash"), "") // 起動すれば、LSP-2 が出る
+			c := startServer(t, Options{})
+			res, byURI := c.initializeWith(p.root, protocol.ClientCapabilities{}, tc.options)
+			if !res.Capabilities.HoverProvider {
+				t.Fatalf("initialize の答えが、おかしい: %+v", res)
+			}
+			if !hasCode(byURI[p.uri], "REL-2") {
+				t.Fatalf("initialized の診断 = %v（期待は、hozoc 自身の REL-2）", codes(byURI[p.uri]))
+			}
+			p.open(c, pluginSpec)
+			c.syncDiagnostics()
+			p.save(c, pluginSpecEdited)
+			if ds := c.syncDiagnostics()[p.uri]; ds != nil && (!hasCode(ds, "REL-2") || len(ds) != 1) {
+				t.Errorf("保存の後の診断 = %v（期待は、REL-2 だけ）", codes(ds))
+			}
+			writeFile(t, filepath.Join(p.root, "a.hozo"), pluginSpec)
+			p.watched(c)
+			all := c.syncDiagnostics()
+			c.shutdown()
+			if n := c.pluginCheckStarts(); n != 0 || p.calls() != 0 {
+				t.Errorf("許していないのに、プラグインの check が走った（始めた %d 回、起動 %d 回）", n, p.calls())
+			}
+			for u, ds := range all {
+				if hasCode(ds, "CHK-1") || hasCode(ds, "LSP-2") {
+					t.Errorf("%s: 許していないのに、プラグインの診断が出た: %v", u, codes(ds))
+				}
+			}
+			if strings.Contains(c.logBuf.String(), "LSP-2") {
+				t.Errorf("許していないのに、LSP-2 が、ログにある")
+			}
+		})
+	}
+}
+
+// TestPluginChecksRevoked は、動いている間に、許しがなくなったら（workspace/didChangeConfiguration）、プラグインの診断が消え、
+// その後は、どのきっかけでも、プラグインを起動しないこと。
+func TestPluginChecksRevoked(t *testing.T) {
+	p := newPluginProject(t, pluginSpec)
+	c := startServer(t, Options{})
+	p.allowed(c)
+	p.open(c, pluginSpec)
+	if msg, _ := c.waitPlugin(p.uri, nil); msg != "run 1" {
+		t.Fatalf("開いた後の CHK-1 = %q", msg)
+	}
+	p.allow(c, false)
+	if ds := c.waitNoPlugin(p.uri); !hasCode(ds, "REL-2") {
+		t.Fatalf("許しがなくなった後の診断 = %v（期待は、hozoc 自身の REL-2 だけ）", codes(ds))
+	}
+	p.save(c, pluginSpec)
+	p.watched(c)
+	for u, ds := range c.syncDiagnostics() {
+		if hasCode(ds, "CHK-1") {
+			t.Errorf("%s: 許しがなくなった後に、プラグインの診断が出た: %v", u, codes(ds))
+		}
+	}
+	c.shutdown()
+	if n := c.pluginCheckStarts(); n != 1 || p.calls() != 1 {
+		t.Errorf("許しがなくなった後に、プラグインの check が走った（始めた %d 回、起動 %d 回。期待は、どちらも 1）", n, p.calls())
+	}
+}
+
+// TestPluginChecksRevokedWhileRunning は、裏の check が走っている間に、許しがなくなったら、その答えを、出さないこと。
+// 異常終了する check でも、LSP-2 は、出ない。
+func TestPluginChecksRevokedWhileRunning(t *testing.T) {
+	for _, crash := range []bool{false, true} {
+		p := newPluginProject(t, pluginSpec)
+		if crash {
+			writeFile(t, filepath.Join(p.dir, "crash"), "")
+		}
+		p.gate()
+		c := startServer(t, Options{})
+		p.allowed(c)
+		p.open(c, pluginSpec)
+		p.waitCalls(1)
+		p.allow(c, false)
+		c.syncDiagnostics() // 許しがなくなったことを、サーバーが、読み終えた
+		p.release()
+		// 走っていた check が終わるのを、ログで待つ（答えは、使わない）
+		deadline := time.Now().Add(waitTimeout)
+		for !strings.Contains(c.logBuf.String(), "plugin check: canceled") && !strings.Contains(c.logBuf.String(), "plugin check: 許されていない") {
+			if time.Now().After(deadline) {
+				t.Fatalf("crash=%v: 走っていた check が、終わらない:\n%s", crash, c.logBuf.String())
+			}
+			time.Sleep(2 * time.Millisecond)
+		}
+		for u, ds := range c.syncDiagnostics() {
+			if hasCode(ds, "CHK-1") || hasCode(ds, "LSP-2") {
+				t.Errorf("crash=%v %s: 許しがなくなった後に、プラグインの診断が出た: %v", crash, u, codes(ds))
+			}
+		}
+		c.shutdown()
+	}
+}
+
+// TestPluginChecksGranted は、動いている間に、許しが与えられたら（後から、ワークスペースを信頼した）、今の中身について、
+// プラグインの check が走ること。値のない知らせと、ほかの項目だけの知らせでは、許しは、変わらない。
+func TestPluginChecksGranted(t *testing.T) {
+	p := newPluginProject(t, pluginSpec)
+	c := startServer(t, Options{})
+	c.initialize(p.root, protocol.ClientCapabilities{})
+	p.open(c, pluginSpec)
+	c.syncDiagnostics()
+	// 許しを言わない知らせ: 変わらない
+	for _, settings := range []string{`null`, `{}`, `{"hozo": {}}`, `{"hozo": {"pluginChecks": "yes"}}`, `{"pluginChecks": true}`, `{"other": {"pluginChecks": true}}`} {
+		c.notify(protocol.MethodDidChangeConfiguration, protocol.DidChangeConfigurationParams{Settings: json.RawMessage(settings)})
+	}
+	c.syncDiagnostics()
+	if n := c.pluginCheckStarts(); n != 0 || p.calls() != 0 {
+		t.Fatalf("許しを言わない知らせで、プラグインの check が走った（始めた %d 回、起動 %d 回）", n, p.calls())
+	}
+	p.allow(c, true)
+	if msg, ds := c.waitPlugin(p.uri, nil); msg != "run 1" || !hasCode(ds, "REL-2") {
+		t.Fatalf("許しが与えられた後の診断 = %v（CHK-1 のメッセージ %q。期待は、REL-2 と、CHK-1 \"run 1\"）", codes(ds), msg)
+	}
+	// 同じ許しを、もう一度: 今の中身の診断を、もう持っているので、走らせない
+	p.allow(c, true)
+	c.syncDiagnostics()
+	// 許しをなくして、また与える: 答えは、捨ててあるので、走り直す
+	p.allow(c, false)
+	c.waitNoPlugin(p.uri)
+	p.allow(c, true)
+	if msg, _ := c.waitPlugin(p.uri, nil); msg != "run 2" {
+		t.Fatalf("許しを、与え直した後の CHK-1 = %q（期待は、走り直した \"run 2\"）", msg)
+	}
+	c.shutdown()
+	if n := c.pluginCheckStarts(); n != 2 || p.calls() != 2 {
+		t.Errorf("裏の check を始めた %d 回、起動 %d 回（期待は、どちらも 2）", n, p.calls())
 	}
 }
