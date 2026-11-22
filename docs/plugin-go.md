@@ -1101,7 +1101,7 @@ func RunWarrantyKind(t *testing.T, cases shop.WarrantyKindCases, x WarrantyKindE
 
 ### デコレータのテストの口
 
-`docs/decisions.md`「決めたこと」382、395。規則の持ち主は `docs/ide-chain.md`「テストの規約」の「デコレータのテスト」。この節が決めるのは、Go での形。期待する出力の実物は、サンプルの `gen/server/servertest/seams.go`。
+`docs/decisions.md`「決めたこと」382、395、398。規則の持ち主は `docs/ide-chain.md`「テストの規約」の「デコレータのテスト」。この節が決めるのは、Go での形。期待する出力の実物は、サンプルの `gen/server/servertest/seams.go`。例外を受けるデコレータの分（「受けるケース」）の実物は、単体テストの入力 `wraps` の `gen/desk/desktest/seams.go`（`plugins/go/internal/gobase/testdata/wraps/expected/`）。
 
 **対象**は、単位の継ぎ目（`docs/config.md`「継ぎ目」）にあるデコレータのうち、単位の対象の op に、一つでも付いているもの（`Seams` にメソッドを持つもの。「継ぎ目」）。本体のあるデコレータ（「本体のあるデコレータ」）と、語彙として読むだけのデコレータには、出さない。対象が一つもなければ、ファイルを出さない。
 
@@ -1168,7 +1168,7 @@ func RunSeams(t *testing.T, c SeamCases) {
 ```
 
 - **`<D>Cases` と `<D>Case`** は、デコレータの宣言ごとに、一組。`<D>` は、デコレータの FQN のセグメントを、それぞれ先頭大文字にして連結したもの（`rate.limited` → `RateLimited`）。並びは、`Seams` のメソッドの並びで、そのデコレータが、最初に出てくる順。
-- **結果**は、正常（`OK`）と、デコレータの宣言の `throws` の例外ごと（書かれた順。同じ例外は、一度だけ）。名前の決まりは、葉の op の結果と同じ（「葉の op」: 例外の宣言の名前。当たれば、名前空間のセグメントを前に付ける）。`throws` に、デコレータの引数の名前で書いた例外（`throws error`）と、`catches` の節は、結果にしない（`docs/open.md`「Hozo の側の改善する点」）。
+- **結果**は、正常（`OK`）と、デコレータの宣言の `throws` の例外ごと（書かれた順。同じ例外は、一度だけ）。名前の決まりは、葉の op の結果と同じ（「葉の op」: 例外の宣言の名前。当たれば、名前空間のセグメントを前に付ける）。`throws` に、デコレータの引数の名前で書いた例外（`throws error`）は、結果にしない（`docs/open.md`「Hozo の側の改善する点」）。`catches` の節も、結果にしない: 受ける例外ごとのテストは、口のメソッドなしに、`RunSeams` が作る（「受けるケース」）。`throws` を持たず、`catches` だけのデコレータの結果は、`OK` だけ。
 - **`<D>Case` のフィールドは、`Seams` 一つ**: その結果になる状態の、継ぎ目の実装を返す関数。型は、N の `Seams`（単位の継ぎ目の、すべてのメソッドを持つ）。
 - **`SeamCases`** は、対象のデコレータごとに、メソッド一つ（名前は `<D>`）。**`RunSeams`** の引数は、`t` と `c SeamCases` だけ。
 - **走らせる単位は、`Seams` のメソッドごと**（付けた op と、デコレータの組）。テストの名前は、`<op の FQN>@<デコレータの FQN>/<結果>`（インテグレーションテストの、出どころの書き方と、同じ。`docs/plugin-go-http.md`「インテグレーションテストの口」）。対応表（「テストの対応表」）に、この名前で載る。
@@ -1183,6 +1183,53 @@ func RunSeams(t *testing.T, c SeamCases) {
 | 例外（関係がない。両方ある） | 返った失敗が、その例外。`calls` は、見ない（`_ = calls` を置く: Go は、読まれない変数を、許さない） |
 
 - 当たる名前は、GO-2（「テストのパッケージ」）: `SeamCases`、`RunSeams`、`<D>Cases`、`<D>Case` は、`golang.PublicTestNames` に並ぶ。
+
+#### 受けるケース
+
+`docs/decisions.md`「決めたこと」398。`catches` の節を持つデコレータの継ぎ目には、`RunSeams` が、受ける例外ごとに、テストを一つ足す。人か AI が書くケースは、増えない。
+
+```go
+	t.Run("desk.load@trace.renamed", func(t *testing.T) {
+		cases := c.TraceRenamed()
+		t.Run("OK", func(t *testing.T) { … })
+		t.Run("catches", func(t *testing.T) {
+			t.Run("Down", func(t *testing.T) {
+				k := cases.OK()
+				calls := 0
+				_, err := k.Seams().LoadTraceRenamed(context.Background(), "", func(ctx context.Context, id string) (string, error) {
+					calls++
+					return "", trace.Down{}
+				})
+				var caught trace.Down
+				if errors.As(err, &caught) {
+					t.Fatalf("want exception trace.Down caught (recovers), got %v", err)
+				}
+				var want0 trace.Late
+				if err != nil && !errors.As(err, &want0) {
+					t.Fatalf("want no error or one of the decorator's exceptions (trace.Late), got %v", err)
+				}
+				if calls != 1 {
+					t.Fatalf("want the body called once, got %d", calls)
+				}
+			})
+		})
+	})
+```
+
+- **受ける例外**は、`Seams` のメソッドごと（付けた op と、デコレータの組）に決める: その op への、そのデコレータの適用のすべて（`@repeatable` のデコレータを、二度付けたものを含む。`Op.decorators` の順）の、宣言の `catches` の節の例外（節の順、節の中の順）。デコレータの引数の名前（`catches error`）は、その適用が渡した例外で置き換える（`Application.args`。`A | B` と、残りの引数で渡したものは、渡した例外ごと。渡していなければ、ない）。例外のユニオンは、メンバーごと（IR で、展開済み）。同じ例外は、一度だけで、扱い（`recovers` / `halts` / `ignores`）は、最初に出てきた節のもの。
+- **その op の、計算した例外にない例外**（DEC-16 の warning が出る適用。`docs/check.md`「デコレータ」）にも、作る。確かめるのは、継ぎ目の実装が、デコレータの宣言のとおりに動くかで、op の中身が、その例外を投げうるかでは、ない。
+- **置き場**は、その継ぎ目の `t.Run` の中の、結果ごとのテストの後ろの、`t.Run("catches", …)` の中。受ける例外が一つもなければ、`t.Run("catches", …)` を出さない。**テストの名前**は、`<op の FQN>@<デコレータの FQN>/catches/<例外の名前>`。例外の名前の決まりは、結果の名前と同じ（例外の宣言の名前。受ける例外どうしで当たれば、名前空間のセグメントを前に付ける）。`catches` は、予約語（`docs/grammar.md`「字句」）なので、結果の名前（`OK` と、例外の宣言の名前）と、当たらない。対応表（「テストの対応表」）に、この名前で載る。
+- **継ぎ目の実装**は、正常のケースのもの（`cases.OK()` の `Seams()`）。
+- **`RunSeams` のコメント**には、受けるケースを持つ継ぎ目が、一つでもあれば、二行を足す（「例外を受けるデコレータの継ぎ目には、受ける例外ごとのテスト（<op の FQN>@<デコレータの FQN>/catches/<例外の名前>）を足す: 正常のケースの継ぎ目を、その例外を返す、にせものの中身と一緒に呼び、デコレータの宣言のとおりに終わることを確かめる。」）。一つもなければ、コメントは、変わらない。
+- **にせものの中身**は、呼ばれた回数（`calls`）を数え、零値と、その例外（`<例外の型>{}`）を返す。値を返さない op では、その例外だけ。
+- **確かめること**は、その例外を受けた節の扱いで決まる。どの扱いでも、`calls` が 1。
+
+| 扱い | 確かめること |
+|---|---|
+| `ignores` | 失敗が返らない |
+| `recovers`（その op への適用の引数を当てた後の、デコレータの `throws` の例外が、一つもない） | 失敗が返らない |
+| `recovers`（その `throws` の例外が、一つでもある） | 返った失敗が、受けた例外でない（変数 `caught`）。失敗が返るなら、その `throws` の例外の、どれか（変数 `want0`、`want1`、…。適用の順、節の順。同じ例外は、一度）。受けた例外が、`throws` にもあれば（DEC-6 の warning が出る宣言）、一つ目は、確かめない |
+| `halts` | 返った失敗が、受けた例外でない（変数 `caught`）。`halts` の効果が、呼ばれたかは、見ない（継ぎ目の口は、効果を受け取らない。`docs/open.md`「Hozo の側の改善する点」） |
 
 ### 口を持たないもの
 

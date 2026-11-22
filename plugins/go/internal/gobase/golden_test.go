@@ -32,7 +32,7 @@ var goldenFixtures = []struct {
 	{name: "rowstate", covers: "「effect」「状態の単位」「コメント」の、行の遷移を持つ効果（メソッドの形は変わらず、コメントに行の遷移の表示。行の引数を絞り込んだ効果は「効果の入口の確かめ」）と、「分類」の、ない側のケース（述語を持たない。判定関数が、値がないことで決める）、「match」の、ない側のケースを as none で書いた presence の分類", behavior: true},
 	{name: "throws", covers: "「exception」（引数ごとにフィールド一つ）と、「match」のアームの本体の throw E(<値>, …)、例外を投げる効果（「状態の単位」と、単位のメソッドのコメントの throws）", behavior: true},
 	{name: "seams", covers: "「継ぎ目」の各行、「内側のフォルダと入口」", behavior: true},
-	{name: "wraps", covers: "「本体のあるデコレータ」の各行（外側のメソッド、proceed() の式、値を返す op の result、値の引数、別の名前空間の op と分類の述語、継ぎ目との入れ子、proceed() のアームを持つ match の後ろの文、never を返す op）", behavior: true},
+	{name: "wraps", covers: "「本体のあるデコレータ」の各行（外側のメソッド、proceed() の式、値を返す op の result、値の引数、別の名前空間の op と分類の述語、継ぎ目との入れ子、proceed() のアームを持つ match の後ろの文、never を返す op）と、「デコレータのテストの口」の、関係ごとの確かめと、「受けるケース」（名前空間 desk: ignores、recovers、halts、引数で渡した例外、残りの引数、ユニオン、同じデコレータを二度、当たる名前、受けた例外が throws にもあるもの、op の例外にない例外）", behavior: true},
 	{name: "unittest", covers: "「単体テストの口」（葉の op の結果ごとのケース、当たる結果の名前、Then_、絞り込んだ戻り値の確かめ、分類の判定の例、口を持たないもの）と、「効果の入口の確かめ」（包む型、New が包むこと、別の名前空間の分類の述語）", behavior: true},
 }
 

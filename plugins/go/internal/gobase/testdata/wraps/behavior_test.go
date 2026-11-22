@@ -10,6 +10,8 @@ import (
 	"reflect"
 	"testing"
 
+	"example.com/app/gen/desk"
+	"example.com/app/gen/desk/desktest"
 	"example.com/app/gen/gate"
 	"example.com/app/gen/shop"
 	"example.com/app/gen/shop/shoptest"
@@ -282,4 +284,128 @@ func TestNeverOp(t *testing.T) {
 		t.Fatalf("閉まっているときの Refuse の失敗 = %v（期待は gate.Closed）", err)
 	}
 	l.expect(t, "gate Ticket")
+}
+
+// deskSeams は、desk の継ぎ目の、宣言どおりの実装: 受ける例外を、扱いのとおりに、片づける
+// （trace.quiet: ignores。trace.steady: recovers。trace.renamed と trace.swapped: 受けて、渡した例外にする。trace.stopped: halts。
+// trace.echoed: recovers。trace.muted: ignores）。
+type deskSeams struct{}
+
+func is[E error](err error) bool {
+	var want E
+	return errors.As(err, &want)
+}
+
+func (deskSeams) PingTraceQuiet(ctx context.Context, body func(ctx context.Context) error) error {
+	if err := body(ctx); err != nil && !is[trace.Down](err) {
+		return err
+	}
+	return nil
+}
+func (deskSeams) FetchTraceSteady(ctx context.Context, id string, body func(ctx context.Context, id string) (string, error)) (string, error) {
+	v, err := body(ctx, id)
+	if is[trace.Down](err) || is[trace.Cut](err) {
+		return "", nil
+	}
+	return v, err
+}
+func (deskSeams) LoadTraceRenamed(ctx context.Context, id string, body func(ctx context.Context, id string) (string, error)) (string, error) {
+	v, err := body(ctx, id)
+	if is[trace.Down](err) {
+		return "", trace.Late{}
+	}
+	return v, err
+}
+func (deskSeams) DialTraceStopped(ctx context.Context, body func(ctx context.Context) error) error {
+	if err := body(ctx); err != nil && !is[trace.Cut](err) {
+		return err
+	}
+	return nil
+}
+func (x deskSeams) IdleTraceQuiet(ctx context.Context, body func(ctx context.Context) error) error {
+	return x.PingTraceQuiet(ctx, body)
+}
+func (deskSeams) RelayTraceSwapped(ctx context.Context, body func(ctx context.Context) (string, error)) (string, error) {
+	v, err := body(ctx)
+	switch {
+	case is[trace.Down](err):
+		return "", trace.Late{}
+	case is[desk.Down](err):
+		return "", trace.Odd{}
+	}
+	return v, err
+}
+func (deskSeams) EchoTraceEchoed(ctx context.Context, body func(ctx context.Context) error) error {
+	if err := body(ctx); err != nil && !is[trace.Down](err) {
+		return err
+	}
+	return nil
+}
+
+func (deskSeams) HushTraceMuted(ctx context.Context, body func(ctx context.Context) error) error {
+	if err := body(ctx); err != nil && !is[trace.Down](err) && !is[trace.Cut](err) {
+		return err
+	}
+	return nil
+}
+
+// echoing は、trace.echoed が、自分で、例外 trace.Down を投げる状態の、継ぎ目（結果 Down のケース）。ほかの継ぎ目は、包んだもの。
+type echoing struct{ desk.Seams }
+
+func (echoing) EchoTraceEchoed(context.Context, func(ctx context.Context) error) error {
+	return trace.Down{}
+}
+
+// deskCases は、desk の七つのデコレータの、ケース。trace.echoed のほかは、結果は OK だけ（throws を持たないか、引数の名前で
+// 書いた throws だけ）で、継ぎ目の実装は s。受ける例外ごとのテストは、ケースなしに、RunSeams が作る。
+type deskCases struct{ s desk.Seams }
+
+type (
+	quietCases   deskCases
+	steadyCases  deskCases
+	renamedCases deskCases
+	stoppedCases deskCases
+	swappedCases deskCases
+	echoedCases  deskCases
+	mutedCases   deskCases
+)
+
+func (c deskCases) TraceQuiet() desktest.TraceQuietCases     { return quietCases(c) }
+func (c deskCases) TraceSteady() desktest.TraceSteadyCases   { return steadyCases(c) }
+func (c deskCases) TraceRenamed() desktest.TraceRenamedCases { return renamedCases(c) }
+func (c deskCases) TraceStopped() desktest.TraceStoppedCases { return stoppedCases(c) }
+func (c deskCases) TraceSwapped() desktest.TraceSwappedCases { return swappedCases(c) }
+func (c deskCases) TraceEchoed() desktest.TraceEchoedCases   { return echoedCases(c) }
+func (c deskCases) TraceMuted() desktest.TraceMutedCases     { return mutedCases(c) }
+
+func (c quietCases) OK() desktest.TraceQuietCase {
+	return desktest.TraceQuietCase{Seams: func() desk.Seams { return c.s }}
+}
+func (c steadyCases) OK() desktest.TraceSteadyCase {
+	return desktest.TraceSteadyCase{Seams: func() desk.Seams { return c.s }}
+}
+func (c renamedCases) OK() desktest.TraceRenamedCase {
+	return desktest.TraceRenamedCase{Seams: func() desk.Seams { return c.s }}
+}
+func (c stoppedCases) OK() desktest.TraceStoppedCase {
+	return desktest.TraceStoppedCase{Seams: func() desk.Seams { return c.s }}
+}
+func (c swappedCases) OK() desktest.TraceSwappedCase {
+	return desktest.TraceSwappedCase{Seams: func() desk.Seams { return c.s }}
+}
+func (c echoedCases) OK() desktest.TraceEchoedCase {
+	return desktest.TraceEchoedCase{Seams: func() desk.Seams { return c.s }}
+}
+func (c mutedCases) OK() desktest.TraceMutedCase {
+	return desktest.TraceMutedCase{Seams: func() desk.Seams { return c.s }}
+}
+func (c echoedCases) Down() desktest.TraceEchoedCase {
+	return desktest.TraceEchoedCase{Seams: func() desk.Seams { return echoing{c.s} }}
+}
+
+// TestCatchCases は、生成した RunSeams が、例外を受けるデコレータの継ぎ目に、受ける例外ごとのテストを足し
+// （docs/plugin-go.md「デコレータのテストの口」の「受けるケース」）、宣言どおりの実装で、どれも通ること。
+// 宣言に反する実装で落ちることは、plugins/go の TestCatchCasesFail。
+func TestCatchCases(t *testing.T) {
+	desktest.RunSeams(t, deskCases{deskSeams{}})
 }

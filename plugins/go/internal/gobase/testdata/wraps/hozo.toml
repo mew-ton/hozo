@@ -19,3 +19,9 @@ out         = "gen/trace"
 namespace   = "shop"
 transpilers = ["go", "go-trace"]
 out         = "gen/shop"
+
+# 4: desk。例外を受ける、継ぎ目のデコレータ（trace.quiet、trace.steady、trace.renamed、trace.stopped、trace.swapped、trace.echoed、trace.muted。go-trace）を付ける
+[[emit]]
+namespace   = "desk"
+transpilers = ["go", "go-trace"]
+out         = "gen/desk"

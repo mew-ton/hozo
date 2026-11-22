@@ -8,4 +8,4 @@ protocol = "0.18"
 name     = "go-trace"
 language = "go"
 requires = ["go"]
-seams    = ["trace.traced"]
+seams    = ["trace.traced", "trace.quiet", "trace.steady", "trace.renamed", "trace.stopped", "trace.swapped", "trace.echoed", "trace.muted"]

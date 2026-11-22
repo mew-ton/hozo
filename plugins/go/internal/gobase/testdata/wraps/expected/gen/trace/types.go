@@ -27,3 +27,19 @@ func (Odd) Error() string         { return "trace.Odd" }
 func (Odd) HozoException() string { return "trace.Odd" }
 
 var _ runtime.Exception = Odd{}
+
+// Down: 落ちた
+type Down struct{}
+
+func (Down) Error() string         { return "trace.Down" }
+func (Down) HozoException() string { return "trace.Down" }
+
+var _ runtime.Exception = Down{}
+
+// Cut: 切れた
+type Cut struct{}
+
+func (Cut) Error() string         { return "trace.Cut" }
+func (Cut) HozoException() string { return "trace.Cut" }
+
+var _ runtime.Exception = Cut{}

@@ -12,6 +12,28 @@ namespace trace {
   // 結果ごとの確かめ: prevents effects（中身を呼ばない）、keeps effects（中身を呼んでいる）、関係なし（例外だけ）
   /** 中身の前後に、印を残す */
   decorator fn traced(): throws Busy prevents effects throws Late keeps effects throws Odd;
+
+  /** 落ちた */
+  exception Down;
+  /** 切れた */
+  exception Cut;
+  /** 落ちたか、切れた */
+  union Outage { Down; Cut; }
+  // 例外を受ける、継ぎ目のデコレータ（go-trace）。デコレータのテストの口の「受けるケース」（docs/plugin-go.md）の、扱いごとの確かめ
+  /** 落ちても、何もなかったことにする */
+  decorator fn quiet(): catches Down ignores;
+  /** 落ちても、切れても、続ける */
+  decorator fn steady(): catches Outage recovers;
+  /** 渡した例外を受けて、別の例外にして、返す */
+  decorator fn renamed(error: any exception, into: any exception): catches error recovers throws into;
+  /** 渡した例外を受けて、効果で、止める */
+  decorator fn stopped(error: any exception, then: any effect): catches error halts then;
+  /** 渡した例外を受けて、別の例外にして、返す。何度でも、付けられる */
+  @repeatable decorator fn swapped(error: any exception, into: any exception): catches error recovers throws into;
+  /** 落ちたのを受けるが、自分でも、落ちたと言う（DEC-6 の warning） */
+  decorator fn echoed(): catches Down recovers throws Down;
+  /** 渡した例外を、いくつでも受けて、何もなかったことにする */
+  decorator fn muted(...errors: any exception): catches errors ignores;
 }
 
 /** 本体のあるデコレータを宣言する名前空間 */
@@ -124,4 +146,56 @@ namespace shop {
   /** いつも、断る */
   @gate.guarded
   export fn refuse(): never throws Denied;
+}
+
+/** 例外を受けるデコレータを付ける名前空間（docs/plugin-go.md「デコレータのテストの口」の「受けるケース」） */
+namespace desk {
+  /** 灯り */
+  state lamp: single<string>;
+  /** 灯りを点ける */
+  effect fn light(color: string): effects lamp.put;
+
+  // ignores: 値を返さない op。受ける例外は、宣言に書いたもの
+  /** 呼びかける（人が書く） */
+  @trace.quiet
+  export fn ping(): throws trace.Down;
+
+  // recovers（throws を持たないデコレータ）: ユニオンは、メンバーごと。値を返す op
+  /** 取ってくる（人が書く） */
+  @trace.steady
+  export fn fetch(id: string): string throws trace.Down, trace.Cut;
+
+  // recovers と throws: 引数で渡した例外を受ける。失敗が返るなら、引数で渡した例外
+  /** 読み込む（人が書く） */
+  @trace.renamed(trace.Down, trace.Late)
+  export fn load(id: string): string throws trace.Down;
+
+  // halts: 引数で渡した例外と、効果
+  /** 電話する（人が書く） */
+  @trace.stopped(trace.Cut, light)
+  export fn dial(): throws trace.Cut;
+
+  // 受ける例外が、op の計算した例外にない（DEC-16 の warning）: それでも、テストは、作る
+  /** 待つ（人が書く） */
+  @trace.quiet
+  export fn idle();
+
+  /** 机の側で、落ちた */
+  exception Down;
+
+  // 同じデコレータを、二度（@repeatable）: 継ぎ目は一つで、受ける例外を、合わせる。名前が当たる例外（trace.Down と desk.Down）は、
+  // 名前空間のセグメントを前に付ける。失敗が返るなら、どちらかの適用が渡した例外（want0、want1）
+  /** 取り次ぐ（人が書く） */
+  @trace.swapped(trace.Down, trace.Late) @trace.swapped(Down, trace.Odd)
+  export fn relay(): string throws trace.Down, Down;
+
+  // 受けた例外が、デコレータの throws にもある（DEC-6 の warning）: 「受けた例外が、返らない」は、確かめない
+  /** 繰り返す（人が書く） */
+  @trace.echoed
+  export fn echo(): throws trace.Down;
+
+  // 残りの引数で、例外を、いくつも渡す: 渡した例外ごと
+  /** 黙る（人が書く） */
+  @trace.muted(trace.Down, trace.Cut)
+  export fn hush(): throws trace.Down, trace.Cut;
 }
