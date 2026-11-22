@@ -1,0 +1,76 @@
+// 診断にならない仕様（docs/plugin-db.md「対象」）: db の語彙の、正しい使い方。名前空間ごとに、その名前空間の表の状態で見る
+// （単位は、要らない）。@db.transaction と、表の model でない model のフィールドのデコレータは、確かめない。
+
+namespace shop {
+  scalar UserId extends string;
+  scalar Email extends string;
+
+  model User {
+    @db.key @db.text id: UserId;
+    @db.unique @db.text email: Email;
+    @db.text nickname: string?;
+    @db.int age: int;
+    @db.datetime joinedAt: datetime;
+    @db.json tags: string[];
+  }
+  model Order {
+    @db.key @db.text id: string;
+    @db.ref(User) @db.text userId: UserId;
+    @db.bool paid: boolean;
+    @db.float total: float;
+    @db.datetime placedAt: datetime;
+  }
+  /** 表の model でない model のフィールドのデコレータは、読まない（しまい方がなくても、二つあっても） */
+  model Draft {
+    @db.key note: string;
+    @db.text @db.int both: string;
+  }
+  exception EmailTaken;
+
+  @db.table state users: list<User>;
+  @db.table state orders: list<Order>;
+  state drafts: list<Draft>;
+
+  @db.find
+  read fn userByEmail(email: Email): User? reads users;
+  @db.find
+  @db.latest("placedAt")
+  read fn latestOrderOf(userId: UserId): Order? reads orders;
+  @db.list
+  @db.where("paid", true)
+  @db.latest("placedAt")
+  read fn paidOrdersOf(userId: UserId): Order[] reads orders;
+  /** 省略可能な列には、T も、T? も渡せる */
+  @db.list
+  read fn usersNamed(nickname: string?): User[] reads users;
+  /** デコレータのない read は、見ない（表の状態でない状態を読んでもよい） */
+  read fn allDrafts(): Draft[] reads drafts;
+
+  @db.insert @db.conflict(EmailTaken)
+  effect fn createUser(user: User): throws EmailTaken effects users.post;
+  @db.update
+  effect fn saveUser(user: User): effects users.put;
+  @db.delete
+  effect fn removeOrder(id: string): effects orders.delete;
+  /** デコレータのない効果は、見ない */
+  effect fn addDraft(draft: Draft): effects drafts.post;
+
+  /** @db.transaction は、確かめない（表の状態のない名前空間の op に付いていても） */
+  @db.transaction
+  export fn register(user: User): throws EmailTaken effects createUser {
+    createUser(user);
+  }
+}
+
+// 設計だけの段階の名前空間（出力の単位がない）も、同じ決まりで見る。同じ model を、別の名前空間が、表の model にしてもよい
+namespace plan {
+  model Memo {
+    @db.key @db.text id: string;
+    @db.text body: string;
+  }
+  @db.table state memos: list<Memo>;
+  @db.table state archive: list<shop.User>;
+
+  @db.find
+  read fn memo(id: string): Memo? reads memos;
+}

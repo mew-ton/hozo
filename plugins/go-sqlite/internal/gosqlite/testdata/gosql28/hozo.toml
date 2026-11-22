@@ -1,8 +1,0 @@
-[options.go]
-module = "example.com/app"
-
-# plugins/go-sqlite の単体テストの入力（docs/testing.md「単体テスト」）: GOSQL-28（@db.delete の効果が、引数を一つも持たない）。
-[[emit]]
-namespace   = "app"
-transpilers = ["go", "go-sqlite"]
-out         = "gen/app"

@@ -1,0 +1,2 @@
+DB-19	app.add	効果 app.add の @db.conflict の例外 app.Taken が、その効果の throws にない（effect fn add(…): throws Taken effects … と書く）
+DB-19	app.save	効果 app.save の @db.conflict の例外 app.TakenBy は、引数を持つ（@db.conflict は、値を埋める書き方を持たない。この効果は、デコレータを付けずに、人が書く）

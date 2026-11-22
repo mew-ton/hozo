@@ -1,0 +1,52 @@
+// DB-7（docs/plugin-db.md「効果」）: 効果のデコレータが、効果の宛先と合わない: 宛先が組み込みの効果でない
+// （分類の遷移）か、操作が合わない（@db.insert は post、@db.update は put、@db.delete は delete）。位置は効果。
+
+namespace app {
+  model Row { @db.key @db.text id: string; @db.text note: string; }
+  @db.table state rows: list<Row>;
+  @db.table state copies: list<Row>;
+
+  // ---- 組み込みの効果: 操作が合わない ----
+
+  @db.insert
+  effect fn insertOnPut(row: Row): effects rows.put;
+  @db.insert
+  effect fn insertOnDelete(row: Row): effects rows.delete;
+  @db.update
+  effect fn updateOnPost(row: Row): effects rows.post;
+  @db.update
+  effect fn updateOnDelete(row: Row): effects rows.delete;
+  @db.delete
+  effect fn deleteOnPost(id: string): effects rows.post;
+  @db.delete
+  effect fn deleteOnPut(id: string): effects rows.put;
+
+  // ---- 宛先が、分類の遷移（基底の状態の組み込みの分類と、状態の分類） ----
+
+  classify Sync of rows, copies {
+    Same;
+    Differ;
+  }
+  @db.insert
+  effect fn fillRows(row: Row): effects rows as Empty -> HasItems;
+  @db.update
+  effect fn touchRows(row: Row): effects rows as HasItems -> HasItems;
+  @db.delete
+  effect fn copyOver(id: string): effects Sync as Differ -> Same;
+
+  // 配線が呼んでも、効果ごとに一度だけ
+  export fn addWrong(row: Row) {
+    insertOnPut(row);
+  }
+
+  // ---- 通るもの ----
+
+  @db.insert
+  effect fn createRow(row: Row): effects rows.post;
+  @db.update
+  effect fn updateRow(row: Row): effects rows.put;
+  @db.delete
+  effect fn deleteRow(id: string): effects rows.delete;
+  /** デコレータを付けていない、遷移の効果は、見ない（人が書く） */
+  effect fn syncRows(): effects Sync as Differ -> Same;
+}

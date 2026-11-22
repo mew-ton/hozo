@@ -8,10 +8,12 @@
 
 | 付ける先 | このトランスパイラがすること |
 |---|---|
-| op 以外（状態、表の model のフィールド、`read`、効果） | **宣言の全体から、中身を作る。** 表は、`read` なら `reads` の状態、効果なら宛先（`effects` の後ろ）の状態。列は、引数の名前。引くものは、`read` の結果の型。列が値を持たなくてよいかは、フィールドの型の `?`。デコレータが言うのは、宣言が言っていないことだけ（表であること、しまい方、キー、引くか足すか消すか、決まった値の条件、並べ方）。書いたものが食い違っていれば「診断」の error |
+| op 以外（状態、表の model のフィールド、`read`、効果） | **宣言の全体から、中身を作る。** 表は、`read` なら `reads` の状態、効果なら宛先（`effects` の後ろ）の状態。列は、引数の名前。引くものは、`read` の結果の型。列が値を持たなくてよいかは、フィールドの型の `?`。デコレータが言うのは、宣言が言っていないことだけ（表であること、しまい方、キー、引くか足すか消すか、決まった値の条件、並べ方）。書いたものが食い違っていれば、語彙のプラグイン `db` の error（`docs/plugin-db.md`「診断」の DB-*）か、このトランスパイラの error（「診断」） |
 | op（`@db.transaction`） | **op の中身は決めない。** 中身の前後に、トランザクションの始めと終わりを足すだけ（継ぎ目）。出すコードは、op の型に依らない |
 
 `db` のデコレータを付けていない `read` と効果の中身は出さず、人が書き足す（足りなければコンパイルエラーになる。「状態ごとの型」）。しまい方だけは、型から当てない: 同じ型を、いくつものしまい方でしまえる（「しまい方」）。
+
+**`db` の語彙の、言語にも保存先にも依らない決まり**（どの状態が表か、デコレータが宣言の何と合っていなければならないか、その検査 DB-*）の持ち主は `docs/plugin-db.md`。この文書が持つのは、その決まりを通った仕様を、SQLite と Go に、どう出すかと、出すのに要る、しまい方の決まり（「しまい方」）。
 
 ## マニフェスト
 
@@ -25,10 +27,12 @@ name     = "go-sqlite"
 language = "go"
 requires = ["go"]
 seams    = ["db.transaction"]
+requires_vocabulary = ["db"]
 ```
 
 - 読む語彙は、状態の `@db.table`、フィールドの、しまい方（`@db.text` / `@db.int` / `@db.float` / `@db.bool` / `@db.datetime` / `@db.date` / `@db.time` / `@db.json`）と `@db.key` / `@db.unique` / `@db.ref`、`read` の `@db.find` / `@db.list` / `@db.where` / `@db.latest`、効果の `@db.insert` / `@db.update` / `@db.delete`、op の `@db.transaction`。語彙は提供しない。
 - **`@db.transaction` は継ぎ目**（`seams`。`docs/config.md`「継ぎ目」）: このトランスパイラを並べた単位では、基底が、`@db.transaction` の付いた op を二層で出し、継ぎ目の口（`Seams` のメソッド）を出す。中身は、このトランスパイラが出す（「トランザクション」）。並べていない単位では、`@db.transaction` は印で、何も起きない（同「継ぎ目」の「読む者がなければ、何も出ない」）。
+- **`requires_vocabulary = ["db"]`**: 語彙のプラグイン `db`（`docs/plugin-db.md`）が入っていなければ CFG-25（`docs/plugin-protocol.md`「語彙のプラグイン」）。このトランスパイラは、`db` の語彙の検査（DB-*）を通った仕様だけを、受け取る（「診断」）。
 - オプションはない。`[emit.options.go-sqlite]` にキーがあれば GOSQL-6。
 - 制約（`@valid.*`）は確かめない（`go-valid` に依存しない）。足す前に確かめるかどうかは、境界を持つ相乗りの仕事（`docs/plugin-go-valid.md`「この文書が決めること」）。
 
@@ -53,11 +57,10 @@ N の `@db.table` の付いた基底の状態（**表の状態**）が一つも�
 
 ### 表
 
-- 表の状態ごとに表一つ。名前は状態の名前。**表の model** M は、状態の要素の型（`State.element`。`@db.table state orders: list<type.Order>;` なら `type.Order`）で、`@db.table` は引数を持たない。要素の型が model でなければ GOSQL-1。M のフィールドごとに列一つで、名前はフィールドの名前、順はフィールドの順。名前はいつも `"…"` で引用する。
-- 表の状態の形は `list` だけ。`nullable` と `single` の状態に `@db.table` が付いていれば GOSQL-2（一行だけの表の形を、まだ決めていない）。
+- 表の状態ごとに表一つ。名前は状態の名前。どの状態が表の状態で、**表の model** M が何かは `docs/plugin-db.md`「表」（M は、状態の要素の型。表の状態の形は `list` だけ）。M のフィールドごとに列一つで、名前はフィールドの名前、順はフィールドの順。名前はいつも `"…"` で引用する。
 - 列の型は、フィールドに付けた、しまい方のデコレータが決める（「しまい方」）。
 - **`NOT NULL` は、フィールドの型が省略可能（`T?`）でない、すべての列に付ける。** 省略可能なフィールドの列は、値がなくてよい（`@db.text nickname: string?`）。フィールドの型に書いてあることなので、別のデコレータは要らない。値がないことの読み書きは「補助」。
-- 制約: `@db.key` は `PRIMARY KEY`、`@db.unique` は `UNIQUE`。`@db.key` の付いたフィールドが二つ以上なら、列には付けず、表の末尾に `PRIMARY KEY ("a", "b")`。`@db.ref(M2)` は、要素の型が M2 の表の状態が N に**ちょうど一つ**あり、M2 が `@db.key` をちょうど一つ持つとき、その表のその列への `REFERENCES "<表>" ("<列>")`。そうでなければ GOSQL-20（指す先の表か列が、一つに決まらない）。黙って制約を省くことはしない: 仕様に書いた参照が、気づかないうちに表から消える。
+- 制約: `@db.key` は `PRIMARY KEY`、`@db.unique` は `UNIQUE`。`@db.key` の付いたフィールドが二つ以上なら、列には付けず、表の末尾に `PRIMARY KEY ("a", "b")`。`@db.ref(M2)` は、指す先（`docs/plugin-db.md`「キーと参照」が決める、表と列）への `REFERENCES "<表>" ("<列>")`。
 - 列の定義は `"<名前>" <型>[ NOT NULL][ PRIMARY KEY][ UNIQUE][ REFERENCES …]`。表は、列を二つの空白で字下げして一行ずつ、`,` で区切る。
 
 ```go
@@ -90,7 +93,8 @@ const Schema = `CREATE TABLE IF NOT EXISTS "sessions" (
 - **一つのしまい方の中で、型によって変え方が分かれることはない。** `duration` を `@db.int` に入れたのは、Go の値が `int` と同じ 64 ビットの整数で、同じ補助が同じに読み書きできるから。同じしまい方の二つの型が、別の変え方を要るようになったら、型で分けずに、しまい方を足す。
 - union（`arms`）と、union を中に持つ `array` / model は、どのしまい方でも列にできない（GOSQL-3。JSON での union の形を、まだ決めていない）。
 - `@db.json` の中の値の形（model のフィールド、配列の要素）は、`encoding/json` が、Go の型から決める。その中の model のフィールドに、しまい方のデコレータは要らない（付いていても読まない）。
-- 表の model でない model のフィールドに付いた、しまい方のデコレータと、`@db.key`、`@db.unique`、`@db.ref` は、読まない（何も出さず、確かめない）。
+- 表の model でない model のフィールドに付いた、しまい方のデコレータは、読まない（何も出さず、確かめない）。`@db.key`、`@db.unique`、`@db.ref` も同じ（`docs/plugin-db.md`「対象」）。
+- **しまい方は、語彙のプラグイン `db` が確かめない**（`docs/plugin-db.md`「しまい方」）: 設計だけの段階の仕様は、しまい方を、まだ言わない。表を、SQLite に出すこのトランスパイラが、出す単位の表の model に、求める。
 
 ### 状態ごとの型
 
@@ -128,30 +132,17 @@ const Schema = `CREATE TABLE IF NOT EXISTS "sessions" (
 read fn latestOrderOf(userId: type.UserId): type.Order? reads orders;
 ```
 
-**宣言から読むもの**（デコレータは、これをもう一度言わない）:
+宣言とデコレータの、何が、何を言うか（表は `reads` の状態、条件は引数と `@db.where`、引くものは結果の型）と、その決まり（`@db.find` が一行に決まる条件、`@db.where` のリテラルと列の型、一つの列に条件は一つ）の持ち主は `docs/plugin-db.md`「read」。ここが決めるのは、その `read` を、どの SQL にするか。
 
-| 宣言の部分 | 読むこと | 合わなければ |
-|---|---|---|
-| `reads T` | 表。T は、N の表の状態 | GOSQL-7 |
-| 引数（`Read.params`） | **条件**。引数ごとに、その名前の列が、引数の値と同じ。引数の名前は、M のフィールドの名前で、型は、その列に合う（「列と引数の型」） | 名前のフィールドがなければ GOSQL-8、型が合わなければ GOSQL-9 |
-| 結果の型（`Read.returns`） | 引くもの。`@db.find` なら `M?`、`@db.list` なら `M[]` | GOSQL-10 |
+| デコレータ | 出すもの |
+|---|---|
+| `@db.find` | 条件に合う一行を引く。なければ `nil` |
+| `@db.list` | 条件に合う行を、すべて引く。条件が一つもなければ、すべての行 |
+| `@db.where("c", v)`（何度でも） | 条件を足す: 列 c が、リテラル v と同じ |
+| `@db.latest("c")` | 並べ方: 列 c の新しい順。c のしまい方は `@db.datetime` / `@db.date` / `@db.time` / `@db.int` / `@db.float`（GOSQL-27: ほかのしまい方の列は、新しい順に並べられない） |
 
-**デコレータが言うこと**:
-
-| デコレータ | 言うこと | 決まり |
-|---|---|---|
-| `@db.find` | 条件に合う一行を引く。なければ `nil` | `@db.list` と一緒には付けられない（GOSQL-22）。一行に決まらなければ GOSQL-13（下） |
-| `@db.list` | 条件に合う行を、すべて引く。条件が一つもなければ、すべての行 | 同上 |
-| `@db.where("c", v)`（何度でも） | 条件を足す: 列 c が、リテラル v と同じ | `@db.find` か `@db.list` の付いた `read` にだけ（GOSQL-24）。c は M のフィールドの名前（GOSQL-8）。v は、列 c の型に渡せる（GOSQL-26。下） |
-| `@db.latest("c")` | 並べ方: 列 c の新しい順 | `@db.find` か `@db.list` の付いた `read` にだけ（GOSQL-24）。c は M のフィールドの名前（GOSQL-8）で、しまい方が `@db.datetime` / `@db.date` / `@db.time` / `@db.int` / `@db.float`（GOSQL-27） |
-
-- **条件**は、引数（宣言の順）の後ろに、`@db.where`（書いた順）を並べたもの。**どれも満たす行**が合う（`AND`）。一つの列を、二つの条件に書けない（引数と `@db.where`、二つの `@db.where`）。書いていれば GOSQL-25。
-- **`@db.find` は、一行に決まる**ものでなければならない。次のどれかを満たさなければ GOSQL-13:
-  1. 条件の列が、M の `@db.key` のフィールドを**すべて**含む（M が `@db.key` を一つ以上持つとき）。
-  2. 条件の列が、`@db.unique` のフィールドを一つ以上含む。
-  3. `@db.latest` が付いている（条件に合う行のうち、いちばん新しい一行に決まる。条件がなくてもよい）。
+- **条件**は、引数（宣言の順）の後ろに、`@db.where`（書いた順）を並べたもの。**どれも満たす行**が合う（`AND`）。
 - **`@db.latest("c")` の「新しい順」**は、列 c の値の大きい順（瞬間、日付、時刻なら、後のものが先）。c の値が同じ行は、後から足した行が先。c が値を持たない行（省略可能な列）は、最後。`@db.list` に足せば、その順のすべての行。`@db.find` に足せば、その順の最初の一行（上の 1 か 2 も満たしていれば、合う行は一つなので、結果は変わらない）。`@db.latest` のない `@db.list` は、足した順。
-- **`@db.where` のリテラル**は、列のフィールドの型（scalar は元の核の型。省略可能は外して見る）に渡せなければならない（`docs/types.md`「互換」の 10: 整数のリテラルは `float` にも渡せる）。しまい方が `@db.datetime`、`@db.date`、`@db.time`、`@db.json` の列には、渡せるリテラルがない。
 - **SQL** は、この形。`<条件>` は、条件ごとの `"<列>" IS ?<n>` を ` AND ` でつないだもの（n は 1 からの通し番号）で、条件がなければ `WHERE` ごと書かない。
 
 | デコレータ | SQL |
@@ -162,9 +153,8 @@ read fn latestOrderOf(userId: type.UserId): type.Order? reads orders;
 | `@db.list` と `@db.latest("c")` | `SELECT <すべての列> FROM "<表>"[ WHERE <条件>] ORDER BY "c" DESC, rowid DESC` |
 
 - 文に渡す値は、条件の順に、その列のしまい方の補助で包む（列 `email` が `@db.text` なら、引数は `dbText(email)`、リテラルは `dbText("paid")`。「補助」）。列のフィールドが省略可能なら、フィールドと同じに `dbNullable` を足す（`dbText(email, dbNullable)`）。`@db.where` のリテラルの Go での書き方は、基底と同じ（`docs/plugin-go.md`「値」の表の `literal` の行）で、`@db.float` の列に渡した整数のリテラルは、小数のリテラルで書く（`1.0`）。
-- `@db.find` も `@db.list` も付けていない `read` には、何も出さない（`@db.where` か `@db.latest` だけが付いていれば GOSQL-24）。その `read` は、人が書き足す（「状態ごとの型」）。
+- `@db.find` も `@db.list` も付けていない `read` には、何も出さない。その `read` は、人が書き足す（「状態ごとの型」）。
 - この語彙で言えないもの（等しいかどうかでない比較、件数と位置、二つ以上の列での並べ方、いくつかの表を合わせた結果）は、その `read` にデコレータを付けず、人が書く。
-- 列は引数の名前なので、仕様の予約語（`docs/grammar.md`「予約語」: `string`、`any`、`on`、`to`、`by` など）と同じ名前のフィールドの列は、引数の条件にできない（フィールドの名前には予約語を書けるが、引数の名前には書けない）。その列で引くなら、フィールドの名前を変えるか、その `read` を人が書く。`@db.where` と `@db.latest` の `column` は文字列なので、名指しできる。`@db.delete` の効果の引数も同じ。
 
 ### 効果の中身
 
@@ -180,17 +170,16 @@ effect fn createOrder(order: type.Order): effects orders.post;
 effect fn deleteSession(token: type.Token): effects sessions.delete;
 ```
 
-| デコレータ | 効果の宛先（合わなければ GOSQL-11） | 引数（合わなければ GOSQL-9） | SQL |
-|---|---|---|---|
-| `@db.insert` | `T.post` | M の行一つ（引数は一つで、型は M そのものか、M を分類のケースで絞り込んだ型 `M on C.K`: 行の引数。`docs/check.md`「行の遷移」の「行と、行の分類」） | `INSERT INTO "<表>" (<すべての列>) VALUES (?1, …)` |
-| `@db.update` | `T.put` | M の行一つ（同じ）。M は `@db.key` を一つ以上と、キーでない列を一つ以上持つ（GOSQL-15） | `UPDATE "<表>" SET <キーでない列> = ?… WHERE <キーの列> IS ?…`。書き換える行は、M の `@db.key` のフィールドが、引数の行と同じ行。行がなければ何もしない |
-| `@db.delete` | `T.delete` | **条件**: 引数ごとに、その名前の列が、引数の値と同じ（`read` と同じ決まり。名前のフィールドがなければ GOSQL-8、型は「列と引数の型」）。引数は一つ以上（GOSQL-28） | `DELETE FROM "<表>" WHERE <条件>`。どの条件も満たす行をすべて消す。行がなければ何もしない |
+宛先と引数の決まり（どの操作の宛先に付けられるか、引数が何か、効果のデコレータは高々一つ）の持ち主は `docs/plugin-db.md`「効果」。ここが決めるのは、その効果を、どの SQL にするか。
 
-- T は、N の表の状態（GOSQL-7）。**宛先は、組み込みの効果でなければならない**: 分類の遷移を宛先にする効果（`effect fn e(): effects Checkout as Shopping -> Ordered;`）に `db` のデコレータが付いていれば GOSQL-11（一つの遷移が、どの表に何をするかは、宣言からは決まらない）。その効果は、人が書く。
-- 効果は、`@db.insert` / `@db.update` / `@db.delete` の三つのうち、高々一つを持つ（二つ以上なら GOSQL-12）。
+| デコレータ | 宛先と引数 | SQL |
+|---|---|---|
+| `@db.insert` | `T.post`。M の行一つ | `INSERT INTO "<表>" (<すべての列>) VALUES (?1, …)` |
+| `@db.update` | `T.put`。M の行一つ | `UPDATE "<表>" SET <キーでない列> = ?… WHERE <キーの列> IS ?…`。書き換える行は、M の `@db.key` のフィールドが、引数の行と同じ行。行がなければ何もしない |
+| `@db.delete` | `T.delete`。引数は条件 | `DELETE FROM "<表>" WHERE <条件>`。どの条件も満たす行をすべて消す。行がなければ何もしない |
+
 - `@db.delete` の条件の値の渡し方は、`read` と同じ（「read の中身」）。
-- **未決: 引数のない `@db.delete`**。「引数がなければ、すべての行」は、`@db.list` では決めたが、消す方では決めていない（書き忘れた引数が、表を空にする）。決まるまで GOSQL-28。
-- **`@db.conflict(E)`** は、`@db.insert` か `@db.update` と一緒に付ける（`docs/vocab.md`「`db` の read と効果」。`docs/decisions.md`「決めたこと」353）。文が、表の一意の制約（`@db.key` の `PRIMARY KEY` と、`@db.unique` の `UNIQUE`。「表」）に当たったら、例外 E を返す。当たらなければ、SQL は、上の表のまま。
+- **`@db.conflict(E)`**（付けられる効果と、E の決まりは `docs/plugin-db.md`「効果」。`docs/decisions.md`「決めたこと」353）: 文が、表の一意の制約（`@db.key` の `PRIMARY KEY` と、`@db.unique` の `UNIQUE`。「表」）に当たったら、例外 E を返す。当たらなければ、SQL は、上の表のまま。
 
   ```
   /** ユーザーを登録する。同じ email のユーザーが、もういれば、投げる */
@@ -198,8 +187,6 @@ effect fn deleteSession(token: type.Token): effects sessions.delete;
   effect fn createUser(user: type.User): throws type.EmailTaken effects users.post;
   ```
 
-  - `@db.insert` も `@db.update` も持たない効果に付いていれば GOSQL-31。
-  - E は、その効果の `throws` にあり、引数を持たない例外（どちらかが違えば GOSQL-32）。引数を持つ例外は、このトランスパイラが値を埋められないので、その効果は、人が書く。
   - **一意の違反の見分け方**: 文を実行したエラーの文（`err.Error()`）が、`UNIQUE constraint failed` を含むこと。SQLite そのものが出す文で、`PRIMARY KEY` の違反も、この文で出る。`database/sql` のドライバの型には、依らない（生成したコードは、ドライバを import しない）。ほかの失敗は、今までどおり、そのまま返す。
   - 返すのは、例外の値（`<型>{}`。`docs/plugin-go.md`「exception」）。もとのエラーは、包まない。
 - **`db` のデコレータで中身を作る効果の `throws` は、`@db.conflict` が名指しした例外だけ。** ほかの例外が `throws` にあれば GOSQL-33（このトランスパイラは、それを投げるコードを出せない）。
@@ -211,29 +198,21 @@ effect fn deleteSession(token: type.Token): effects sessions.delete;
 |---|---|---|
 | `@db.insert`（`post`） | 引数の行を、そのまま足す | 足した行が、`as` の後のケースにあること。行を作る側（配線と、葉の op）が担う |
 | `@db.update`（`put`） | 引数の行のすべての列を、キーが同じ行に書く | 保存してある行が、前のケースにあること（`WHERE` に足すものがない）。書いた後の行が、後のケースにあること |
-| `@db.delete`（`delete`） | 付けられない（下） | — |
+| `@db.delete`（`delete`） | 付けられない（`docs/plugin-db.md`「効果」） | — |
 
-- **`@db.update` は、後のケースが、行の引数の型の言う、前のケースの並びにないとき、付けられない**（GOSQL-30）: `effect fn start(order: Order on Stage.Accepted): effects orders.put as Stage.InProduction;` に渡る行は、`Accepted` にあると分かっている行（`docs/check.md`「行の遷移」の「呼ぶ側」）。`@db.update` は、その行を、そのまま書く。書いた後の行も `Accepted` のままで、宣言した `InProduction` にならない。行を `InProduction` にする書き方（どの列を、何に変えるか）は、宣言から決まらないので、その効果は、人が書く（遷移を宛先にする効果と同じ扱い: GOSQL-11）。付けられるのは、行の引数を、その分類で絞り込んでいない形（`effect fn forceShip(order: Order): effects orders.put as Stage.Shipped;`: 渡した行が、もう `Shipped` でありうる）、後のケースが、前のケースの並びにある形、`as else` の形。
-- **`@db.delete` は、行の遷移を持つ効果に、付けられない**: 行の遷移を持つ効果は、行を引数に取る（STATE-7）。`@db.delete` の引数は、列の条件で、行の引数の名前の列は、ない（GOSQL-8）。その効果は、人が書く。**未決: 行を受け取る `@db.delete`**（キーが、引数の行と同じ行を消す）。決まるまで、今の規則のまま。
+- `@db.update` を、行のケースを変える効果に付けられない条件（後のケースが、行の引数の型の言う、前のケースの並びにない）の持ち主は `docs/plugin-db.md`「効果」（DB-17）。
 - 生成するメソッドのコメントは、行の遷移を確かめないことを言う（「メソッドの形とコメント」の「効果の句」）。確かめないのは、このメソッド。絞り込んだ引数（効果の前のケース）は、基底が、`New` で包んだ単位の入口で確かめる（`docs/plugin-go.md`「効果の入口の確かめ」）ので、コメントの「（<絞り込んだ引数の表示>、…）は、確かめない。」は、前のケースについては、このメソッドの中のことだけを言う。文を直すかは、決めていない（`docs/open.md`「語彙とプラグイン」）。
 
 ### 列と引数の型
 
-値を、名前の同じ列と比べるところ（`read` と、`@db.delete` の効果の、引数の条件）のすべてに掛かる、ただ一つの規則（`docs/decisions.md`「決めたこと」96）:
-
-**引数の型は、列の型（M のそのフィールドの型）と等しくなければならない。列の型が union なら、引数は、その一部でよい。** `T?` は「T」と「値がない」の union と数える。向きは一方だけで、列より広い引数は GOSQL-9。
-
-この規則は、書いたものの整合の検査で、出力を変えない。**条件の SQL は、型によらず、いつも `"c" IS ?n`**（`@db.update` のキーの条件と、`@db.where` の条件も同じ）。SQLite の `IS` は、両辺に値があれば `=` と同じで、両辺が `NULL` のとき真になる。引数に値があるかどうかは、実行時に補助が見る（値のないポインタは `NULL`）。その結果:
+引数の型が、列の型に合うかの規則の持ち主は `docs/plugin-db.md`「列と引数の型」（引数の型は、列の型と等しいか、列が `T?` なら `T`）。この規則は、出力を変えない。**条件の SQL は、型によらず、いつも `"c" IS ?n`**（`@db.update` のキーの条件と、`@db.where` の条件も同じ）。SQLite の `IS` は、両辺に値があれば `=` と同じで、両辺が `NULL` のとき真になる。引数に値があるかどうかは、実行時に補助が見る（値のないポインタは `NULL`）。その結果:
 
 | 列の型 | 引数の型 | 合う行 |
 |---|---|---|
 | `T` | `T` | 列の値が、引数と同じ行 |
 | `T?` | `T` | 同じ。値のない行（`NULL`）は、どの値にも合わない |
 | `T?` | `T?` | 引数に値があれば、同じ。値がなければ、値のない行 |
-| `T` | `T?` | —（GOSQL-9。列より広い） |
 
-- 「等しい」は `docs/types.md`「等しい」。scalar は名前で比べる（`type.Token` の列に `string` の引数は渡せない）。
-- 今、列にできる union は `T?` だけ（アームを持つ union は列にできない。GOSQL-3）。
 - 引数に値がないとき、問い合わせをやめて「ない」を返すことはしない。値がないときにどうするかは、呼ぶ側の配線が、呼ぶ前に決める（`match … by nullable` か、場合に名前を付けた分類。`docs/requirements.md`「書き方の指針」）。
 
 ### トランザクション
@@ -396,7 +375,7 @@ func dbScanOrder(r dbRow) (pkgtype.Order, error) {
 - **値がないこと（`NULL`）は、`dbCol` が、実行時に、渡された Go の値と `dbNullable` を見て決める**（`reflect`）。
   - 書くとき: 値のないポインタは `NULL`（省略可能なフィールドの、値のない値。列と比べる、値のない引数）。`dbNullable` の列では、値のないスライスとマップ（`T[]?` と、省略可能な、インデックスの model の `nil`）も `NULL` で、`@db.json` でも、JSON の `null` という文字列にはしない。`dbNullable` のない列の、値のないスライスとマップは、しまい方のまま書く（`@db.json` なら、`encoding/json` が出す文字列 `null`）。
   - 読むとき: `NULL` を読めるのは、`dbNullable` の列だけで、読む先は、値がない（`nil`）。ほかの列に `NULL` があれば、エラー（その列は `NOT NULL` なので、`Schema` で作った表では起きない）。値があれば、読む先がポインタなら、置く先を作って読む。
-- しまい方の補助に、合わない型の値が渡ることは、GOSQL-17 と GOSQL-26 が先に断るので、ない（そのときの振る舞いは、決めない）。型の食い違いをコンパイルエラーにする形（型引数）にしないのは、省略可能な値と、そうでない値を、一つの関数で、型を書かずに受け取れないため（`docs/plugin-go-http.md`「補助」の末尾と同じ理由）。
+- しまい方の補助に、合わない型の値が渡ることは、GOSQL-17 と、語彙のプラグイン `db` の DB-15 が先に断るので、ない（そのときの振る舞いは、決めない）。型の食い違いをコンパイルエラーにする形（型引数）にしないのは、省略可能な値と、そうでない値を、一つの関数で、型を書かずに受け取れないため（`docs/plugin-go-http.md`「補助」の末尾と同じ理由）。
 - 補助の中身は、サンプルの `gen/store/db.go` の通り（`dbInt`、`dbFloat`、`dbBool` は、サンプルが使わないので、`go-sqlite` の単体テストのゴールデンが固定する。`docs/testing.md`「単体テスト」）。
 
 メソッドの引数の名前は、基底と同じ規則で仕様の引数名から作る。このファイルが使う名前（表のメソッドのレシーバ `t`、継ぎ目のメソッドのレシーバ `s`、`ctx`、`args`、`err`、import するパッケージの名前、このファイルの非公開の名前）と当たれば、末尾に `_` を付ける。`dbArgs<Model>` と `dbScan<Model>` の中の局所の名前（`row`、`r`、`err`）と、継ぎ目のメソッドの中の局所の名前（レシーバ `s`、`ctx`、`err`、`body`）は、import するパッケージの名前と当たれば、当たらなくなるまで末尾に `_` を付ける（その名前のパッケージの型を、本体が書けなくなるため: 継ぎ目のメソッドの本体は、関数リテラルに、op の戻り値の型を書く。`docs/plugin-go.md`「パッケージと import パス」の「import の名前」の、相乗りの側の決まり）。継ぎ目のメソッドでは、引数の局所の名前とも当たらないようにする（名前空間 `s` の型を返し、引数 `s` を持つ op なら、引数が `s_`、レシーバが `s__`）。基底の `Seams` のメソッドとは、引数の名前だけが違い、形（型の並び）は同じ。`<Model>` は model の Go の型の名前で、別の名前空間の同じ名前の model と当たれば、後の方に `2`、`3`、… を付ける。
@@ -495,7 +474,7 @@ func dbConflict(err, conflict error) error {
 
 `@db.conflict(E)` を付けた効果は、効果の句の後ろに、空白なしで一文を足す: `一意の制約に当たれば、例外 <E の FQN> を返す。`。行の遷移の一文も足すときは、こちらが先。
 
-行の遷移を持つ効果（`Effect.row`）は、効果の句の後ろに、空白なしで一文を足す: `行の遷移（<行の遷移の表示>）は、確かめない。`（表示の形は `docs/plugin-go.md`「コメント」の「行の遷移の表示」）。絞り込んだ引数があれば、その表示を、前に、`、` でつなぐ: `行の遷移（<絞り込んだ引数の表示>、<行の遷移の表示>）は、確かめない。`（同「絞り込んだ引数の表示」。行の引数なら、効果の前のケース）。GOSQL-30 のメッセージも、同じ並びで言う。
+行の遷移を持つ効果（`Effect.row`）は、効果の句の後ろに、空白なしで一文を足す: `行の遷移（<行の遷移の表示>）は、確かめない。`（表示の形は `docs/plugin-go.md`「コメント」の「行の遷移の表示」）。絞り込んだ引数があれば、その表示を、前に、`、` でつなぐ: `行の遷移（<絞り込んだ引数の表示>、<行の遷移の表示>）は、確かめない。`（同「絞り込んだ引数の表示」。行の引数なら、効果の前のケース）。DB-17 のメッセージも、同じ並びで言う。
 
 ```go
 // AcceptOrder は効果 shop.acceptOrder（@db.insert）: 表 "orders" に、引数 order の行を足す。行の遷移（as shop.Stage.Accepted）は、確かめない。
@@ -509,35 +488,37 @@ func dbConflict(err, conflict error) error {
 
 | ID | 重さ | 意味 |
 |---|---|---|
-| GOSQL-1 | error | `@db.table` の付いた状態の要素の型が、model でないか、インデックスの model（フィールドを持たない。「表」）。位置は状態 |
-| GOSQL-2 | error | `@db.table` の付いた状態の形が `list` でない（`nullable`、`single`）。位置は状態 |
 | GOSQL-3 | error | 表の model に、どのしまい方でも列にできない型のフィールドがある（union と、union を中に持つ型）。位置は model |
 | GOSQL-4 | error | このトランスパイラの公開の名前（`Schema`、`CreateTables`、`Querier`、`Conn`、`<状態>Table`、`New<状態>Table`、出すなら `DbSeams`、`NewDbSeams`）が、N の定義のパッケージの名前（型など。`docs/plugin-go.md`「名前」）と当たる。位置は当たった宣言。このトランスパイラの公開の名前どうし（状態 `users` の `NewUsersTable` と、状態 `newUsers` の `NewUsersTable`）も同じで、位置は後ろの宣言 |
 | GOSQL-6 | error | `[emit.options.go-sqlite]` に、知らないキーがある。位置なし |
-| GOSQL-7 | error | `db` のデコレータを付けた `read` の `reads` の状態か、効果の宛先の状態が、N の表の状態でない（`@db.table` が付いていない）。位置は、その `read` か効果 |
-| GOSQL-8 | error | 列を名指しするもの（`read` と `@db.delete` の効果の引数の名前、`@db.where` と `@db.latest` の `column`）が、表の model のフィールドにない。位置は、その `read` か効果 |
-| GOSQL-9 | error | 引数が、デコレータの言うものと合わない: 条件の引数（`read` と、`@db.delete` の効果）の型が、列に合わない（「列と引数の型」）。`@db.insert` / `@db.update` の効果の引数が、表の model の行一つでない。位置は、その `read` か効果 |
-| GOSQL-10 | error | `read` の結果の型が、デコレータの言うものと合わない: `@db.find` は `M?`、`@db.list` は `M[]`（M は表の model）。位置は `read` |
-| GOSQL-11 | error | 効果のデコレータが、効果の宛先と合わない（「効果の中身」）: 宛先が組み込みの効果でない（分類の遷移）か、操作が合わない（`@db.insert` は `post`、`@db.update` は `put`、`@db.delete` は `delete`）。位置は効果 |
-| GOSQL-12 | error | 一つの効果が、`@db.insert` / `@db.update` / `@db.delete` のうち二つ以上を持つ。位置は効果 |
-| GOSQL-13 | error | `@db.find` の `read` が、一行に決まらない: 条件の列が、表の model の `@db.key` のすべても、`@db.unique` の列も含まず、`@db.latest` もない（「read の中身」）。位置は `read` |
-| GOSQL-15 | error | `@db.update` の表の model が、`@db.key` を一つも持たないか、キーでない列を一つも持たない。位置は効果 |
 | GOSQL-16 | error | 表の model のフィールドが、しまい方のデコレータ（`@db.text` / `@db.int` / `@db.float` / `@db.bool` / `@db.datetime` / `@db.date` / `@db.time` / `@db.json`）を一つも持たないか、二つ以上持つ（「しまい方」）。位置は model |
 | GOSQL-17 | error | しまい方が、フィールドの型に合わない（「しまい方」の表）。メッセージに、フィールド、しまい方、型を示す。位置は model |
-| GOSQL-20 | error | 表の model のフィールドの `@db.ref(M2)` の指す先が、一つに決まらない: 要素の型が M2 の表の状態が、N にないか、二つ以上ある。または、M2 の `@db.key` が一つでない（「表」）。位置は model |
-| GOSQL-22 | error | 一つの `read` が、`@db.find` と `@db.list` の両方を持つ。位置は `read` |
-| GOSQL-24 | error | `@db.where` か `@db.latest` の付いた `read` が、`@db.find` も `@db.list` も持たない。位置は `read` |
-| GOSQL-25 | error | 一つの `read` の条件が、同じ列を二度名指ししている（引数と `@db.where`、二つの `@db.where`）。位置は `read` |
-| GOSQL-26 | error | `@db.where` のリテラルが、列の型に渡せない（しまい方が `@db.datetime`、`@db.date`、`@db.time`、`@db.json` の列を含む。「read の中身」）。メッセージに、列、リテラル、型を示す。位置は `read` |
 | GOSQL-27 | error | `@db.latest` の列のしまい方が、`@db.datetime` / `@db.date` / `@db.time` / `@db.int` / `@db.float` のどれでもない。位置は `read` |
-| GOSQL-28 | error | `@db.delete` の効果が、引数を一つも持たない。まだ決めていない形（「効果の中身」の未決）。位置は効果 |
 | GOSQL-29 | error | N の単位の対象の op に `@db.transaction` が付いているのに、N に表の状態が一つもない（継ぎ目の実装を出せない。「出力」）。位置は op |
-| GOSQL-30 | error | `@db.update` を付けた効果の行の遷移（`Effect.row`）の、行の引数の型が、同じ分類で絞り込んだ型（`case`）で、後のケース（`to`）が、その `cases` にない（「効果の中身」: 渡る行は前のケースにあり、そのまま書いても、後のケースにならない）。位置は効果 |
-| GOSQL-31 | error | `@db.conflict` を付けた効果が、`@db.insert` も `@db.update` も持たない（「効果の中身」）。位置は効果 |
-| GOSQL-32 | error | `@db.conflict` の例外が、使えない: その効果の `throws` にない。引数を持つ。メッセージに、どちらかを示す。位置は効果 |
 | GOSQL-33 | error | `@db.insert` / `@db.update` / `@db.delete` を付けた効果の `throws` に、`@db.conflict` が名指ししていない例外がある（このトランスパイラは、それを投げるコードを出せない）。メッセージに、その例外。位置は効果 |
 
-- 欠番（番号は別の意味に使い回さない。欠番の一覧は `docs/requirements.md`「検査の規則の一覧」）:
+- **`go-sqlite` は、`db` の語彙の検査（DB-*。`docs/plugin-db.md`「診断」）を通っていない仕様を受け取ったら、診断にせず、異常終了する**（`proc.Crashed`。`docs/plugin-protocol.md`「起動」）。hozoc からは、起きない: 語彙のプラグイン `db` が error を返せば、`emit` は頼まれず、入っていなければ CFG-25（「マニフェスト」）。見るのは、N の検査だけ（ほかの名前空間の DB-* は、見ない）。
+- **残した診断は、このトランスパイラが、出すときに要るもの**: しまい方（GOSQL-3、GOSQL-16、GOSQL-17、GOSQL-27。語彙のプラグイン `db` は、しまい方を確かめない: `docs/plugin-db.md`「しまい方」）、出力の形と設定（GOSQL-4、GOSQL-6）、このトランスパイラが出せないもの（GOSQL-29: 継ぎ目の実装を置くファイルがない。GOSQL-33: 投げるコードを出せない例外）。
+- GOSQL-3 を返したフィールドに、GOSQL-17 は、重ねて出さない。
+- warning（コードは `PLUGIN`）は一つ: 表の状態が一つもない（GOSQL-29 のときは出さない）。`db` のデコレータを付けていない `read` と効果には、warning を出さない（「状態ごとの型」）。
+- 基底のオプション `module` がないことは、基底が報告する（GO-8。`docs/plugin-go.md`「診断」）。このトランスパイラは、型のパッケージの import パスを求められないので、ファイルも診断も返さない。
+- `@db.table` は、どの保存先かを言わない。同じ `@db.table` の状態を別の保存先にするのは、別のトランスパイラを並べた別の単位（か、人が書く実装）。`@db.key` / `@db.unique` / `@db.ref` と `@db.transaction` の意味（重なれば失敗する、失敗すれば取り消す、など）は、このトランスパイラの出力にしかなく、ほかの実装が同じ振る舞いをすることは、仕様からは言えない。
+
+### 欠番
+
+番号は別の意味に使い回さない（欠番の一覧は `docs/requirements.md`「検査の規則の一覧」）。
+
+- **言語にも、保存先にも依らない 19 個は、語彙のプラグイン `db` の診断に移した**（`docs/plugin-db.md`「診断」。`docs/decisions.md`「決めたこと」410）。規則は、同じ。メッセージも同じで、変えたのは、型の書き方（言語の綴り）と、DB-19 の「引数を持つ」の言い方だけ。
+
+  | 欠番 | 移した先 | 欠番 | 移した先 | 欠番 | 移した先 | 欠番 | 移した先 |
+  |---|---|---|---|---|---|---|---|
+  | GOSQL-1 | DB-1 | GOSQL-2 | DB-2 | GOSQL-7 | DB-3 | GOSQL-8 | DB-4 |
+  | GOSQL-9 | DB-5 | GOSQL-10 | DB-6 | GOSQL-11 | DB-7 | GOSQL-12 | DB-8 |
+  | GOSQL-13 | DB-9 | GOSQL-15 | DB-10 | GOSQL-20 | DB-11 | GOSQL-22 | DB-12 |
+  | GOSQL-24 | DB-13 | GOSQL-25 | DB-14 | GOSQL-26 | DB-15 | GOSQL-28 | DB-16 |
+  | GOSQL-30 | DB-17 | GOSQL-31 | DB-18 | GOSQL-32 | DB-19 |  |  |
+
+- そのほかの欠番:
 
 | 欠番 | 規則だったもの | なくなった理由 |
 |---|---|---|
@@ -546,10 +527,3 @@ func dbConflict(err, conflict error) error {
 | GOSQL-18、GOSQL-19 | `@db.nullable` と、フィールドの型（省略可能かどうか）の食い違い | `@db.nullable` をなくした（値がなくてよいかは、フィールドの型の `?`） |
 | GOSQL-21 | `read` のデコレータの表が、`read` の読む状態でない | デコレータは、表を引数に取らない（表は、`reads` の状態） |
 | GOSQL-23 | `@db.reads` に、`read` を二つ以上並べている（決まるまでの間だけの規則） | `@db.reads` をなくした |
-
-- GOSQL-1、GOSQL-7〜GOSQL-13、GOSQL-22 は、同じ規則を、今の書き方（引数のない `@db.table`、`read` と効果の宣言の引数と宛先）に合わせて書き直した。GOSQL-12 と GOSQL-22 の、`@db.effects` / `@db.reads` に並べたものについての半分は、なくなった。
-- 一つの食い違いを、重ねて報告しない: 表にならなかった状態（GOSQL-1 か GOSQL-2 を返した）を `reads` の状態か宛先にする `read` と効果に、GOSQL-7 は出さない。GOSQL-12、GOSQL-22、GOSQL-24 を返した宣言と、宛先が分類の遷移の効果（GOSQL-11）は、ほかの検査をしない（デコレータが何を言っているのかが、決まらない）。条件の列がフィールドになかった（GOSQL-8）`@db.find` に、GOSQL-13 は出さない（一行に決まるかどうかを、言えない）。一つの `read` が同じ列を三度名指ししていても、GOSQL-25 は、列ごとに一つ。
-- どれも、書いたものの整合の検査: デコレータと宣言が食い違っていれば、黙って何かを出すことも、出さないこともせず、error にする（`docs/requirements.md`「出力を推論しない」）。`db` のデコレータを、付けられない宣言に付けたとき（`@db.find` を op に、など）は、hozoc が先に DEC-1 を返す（`docs/check.md`「デコレータ」）。
-- warning（コードは `PLUGIN`）は一つ: 表の状態が一つもない（GOSQL-29 のときは出さない）。`db` のデコレータを付けていない `read` と効果には、warning を出さない（「状態ごとの型」）。
-- 基底のオプション `module` がないことは、基底が報告する（GO-8。`docs/plugin-go.md`「診断」）。このトランスパイラは、型のパッケージの import パスを求められないので、ファイルも診断も返さない。
-- `@db.table` は、どの保存先かを言わない。同じ `@db.table` の状態を別の保存先にするのは、別のトランスパイラを並べた別の単位（か、人が書く実装）。`@db.key` / `@db.unique` / `@db.ref` と `@db.transaction` の意味（重なれば失敗する、失敗すれば取り消す、など）は、このトランスパイラの出力にしかなく、ほかの実装が同じ振る舞いをすることは、仕様からは言えない。

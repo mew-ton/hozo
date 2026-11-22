@@ -1,0 +1,2 @@
+DB-17	app.start	効果 app.start の @db.update が、行の遷移（order on app.Stage.Accepted、as app.Stage.InProduction）と合わない: 渡る行は、前のケースにあり、@db.update は、その行を、そのまま書くので、書いた後の行は app.Stage.InProduction にならない（行をそのケースにする書き方は、宣言から決まらない。この効果は、デコレータを付けずに、人が書く）
+DB-17	app.ship	効果 app.ship の @db.update が、行の遷移（order on app.Stage.Accepted | app.Stage.InProduction、as app.Stage.Shipped）と合わない: 渡る行は、前のケースにあり、@db.update は、その行を、そのまま書くので、書いた後の行は app.Stage.Shipped にならない（行をそのケースにする書き方は、宣言から決まらない。この効果は、デコレータを付けずに、人が書く）

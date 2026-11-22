@@ -5,12 +5,14 @@ import (
 	"strings"
 
 	"github.com/mew-ton/hozo/ir"
+	"github.com/mew-ton/hozo/plugin/dbvocab"
 	"github.com/mew-ton/hozo/plugin/golang"
 )
 
 // このファイルは docs/plugin-go-sqlite.md「表」「しまい方」: 表の状態と、表の model の列（しまい方、値がなくてよいか、制約）と、
-// Schema の SQL。表の model は、状態の要素の型。列が値を持たなくてよいかは、フィールドの型の ?。しまい方だけは、型から当てない:
-// フィールドのデコレータが言い、型は、それに合うかを確かめるのにだけ使う（GOSQL-3、GOSQL-16、GOSQL-17）。
+// Schema の SQL。どの状態が表で、どのフィールドが列か、キーと参照は、語彙の読み解き（plugin/dbvocab。docs/plugin-db.md「表」
+// 「キーと参照」）が決める。しまい方は、ここが読む: 型からは当てず、フィールドのデコレータが言い、型は、それに合うかを確かめるのに
+// だけ使う（GOSQL-3、GOSQL-16、GOSQL-17）。
 
 // storage は、しまい方一つ（docs/plugin-go-sqlite.md「しまい方」の表の行）。
 type storage struct {
@@ -86,80 +88,42 @@ type table struct {
 	model *model
 }
 
-// collectTables は、N の @db.table の付いた基底の状態から、表の状態（e.tables）と、表の model（e.models）を作る。
-// 表の model は、状態の要素の型（@db.table は引数を持たない）。形が list でなければ GOSQL-2、要素の型が model でなければ GOSQL-1。
-// model のフィールドの検査は columns、@db.ref の先は resolveRefs。戻り値は、@db.table の付いた状態の数（診断を返したものを含む）。
+// collectTables は、語彙の読み解き（e.vocab）の、表の状態と、表の model から、このトランスパイラの表（e.tables）と model（e.models）を
+// 作る: 列に、Go のフィールドの名前と、しまい方を足す（columns）。戻り値は、@db.table の付いた N の状態の数。
 func (e *emitter) collectTables() (marked int) {
-	// perModel は、model の FQN → それを要素に持つ、@db.table の付いた N の状態の数（診断を返したものを含む。GOSQL-20 が重ねて出ないように）
-	perModel := map[string]int{}
-	for _, d := range e.ns.Decls {
-		st, ok := d.(*ir.State)
-		if !ok || len(applications(st.Decorators, decoratorTable)) == 0 {
-			continue
-		}
-		marked++
-		e.marked[st.Name] = true
-		var decl *ir.Model
-		if ref, isRef := st.Element.(ir.RefType); isRef {
-			decl, _ = e.p.Lookup(ref.Target).(*ir.Model)
-		}
-		if decl != nil {
-			perModel[decl.Name]++
-		}
-		valid := true
-		if st.Shape != ir.StateList {
-			e.errorf(codeSQLShape, st.Name, "@db.table の状態 %s の形が %s（表にできるのは list だけ。一行だけの表の形は、まだ決めていない）", st.Name, st.Shape)
-			valid = false
-		}
-		if decl == nil {
-			e.errorf(codeSQLElement, st.Name, "@db.table の状態 %s の要素の型 %s が、model でない（表の列は、要素の model のフィールドから作る）",
-				st.Name, golang.TypeDisplay(st.Element))
-			valid = false
-		} else if decl.Index != nil {
-			e.errorf(codeSQLElement, st.Name, "@db.table の状態 %s の要素の型 %s が、インデックスの model（表の列は、要素の model のフィールドから作る。インデックスの model は、フィールドを持たない）",
-				st.Name, golang.TypeDisplay(st.Element))
-			valid = false
-		}
-		if !valid {
-			continue
-		}
-		t := &table{state: st, name: short(st.Name)}
-		m := e.byModel[decl.Name]
-		if m == nil {
-			m = &model{decl: decl, table: t.name}
-			e.byModel[decl.Name] = m
-			e.models = append(e.models, m)
-			e.columns(m)
-		}
-		t.model = m
-		e.tables = append(e.tables, t)
-		e.byState[st.Name] = t
+	for _, vm := range e.vocab.Models {
+		m := &model{decl: vm.Decl}
+		e.byModel[vm.Decl.Name] = m
+		e.models = append(e.models, m)
+		e.columns(m, vm)
 	}
-	e.resolveRefs(perModel)
+	for _, vt := range e.vocab.Tables {
+		t := &table{state: vt.State, name: vt.Name, model: e.byModel[vt.Model.Decl.Name]}
+		if t.model.table == "" {
+			t.model.table = t.name
+		}
+		e.tables = append(e.tables, t)
+		e.byState[vt.State.Name] = t
+	}
 	e.nameHelpers()
-	return marked
+	return e.vocab.Marked
 }
 
-// columns は、表の model m のフィールドから列を作り、フィールドのデコレータと型の食い違いを確かめる（どれも、位置は model）:
-// どのしまい方でも列にできない型（union と、union を中に持つ型）は GOSQL-3、しまい方がちょうど一つでなければ GOSQL-16、
-// しまい方が型に合わなければ GOSQL-17。列が値を持たなくてよいかは、フィールドの型の ? から決める。
-func (e *emitter) columns(m *model) {
-	for _, f := range m.decl.Fields {
-		c := column{name: f.Name, field: golang.FieldName(f.Name), typ: f.Type}
+// columns は、表の model m の列を、語彙の読み解きの列（vm.Columns。フィールドの順）から作り、しまい方を読んで、フィールドの
+// デコレータと型の食い違いを確かめる（どれも、位置は model）: どのしまい方でも列にできない型（union と、union を中に持つ型）は GOSQL-3、
+// しまい方がちょうど一つでなければ GOSQL-16、しまい方が型に合わなければ GOSQL-17。
+func (e *emitter) columns(m *model, vm *dbvocab.Model) {
+	for i, f := range m.decl.Fields {
+		vc := vm.Columns[i]
+		c := column{
+			name: vc.Name, field: golang.FieldName(vc.Name), typ: vc.Type,
+			nullable: vc.Nullable, key: vc.Key, unique: vc.Unique, ref: vc.Ref, refTable: vc.RefTable, refColumn: vc.RefColumn,
+		}
 		var stores []*storage
 		for _, a := range f.Decorators {
-			switch a.Decorator {
-			case decoratorKey:
-				c.key = true
-			case decoratorUnique:
-				c.unique = true
-			case decoratorRef:
-				c.ref = refArg(a, "target")
-			default:
-				for _, s := range storages {
-					if s.decorator == a.Decorator {
-						stores = append(stores, s)
-					}
+			for _, s := range storages {
+				if s.decorator == a.Decorator {
+					stores = append(stores, s)
 				}
 			}
 		}
@@ -168,7 +132,7 @@ func (e *emitter) columns(m *model) {
 		}
 		inner := f.Type
 		if o, ok := f.Type.(ir.OptionalType); ok {
-			inner, c.nullable = o.Of, true
+			inner = o.Of
 		}
 		union := e.hasUnion(inner, map[string]bool{})
 		if union {
@@ -182,7 +146,7 @@ func (e *emitter) columns(m *model) {
 		case len(stores) > 1:
 			e.errorf(codeSQLStorage, m.decl.Name, "model %s のフィールド %s が、しまい方のデコレータを二つ以上持つ（%s。ちょうど一つ要る）",
 				m.decl.Name, f.Name, storageNames(stores))
-		case !union && !fits(c.store, e.typeClass(inner)):
+		case !union && !fits(c.store, dbvocab.ClassOf(e.p, inner)):
 			e.errorf(codeSQLFit, m.decl.Name, "model %s のフィールド %s のしまい方 @%s が、型 %s に合わない（@%s に合う型は %s）",
 				m.decl.Name, f.Name, c.store.decorator, golang.TypeDisplay(f.Type), c.store.decorator, c.store.fits)
 		}
@@ -207,32 +171,6 @@ func fits(s *storage, class string) bool {
 		}
 	}
 	return false
-}
-
-// typeClass は、型 t（省略可能を外したもの）の種類: 核の型の名前（scalar は、元の核の型まで辿る）、"array"、"model"（インデックスの model を含む）。
-// どれでもなければ ""。しまい方が型に合うか（GOSQL-17）を確かめるのにだけ使う。
-func (e *emitter) typeClass(t ir.Type) string {
-	for depth := 0; depth < 64; depth++ {
-		switch x := t.(type) {
-		case ir.CaseType:
-			t = x.Of
-			continue
-		case ir.CoreType:
-			return string(x.Name)
-		case ir.ArrayType:
-			return "array"
-		case ir.RefType:
-			switch d := e.p.Lookup(x.Target).(type) {
-			case *ir.Scalar:
-				t = d.Base
-				continue
-			case *ir.Model:
-				return "model"
-			}
-		}
-		break
-	}
-	return ""
 }
 
 // hasUnion は、型 t が union（arms）か、union を中に持つ array / model（インデックスの model を含む）か。seen は、辿った model（自分を指す model で止まる）。
@@ -264,45 +202,6 @@ func (e *emitter) hasUnion(t ir.Type, seen map[string]bool) bool {
 		}
 	}
 	return false
-}
-
-// resolveRefs は、@db.ref(M2) の指す先（docs/plugin-go-sqlite.md「表」）: 要素の型が M2 の表の状態が N にちょうど一つあり、
-// M2 が @db.key をちょうど一つ持つとき、その表のその列。そうでなければ GOSQL-20（位置は model）。黙って制約を省くことはしない。
-// perModel は、model を要素に持つ、@db.table の付いた N の状態の数（診断を返して、表にならなかったものを含む）。
-func (e *emitter) resolveRefs(perModel map[string]int) {
-	tablesOf := map[string][]*table{}
-	for _, t := range e.tables {
-		tablesOf[t.model.decl.Name] = append(tablesOf[t.model.decl.Name], t)
-	}
-	for _, m := range e.models {
-		for i := range m.cols {
-			c := &m.cols[i]
-			if c.ref == "" {
-				continue
-			}
-			switch n := perModel[c.ref]; {
-			case n == 0:
-				e.errorf(codeSQLRef, m.decl.Name, "model %s のフィールド %s の @db.ref(%s) の指す先が決まらない: 名前空間 %s に、要素の型が %s の @db.table の状態がない",
-					m.decl.Name, c.name, c.ref, e.view.Viewer, c.ref)
-				continue
-			case n > 1:
-				e.errorf(codeSQLRef, m.decl.Name, "model %s のフィールド %s の @db.ref(%s) の指す先が決まらない: 名前空間 %s に、要素の型が %s の @db.table の状態が %d 個ある",
-					m.decl.Name, c.name, c.ref, e.view.Viewer, c.ref, n)
-				continue
-			}
-			targets := tablesOf[c.ref]
-			if len(targets) != 1 {
-				continue // 先の状態が、表にならなかった（GOSQL-1 か GOSQL-2 を返している）
-			}
-			keys := targets[0].model.keys()
-			if len(keys) != 1 {
-				e.errorf(codeSQLRef, m.decl.Name, "model %s のフィールド %s の @db.ref(%s) の指す先が決まらない: model %s の @db.key が %d 個（ちょうど一つ要る）",
-					m.decl.Name, c.name, c.ref, c.ref, len(keys))
-				continue
-			}
-			c.refTable, c.refColumn = targets[0].name, keys[0].name
-		}
-	}
 }
 
 // nameHelpers は、表の model ごとの補助の名前 dbArgs<Model> と dbScan<Model> を決める。<Model> は model の Go の型の名前。

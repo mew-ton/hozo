@@ -1,0 +1,2 @@
+DB-8	app.both	効果 app.both が、効果のデコレータを二つ以上持つ（@db.insert、@db.update。@db.insert / @db.update / @db.delete のうち、高々一つ）
+DB-8	app.all	効果 app.all が、効果のデコレータを二つ以上持つ（@db.insert、@db.update、@db.delete。@db.insert / @db.update / @db.delete のうち、高々一つ）

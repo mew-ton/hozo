@@ -84,7 +84,7 @@ enabled = false                 # true なら hozoc tests で direction "coverag
 
 ## 語彙のプラグイン
 
-`docs/decisions.md`「決めたこと」410、416、428。**語彙のプラグイン**は、ある語彙の、言語に依らない決まりを確かめるプラグイン: マニフェストに `[read]` を持つ（「マニフェスト `hozo-plugin.toml`」）。頼みごとは一つで、`read`（「read」）: 仕様を受け取り、診断を返す。今あるのは `http`（`docs/plugin-http.md`）と `valid`（`docs/plugin-valid.md`）。
+`docs/decisions.md`「決めたこと」410、416、428。**語彙のプラグイン**は、ある語彙の、言語に依らない決まりを確かめるプラグイン: マニフェストに `[read]` を持つ（「マニフェスト `hozo-plugin.toml`」）。頼みごとは一つで、`read`（「read」）: 仕様を受け取り、診断を返す。今あるのは `http`（`docs/plugin-http.md`）、`valid`（`docs/plugin-valid.md`）、`db`（`docs/plugin-db.md`）。
 
 | | 語彙のプラグイン | トランスパイラを提供するプラグイン |
 |---|---|---|
@@ -159,6 +159,7 @@ enabled = false                 # true なら hozoc tests で direction "coverag
 | WASM。機械の言葉に直したものを、覚えた後 | 3.7 秒 |
 | WASM。語彙のプラグイン `http` を足した後（七つのプラグイン。同じ機械で、足す前は 3.8 秒） | 4.3 秒 |
 | WASM。語彙のプラグイン `valid` を足した後（八つのプラグイン。同じ機械で、足す前は 4.3 秒） | 4.8 秒 |
+| WASM。語彙のプラグイン `db` を足した後（九つのプラグイン。同じ機械で、足す前は 4.8 秒） | 5.0 秒 |
 | WASM。はじめての実行（六つの WASM を、機械の言葉に直す。4 コア） | 8.3 秒 |
 | WASM。途中で止められる形（言語サーバーの中で、二度目から） | 13.7 秒 |
 | （前の形）子プロセス。ビルドした実行ファイル。プラグインごとに一回 | 0.38 秒 |

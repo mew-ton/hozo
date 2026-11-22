@@ -1,0 +1,28 @@
+// DB-8（docs/plugin-db.md「効果」）: 一つの効果が、@db.insert / @db.update / @db.delete のうち二つ以上を持つ。
+// 位置は効果。同じデコレータを二度付けるのは、hozoc の DEC-13。
+
+namespace app {
+  model Row { @db.key @db.text id: string; @db.text note: string; }
+  @db.table state rows: list<Row>;
+
+  /** 二つ持つ効果 */
+  @db.insert
+  @db.update
+  effect fn both(row: Row): effects rows.post;
+  /** 三つとも持つ効果（配線が呼んでいなくても、確かめる） */
+  @db.insert
+  @db.update
+  @db.delete
+  effect fn all(id: string): effects rows.delete;
+
+  // 配線が呼んでも、効果ごとに一度だけ
+  export fn addBoth(row: Row) {
+    both(row);
+  }
+
+  // 通るもの
+  @db.insert
+  effect fn createRow(row: Row): effects rows.post;
+  /** デコレータを持たない効果 */
+  effect fn bare(): effects rows.delete;
+}

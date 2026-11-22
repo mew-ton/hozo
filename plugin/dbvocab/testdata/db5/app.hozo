@@ -1,0 +1,82 @@
+// DB-5（docs/plugin-db.md「列と引数の型」「効果」）: 条件の引数（read と、@db.delete の効果）の型が、列に合わない
+// （引数の型は、列の型と等しい。列の型が T? なら、T でもよい。列より広い引数は合わない）。@db.insert / @db.update の効果の引数が、
+// 表の model の行一つでない。位置は、その read か効果。
+
+namespace app {
+  scalar Id extends string;
+  scalar Code extends string;
+  model Row {
+    @db.key @db.text id: Id;
+    @db.text note: string;
+    @db.int rank: int?;
+  }
+  /** 形は同じでも、別の model */
+  model Other {
+    @db.key @db.text id: Id;
+    @db.text note: string;
+    @db.int rank: int?;
+  }
+  @db.table state rows: list<Row>;
+
+  // ---- read の引数 ----
+
+  // scalar は名前で比べる（Id の列に string、別の scalar）
+  @db.find
+  read fn rowByString(id: string): Row? reads rows;
+  @db.find
+  read fn rowByCode(id: Code): Row? reads rows;
+  // 列より広い引数（T の列に T?）
+  @db.find
+  read fn rowByMaybe(id: Id?): Row? reads rows;
+  // 型が違う
+  @db.list
+  read fn rowsByIntNote(note: int): Row[] reads rows;
+  // T? の列に、別の型
+  @db.list
+  read fn rowsByStringRank(rank: string?): Row[] reads rows;
+  // 二つの引数の、一つだけが合わない
+  @db.find
+  read fn rowByIdAndRank(id: Id, rank: float): Row? reads rows;
+
+  // ---- @db.delete の効果の引数 ----
+
+  @db.delete
+  effect fn deleteByString(id: string): effects rows.delete;
+  @db.delete
+  effect fn deleteByMaybeNote(note: string?): effects rows.delete;
+
+  // ---- @db.insert / @db.update の効果の引数: 表の model の行一つ ----
+
+  // 引数がない
+  @db.insert
+  effect fn createNothing(): effects rows.post;
+  // 二つ
+  @db.insert
+  effect fn createTwo(first: Row, second: Row): effects rows.post;
+  // 別の model
+  @db.insert
+  effect fn createOther(row: Other): effects rows.post;
+  // 省略可能な行、行の並び
+  @db.update
+  effect fn updateMaybe(row: Row?): effects rows.put;
+  @db.update
+  effect fn updateMany(rows: Row[]): effects rows.put;
+  // 行でなく、列の値
+  @db.update
+  effect fn updateNote(id: Id, note: string): effects rows.put;
+
+  // ---- 通るもの ----
+
+  @db.find
+  read fn rowById(id: Id): Row? reads rows;
+  @db.list
+  read fn rowsByRank(rank: int): Row[] reads rows;
+  @db.list
+  read fn rowsByRankOrNone(rank: int?): Row[] reads rows;
+  @db.delete
+  effect fn deleteByRank(id: Id, rank: int?): effects rows.delete;
+  @db.insert
+  effect fn createRow(row: Row): effects rows.post;
+  @db.update
+  effect fn updateRow(row: Row): effects rows.put;
+}

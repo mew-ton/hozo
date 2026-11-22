@@ -29,7 +29,7 @@ namespace api {
     override hash: never;
   }
 
-  model Session { token: Token; userId: UserId; }
+  model Session { token: Token; userId: UserId; revoked: boolean; kind: string; } // revoked と kind は、read sessionsOf の @db.where が名指しする列
 
   @db.table state users: list<User>;
   @db.table state sessions: list<Session>;

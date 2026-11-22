@@ -1,0 +1,37 @@
+// DB-17（docs/plugin-db.md「効果」）: @db.update を付けた効果の、行の引数の型が、行の分類で絞り込んだ型で、
+// 後のケースが、その並びにない。渡る行は前のケースにあり（呼ぶ側の TYPE-4、MATCH-4）、@db.update は、その行を、そのまま書くので、
+// 後のケースにならない。位置は効果。
+
+namespace app {
+  model Order { @db.key @db.text id: string; @db.text note: string; }
+  @db.table state orders: list<Order>;
+
+  classify Stage of Order { Draft; Accepted; InProduction; Shipped; }
+
+  @db.update
+  effect fn start(order: Order on Stage.Accepted): effects orders.put as Stage.InProduction;
+  /** 配線が呼んでいない効果も、同じに確かめる。前のケースが二つでも、後のケースが、その並びになければ同じ */
+  @db.update
+  effect fn ship(order: Order on Stage.Accepted | Stage.InProduction): effects orders.put as Stage.Shipped;
+  // 配線が呼んでも、効果ごとに一度だけ
+  export fn begin(order: Order on Stage.Accepted) {
+    start(order);
+  }
+
+  // 通るもの: 前が any、後ろが else、後のケースが前の並びにある、行の遷移を書かない
+  @db.update
+  effect fn forceShip(order: Order): effects orders.put as Stage.Shipped;
+  @db.update
+  effect fn revise(order: Order on Stage.Accepted): effects orders.put as else;
+  @db.update
+  effect fn touch(order: Order on Stage.Accepted): effects orders.put as Stage.Accepted;
+  @db.update
+  effect fn hold(order: Order on Stage.Accepted | Stage.InProduction): effects orders.put as Stage.Accepted;
+  @db.update
+  effect fn patch(order: Order): effects orders.put as else;
+  @db.update
+  effect fn rename(order: Order): effects orders.put;
+  // @db.insert は、入る行を、そのまま足す
+  @db.insert
+  effect fn accept(order: Order): effects orders.post as Stage.Accepted;
+}

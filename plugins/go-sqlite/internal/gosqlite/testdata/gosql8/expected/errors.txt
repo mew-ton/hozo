@@ -1,7 +1,0 @@
-GOSQL-8	app.rowByID	read app.rowByID の引数 ID が、表 app.rows の model app.Row のフィールドにない（列は、引数の名前とデコレータの column で名指しする）
-GOSQL-8	app.rowByIdAndNotes	read app.rowByIdAndNotes の引数 notes が、表 app.rows の model app.Row のフィールドにない（列は、引数の名前とデコレータの column で名指しする）
-GOSQL-8	app.rowsOfKind	read app.rowsOfKind の @db.where の列 "kind" が、表 app.rows の model app.Row のフィールドにない（列は、引数の名前とデコレータの column で名指しする）
-GOSQL-8	app.newestRows	read app.newestRows の @db.latest の列 "addedAt" が、表 app.rows の model app.Row のフィールドにない（列は、引数の名前とデコレータの column で名指しする）
-GOSQL-8	app.lastRow	read app.lastRow の @db.latest の列 "rowid" が、表 app.rows の model app.Row のフィールドにない（列は、引数の名前とデコレータの column で名指しする）
-GOSQL-8	app.deleteRow	効果 app.deleteRow の引数 key が、表 app.rows の model app.Row のフィールドにない（列は、引数の名前とデコレータの column で名指しする）
-GOSQL-8	app.deleteByRowid	効果 app.deleteByRowid の引数 rowid が、表 app.rows の model app.Row のフィールドにない（列は、引数の名前とデコレータの column で名指しする）

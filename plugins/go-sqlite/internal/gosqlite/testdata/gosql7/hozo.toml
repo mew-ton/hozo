@@ -1,8 +1,0 @@
-[options.go]
-module = "example.com/app"
-
-# plugins/go-sqlite の単体テストの入力（docs/testing.md「単体テスト」）: GOSQL-7（read の on の状態か、効果の宛先の状態が、N の表の状態でない）。
-[[emit]]
-namespace   = "app"
-transpilers = ["go", "go-sqlite"]
-out         = "gen/app"

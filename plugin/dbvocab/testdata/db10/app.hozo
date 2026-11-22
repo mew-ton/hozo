@@ -1,0 +1,32 @@
+// DB-10（docs/plugin-db.md「効果」）: @db.update の表の model が、@db.key を一つも持たないか、キーでない列を
+// 一つも持たない。位置は効果。
+
+namespace app {
+  /** キーのない model */
+  model Note { @db.text text: string; @db.unique @db.int stars: int; }
+  /** キーだけの model */
+  model Mark { @db.key @db.text book: string; @db.key @db.int page: int; }
+  model Row { @db.key @db.text id: string; @db.text note: string; }
+  @db.table state notes: list<Note>;
+  @db.table state marks: list<Mark>;
+  @db.table state rows: list<Row>;
+
+  @db.update
+  effect fn updateNote(row: Note): effects notes.put;
+  /** 配線が呼んでいない効果も、同じに確かめる */
+  @db.update
+  effect fn updateMark(row: Mark): effects marks.put;
+  // 配線が呼んでも、効果ごとに一度だけ
+  export fn saveNote(note: Note) {
+    updateNote(note);
+  }
+
+  // 通るもの
+  @db.update
+  effect fn updateRow(row: Row): effects rows.put;
+  // @db.insert と @db.delete は、キーを要らない
+  @db.insert
+  effect fn createNote(row: Note): effects notes.post;
+  @db.delete
+  effect fn deleteMark(book: string): effects marks.delete;
+}

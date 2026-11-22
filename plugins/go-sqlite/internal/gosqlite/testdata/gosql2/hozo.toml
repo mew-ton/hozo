@@ -1,8 +1,0 @@
-[options.go]
-module = "example.com/app"
-
-# plugins/go-sqlite の単体テストの入力（docs/testing.md「単体テスト」）: GOSQL-2（@db.table の付いた状態の形が list でない）。
-[[emit]]
-namespace   = "app"
-transpilers = ["go", "go-sqlite"]
-out         = "gen/app"

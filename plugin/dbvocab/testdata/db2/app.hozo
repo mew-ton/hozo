@@ -1,0 +1,21 @@
+// DB-2（docs/plugin-db.md「表」）: @db.table の付いた状態の形が list でない（nullable、single）。位置は状態。
+
+namespace app {
+  model Row { @db.key @db.text id: string; }
+
+  // nullable
+  @db.table state current: nullable<Row>;
+  // single
+  @db.table state config: single<Row>;
+  // list は通る
+  @db.table state rows: list<Row>;
+  // @db.table がなければ、見ない
+  state other: single<Row>;
+
+  // 表にならなかった状態を宛先にする効果は、重ねて報告しない
+  @db.update
+  effect fn saveConfig(row: Row): effects config.put;
+  export fn setConfig(row: Row) {
+    saveConfig(row);
+  }
+}

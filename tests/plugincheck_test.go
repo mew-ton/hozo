@@ -282,3 +282,53 @@ func TestValidVocabularyDiagnostics(t *testing.T) {
 		t.Errorf("診断で止まったのに、gen/ がある（%v）", err)
 	}
 }
+
+// TestDBVocabularyDiagnostics は、語彙のプラグイン db が、db のデコレータと宣言の食い違い（DB-6。docs/plugin-db.md「診断」）を、
+// 出力の単位がなくても、位置と一緒に出すこと（docs/decisions.md「決めたこと」429）。同じ仕様に、go-sqlite の単位を足しても、
+// 診断は、一度だけ出る: 語彙のプラグインが error を返したら、emit は、頼まない（go-sqlite は、同じ診断を、自分では返さない。
+// docs/plugin-go-sqlite.md「診断」）。hozoc build も、同じ診断で止まり、何も書き出さない。
+func TestDBVocabularyDiagnostics(t *testing.T) {
+	root, lines := vocabularyProject(t, "dbvocab", "db6", "# 単位は、一つもない\n[hozo]\nsources = [\"*.hozo\"]\n")
+	var stdout, stderr bytes.Buffer
+	if code := hozocCorpus(t, root, []string{"build", "--no-emit"}, &stdout, &stderr); code != 1 {
+		t.Fatalf("hozoc build --no-emit の終了コード = %d（期待は 1: CheckFailed）\n%s", code, stderr.String())
+	}
+	wantVocabularyDiagnostics(t, stderr.String(), "DB-6", lines)
+
+	// db の語彙を、正しく使っている仕様（単位のない名前空間の、表の状態と read を含む。plugin/dbvocab の入力 clean）は、単位がなくても、通る
+	ok, err := os.ReadFile(filepath.Join("..", "plugin", "dbvocab", "testdata", "clean", "app.hozo"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	clean := t.TempDir()
+	for name, data := range map[string][]byte{"app.hozo": ok, "hozo.toml": []byte("[hozo]\nsources = [\"*.hozo\"]\n")} {
+		if err := os.WriteFile(filepath.Join(clean, name), data, 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	stdout.Reset()
+	stderr.Reset()
+	if code := hozocCorpus(t, clean, []string{"build", "--no-emit"}, &stdout, &stderr); code != 0 || !strings.HasPrefix(stdout.String(), "0 errors") {
+		t.Errorf("正しい仕様の hozoc build --no-emit の終了コード = %d\n%s%s", code, stdout.String(), stderr.String())
+	}
+
+	config := "[options.go]\nmodule = \"example.com/app\"\n\n[[emit]]\nnamespace = \"app\"\ntranspilers = [\"go\", \"go-sqlite\"]\nout = \"gen/app\"\n"
+	root, lines = vocabularyProject(t, "dbvocab", "db6", config)
+	stdout.Reset()
+	stderr.Reset()
+	if code := hozocCorpus(t, root, []string{"build", "--no-emit"}, &stdout, &stderr); code != 1 {
+		t.Fatalf("hozoc build --no-emit の終了コード = %d（期待は 1: CheckFailed）\n%s", code, stderr.String())
+	}
+	wantVocabularyDiagnostics(t, stderr.String(), "DB-6", lines)
+	if strings.Contains(stderr.String(), "GOSQL-") || strings.Contains(stderr.String(), "PLG-") {
+		t.Errorf("db の語彙の食い違いが、go-sqlite からも出た\n%s", stderr.String())
+	}
+	stdout.Reset()
+	stderr.Reset()
+	if code := hozocCorpus(t, root, []string{"build"}, &stdout, &stderr); code != 1 || !strings.Contains(stderr.String(), "error[DB-6]") {
+		t.Errorf("hozoc build の終了コード = %d\n%s", code, stderr.String())
+	}
+	if _, err := os.Stat(filepath.Join(root, "gen")); !os.IsNotExist(err) {
+		t.Errorf("診断で止まったのに、gen/ がある（%v）", err)
+	}
+}

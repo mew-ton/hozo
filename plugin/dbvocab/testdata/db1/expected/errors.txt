@@ -1,0 +1,5 @@
+DB-1	app.names	@db.table の状態 app.names の要素の型 string が、model でない（表の列は、要素の model のフィールドから作る）
+DB-1	app.ids	@db.table の状態 app.ids の要素の型 app.Id が、model でない（表の列は、要素の model のフィールドから作る）
+DB-1	app.groups	@db.table の状態 app.groups の要素の型 app.Row[] が、model でない（表の列は、要素の model のフィールドから作る）
+DB-1	app.byName	@db.table の状態 app.byName の要素の型 app.RowsByName が、インデックスの model（表の列は、要素の model のフィールドから作る。インデックスの model は、フィールドを持たない）
+DB-1	app.shapes	@db.table の状態 app.shapes の要素の型 app.Shape が、model でない（表の列は、要素の model のフィールドから作る）

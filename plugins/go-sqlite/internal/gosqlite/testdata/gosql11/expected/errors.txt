@@ -1,9 +1,0 @@
-GOSQL-11	app.insertOnPut	効果 app.insertOnPut の @db.insert が、効果の宛先 app.rows.put の操作と合わない（@db.insert は post）
-GOSQL-11	app.insertOnDelete	効果 app.insertOnDelete の @db.insert が、効果の宛先 app.rows.delete の操作と合わない（@db.insert は post）
-GOSQL-11	app.updateOnPost	効果 app.updateOnPost の @db.update が、効果の宛先 app.rows.post の操作と合わない（@db.update は put）
-GOSQL-11	app.updateOnDelete	効果 app.updateOnDelete の @db.update が、効果の宛先 app.rows.delete の操作と合わない（@db.update は put）
-GOSQL-11	app.deleteOnPost	効果 app.deleteOnPost の @db.delete が、効果の宛先 app.rows.post の操作と合わない（@db.delete は delete）
-GOSQL-11	app.deleteOnPut	効果 app.deleteOnPut の @db.delete が、効果の宛先 app.rows.put の操作と合わない（@db.delete は delete）
-GOSQL-11	app.fillRows	効果 app.fillRows の @db.insert が、効果の宛先と合わない: 宛先が、分類の遷移（どの表に何をするかが、宣言から決まらない。この効果は、デコレータを付けずに、人が書く）
-GOSQL-11	app.touchRows	効果 app.touchRows の @db.update が、効果の宛先と合わない: 宛先が、分類の遷移（どの表に何をするかが、宣言から決まらない。この効果は、デコレータを付けずに、人が書く）
-GOSQL-11	app.copyOver	効果 app.copyOver の @db.delete が、効果の宛先と合わない: 宛先が、分類の遷移（どの表に何をするかが、宣言から決まらない。この効果は、デコレータを付けずに、人が書く）

@@ -106,22 +106,22 @@ namespace db {
 }
 ```
 
-- **`vocab/db.hozo` のファイルは、この全文と、バイト単位で同じ**（`tests/parse_test.go` の `TestDocsEmbedVocabulary` が確かめる。`docs/testing.md`「コーパス」）。言語（`read` と効果の宣言と引数、デコレータの対象 `read` と `effect`、核の印 `@repeatable`、予約語のデコレータ名）は hozoc が読む（`docs/grammar.md`「exception / effect / read」「decorator の宣言」）。語彙を読んで出力にするのは `go-sqlite`（`docs/plugin-go-sqlite.md`）。
+- **`vocab/db.hozo` のファイルは、この全文と、バイト単位で同じ**（`tests/parse_test.go` の `TestDocsEmbedVocabulary` が確かめる。`docs/testing.md`「コーパス」）。言語（`read` と効果の宣言と引数、デコレータの対象 `read` と `effect`、核の印 `@repeatable`、予約語のデコレータ名）は hozoc が読む（`docs/grammar.md`「exception / effect / read」「decorator の宣言」）。語彙の、言語にも保存先にも依らない決まりの持ち主は `docs/plugin-db.md`。語彙を読んで出力にするのは `go-sqlite`（`docs/plugin-go-sqlite.md`）。
 - `int`、`float`、`list` は予約語、`delete` は文脈キーワードだが、デコレータの名前には書ける（`docs/grammar.md`「識別子」の `DecoratorName`）。
-- hozoc が確かめるのは、付ける対象（`for`）と、引数の種類と型（`docs/types.md`「デコレータの引数」）と、`@repeatable` のないデコレータを一つの宣言に二度付けていないこと（DEC-13）だけ。書いたものどうしの整合（表は `@db.table` の状態か、列はあるか、型は合うか）は、語彙を読むトランスパイラが確かめる（`docs/plugin-go-sqlite.md`「診断」）。
+- hozoc が確かめるのは、付ける対象（`for`）と、引数の種類と型（`docs/types.md`「デコレータの引数」）と、`@repeatable` のないデコレータを一つの宣言に二度付けていないこと（DEC-13）だけ。書いたものどうしの整合（表は `@db.table` の状態か、列はあるか、型は合うか）は、語彙のプラグイン `db` が確かめる（`docs/plugin-db.md`「診断」の DB-*）。
 
 ### `db` の表と、しまい方
 
-表の model のフィールドに書くデコレータ（`docs/decisions.md`「決めたこと」105、134）。何を出すかと、整合の検査の持ち主は `docs/plugin-go-sqlite.md`「表」「しまい方」。
+表の model のフィールドに書くデコレータ（`docs/decisions.md`「決めたこと」105、134）。表、キー、参照の整合の検査の持ち主は `docs/plugin-db.md`「表」「キーと参照」。しまい方の検査と、何を出すかの持ち主は `docs/plugin-go-sqlite.md`「表」「しまい方」。
 
 - **表**は、状態に `@db.table` を付けて言う（`@db.table state orders: list<type.Order>;`）。引数はない: 表の行の model（**表の model**）は、状態の要素の型（`docs/ir.md`「state / exception / effect」の `State.element`）。出典のグローバルのデコレータ `db`（`@db state …`）は、名前空間 `db` の中の `table` にした。
-- **しまい方**（`text` / `int` / `float` / `bool` / `datetime` / `date` / `time` / `json`）は、フィールドを列にどうしまうかの種類で、保存先の製品に依らない名前。表の model のフィールドは、どれか一つを、ちょうど一つ持つ。**しまい方は、フィールドの型からは当てない**: `string` のフィールドでも `@db.text` を書く（同じ型を、文字列でも JSON でもしまえる。どれにするかは、書いた人が決める）。型は、種類に合うかの検査にだけ使う。同じ種類の中で、型によって変え方が分かれるようになったら、種類を足す。
+- **しまい方**（`text` / `int` / `float` / `bool` / `datetime` / `date` / `time` / `json`）は、フィールドを列にどうしまうかの種類で、保存先の製品に依らない名前。保存先に出す表の model のフィールドは、どれか一つを、ちょうど一つ持つ（確かめるのは、表を出すトランスパイラ。設計だけの段階の仕様は、まだ書かなくてよい: `docs/plugin-db.md`「しまい方」）。**しまい方は、フィールドの型からは当てない**: `string` のフィールドでも `@db.text` を書く（同じ型を、文字列でも JSON でもしまえる。どれにするかは、書いた人が決める）。型は、種類に合うかの検査にだけ使う。同じ種類の中で、型によって変え方が分かれるようになったら、種類を足す。
 - **値がなくてよい列**かどうかは、フィールドの型の `?` が言う（`@db.text nickname: string?` の列は、値がなくてよい。`?` のないフィールドの列は、いつも値を持つ）。型に書いてあることで、当てるのではないので、別のデコレータは要らない。
-- **`@db.key`** は、行を一つに決める列（の組）。**`@db.unique`** は、その列だけで行が一つに決まる列。**`@db.ref(M)`** は、M の表の行を指す列で、指す先（M の表と、その列）が一つに決まらなければ、語彙を読むトランスパイラの error。
+- **`@db.key`** は、行を一つに決める列（の組）。**`@db.unique`** は、その列だけで行が一つに決まる列。**`@db.ref(M)`** は、M の表の行を指す列で、指す先（M の表と、その列）が一つに決まらなければ、語彙のプラグイン `db` の error（`docs/plugin-db.md`「キーと参照」）。
 
 ### `db` の read と効果
 
-`read` と効果の宣言（`docs/check.md`「read と効果」）に付けて、その中身を言うデコレータと、op に付ける `transaction`（`docs/decisions.md`「決めたこと」135〜138）。付けた宣言の中身は、語彙を読むトランスパイラが出し、付けていない宣言の中身は、人が書く。何を出すかと、整合の検査の持ち主は `docs/plugin-go-sqlite.md`「read の中身」「効果の中身」「トランザクション」。
+`read` と効果の宣言（`docs/check.md`「read と効果」）に付けて、その中身を言うデコレータと、op に付ける `transaction`（`docs/decisions.md`「決めたこと」135〜138）。付けた宣言の中身は、語彙を読むトランスパイラが出し、付けていない宣言の中身は、人が書く。整合の検査の持ち主は `docs/plugin-db.md`「read」「効果」「列と引数の型」、何を出すかの持ち主は `docs/plugin-go-sqlite.md`「read の中身」「効果の中身」「トランザクション」。
 
 ```ts
 /** email が同じユーザー */
@@ -143,7 +143,7 @@ effect fn deleteSession(token: type.Token): effects sessions.delete;
 - **引数が二つ以上なら、どの列も同じ行**（かつ）。`find` と `list` と `delete` に共通。
 - **`where`** は、引数にならない、決まった値の条件（列 `column` が、リテラル `value` と同じ）。`find` か `list` を付けた `read` に、いくつでも足せる（`@repeatable`）。引数の条件と合わせて、どれも満たす行。
 - **`latest`** は、並べ方。`list` に足せば、列 `column` の新しい順（付けていない `list` は、足した順）。`find` に足せば、条件に合う行のうち、いちばん新しい一行。
-- **`find`** は、一行に決まるものでなければならない（決まるかどうかの確かめ方は `docs/plugin-go-sqlite.md`「read の中身」）。
+- **`find`** は、一行に決まるものでなければならない（決まるかどうかの確かめ方は `docs/plugin-db.md`「read」）。
 - **`insert`** は宛先が `<状態>.post`、**`update`** は `<状態>.put`、**`delete`** は `<状態>.delete` の効果に付ける。`insert` と `update` の効果の引数は、表の model の行一つ。
 - **`conflict`** は、`insert` か `update` の効果に足す（`docs/decisions.md`「決めたこと」353）。その効果が、表の一意の制約（`@db.key` と `@db.unique`）に当たったら、名指しした例外を投げる（`@db.insert @db.conflict(EmailTaken) effect fn createUser(user: User): throws EmailTaken effects users.post;`）。例外は、効果ごとに一つで、その効果の `throws` にあり、引数を持たないもの。引数を持つ例外を投げる効果と、制約ごとに例外を分ける効果は、デコレータを付けずに、人が書く。
 - **`transaction`** は、op に付ける。その op が DB にすることが、一つのトランザクションで起きる。op のデコレータなので、op の中身は決めず、中身の前後に処理を足すだけ（継ぎ目。`docs/config.md`「継ぎ目」）。どこまでがトランザクションに入るかと、入れ子の扱いは、語彙を読むトランスパイラが決める（`docs/plugin-go-sqlite.md`「トランザクション」）。

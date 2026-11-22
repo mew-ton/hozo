@@ -1,5 +1,0 @@
-GOSQL-7	app.plainById	read app.plainById の reads の状態 app.plain が、名前空間 app の表の状態でない（@db.table が付いていない）
-GOSQL-7	app.plainRows	read app.plainRows の reads の状態 app.plain が、名前空間 app の表の状態でない（@db.table が付いていない）
-GOSQL-7	app.createPlain	効果 app.createPlain の宛先の状態 app.plain が、名前空間 app の表の状態でない（@db.table が付いていない）
-GOSQL-7	app.updatePlain	効果 app.updatePlain の宛先の状態 app.plain が、名前空間 app の表の状態でない（@db.table が付いていない）
-GOSQL-7	app.deletePlain	効果 app.deletePlain の宛先の状態 app.plain が、名前空間 app の表の状態でない（@db.table が付いていない）

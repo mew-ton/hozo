@@ -207,35 +207,17 @@ func TestOtherDir(t *testing.T) {
 }
 
 // diagnosticFixtures は、診断を返す入力（testdata/<名前>/）。期待する診断は testdata/<名前>/expected/errors.txt
-// （一行に、コード、位置、メッセージをタブで区切って。View の順、その中は返した順）。docs/plugin-go-sqlite.md「診断」の表の行ごとに一つ
-// （GOSQL-5、GOSQL-14、GOSQL-18、GOSQL-19、GOSQL-21、GOSQL-23 は欠番）。
+// （一行に、コード、位置、メッセージをタブで区切って。View の順、その中は返した順）。docs/plugin-go-sqlite.md「診断」の表の行ごとに一つ。
+// db の語彙の、言語にも保存先にも依らない検査（DB-*。前は、GOSQL の 19 個）の入力は、plugin/dbvocab/testdata に移した
+// （同「診断」の「欠番」）。
 var diagnosticFixtures = []struct{ name, code string }{
-	{"gosql1", codeSQLElement},      // @db.table の状態の要素の型が、model でない
-	{"gosql2", codeSQLShape},        // @db.table の状態の形が list でない
 	{"gosql3", codeSQLColumn},       // どのしまい方でも列にできない型のフィールドがある
 	{"gosql4", codeSQLCollision},    // 公開の名前が当たる（条件ごとに名前空間が一つ。当たらない名前空間には出ない）
 	{"gosql6", codeSQLOption},       // [emit.options.go-sqlite] に、知らないキーがある
-	{"gosql7", codeSQLTable},        // read の on の状態か、効果の宛先の状態が、N の表の状態でない
-	{"gosql8", codeSQLName},         // 列を名指しするものが、表の model のフィールドにない
-	{"gosql9", codeSQLParams},       // 引数が、デコレータの言うものと合わない
-	{"gosql10", codeSQLReturns},     // read の結果の型が、デコレータの言うものと合わない
-	{"gosql11", codeSQLTarget},      // 効果のデコレータが、効果の宛先と合わない
-	{"gosql12", codeSQLEffect},      // 一つの効果が、効果のデコレータを二つ以上持つ
-	{"gosql13", codeSQLUnique},      // @db.find の read が、一行に決まらない
-	{"gosql15", codeSQLUpdate},      // @db.update の表の model が、キーか、キーでない列を持たない
 	{"gosql16", codeSQLStorage},     // フィールドが、しまい方のデコレータを、ちょうど一つ持たない
 	{"gosql17", codeSQLFit},         // しまい方が、フィールドの型に合わない
-	{"gosql20", codeSQLRef},         // @db.ref の指す先が、一つに決まらない
-	{"gosql22", codeSQLBoth},        // 一つの read が、@db.find と @db.list の両方を持つ
-	{"gosql24", codeSQLNeither},     // @db.where か @db.latest の付いた read が、@db.find も @db.list も持たない
-	{"gosql25", codeSQLTwice},       // 一つの read の条件が、同じ列を二度名指ししている
-	{"gosql26", codeSQLLiteral},     // @db.where のリテラルが、列の型に渡せない
 	{"gosql27", codeSQLLatest},      // @db.latest の列のしまい方が、@db.datetime / @db.int / @db.float のどれでもない
-	{"gosql28", codeSQLDeleteAll},   // @db.delete の効果が、引数を一つも持たない
 	{"gosql29", codeSQLTransaction}, // op に @db.transaction が付いているのに、N に表の状態が一つもない
-	{"gosql30", codeSQLRow},         // @db.update の効果の行の遷移の、後のケースが、前のケースの並びにない
-	{"gosql31", codeSQLConflictOn},  // @db.conflict を付けた効果が、@db.insert も @db.update も持たない
-	{"gosql32", codeSQLConflictExc}, // @db.conflict の例外が、効果の throws にないか、引数を持つ
 	{"gosql33", codeSQLThrows},      // db のデコレータで中身を作る効果の throws に、@db.conflict が名指ししていない例外がある
 }
 
@@ -271,6 +253,42 @@ func TestDiagnosedOutputsOnly(t *testing.T) {
 			if ok := v.Viewer == clean; ok != (len(res.errors) == 0) || ok != (len(res.files) == 1) {
 				t.Errorf("%s の %s: files=%d errors=%d", fixture, v.Viewer, len(res.files), len(res.errors))
 			}
+		}
+	}
+}
+
+// TestUncheckedSpec は「診断」: db の語彙の、書いたものの整合の検査（DB-*。docs/plugin-db.md「診断」）は、語彙のプラグイン db が、
+// 先に断る。その検査を通っていない仕様（ここでは、表の状態の形を single に変えた View: DB-2。read の結果の型を変えた
+// View: DB-6）を受け取ったら、go-sqlite は、診断にせず、error で終わる
+// （hozoc からは proc.Crashed）。
+func TestUncheckedSpec(t *testing.T) {
+	for name, breakIt := range map[string]func(ns *ir.Namespace, _ *ir.Program) bool{
+		"DB-2": func(ns *ir.Namespace, _ *ir.Program) bool {
+			for _, d := range ns.Decls {
+				if st, ok := d.(*ir.State); ok && len(st.Decorators) > 0 {
+					st.Shape = ir.StateSingle
+					return true
+				}
+			}
+			return false
+		},
+		"DB-6": func(ns *ir.Namespace, _ *ir.Program) bool {
+			for _, d := range ns.Decls {
+				if r, ok := d.(*ir.Read); ok && len(r.Decorators) > 0 {
+					r.Returns = ir.String()
+					return true
+				}
+			}
+			return false
+		},
+	} {
+		view := ours(t, loadViews(t, "reads"))[0]
+		if !breakIt(view.Program.Namespace(view.Viewer), view.Program) {
+			t.Fatalf("%s: 入力 reads の名前空間 %s に、変えるものがない", name, view.Viewer)
+		}
+		resp, err := Emit(request(view))
+		if err == nil || !strings.Contains(err.Error(), name+"）") {
+			t.Errorf("%s: resp = %+v, err = %v, want %s を名指しした error", name, resp, err, name)
 		}
 	}
 }

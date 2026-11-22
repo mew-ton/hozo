@@ -1,0 +1,30 @@
+// DB-13（docs/plugin-db.md「read」）: @db.where か @db.latest の付いた read が、@db.find も @db.list も持たない。
+// 位置は read。
+
+namespace app {
+  model Row { @db.key @db.text id: string; @db.text note: string; @db.datetime at: datetime; }
+  @db.table state rows: list<Row>;
+
+  // @db.where だけ
+  @db.where("note", "x")
+  read fn notedRows(): Row[] reads rows;
+  // 二つの @db.where
+  @db.where("note", "x")
+  @db.where("id", "a")
+  read fn fixedRow(): Row? reads rows;
+  // @db.latest だけ
+  @db.latest("at")
+  read fn lastRow(): Row? reads rows;
+  // 両方
+  @db.where("note", "x")
+  @db.latest("at")
+  read fn lastNoted(): Row? reads rows;
+
+  // 通るもの
+  @db.list
+  @db.where("note", "x")
+  @db.latest("at")
+  read fn newestNoted(): Row[] reads rows;
+  /** デコレータを付けていない read は、人が書く */
+  read fn rowCount(): int reads rows;
+}

@@ -10,3 +10,5 @@ language = "go"
 requires = ["go"]
 # @db.transaction は継ぎ目: 基底が、付いた op を二層で出し、このトランスパイラが、その中身（DbSeams）を出す（同「トランザクション」）
 seams    = ["db.transaction"]
+# db の語彙の検査（DB-*）を通った仕様だけを、受け取る（同「マニフェスト」）
+requires_vocabulary = ["db"]

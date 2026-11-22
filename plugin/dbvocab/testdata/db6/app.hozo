@@ -1,0 +1,44 @@
+// DB-6（docs/plugin-db.md「read」）: read の結果の型が、デコレータの言うものと合わない: @db.find は M?、
+// @db.list は M[]（M は表の model）。位置は read。
+
+namespace app {
+  model Row { @db.key @db.text id: string; @db.text note: string; @db.datetime at: datetime; }
+  /** 形は同じでも、別の model */
+  model Other { @db.key @db.text id: string; @db.text note: string; @db.datetime at: datetime; }
+  @db.table state rows: list<Row>;
+  model RowsByNote { [note: string]: Row; }
+
+  // ---- @db.find は M? ----
+
+  @db.find
+  read fn sureRow(id: string): Row reads rows;
+  @db.find
+  read fn manyRows(id: string): Row[] reads rows;
+  @db.find
+  read fn otherRow(id: string): Other? reads rows;
+  @db.find
+  read fn noteOf(id: string): string? reads rows;
+  @db.find
+  @db.latest("at")
+  read fn lastNote(): string reads rows;
+
+  // ---- @db.list は M[] ----
+
+  @db.list
+  read fn oneRow(): Row? reads rows;
+  @db.list
+  read fn maybeRows(note: string): Row[]? reads rows;
+  @db.list
+  read fn otherRows(): Other[] reads rows;
+  @db.list
+  read fn rowCount(): int reads rows;
+  @db.list
+  read fn rowsByNote(): RowsByNote reads rows;
+
+  // ---- 通るもの ----
+
+  @db.find
+  read fn rowById(id: string): Row? reads rows;
+  @db.list
+  read fn allRows(): Row[] reads rows;
+}

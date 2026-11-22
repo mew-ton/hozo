@@ -1,2 +1,0 @@
-GOSQL-31	app.remove	効果 app.remove の @db.conflict は、@db.insert か @db.update と一緒に付ける（一意の制約に当たりうるのは、行を足す文と、書き換える文だけ）
-GOSQL-31	app.add	効果 app.add の @db.conflict は、@db.insert か @db.update と一緒に付ける（一意の制約に当たりうるのは、行を足す文と、書き換える文だけ）

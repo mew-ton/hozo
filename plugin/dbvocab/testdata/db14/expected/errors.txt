@@ -1,0 +1,3 @@
+DB-14	app.rowsNoted	read app.rowsNoted の条件が、列 "note" を二度名指ししている（一つの列に書ける条件は、引数か @db.where の、どちらか一つ）
+DB-14	app.topRows	read app.topRows の条件が、列 "rank" を二度名指ししている（一つの列に書ける条件は、引数か @db.where の、どちらか一つ）
+DB-14	app.fixedRow	read app.fixedRow の条件が、列 "id" を二度名指ししている（一つの列に書ける条件は、引数か @db.where の、どちらか一つ）

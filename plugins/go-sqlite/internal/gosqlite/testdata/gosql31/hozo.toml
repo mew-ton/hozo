@@ -1,8 +1,0 @@
-[options.go]
-module = "example.com/app"
-
-# plugins/go-sqlite の単体テストの入力（docs/testing.md「単体テスト」）: GOSQL-31（@db.conflict を付けた効果が、@db.insert も @db.update も持たない）。
-[[emit]]
-namespace   = "app"
-transpilers = ["go", "go-sqlite"]
-out         = "gen/app"

@@ -1,4 +1,0 @@
-GOSQL-24	app.notedRows	read app.notedRows に @db.where が付いているが、@db.find も @db.list も付いていない（条件と並べ方は、引くものを言うデコレータに足す）
-GOSQL-24	app.fixedRow	read app.fixedRow に @db.where が付いているが、@db.find も @db.list も付いていない（条件と並べ方は、引くものを言うデコレータに足す）
-GOSQL-24	app.lastRow	read app.lastRow に @db.latest が付いているが、@db.find も @db.list も付いていない（条件と並べ方は、引くものを言うデコレータに足す）
-GOSQL-24	app.lastNoted	read app.lastNoted に @db.where、@db.latest が付いているが、@db.find も @db.list も付いていない（条件と並べ方は、引くものを言うデコレータに足す）

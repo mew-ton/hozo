@@ -17,6 +17,7 @@ plugin/golang/         Go の基底の形の規則: 置き場、名前、型、o
 plugin/govalid/        go-valid の形の規則: どの型が Validate を持つか（公開）
 plugin/httpvocab/      語彙 http の、言語に依らない読み解き: 経路、通信に出る union、使い方の検査（公開）
 plugin/validvocab/     語彙 valid の、言語に依らない読み解き: 制約、使い方の検査、値一つが制約に合うか（公開）
+plugin/dbvocab/        語彙 db の、言語にも保存先にも依らない読み解き: 表の状態、列、read と効果、使い方の検査（公開）
 runtime/               生成した Go のコードが import する型（公開）
 vocab/                 標準の語彙の .hozo と、それを embed する公開パッケージ vocab（go:embed はパッケージのディレクトリの外を参照できないため）
 internal/source/       ファイルと位置
@@ -43,6 +44,7 @@ plugins/go-sqlite/     go-sqlite プラグイン（main。中身は internal/gos
 plugins/go-http/       go-http プラグイン（main。中身は internal/gohttp/）
 plugins/http/          語彙のプラグイン http（main。中身は、公開のライブラリ plugin/httpvocab）
 plugins/valid/         語彙のプラグイン valid（main。中身は、公開のライブラリ plugin/validvocab）
+plugins/db/            語彙のプラグイン db（main。中身は、公開のライブラリ plugin/dbvocab）
 plugins/go-cli/        go-cli プラグイン（main。中身は internal/gocli/）と、その語彙 cli.hozo
 plugins/go-design/     go-design プラグイン（main。中身は internal/godesign/）
 schema/                IR の JSON スキーマ（go generate の置き場のパッケージ schema）
@@ -96,6 +98,7 @@ Go のパッケージごとの、このモジュールの中で import してい
 | `plugin/govalid` | `ir`、`plugin/validvocab` |
 | `plugin/httpvocab` | `ir`、`plugin`、`plugin/validvocab` |
 | `plugin/validvocab` | `ir`、`plugin`、`runtime` |
+| `plugin/dbvocab` | `ir`、`plugin` |
 | `runtime` | — |
 | `vocab` | — |
 | `plugins/go` | `plugin`、`plugins/go/internal/gobase` |
@@ -103,11 +106,12 @@ Go のパッケージごとの、このモジュールの中で import してい
 | `plugins/go-valid` | `plugin`、`plugins/go-valid/internal/govalid` |
 | `plugins/go-valid/internal/govalid` | `ir`、`plugin`、`plugin/golang`、`plugin/govalid`、`plugin/validvocab` |
 | `plugins/go-sqlite` | `plugin`、`plugins/go-sqlite/internal/gosqlite` |
-| `plugins/go-sqlite/internal/gosqlite` | `ir`、`plugin`、`plugin/golang` |
+| `plugins/go-sqlite/internal/gosqlite` | `ir`、`plugin`、`plugin/dbvocab`、`plugin/golang` |
 | `plugins/go-http` | `plugin`、`plugins/go-http/internal/gohttp` |
 | `plugins/go-http/internal/gohttp` | `ir`、`plugin`、`plugin/golang`、`plugin/govalid`、`plugin/httpvocab` |
 | `plugins/http` | `plugin`、`plugin/httpvocab` |
 | `plugins/valid` | `plugin`、`plugin/validvocab` |
+| `plugins/db` | `plugin`、`plugin/dbvocab` |
 | `plugins/go-cli` | `plugin`、`plugins/go-cli/internal/gocli` |
 | `plugins/go-cli/internal/gocli` | `ir`、`plugin`、`plugin/golang`、`plugin/govalid`、`plugin/validvocab` |
 | `plugins/go-design` | `plugin`、`plugins/go-design/internal/godesign` |
@@ -118,8 +122,8 @@ Go のパッケージごとの、このモジュールの中で import してい
 | `tests` | — |
 
 - `internal/` は `cmd/hozoc` と `internal/` の中からだけ使う。例外は、リポジトリをまたぐテストのパッケージ `tests` だけ（テストのファイルから `internal/app`、`internal/project` などを import する。`tests` にテストでないファイルはない）。
-- プラグインが使えるのは `ir`、`plugin`、`plugin/golang`、`plugin/govalid`、`plugin/httpvocab`、`plugin/validvocab`、`runtime`（と、自分のディレクトリの下のパッケージ）。テスト用のプラグインも同じ。別のプラグインのパッケージは import しない: 相乗りが基底やほかの相乗りの形を知るのは、公開の SDK（`plugin/golang`、`plugin/govalid`）を通してだけ（`docs/plugin-protocol.md`「相乗りが基底の形を知る方法」）。
-- 公開のパッケージ（`ir`、`plugin`、`plugin/golang`、`plugin/govalid`、`plugin/httpvocab`、`plugin/validvocab`、`runtime`、`vocab`）は `internal/` に依存しない。
+- プラグインが使えるのは `ir`、`plugin`、`plugin/golang`、`plugin/govalid`、`plugin/httpvocab`、`plugin/validvocab`、`plugin/dbvocab`、`runtime`（と、自分のディレクトリの下のパッケージ）。テスト用のプラグインも同じ。別のプラグインのパッケージは import しない: 相乗りが基底やほかの相乗りの形を知るのは、公開の SDK（`plugin/golang`、`plugin/govalid`）を通してだけ（`docs/plugin-protocol.md`「相乗りが基底の形を知る方法」）。
+- 公開のパッケージ（`ir`、`plugin`、`plugin/golang`、`plugin/govalid`、`plugin/httpvocab`、`plugin/validvocab`、`plugin/dbvocab`、`runtime`、`vocab`）は `internal/` に依存しない。
 - **hozoc 本体（`cmd/hozoc` と `internal/` のパッケージ。生成物 `internal/gen/` を除く）は、特定の言語の出力のコードを持たない。** `plugin/golang`、`plugin/govalid`、`plugins/` を import しない（言語を知るのはプラグインだけ。`docs/plugin-protocol.md`「この文書が決めること」）。語彙ごとの決まりも、持たない: `plugin/httpvocab`、`plugin/validvocab` を import しない（語彙の決まりを知るのは、語彙のプラグインと、その語彙を出すトランスパイラだけ。同「語彙のプラグイン」）。`runtime` を import するのは、生成物だけ。
 - 解析（`internal/project`）は、プラグインの `emit` を起動しない。応答のファイルを集めて書き出すのは `internal/app`。言語サーバーは `internal/project` までで、プラグインの起動（`emit`）を行わない。
 - `internal/sema` は設定（`internal/config`）に依存しない。設定に関わる検査は `internal/config`、`internal/check`、`internal/project` が行う（「`internal/config`」）。
@@ -450,6 +454,43 @@ func CheckLiteral(p *ir.Program, field *ir.Field, lit ir.Literal) []Mismatch   /
 - 制約を出すトランスパイラは、`Scalar` と `Field` で、自分の出力の型の制約を読む。誤り（`Problem`）が返れば、語彙のプラグインの検査を通っていない仕様で、トランスパイラは、診断にせず、異常終了する（`docs/plugin-go-valid.md`「診断」）。
 - `CheckLiteral` は、値一つを制約で確かめる、ただ一つの写し（`docs/plugin-valid.md`「値一つを確かめる」）。境界のデコレータが補う値（`@http.default`、`@cli.default`）を、`http` の HTTP-15 と、`go-cli` の CLI-14 が、これで確かめる。リテラルがフィールドの型に渡せることは、呼ぶ側が先に確かめる（HTTP-14、CLI-13）。`format` は `runtime.CheckFormat` を、そのまま呼ぶ（`runtime` に依存するのは、このため）。
 
+### `plugin/dbvocab`（公開）
+
+`docs/plugin-db.md`「対象」「表」「キーと参照」「read」「効果」「列と引数の型」「診断」の写し: 標準の語彙 `db` の、言語にも保存先にも依らない読み解き。語彙のプラグイン `db`（`plugins/db`）と、`db` の語彙を出すプラグイン（`go-sqlite`）が共有する（`docs/decisions.md`「決めたこと」428）。読むのは `ir.Program` だけで、単位にも、言語にも、保存先にも、依らない。
+
+```go
+const Namespace = "db"                                 // この語彙の名前空間
+const Table, Text, Int, Float, Bool, Datetime, Date, Time, JSON, Key, Unique, Ref,
+      Find, List, Where, Latest, Insert, Update, Delete, Conflict, Transaction   // 語彙のデコレータの FQN
+func Check(p *ir.Program) []plugin.Diagnostic          // すべての名前空間を読み解いた診断（DB-*）。同じ診断は、一度だけ
+func ReadNamespace(p *ir.Program, name string) *Reading // 名前空間一つの読み解き
+type Reading struct {                                  // 名前空間 N の読み解き
+	Name    string                                     // N の名前
+	Marked  int                                        // @db.table の付いた N の状態の数（表にならなかったものを含む）
+	Tables  []*TableState                              // 表の状態（宣言順）
+	Models  []*Model                                   // 表の model（表の状態の順。同じ model は一度）
+	Reads   map[string]*ReadDecl                       // FQN → @db.find か @db.list を付けた read
+	Effects map[string]*EffectDecl                     // FQN → 効果のデコレータを、ちょうど一つ付けた効果
+	Errors  []plugin.Diagnostic                        // N の診断（DB-*）
+}
+func (r *Reading) TableOf(state string) *TableState    // FQN が state の、表の状態。なければ nil
+func (r *Reading) ModelOf(model string) *Model         // FQN が model の、表の model。なければ nil
+type TableState struct { State *ir.State; Name string; Model *Model }           // 表の状態一つ。Name は、表の名前（状態の名前）
+type Model struct { Decl *ir.Model; Columns []*Column }                         // 表の model 一つ。Columns は、Decl.Fields と同じ順
+func (m *Model) Keys() []*Column                       // @db.key の付いた列
+func (m *Model) Column(name string) *Column            // 名前が name の列。なければ nil
+type Column struct { Name string; Type ir.Type; Nullable, Key, Unique bool; Ref, RefTable, RefColumn string }   // 列一つ。しまい方は、持たない
+type Condition struct { Column *Column; Param *ir.OpParam; Literal ir.Literal } // 条件一つ: 列が、引数か、@db.where のリテラルと同じ
+type ReadDecl struct { Decl *ir.Read; Apps []ir.Application; Kind string; Table *TableState; Conds []Condition; Latest *Column; OK bool }
+type EffectDecl struct { Decl *ir.Effect; Kind string; Table *TableState; Conds []Condition; Conflict string; OK bool }
+func ClassOf(p *ir.Program, t ir.Type) string          // 型の種類: 核の型の名前（scalar は元の核の型）、"array"、"model"。どれでもなければ ""
+func LiteralText(lit ir.Literal) string                // リテラルの、仕様での書き方
+```
+
+- `db` の語彙を出すトランスパイラは、`ReadNamespace` で、自分の出力の名前空間を読む。`Errors` が空でなければ、語彙のプラグインの検査を通っていない仕様で、トランスパイラは、診断にせず、異常終了する（`docs/plugin-go-sqlite.md`「診断」）。
+- **しまい方のデコレータは、読まない**（`docs/plugin-db.md`「しまい方」）。トランスパイラは、`Model.Decl.Fields` の、列と同じ位置のフィールドから、自分で読む。
+- `OK` は、その宣言に、食い違い（DB-*）がないこと。デコレータの言うことが決まらない宣言（DB-8、DB-12、DB-13、DB-18）は、`Reads` と `Effects` に入らない。
+
 ### `plugin/govalid`（公開）
 
 `docs/plugin-go-valid.md`「Validate を持つ型」の規則の写し。`go-valid` と、`Validate` を呼ぶ相乗り（`go-http`、`go-cli`）が共有する。どのデコレータが `@valid.*` かは、`plugin/validvocab` の `Applied`。
@@ -696,10 +737,11 @@ Go のプラグインは、どれも同じ形: `main` パッケージが `plugin
 |---|---|---|
 | `plugins/go` | `docs/plugin-go.md` | `internal/gobase`: 形は `plugin/golang` で求め、ファイルのテキストを作る。GO-* |
 | `plugins/go-valid` | `docs/plugin-go-valid.md` | `internal/govalid`: `validate.go`。GOVALID-* |
-| `plugins/go-sqlite` | `docs/plugin-go-sqlite.md` | `internal/gosqlite`: `db.go`。GOSQL-* |
+| `plugins/go-sqlite` | `docs/plugin-go-sqlite.md` | `internal/gosqlite`: `db.go`。表、列、`read` と効果は、`plugin/dbvocab` の `ReadNamespace` で読む。GOSQL-* |
 | `plugins/go-http` | `docs/plugin-go-http.md` | `internal/gohttp`: 入口のパッケージの `http.go` と、テストのパッケージの `http.go`。GOHTTP-* |
 | `plugins/http` | `docs/plugin-http.md` | 語彙のプラグイン: `main` が `plugin.Main(plugin.ReadOnly(…))` を呼び、`plugin/httpvocab` の `Check` の診断を返す。HTTP-* |
 | `plugins/valid` | `docs/plugin-valid.md` | 語彙のプラグイン: 同じ形で、`plugin/validvocab` の `Check` の診断を返す。VALID-* |
+| `plugins/db` | `docs/plugin-db.md` | 語彙のプラグイン: 同じ形で、`plugin/dbvocab` の `Check` の診断を返す。DB-* |
 | `plugins/go-cli` | `docs/plugin-go-cli.md` | `internal/gocli`: `cli/cli.go`。CLI-* |
 | `plugins/go-design` | `docs/plugin-go-design.md` | `internal/godesign`: テストのパッケージの `design.go`。GODESIGN-* |
 

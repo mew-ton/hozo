@@ -7,56 +7,31 @@ import (
 
 	"github.com/mew-ton/hozo/ir"
 	"github.com/mew-ton/hozo/plugin"
+	"github.com/mew-ton/hozo/plugin/dbvocab"
 	"github.com/mew-ton/hozo/plugin/golang"
 )
 
-// 診断のコード（docs/plugin-go-sqlite.md「診断」）。欠番（GOSQL-5、GOSQL-14、GOSQL-18、GOSQL-19、GOSQL-21、GOSQL-23）は、
-// 別の意味に使い回さない。
+// 診断のコード（docs/plugin-go-sqlite.md「診断」）。欠番（語彙のプラグイン db に移した 19 個と、GOSQL-5、GOSQL-14、GOSQL-18、GOSQL-19、
+// GOSQL-21、GOSQL-23）は、使い回さない。
 const (
-	codeSQLElement     = "GOSQL-1"  // @db.table の状態の要素の型が、model でない
-	codeSQLShape       = "GOSQL-2"  // @db.table の状態の形が list でない
 	codeSQLColumn      = "GOSQL-3"  // どのしまい方でも列にできない型のフィールドがある
 	codeSQLCollision   = "GOSQL-4"  // 公開の名前が当たる
 	codeSQLOption      = "GOSQL-6"  // [emit.options.go-sqlite] に知らないキーがある
-	codeSQLTable       = "GOSQL-7"  // read の reads の状態か、効果の宛先の状態が、N の表の状態でない
-	codeSQLName        = "GOSQL-8"  // 列を名指しするものが、表の model のフィールドにない
-	codeSQLParams      = "GOSQL-9"  // 引数が、デコレータの言うものと合わない
-	codeSQLReturns     = "GOSQL-10" // read の結果の型が、デコレータの言うものと合わない
-	codeSQLTarget      = "GOSQL-11" // 効果のデコレータが、効果の宛先と合わない
-	codeSQLEffect      = "GOSQL-12" // 一つの効果が、効果のデコレータを二つ以上持つ
-	codeSQLUnique      = "GOSQL-13" // @db.find の read が、一行に決まらない
-	codeSQLUpdate      = "GOSQL-15" // @db.update の表の model が、キーか、キーでない列を持たない
 	codeSQLStorage     = "GOSQL-16" // フィールドが、しまい方のデコレータを、ちょうど一つ持たない
 	codeSQLFit         = "GOSQL-17" // しまい方が、フィールドの型に合わない
-	codeSQLRef         = "GOSQL-20" // @db.ref の指す先が、一つに決まらない
-	codeSQLBoth        = "GOSQL-22" // 一つの read が、@db.find と @db.list の両方を持つ
-	codeSQLNeither     = "GOSQL-24" // @db.where か @db.latest の付いた read が、@db.find も @db.list も持たない
-	codeSQLTwice       = "GOSQL-25" // 一つの read の条件が、同じ列を二度名指ししている
-	codeSQLLiteral     = "GOSQL-26" // @db.where のリテラルが、列の型に渡せない
 	codeSQLLatest      = "GOSQL-27" // @db.latest の列のしまい方が、@db.datetime / @db.date / @db.time / @db.int / @db.float のどれでもない
-	codeSQLDeleteAll   = "GOSQL-28" // @db.delete の効果が、引数を一つも持たない
 	codeSQLTransaction = "GOSQL-29" // op に @db.transaction が付いているのに、N に表の状態が一つもない
-	codeSQLRow         = "GOSQL-30" // @db.update の効果の行の遷移の、後のケースが、前のケースの並びにない
-	codeSQLConflictOn  = "GOSQL-31" // @db.conflict を付けた効果が、@db.insert も @db.update も持たない
-	codeSQLConflictExc = "GOSQL-32" // @db.conflict の例外が、効果の throws にないか、引数を持つ
 	codeSQLThrows      = "GOSQL-33" // db のデコレータで中身を作る効果の throws に、@db.conflict が名指ししていない例外がある
 )
 
-// 読む語彙（docs/vocab.md「`db` の語彙」）のデコレータの FQN。しまい方のデコレータは storages（tables.go）。
+// 出力で名指しする、db の語彙のデコレータの FQN（語彙の持ち主は plugin/dbvocab）。
 const (
-	decoratorTable       = "db.table"
-	decoratorKey         = "db.key"
-	decoratorUnique      = "db.unique"
-	decoratorRef         = "db.ref"
-	decoratorFind        = "db.find"
-	decoratorList        = "db.list"
-	decoratorWhere       = "db.where"
-	decoratorLatest      = "db.latest"
-	decoratorInsert      = "db.insert"
-	decoratorUpdate      = "db.update"
-	decoratorDelete      = "db.delete"
-	decoratorConflict    = "db.conflict"
-	decoratorTransaction = "db.transaction"
+	decoratorFind        = dbvocab.Find
+	decoratorInsert      = dbvocab.Insert
+	decoratorUpdate      = dbvocab.Update
+	decoratorDelete      = dbvocab.Delete
+	decoratorConflict    = dbvocab.Conflict
+	decoratorTransaction = dbvocab.Transaction
 )
 
 // Emit は、要求の View の出力 (U, N) の db.go を作る（docs/plugin-go-sqlite.md）。読むのは、要求だけ（ファイルも、環境変数も、読まない）。
@@ -84,7 +59,12 @@ func Emit(req *plugin.EmitRequest) (*plugin.EmitResponse, error) {
 		e.errorf(codeSQLOption, "", "%d 番目の [[emit]] の [emit.options.go-sqlite] に、知らないキー %s がある（go-sqlite にオプションはない）", view.Config.Index, key)
 	}
 
-	// 書いたものの整合の検査（GOSQL-1〜GOSQL-3、GOSQL-7〜GOSQL-29）。食い違っていれば、黙って何かを出すことも、出さないこともしない
+	// db の語彙の、書いたものの整合の検査（DB-*。docs/plugin-db.md「診断」）は、語彙のプラグイン db が、先に断る。その検査を
+	// 通っていない仕様を受け取ったら、診断にせず、誤りで終わる（docs/plugin-go-sqlite.md「診断」）
+	e.vocab = dbvocab.ReadNamespace(e.p, view.Viewer)
+	if errs := e.vocab.Errors; len(errs) > 0 {
+		return nil, fmt.Errorf("emit: db の語彙の検査（%s）を通っていない仕様を受け取った: %s", errs[0].Code, errs[0].Message)
+	}
 	marked := e.collectTables()
 	e.collectReads()
 	e.collectEffects()
@@ -134,9 +114,10 @@ type emitter struct {
 
 	declNS map[string]string // 宣言の FQN → 宣言した名前空間
 
+	vocab *dbvocab.Reading // N の、db の語彙の読み解き（表の状態、表の model、read と効果）
+
 	tables  []*table          // 表の状態（宣言順）
 	byState map[string]*table // 表の状態の FQN → tables の要素
-	marked  map[string]bool   // @db.table の付いた N の状態（診断を返して、表にならなかったものを含む）
 	models  []*model          // 表の model（表の状態の順。同じ model は一度）
 	byModel map[string]*model // model の FQN → models の要素
 
@@ -168,7 +149,7 @@ func (e *emitter) prepare() {
 			}
 		}
 	}
-	e.byState, e.marked, e.byModel = map[string]*table{}, map[string]bool{}, map[string]*model{}
+	e.byState, e.byModel = map[string]*table{}, map[string]*model{}
 	e.reads, e.effects = map[string]*read{}, map[string]*effect{}
 }
 
@@ -197,21 +178,6 @@ func short(fqn string) string {
 // typeName は宣言 fqn の Go の型の名前（修飾なし）。
 func (e *emitter) typeName(fqn string) string { return golang.TypeName(fqn, e.declNS[fqn]) }
 
-// applications は、適用の並び apps のうち、デコレータ（汎用デコレータの FQN。名前付きデコレータは展開済み）が names のどれかであるもの。
-// 書かれた順。
-func applications(apps []ir.Application, names ...string) []ir.Application {
-	var out []ir.Application
-	for _, a := range apps {
-		for _, n := range names {
-			if a.Decorator == n {
-				out = append(out, a)
-				break
-			}
-		}
-	}
-	return out
-}
-
 // decoratorNames は、適用の並び apps のデコレータの名前を、`@db.find、@db.list` の形でつないだもの。
 func decoratorNames(apps []ir.Application) string {
 	out := ""
@@ -222,49 +188,4 @@ func decoratorNames(apps []ir.Application) string {
 		out += "@" + a.Decorator
 	}
 	return out
-}
-
-// refArg は、適用 a の引数 param に渡した宣言の FQN。渡していないか、宣言への参照でなければ ""。
-func refArg(a ir.Application, param string) string {
-	for _, arg := range a.Args {
-		if r, ok := arg.Value.(ir.RefValue); ok && arg.Param == param {
-			return r.Target
-		}
-	}
-	return ""
-}
-
-// refsArg は、適用 a の引数 param に渡した宣言の FQN の並び（any exception と any effect の引数は、ユニオンを展開した並びで
-// 渡ることがある）。渡していなければ nil。
-func refsArg(a ir.Application, param string) []string {
-	for _, arg := range a.Args {
-		if arg.Param != param {
-			continue
-		}
-		switch v := arg.Value.(type) {
-		case ir.RefValue:
-			return []string{v.Target}
-		case ir.RefsValue:
-			return v.Targets
-		}
-	}
-	return nil
-}
-
-// literalArg は、適用 a の引数 param に渡したリテラル。渡していないか、リテラルでなければ nil。
-func literalArg(a ir.Application, param string) ir.Literal {
-	for _, arg := range a.Args {
-		if l, ok := arg.Value.(ir.LiteralValue); ok && arg.Param == param {
-			return l.Literal
-		}
-	}
-	return nil
-}
-
-// stringArg は、適用 a の引数 param に渡した文字列。渡していないか、文字列でなければ ""。
-func stringArg(a ir.Application, param string) string {
-	if s, ok := literalArg(a, param).(ir.StringLiteral); ok {
-		return s.Value
-	}
-	return ""
 }

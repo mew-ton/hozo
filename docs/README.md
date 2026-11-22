@@ -26,6 +26,7 @@ Hozo の言語と、その実装（このリポジトリ）の設計。言語の
 | [`plugin-go.md`](plugin-go.md) | Go の基底のトランスパイラ `go`: 語彙によらずに決まる Go の出力のすべて（置き場、名前、型、op の形、実装を受け取る口、配線の本体、継ぎ目） | `plugins/go`、`plugin/golang`、`runtime` |
 | [`plugin-valid.md`](plugin-valid.md) | 語彙のプラグイン `valid`: `valid` の語彙の、言語に依らない決まり（制約が、何に付けられ、どの値を通すか、使い方の検査 VALID-*） | `plugins/valid`、`plugin/validvocab` |
 | [`plugin-go-valid.md`](plugin-go-valid.md) | `valid` の制約を確かめる関数を出す相乗り `go-valid` | `plugins/go-valid`、`plugin/govalid`、`runtime` |
+| [`plugin-db.md`](plugin-db.md) | 語彙のプラグイン `db`: `db` の語彙の、言語にも保存先にも依らない決まり（どの状態が表か、`read` と効果のデコレータが、宣言の何と合うか、使い方の検査 DB-*） | `plugins/db`、`plugin/dbvocab` |
 | [`plugin-go-sqlite.md`](plugin-go-sqlite.md) | `db` の状態を SQLite の表と読み書きにする相乗り `go-sqlite` | `plugins/go-sqlite` |
 | [`plugin-http.md`](plugin-http.md) | 語彙のプラグイン `http`: `http` の語彙の、言語に依らない決まり（経路、HTTP の通信の上の形、使い方の検査 HTTP-*） | `plugins/http`、`plugin/httpvocab` |
 | [`plugin-go-http.md`](plugin-go-http.md) | `http` の op を `net/http` のハンドラにする相乗り `go-http` | `plugins/go-http` |
@@ -92,7 +93,8 @@ Hozo の言語と、その実装（このリポジトリ）の設計。言語の
 | 要求（システムが、守らなければならないこと。約束と、同じもの。278 より前の文書は、「約束」と書いている） | `ide-chain.md`「要求の文書」「要求トレーサビリティマトリクス」 |
 | 出力を推論しない（プラグインの原則: op のデコレータは包むだけで、出すコードは型に依らない。op 以外は、宣言の全体から作る） | `requirements.md`「出力を推論しない」 |
 | op の中身に立ち入らない（基底の原則: op の中身に何が要るかを判定せず、言語の作法で関数に付くものを、どの関数にも同じ形で与える） | `requirements.md`「op の中身に立ち入らない」 |
-| 表の状態、表の model、しまい方 | `plugin-go-sqlite.md`「出力」「表」「しまい方」（語彙は `vocab.md`「`db` の表と、しまい方」） |
+| 表の状態、表の model | `plugin-db.md`「対象」「表」（語彙は `vocab.md`「`db` の表と、しまい方」） |
+| しまい方 | `plugin-go-sqlite.md`「しまい方」（語彙は `vocab.md`「`db` の表と、しまい方」） |
 | 項目の形、全体の形（要求のどこから読むか） | `plugin-http.md`「対象」（語彙は `vocab.md`「`http` の語彙」） |
 | 形の語、状態の型 | `types.md`「形の書き方」 |
 | 継承した model、元の model、継承している | `types.md`「継承した model」 |

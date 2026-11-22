@@ -1,0 +1,8 @@
+# 語彙のプラグイン db（docs/plugin-db.md「マニフェスト」）: 標準の語彙 db の、言語にも保存先にも依らない決まりを確かめる。
+# トランスパイラも、語彙の宣言も、持たない（宣言は、hozoc に同梱の vocab/db.hozo）
+name     = "db"
+wasm     = "plugin.wasm"
+protocol = "0.23"
+
+[read]
+namespaces = ["db"]

@@ -579,7 +579,7 @@
               },
               "end": {
                 "line": 32,
-                "col": 50
+                "col": 82
               }
             },
             "fields": [
@@ -618,6 +618,44 @@
                   "end": {
                     "line": 32,
                     "col": 48
+                  }
+                }
+              },
+              {
+                "name": "revoked",
+                "type": {
+                  "kind": "core",
+                  "name": "boolean"
+                },
+                "decorators": [],
+                "span": {
+                  "file": "api.hozo",
+                  "start": {
+                    "line": 32,
+                    "col": 49
+                  },
+                  "end": {
+                    "line": 32,
+                    "col": 66
+                  }
+                }
+              },
+              {
+                "name": "kind",
+                "type": {
+                  "kind": "core",
+                  "name": "string"
+                },
+                "decorators": [],
+                "span": {
+                  "file": "api.hozo",
+                  "start": {
+                    "line": 32,
+                    "col": 67
+                  },
+                  "end": {
+                    "line": 32,
+                    "col": 80
                   }
                 }
               }

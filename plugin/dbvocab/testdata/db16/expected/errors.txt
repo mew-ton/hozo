@@ -1,0 +1,2 @@
+DB-16	app.clearRows	効果 app.clearRows（@db.delete）が、引数を一つも持たない（すべての行を消す形は、まだ決めていない。消す行を、引数の名前の列で選ぶ）
+DB-16	app.clearLogs	効果 app.clearLogs（@db.delete）が、引数を一つも持たない（すべての行を消す形は、まだ決めていない。消す行を、引数の名前の列で選ぶ）

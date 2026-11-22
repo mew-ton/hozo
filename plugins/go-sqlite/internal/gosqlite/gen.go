@@ -9,6 +9,7 @@ import (
 
 	"github.com/mew-ton/hozo/ir"
 	"github.com/mew-ton/hozo/plugin"
+	"github.com/mew-ton/hozo/plugin/dbvocab"
 	"github.com/mew-ton/hozo/plugin/golang"
 )
 
@@ -273,7 +274,7 @@ func (f *fileGen) where(conds []condition, local func(ir.OpParam) string) (sql, 
 			texts = append(texts, quote(c.column.name)+" が引数 "+c.param.Name+" と同じ")
 		} else {
 			args += ", " + f.col(c.column, goLiteral(c.literal, c.column))
-			texts = append(texts, quote(c.column.name)+" が "+literalText(c.literal)+" と同じ")
+			texts = append(texts, quote(c.column.name)+" が "+dbvocab.LiteralText(c.literal)+" と同じ")
 		}
 	}
 	if len(clauses) > 0 {

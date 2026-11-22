@@ -1,5 +1,0 @@
-GOSQL-20	app.Link	model app.Link のフィールド loose の @db.ref(app.Loose) の指す先が決まらない: 名前空間 app に、要素の型が app.Loose の @db.table の状態がない
-GOSQL-20	app.Link	model app.Link のフィールド twin の @db.ref(app.Twin) の指す先が決まらない: 名前空間 app に、要素の型が app.Twin の @db.table の状態が 2 個ある
-GOSQL-20	app.Link	model app.Link のフィールド pair の @db.ref(app.Pair) の指す先が決まらない: model app.Pair の @db.key が 2 個（ちょうど一つ要る）
-GOSQL-20	app.Link	model app.Link のフィールド log の @db.ref(app.Log) の指す先が決まらない: model app.Log の @db.key が 0 個（ちょうど一つ要る）
-GOSQL-20	app.Link	model app.Link のフィールド far の @db.ref(far.Row) の指す先が決まらない: 名前空間 app に、要素の型が far.Row の @db.table の状態がない
