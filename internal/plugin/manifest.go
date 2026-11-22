@@ -1,5 +1,5 @@
 // Package plugin はプラグインのホスト側（docs/plugin-protocol.md）。マニフェスト hozo-plugin.toml の読み込み、
-// 探索（「探索」）、起動と JSON のやり取り（「起動」）。プラグインの側の SDK は plugin（Go）と sdk/ts。
+// 探索（「探索」）、起動と JSON のやり取り（「起動」）。プラグインの側の SDK は plugin（Go）。
 package plugin
 
 import (

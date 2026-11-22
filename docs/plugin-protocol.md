@@ -2,7 +2,7 @@
 
 ## この文書が決めること
 
-プラグインのマニフェスト、探し方、起動、標準入出力の JSON の形（出どころは設計書 §4.6）。hozoc 側は `internal/plugin`、プラグイン側の SDK は `plugin`（Go）と `sdk/ts/`（`docs/packages.md`）。この形にした決定（要求の `ir` を `view` にし、`protocol` を足したこと、マニフェストの追加項目、プラグインとトランスパイラを分けたこと、基底と相乗りに分けたこと）の一覧は `docs/decisions.md`「決めたこと」。
+プラグインのマニフェスト、探し方、起動、標準入出力の JSON の形（出どころは設計書 §4.6）。hozoc 側は `internal/plugin`、プラグイン側の SDK は `plugin`（Go。`docs/packages.md`）。この形にした決定（要求の `ir` を `view` にし、`protocol` を足したこと、マニフェストの追加項目、プラグインとトランスパイラを分けたこと、基底と相乗りに分けたこと）の一覧は `docs/decisions.md`「決めたこと」。
 
 **プラグイン**は入れるもの。マニフェストと実行ファイルと、あれば語彙を一つのディレクトリに持つ。**トランスパイラ**は、プラグインが提供する名前の付いた変換で、`hozo.toml` の単位が `transpilers` に名前を書いて選ぶ（`docs/config.md`「単位」）。二つの言葉の定義の持ち主はこの段落で、ほかの文書も同じ意味で使う: 起動される実行ファイルと、マニフェスト、語彙、`check` の話は「プラグイン」、設定が選ぶもの、ファイルを出すもの、実装を出すものの話は「トランスパイラ」。
 
@@ -273,4 +273,4 @@ enabled = false                 # true なら hozoc tests で direction "coverag
 
 ## SDK
 
-Go は `plugin` パッケージ、TS は `sdk/ts/`。形は `docs/packages.md`「`plugin`（公開）」。
+Go の `plugin` パッケージ。形は `docs/packages.md`「`plugin`（公開）」。TS の SDK は、外した（`docs/decisions.md`「決めたこと」415）。

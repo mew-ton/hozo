@@ -39,7 +39,6 @@ plugins/go-sqlite/     go-sqlite プラグイン（main。中身は internal/gos
 plugins/go-http/       go-http プラグイン（main。中身は internal/gohttp/）
 plugins/go-cli/        go-cli プラグイン（main。中身は internal/gocli/）と、その語彙 cli.hozo
 plugins/go-design/     go-design プラグイン（main。中身は internal/godesign/）
-sdk/ts/                TS 向けプラグイン SDK
 schema/                IR の JSON スキーマ（go generate の置き場のパッケージ schema）
 editors/vscode/        VS Code 拡張（syntaxes/ は TextMate の文法と、go generate の置き場のパッケージ syntaxes）
 tests/                 リポジトリをまたぐテスト（パッケージ tests。テストのファイルだけ）
@@ -140,7 +139,7 @@ func NamedEffects(fqns ...string) []EffectRef      // effect の宣言の FQN �
 
 `ReadRef` と `EffectRef`（`docs/ir.md`「op」）は、具体型が値型（`NamedRead`、`DirectRead`、`NamedEffect`、`DirectEffect`）の interface で、`==` で比べられ、写像のキーにできる。`Callee`（同「配線」）も同じ形で、具体型は `OpCallee`、`ReadCallee`、`EffectCallee`。`String()` は表示のための文字列: 名前で書いた要素は宣言の FQN、直に書いた要素は `<状態の FQN>`（読む方）か `<状態の FQN>.<操作>`（効果）。
 
-TS の SDK（`sdk/ts`）は同じ引き方を関数で持つ: `lookup(program, fqn)`、`namespace(program, fqn)`、`signature(view, op)`、`inUnit(view, fqn)`（なければ `undefined`）、`directReads(op)`、`directEffects(op)`、`calledOp(call)`（op でなければ `undefined`）、`readState(program, ref)`、`readStates(program, refs)`、`effectWrites(program, ref)`。値として比べられないので、要素が同じかどうかは `sameRef(a, b)` で見る。
+TS の SDK は、ない（`docs/decisions.md`「決めたこと」415 で、外した）。
 
 ### `plugin`（公開）
 
@@ -183,7 +182,7 @@ var ErrUnsupported error
 func CheckByEmit(h Handler, transpilers []string, req *CheckRequest) (*CheckResponse, error)
 ```
 
-`Select`、`Wrap`、`EmitResponse.Select` はなくした（`docs/plugin-protocol.md`「選択をなくしたこと」）。TS の SDK（`sdk/ts`）も同じ: `select` の型をなくし、`options(request)` を足す。`CheckByEmit` に当たるのは、`checkByEmit(handler, transpilers, request)`。
+`Select`、`Wrap`、`EmitResponse.Select` はなくした（`docs/plugin-protocol.md`「選択をなくしたこと」）。
 
 ### `plugin/golang`（公開）
 
@@ -625,14 +624,13 @@ Go のプラグインは、どれも同じ形: `main` パッケージが `plugin
 | 元 | 生成物 | 道具 |
 |---|---|---|
 | `ir` と `plugin` の型 | `schema/ir.schema.json`（`Program` / `View` と、`$defs` にプロトコルの要求と応答） | `internal/tools/irschema`（`go generate ./schema/...`。構造体は reflect で写し、`kind` のユニオンと列挙は道具の表で持つ） |
-| `schema/ir.schema.json` | `sdk/ts/src/ir.ts`（IR の型） | `json-schema-to-typescript`（`sdk/ts` の `npm run generate`） |
 | `token.Keywords` | `editors/vscode/syntaxes/hozo.tmLanguage.json`（予約語の部分は `token.Keywords` から、それ以外は道具の中の表から） | `internal/tools/tmgrammar`（`go generate ./editors/...`） |
 | `cli.hozo` | `internal/gen/hozoc/**`、`internal/gen/proc/**` | `internal/tools/selfgen`（`make generate`。下の「自己生成の手順」） |
 | `plugins/` の下の `testdata/<名前>/` の `hozo.toml` と `.hozo` | `testdata/<名前>/views.json`（プラグインの単体テストの入力の `View`） | `tests/pluginviews_test.go` の `TestPluginViewFixtures`（`go test ./tests -run TestPluginViewFixtures -update`。遅れていれば、このテストが落ちる。`docs/testing.md`「単体テスト」） |
 
 生成物はコミットする。CI で生成し直して差分がないことを確かめる（`docs/testing.md`「生成物の一致」）。
 
-生成せずに手で写すものは、写しが合っていることをテストで確かめる: プロトコルの要求と応答の TS の型 `sdk/ts/src/protocol.ts`（スキーマの `$defs` を写す。項目の名前、必須かどうか、型が合っていることを `sdk/ts/test/protocol.test.ts` が確かめる）と、`docs/cli.md` に埋め込んだ `cli.hozo` と `hozo.toml`（`docs/testing.md`「コーパス」）。
+生成せずに手で写すものは、写しが合っていることをテストで確かめる: `docs/cli.md` に埋め込んだ `cli.hozo` と `hozo.toml`（`docs/testing.md`「コーパス」）。
 
 ### 自己生成の手順
 

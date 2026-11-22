@@ -339,8 +339,7 @@ func TestProtocolMismatch(t *testing.T) {
 
 // TestRequestHead は testdata/request_head.json の表: 要求の protocol と direction の読み方と終了コード
 // （docs/plugin-protocol.md「要求と応答」「起動」）。文字列でない protocol は「合わない」で code "protocol"（終了コード 2）、
-// 文字列でない direction は実装していない direction と同じ。TS の SDK のテスト（sdk/ts/test/run.test.ts）も同じ表を
-// 読むので、二つの SDK は同じ要求に同じ終了コードを返す。
+// 文字列でない direction は実装していない direction と同じ。
 func TestRequestHead(t *testing.T) {
 	data, err := os.ReadFile(filepath.Join("testdata", "request_head.json"))
 	if err != nil {

@@ -250,7 +250,6 @@ type Diagnostic struct {
 // direction を実装していなければ 2（標準出力に {"error":{"code":...,"message":...}}）、
 // それ以外の誤り（要求が JSON のオブジェクトとして読めない、h が誤りを返した、書き出せない）なら 1（標準エラーにメッセージ）。
 // protocol は文字列で、この SDK の版と等しくなければ「合わない」（ない、null、文字列でないものを含む）。
-// TS の SDK（sdk/ts の run）も同じ終了コードを返す。
 func Main(h Handler) int {
 	return Run(h, os.Stdin, os.Stdout, os.Stderr)
 }

@@ -2,7 +2,7 @@
 //
 // IR の意味（何をどう正規化するか）は docs/ir.md が持ち主で、このパッケージはその
 // 「構造」を Go の型に写したもの。JSON の形の持ち主はこのパッケージで、
-// schema/ir.schema.json と sdk/ts の型はここから生成する
+// schema/ir.schema.json はここから生成する
 // （docs/requirements.md「プラグインの書き方」）。
 // プラグインが import してよいのは、このパッケージと plugin パッケージだけ。
 //

@@ -50,9 +50,9 @@ hozoc 自身（リポジトリ直下の `cli.hozo` と `hozo.toml`）はコー�
 
 ## 生成物の一致
 
-CI で `go generate ./...` と `sdk/ts` の `npm run generate` と `make generate`（`cli.hozo` からの自己生成。`docs/packages.md`「自己生成の手順」）を実行し、`git diff --exit-code` で差分がないことを確かめる。対象は `docs/packages.md`「生成するもの」の表。`hozoc emit` の分は `tests/generated_test.go` も確かめる: 一時ディレクトリに `cli.hozo` と `hozo.toml` を写して emit し、コミット済みの `internal/gen/hozoc/**` と `internal/gen/proc/**` とバイト単位で比べる（`go test ./...` だけで遅れが分かる）。`tests/selfcheck_test.go` は、リポジトリ直下での `emit --dry-run` が、コミット済みの生成物とちょうど同じファイルを書く予定にすることを確かめる。
+CI で `go generate ./...` と `make generate`（`cli.hozo` からの自己生成。`docs/packages.md`「自己生成の手順」）を実行し、`git diff --exit-code` で差分がないことを確かめる。対象は `docs/packages.md`「生成するもの」の表。`hozoc emit` の分は `tests/generated_test.go` も確かめる: 一時ディレクトリに `cli.hozo` と `hozo.toml` を写して emit し、コミット済みの `internal/gen/hozoc/**` と `internal/gen/proc/**` とバイト単位で比べる（`go test ./...` だけで遅れが分かる）。`tests/selfcheck_test.go` は、リポジトリ直下での `emit --dry-run` が、コミット済みの生成物とちょうど同じファイルを書く予定にすることを確かめる。
 
-手で写すもの（生成しないもの）の一致もテストで確かめる: `sdk/ts/src/protocol.ts` がスキーマの `$defs` と合っていること（`sdk/ts/test/protocol.test.ts`）、`docs/cli.md` のブロックがリポジトリ直下のファイルと同じであること（「コーパス」の `TestDocsEmbedRootFiles`）。
+手で写すもの（生成しないもの）の一致もテストで確かめる: `docs/cli.md` のブロックがリポジトリ直下のファイルと同じであること（「コーパス」の `TestDocsEmbedRootFiles`）。
 
 ## 文書とコードの一致
 
@@ -74,7 +74,7 @@ CI で `go generate ./...` と `sdk/ts` の `npm run generate` と `make generat
 
 ## プラグインのプロトコル
 
-`internal/plugin` のテストは、`testdata/echo-plugin/`（テストの初めにビルドする小さなプラグイン）を使い、要求がそのまま応答に写ること、終了コードが 0 以外なら `proc.Crashed`、JSON でない・形が違う（`docs/plugin-protocol.md`「応答の形」: 必須の項目がない、型が違う。知らない項目は通る）なら `proc.MalformedOutput` になることを確かめる。二つの SDK（Go の `plugin`、TS の `sdk/ts`）が同じ要求に同じ終了コードを返すことは、どちらのテストも同じ表（`plugin/testdata/request_head.json`）を読んで確かめる。`plugins/` のプラグインは、サンプル（「トランスパイラのテスト」）、それぞれの単体テスト（「単体テスト」）、生成物の遅れの検査（「生成物の一致」。`go`、`go-valid`、`go-cli`）で確かめる。
+`internal/plugin` のテストは、`testdata/echo-plugin/`（テストの初めにビルドする小さなプラグイン）を使い、要求がそのまま応答に写ること、終了コードが 0 以外なら `proc.Crashed`、JSON でない・形が違う（`docs/plugin-protocol.md`「応答の形」: 必須の項目がない、型が違う。知らない項目は通る）なら `proc.MalformedOutput` になることを確かめる。SDK（Go の `plugin`）が、要求ごとに返す終了コードは、表（`plugin/testdata/request_head.json`）を読んで確かめる。`plugins/` のプラグインは、サンプル（「トランスパイラのテスト」）、それぞれの単体テスト（「単体テスト」）、生成物の遅れの検査（「生成物の一致」。`go`、`go-valid`、`go-cli`）で確かめる。
 
 ## 単体テスト
 
@@ -103,7 +103,7 @@ CI で `go generate ./...` と `sdk/ts` の `npm run generate` と `make generat
 
 ## CI
 
-`.github/workflows/ci.yml`: `go build ./...`、`go vet ./...`、`go test ./...`、生成物の一致。`sdk/ts` と `editors/vscode` は Node 22 で、`npm ci`、ビルド（`npm run build`。`sdk/ts` は、その前に `npm run generate` と、差分がないこと）、`npm test`。`editors/vscode` のテストのうち、`test/trust.test.js` は、ビルドした `out/trust.js` を読む（`docs/editors.md`「VS Code 拡張」）。
+`.github/workflows/ci.yml`: `go build ./...`、`go vet ./...`、`go test ./...`、生成物の一致。`editors/vscode` は Node 22 で、`npm ci`、ビルド（`npm run build`）、`npm test`。`editors/vscode` のテストのうち、`test/trust.test.js` は、ビルドした `out/trust.js` を読む（`docs/editors.md`「VS Code 拡張」）。
 
 - **実行は、同時に一つだけ。** `main` への push と、どの PR の実行も、一つの組（`concurrency` の `group: ci`）に入れる。新しい実行が始まると、動いている実行と、待っている実行は、止まる（`cancel-in-progress`）。止められた実行は、緑ではない。
 

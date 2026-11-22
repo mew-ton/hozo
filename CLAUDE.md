@@ -73,7 +73,7 @@ Hozo は、アプリの設計の、ただ一つの正（SSOT）になる、仕�
 
 ## 確かめ方
 
-push する前に、変えた範囲に当たるものを走らせる。CI（`.github/workflows/ci.yml` のジョブ `go`、`node`、`sdk-ts`）が確かめることの持ち主は `docs/testing.md`「CI」「生成物の一致」。
+push する前に、変えた範囲に当たるものを走らせる。CI（`.github/workflows/ci.yml` のジョブ `go`、`node`）が確かめることの持ち主は `docs/testing.md`「CI」「生成物の一致」。
 
 ```bash
 go build ./... && go vet ./... && go test ./...
@@ -85,10 +85,6 @@ go generate ./... && make generate && git diff --exit-code
 
 ```bash
 go run ./cmd/hozoc check
-```
-
-```bash
-(cd sdk/ts && npm ci && npm run generate && npm run build && npm test)
 ```
 
 ```bash

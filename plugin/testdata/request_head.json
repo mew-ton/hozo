@@ -1,5 +1,5 @@
 {
-  "comment": "Go の SDK（plugin.Run）と TS の SDK（sdk/ts の run）が、同じ要求に同じ終了コードと同じ error の code を返すことを確かめる表（docs/plugin-protocol.md「要求と応答」「起動」）。どちらのテストもこのファイルを読む。request は標準入力に渡す文字列そのまま。Handler は三つの direction をすべて実装していて、空の応答を返す。code は終了コード 2 のときの error の code（それ以外は \"\"）。",
+  "comment": "Go の SDK（plugin.Run）が、要求ごとに返す、終了コードと error の code を確かめる表（docs/plugin-protocol.md「要求と応答」「起動」）。request は標準入力に渡す文字列そのまま。Handler は三つの direction をすべて実装していて、空の応答を返す。code は終了コード 2 のときの error の code（それ以外は \"\"）。",
   "cases": [
     { "name": "protocol が合い direction を実装している", "request": "{\"protocol\":\"0.18\",\"direction\":\"check\",\"view\":null}", "exit": 0, "code": "" },
 

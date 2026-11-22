@@ -248,7 +248,7 @@ UI が変えるのは、文面と同じ IR（`docs/ir.md`「この文書が決�
 | MCP サーバー | `hozoc mcp`。AI が仕様を扱うための口（検査、宣言を引く、足りない宣言を足す、枠を出す、言語の手引き）。**まだない** | `docs/tools.md`「道具」「操作」 |
 | プラグイン | 展開・取り込みの実行ファイル。「標準入出力で JSON をやり取りする実行ファイル」（§4.6）。モノレポの中で一つずつ別の実行ファイルとして作る。プラグインはトランスパイラ（`hozo.toml` の単位が名前で選ぶ変換）を提供し、トランスパイラは自分のファイルを返す（`docs/plugin-protocol.md`）。トランスパイラは、言語ごとの基底と、それに相乗りするものに分かれる（`docs/config.md`「基底と相乗り」）。Go は、基底 `go`（`docs/plugin-go.md`）と、相乗りの `go-valid`（`docs/plugin-go-valid.md`）、`go-sqlite`（`docs/plugin-go-sqlite.md`）、`go-http`（`docs/plugin-go-http.md`）、`go-cli`（`docs/plugin-go-cli.md`） | §4.3、§4.6 |
 | 標準の語彙 | `valid` などの語彙の `.hozo` | §4.2、§6.5 |
-| プラグイン SDK | プラグインが IR を受け取り、ファイルと warning と error を返すための型と読み書き。Go（`ir`、`plugin`）と TS（`sdk/ts`） | この文書の「プラグインの書き方」 |
+| プラグイン SDK | プラグインが IR を受け取り、ファイルと warning と error を返すための型と読み書き。Go（`ir`、`plugin`）。TS の SDK は、外した（`docs/decisions.md`「決めたこと」415） | この文書の「プラグインの書き方」 |
 | 生成したコードと Go のプラグインが使う公開のパッケージ | `runtime`（生成した Go のコードが import する型）、`plugin/golang`（Go の基底の形の規則。基底と相乗りが共有する）、`plugin/govalid`（`go-valid` の形の規則） | `docs/plugin-go.md`「runtime パッケージ」「相乗りのファイル」、`docs/packages.md`「`plugin/golang`（公開）」 |
 
 ## 自己展開
@@ -267,9 +267,9 @@ hozoc は自分自身の境界（コマンド、ファイル、プラグイン�
 
 当面の展開先は Go と TS の二つ。プラグインは展開先の言語で書く。TS のコードを出すプラグインは TS（Node）で、Go のコードを出すプラグインは Go で書く。§4.6「どの言語で書いてもよく」の範囲で、プラグインの実行環境の要求を利用者の手元にあるもの（TS のプロジェクトには Node、Go のプロジェクトには Go）に一致させるため。protoc の `protoc-gen-go` と `ts-proto` と同じ分かれ方。
 
-プラグインの側で IR を扱うための SDK（IR の型と、標準入出力の JSON の読み書き）を言語ごとに用意する。Go はこのリポジトリの `ir` パッケージと `plugin` パッケージをそのまま import する。TS は `sdk/ts/` を npm パッケージとして出す。npm のパッケージ名は未確認で、出す前に確かめる。
+プラグインの側で IR を扱うための SDK（IR の型と、標準入出力の JSON の読み書き）を言語ごとに用意する。Go はこのリポジトリの `ir` パッケージと `plugin` パッケージをそのまま import する。TS の SDK（`sdk/ts/`）は、リポジトリから外した（`docs/decisions.md`「決めたこと」414、415: プラグインは、WASM のサンドボックスの中で動かし、TS で書くプラグインは、いったん、考えから外す。この見出しは、プラグインの要件の整理（同 406）が済んだら、書き直す）。
 
-IR の構造と JSON の形は `docs/ir.md` が持ち主。Go の `ir` パッケージはそれを手で写し、JSON スキーマ `schema/ir.schema.json` は `ir` パッケージから、TS の型はスキーマから生成する（`docs/packages.md`「生成するもの」）。生成物が元から遅れていないことは `docs/testing.md`「生成物の一致」で確かめる。
+IR の構造と JSON の形は `docs/ir.md` が持ち主。Go の `ir` パッケージはそれを手で写し、JSON スキーマ `schema/ir.schema.json` は `ir` パッケージから生成する（`docs/packages.md`「生成するもの」）。生成物が元から遅れていないことは `docs/testing.md`「生成物の一致」で確かめる。
 
 ### 出力を推論しない
 
@@ -392,7 +392,7 @@ R2 の成果物:
 |---|---|
 | 設定: `[emit.options]`、基底と相乗り（CFG-19〜CFG-21）、型の置き場（CFG-22）、継ぎ目（CFG-23）、語彙の名前空間の単位 | `docs/config.md` |
 | プロトコル: 版 0.4（`requires`、`seams`、`View.config` の `index` / `base` / `options` / `seams`、`select` の廃止） | `docs/plugin-protocol.md`、`docs/ir.md`「その名前空間から見た IR」 |
-| 公開の SDK: `plugin`（`Options`）、`plugin/golang`（形の規則）、`plugin/govalid`、`sdk/ts`（同じ変更） | `docs/packages.md` |
+| 公開の SDK: `plugin`（`Options`）、`plugin/golang`（形の規則）、`plugin/govalid` | `docs/packages.md` |
 | プラグイン `plugins/go`、`plugins/go-valid`、`plugins/go-sqlite`、`plugins/go-http`、`plugins/go-cli`（作り直し） | `docs/plugin-go.md`、`docs/plugin-go-valid.md`、`docs/plugin-go-sqlite.md`、`docs/plugin-go-http.md`、`docs/plugin-go-cli.md` |
 | `emit` の手順（本体は出力を作らない）、`cli.hozo` と `hozo.toml`、`internal/app` | `docs/cli.md` |
 | 語彙: `http.BadRequest` | `docs/vocab.md`「同梱する語彙」 |
