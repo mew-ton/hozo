@@ -173,9 +173,9 @@
 |---|---|---|---|
 | `backoffice.recover` | `catches` | 34 | 画面 |
 | `storefront.recover` | `catches` | 12 | 画面 |
-| `page.fallback` | `catches` | 12 | 画面 |
+| `browser.page.fallback` | `catches` | 12 | 画面 |
 | `backoffice.ignoreFailure` | `catches` | 1 | 画面 |
-| `page.dialog` | `throws` | 4 | 画面 |
+| `browser.page.dialog` | `throws` | 4 | 画面 |
 | `payment.noteFailure` | `catches` | 3 | サーバー |
 | `notice.bestEffort` | `catches` | 2 | サーバー |
 | `outside.failsAs` | `throws`、`catches` | 3 | サーバー |
@@ -279,7 +279,7 @@
 |---|---|
 | `catches` を持つデコレータが、付いている | 23 |
 | 計算した例外が、残っていない | 21 |
-| 計算した例外が、残っている | 3（どれも、`page.Aborted` だけ。`@page.dialog` が足す例外） |
+| 計算した例外が、残っている | 3（どれも、`browser.page.Aborted` だけ。`@browser.page.dialog` が足す例外） |
 
 - **頭から行き着く入口の、計算した例外は、頭ごとに合わせて、延べ 92。そのうち、頭の、計算した例外に残っているものは、0。** 入口から来る例外は、今は、すべて、画面の側で、受けられている。
 - **受けるデコレータは、例外を、名前で受ける**（`@recover(<例外>, <効果>)`。`grammar.md`「decorator の宣言」の `CatchesClause`）。入口に、例外が一つ増えると、それを受ける適用を足すまで、その入口に行き着く頭の、計算した例外に、残る。

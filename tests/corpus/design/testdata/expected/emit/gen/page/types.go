@@ -7,8 +7,8 @@ import "github.com/mew-ton/hozo/runtime"
 // Aborted: ダイアログが閉じられた
 type Aborted struct{}
 
-func (Aborted) Error() string         { return "page.Aborted" }
-func (Aborted) HozoException() string { return "page.Aborted" }
+func (Aborted) Error() string         { return "browser.page.Aborted" }
+func (Aborted) HozoException() string { return "browser.page.Aborted" }
 
 var _ runtime.Exception = Aborted{}
 

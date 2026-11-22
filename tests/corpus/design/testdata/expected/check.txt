@@ -1,21 +1,21 @@
-browser.hozo:9:3: warning[CFG-26]: @localStorage を解釈するトランスパイラが、hozo.toml のどの単位にもない（何も生成されない）。解釈するトランスパイラを、hozo.toml の単位の transpilers に並べる。または、解釈されなくてよい印なら、デコレータの宣言に @hint を付ける
-browser.hozo:12:3: warning[CFG-26]: @page.query を解釈するトランスパイラが、hozo.toml のどの単位にもない（何も生成されない）。解釈するトランスパイラを、hozo.toml の単位の transpilers に並べる。または、解釈されなくてよい印なら、デコレータの宣言に @hint を付ける
-browser.hozo:15:3: warning[CFG-26]: @page.path を解釈するトランスパイラが、hozo.toml のどの単位にもない（何も生成されない）。解釈するトランスパイラを、hozo.toml の単位の transpilers に並べる。または、解釈されなくてよい印なら、デコレータの宣言に @hint を付ける
-browser.hozo:47:3: warning[CFG-26]: @valid.min を解釈するトランスパイラが、hozo.toml のどの単位にもない（何も生成されない）。解釈するトランスパイラを、hozo.toml の単位の transpilers に並べる。または、解釈されなくてよい印なら、デコレータの宣言に @hint を付ける
-browser.hozo:76:3: warning[CFG-26]: @browser.ignoreFailure を解釈するトランスパイラが、hozo.toml のどの単位にもない（何も生成されない）。デコレータの宣言に本体を書く。または、解釈するトランスパイラを、hozo.toml の単位の transpilers に並べる
-browser.hozo:126:3: warning[CFG-26]: @page.interaction を解釈するトランスパイラが、hozo.toml のどの単位にもない（何も生成されない）。デコレータの宣言に本体を書く。または、解釈するトランスパイラを、hozo.toml の単位の transpilers に並べる。または、解釈されなくてよい印なら、デコレータの宣言に @hint を付ける
-browser.hozo:147:3: warning[CFG-26]: @page.dialog を解釈するトランスパイラが、hozo.toml のどの単位にもない（何も生成されない）。デコレータの宣言に本体を書く。または、解釈するトランスパイラを、hozo.toml の単位の transpilers に並べる
-browser.hozo:167:3: warning[CFG-26]: @page.dialog を解釈するトランスパイラが、hozo.toml のどの単位にもない（何も生成されない）。デコレータの宣言に本体を書く。または、解釈するトランスパイラを、hozo.toml の単位の transpilers に並べる
-browser.hozo:218:3: warning[CFG-26]: @page.fallback を解釈するトランスパイラが、hozo.toml のどの単位にもない（何も生成されない）。デコレータの宣言に本体を書く。または、解釈するトランスパイラを、hozo.toml の単位の transpilers に並べる
-browser.hozo:219:3: warning[CFG-26]: @page.route を解釈するトランスパイラが、hozo.toml のどの単位にもない（何も生成されない）。デコレータの宣言に本体を書く。または、解釈するトランスパイラを、hozo.toml の単位の transpilers に並べる
-browser.hozo:234:3: warning[CFG-26]: @browser.unavailableOnFailure を解釈するトランスパイラが、hozo.toml のどの単位にもない（何も生成されない）。デコレータの宣言に本体を書く。または、解釈するトランスパイラを、hozo.toml の単位の transpilers に並べる
-browser.hozo:235:3: warning[CFG-26]: @page.route を解釈するトランスパイラが、hozo.toml のどの単位にもない（何も生成されない）。デコレータの宣言に本体を書く。または、解釈するトランスパイラを、hozo.toml の単位の transpilers に並べる
-browser.hozo:260:3: warning[CFG-26]: @browser.unavailableOnFailure を解釈するトランスパイラが、hozo.toml のどの単位にもない（何も生成されない）。デコレータの宣言に本体を書く。または、解釈するトランスパイラを、hozo.toml の単位の transpilers に並べる
-browser.hozo:261:3: warning[CFG-26]: @page.route を解釈するトランスパイラが、hozo.toml のどの単位にもない（何も生成されない）。デコレータの宣言に本体を書く。または、解釈するトランスパイラを、hozo.toml の単位の transpilers に並べる
+client.hozo:9:3: warning[CFG-26]: @browser.localStorage を解釈するトランスパイラが、hozo.toml のどの単位にもない（何も生成されない）。解釈するトランスパイラを、hozo.toml の単位の transpilers に並べる。または、解釈されなくてよい印なら、デコレータの宣言に @hint を付ける
+client.hozo:12:3: warning[CFG-26]: @browser.page.query を解釈するトランスパイラが、hozo.toml のどの単位にもない（何も生成されない）。解釈するトランスパイラを、hozo.toml の単位の transpilers に並べる。または、解釈されなくてよい印なら、デコレータの宣言に @hint を付ける
+client.hozo:15:3: warning[CFG-26]: @browser.page.path を解釈するトランスパイラが、hozo.toml のどの単位にもない（何も生成されない）。解釈するトランスパイラを、hozo.toml の単位の transpilers に並べる。または、解釈されなくてよい印なら、デコレータの宣言に @hint を付ける
+client.hozo:47:3: warning[CFG-26]: @valid.min を解釈するトランスパイラが、hozo.toml のどの単位にもない（何も生成されない）。解釈するトランスパイラを、hozo.toml の単位の transpilers に並べる。または、解釈されなくてよい印なら、デコレータの宣言に @hint を付ける
+client.hozo:76:3: warning[CFG-26]: @client.ignoreFailure を解釈するトランスパイラが、hozo.toml のどの単位にもない（何も生成されない）。デコレータの宣言に本体を書く。または、解釈するトランスパイラを、hozo.toml の単位の transpilers に並べる
+client.hozo:126:3: warning[CFG-26]: @browser.page.interaction を解釈するトランスパイラが、hozo.toml のどの単位にもない（何も生成されない）。デコレータの宣言に本体を書く。または、解釈するトランスパイラを、hozo.toml の単位の transpilers に並べる。または、解釈されなくてよい印なら、デコレータの宣言に @hint を付ける
+client.hozo:147:3: warning[CFG-26]: @browser.page.dialog を解釈するトランスパイラが、hozo.toml のどの単位にもない（何も生成されない）。デコレータの宣言に本体を書く。または、解釈するトランスパイラを、hozo.toml の単位の transpilers に並べる
+client.hozo:167:3: warning[CFG-26]: @browser.page.dialog を解釈するトランスパイラが、hozo.toml のどの単位にもない（何も生成されない）。デコレータの宣言に本体を書く。または、解釈するトランスパイラを、hozo.toml の単位の transpilers に並べる
+client.hozo:218:3: warning[CFG-26]: @browser.page.fallback を解釈するトランスパイラが、hozo.toml のどの単位にもない（何も生成されない）。デコレータの宣言に本体を書く。または、解釈するトランスパイラを、hozo.toml の単位の transpilers に並べる
+client.hozo:219:3: warning[CFG-26]: @browser.page.route を解釈するトランスパイラが、hozo.toml のどの単位にもない（何も生成されない）。デコレータの宣言に本体を書く。または、解釈するトランスパイラを、hozo.toml の単位の transpilers に並べる
+client.hozo:234:3: warning[CFG-26]: @client.unavailableOnFailure を解釈するトランスパイラが、hozo.toml のどの単位にもない（何も生成されない）。デコレータの宣言に本体を書く。または、解釈するトランスパイラを、hozo.toml の単位の transpilers に並べる
+client.hozo:235:3: warning[CFG-26]: @browser.page.route を解釈するトランスパイラが、hozo.toml のどの単位にもない（何も生成されない）。デコレータの宣言に本体を書く。または、解釈するトランスパイラを、hozo.toml の単位の transpilers に並べる
+client.hozo:260:3: warning[CFG-26]: @client.unavailableOnFailure を解釈するトランスパイラが、hozo.toml のどの単位にもない（何も生成されない）。デコレータの宣言に本体を書く。または、解釈するトランスパイラを、hozo.toml の単位の transpilers に並べる
+client.hozo:261:3: warning[CFG-26]: @browser.page.route を解釈するトランスパイラが、hozo.toml のどの単位にもない（何も生成されない）。デコレータの宣言に本体を書く。または、解釈するトランスパイラを、hozo.toml の単位の transpilers に並べる
 server.hozo:15:3: warning[CFG-26]: @valid.format を解釈するトランスパイラが、hozo.toml のどの単位にもない（何も生成されない）。解釈するトランスパイラを、hozo.toml の単位の transpilers に並べる。または、解釈されなくてよい印なら、デコレータの宣言に @hint を付ける
 server.hozo:25:3: warning[CFG-26]: @valid.length を解釈するトランスパイラが、hozo.toml のどの単位にもない（何も生成されない）。解釈するトランスパイラを、hozo.toml の単位の transpilers に並べる。または、解釈されなくてよい印なら、デコレータの宣言に @hint を付ける
 server.hozo:29:3: warning[CFG-26]: @valid.pattern を解釈するトランスパイラが、hozo.toml のどの単位にもない（何も生成されない）。解釈するトランスパイラを、hozo.toml の単位の transpilers に並べる。または、解釈されなくてよい印なら、デコレータの宣言に @hint を付ける
-server.hozo:30:3: warning[CFG-26]: @valid.checkDigit を解釈するトランスパイラが、hozo.toml のどの単位にもない（何も生成されない）。解釈するトランスパイラを、hozo.toml の単位の transpilers に並べる。または、解釈されなくてよい印なら、デコレータの宣言に @hint を付ける
+server.hozo:30:3: warning[CFG-26]: @server.checkDigit を解釈するトランスパイラが、hozo.toml のどの単位にもない（何も生成されない）。解釈するトランスパイラを、hozo.toml の単位の transpilers に並べる。または、解釈されなくてよい印なら、デコレータの宣言に @hint を付ける
 server.hozo:53:5: warning[CFG-26]: @db.key を解釈するトランスパイラが、hozo.toml のどの単位にもない（何も生成されない）。解釈するトランスパイラを、hozo.toml の単位の transpilers に並べる。または、解釈されなくてよい印なら、デコレータの宣言に @hint を付ける
 server.hozo:54:5: warning[CFG-26]: @db.unique を解釈するトランスパイラが、hozo.toml のどの単位にもない（何も生成されない）。解釈するトランスパイラを、hozo.toml の単位の transpilers に並べる。または、解釈されなくてよい印なら、デコレータの宣言に @hint を付ける
 server.hozo:56:5: warning[CFG-26]: @valid.length を解釈するトランスパイラが、hozo.toml のどの単位にもない（何も生成されない）。解釈するトランスパイラを、hozo.toml の単位の transpilers に並べる。または、解釈されなくてよい印なら、デコレータの宣言に @hint を付ける

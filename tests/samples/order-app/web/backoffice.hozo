@@ -7,7 +7,7 @@ namespace backoffice {
   // ---- 状態 ----
 
   /** ログインのトークン。空なら、ログインしていない */
-  @localStorage
+  @browser.localStorage
   state token: nullable<type.Token>;
 
   // staffApi への呼び出しでは、入力のうち Token 型の位置を token で埋める
@@ -16,11 +16,11 @@ namespace backoffice {
   /** 操作が通らなかった理由。次の操作で消える */
   state problem: nullable<Problem>;
 
-  @page.path
-  state location: single<page.Route>;
+  @browser.page.path
+  state location: single<browser.page.Route>;
 
-  @page.query
-  state query: single<page.Query>;
+  @browser.page.query
+  state query: single<browser.page.Query>;
 
   /** 操作が通らなかった理由（値の集合は、下の効果の名前が決める） */
   model Problem {
@@ -79,7 +79,7 @@ namespace backoffice {
   model Unavailable {}
 
   /** サーバーに届かないときは、ページの代わりに Unavailable を描く */
-  decorator unavailableOnFailure = page.fallback(http.NetworkError | http.ServerError, Unavailable);
+  decorator unavailableOnFailure = browser.page.fallback(http.NetworkError | http.ServerError, Unavailable);
 
   /** ログインしていない、またはその仕事の担当でないときは、ログインの画面へ移す */
   decorator staffOnly = recover(type.Unauthorized | type.Forbidden, goToLogin);
@@ -93,13 +93,13 @@ namespace backoffice {
 
   fn loginVm(problem: Problem?): LoginPage;
 
-  @page.route("/login")
+  @browser.page.route("/login")
   fn openLogin(): LoginPage {
     return loginVm(problem);
   }
 
   /** ログインする */
-  @page.interaction(page: openLogin, when: LoginPage.Form)
+  @browser.page.interaction(page: openLogin, when: LoginPage.Form)
   @recover(staff.InvalidCredentials, sayWrongCredentials)
   @recover(http.NetworkError | http.ServerError, sayUnknownOutcome)
   fn onLogin(loginName: string, password: staff.Password) {
@@ -140,14 +140,14 @@ namespace backoffice {
 
   @staffOnly
   @unavailableOnFailure
-  @page.route("/production")
+  @browser.page.route("/production")
   fn openProduction(): ProductionPage {
     val jobs = staffApi.jobs({});
     return productionVm(jobs, problem);
   }
 
   /** 作り始めた */
-  @page.interaction(page: openProduction, when: ProductionPage.Ready)
+  @browser.page.interaction(page: openProduction, when: ProductionPage.Ready)
   @staffOnly
   @recover(production.NoJob | production.NotQueued, sayStale)
   @recover(http.NetworkError | http.ServerError, sayUnknownOutcome)
@@ -158,7 +158,7 @@ namespace backoffice {
   }
 
   /** 作り終えた。出来上がりを量って、入れる。ここで入れた大きさと重さが、箱と送料を決める材料になる */
-  @page.interaction(page: openProduction, when: ProductionPage.Ready)
+  @browser.page.interaction(page: openProduction, when: ProductionPage.Ready)
   @staffOnly
   @recover(production.NoJob | production.NotInProduction | shipping.NoShipment | shipping.UnknownItem, sayStale)
   @recover(http.NetworkError | http.ServerError, sayUnknownOutcome)
@@ -170,7 +170,7 @@ namespace backoffice {
   }
 
   /** 出来上がりの大きさと重さを聞く */
-  @page.dialog("MeasurementDialog")
+  @browser.page.dialog("MeasurementDialog")
   fn askMeasurement(job: production.Job): type.Measurement;
 
   /** 始めた仕事を、画面に出す（描き方は、ここでは決めない） */
@@ -192,14 +192,14 @@ namespace backoffice {
 
   @staffOnly
   @unavailableOnFailure
-  @page.route("/picking")
+  @browser.page.route("/picking")
   fn openPicking(): PickingPage {
     val picks = staffApi.picks({});
     return pickingVm(picks, problem);
   }
 
   /** 棚から出して、そろえ場所に置いた */
-  @page.interaction(page: openPicking, when: PickingPage.Ready)
+  @browser.page.interaction(page: openPicking, when: PickingPage.Ready)
   @staffOnly
   @recover(inventory.NotReserved | inventory.AlreadyPicked | shipping.NoShipment | shipping.UnknownItem, sayStale)
   @recover(http.NetworkError | http.ServerError, sayUnknownOutcome)
@@ -222,14 +222,14 @@ namespace backoffice {
 
   @staffOnly
   @unavailableOnFailure
-  @page.route("/shipments")
+  @browser.page.route("/shipments")
   fn openShipments(): ShipmentsPage {
     val all = staffApi.shipments({});
     return shipmentsVm(all);
   }
 
   /** 出荷一つの、梱包の台を開く */
-  @page.interaction(page: openShipments, when: ShipmentsPage.Ready)
+  @browser.page.interaction(page: openShipments, when: ShipmentsPage.Ready)
   fn onOpenStation(id: shipping.ShipmentId) {
     clearProblem();
     goToStation(id);
@@ -266,8 +266,8 @@ namespace backoffice {
   fn stationVm(station: fulfilment.Station, problem: Problem?): StationPage;
 
   @staffOnly
-  @page.fallback(shipping.NoShipment | carrier.NoCarrier | http.NetworkError | http.ServerError, Unavailable)
-  @page.route("/station", from: query)
+  @browser.page.fallback(shipping.NoShipment | carrier.NoCarrier | http.NetworkError | http.ServerError, Unavailable)
+  @browser.page.route("/station", from: query)
   fn openStation(query: StationQuery): StationPage {
     val station = staffApi.station({ id: query.id });
     return stationVm(station, problem);
@@ -285,7 +285,7 @@ namespace backoffice {
    * 梱包した: 選んだ箱の種類と、量った重さを入れる。送料が、ここで決まる。
    * 上限を超える箱を選んだときは、店が持つ額を見せて、確かめてから進む。
    */
-  @page.interaction(page: openStation, when: StationPage.ChooseBox)
+  @browser.page.interaction(page: openStation, when: StationPage.ChooseBox)
   @staffOnly
   @recover(shipping.NoShipment | shipping.NotGathered | shipping.AlreadyPacked, sayStale)
   @recover(shipping.UnknownBox | shipping.OverWeight | shipping.Undeliverable, sayRejected)
@@ -301,7 +301,7 @@ namespace backoffice {
   }
 
   /** 店が持つ額を見せて、確かめる。やめれば、梱包は記録しない */
-  @page.dialog("AbsorbOverCeilingDialog")
+  @browser.page.dialog("AbsorbOverCeilingDialog")
   fn confirmAbsorb(over: type.Yen);
 
   /** 決まった送料を、画面に出す */
@@ -312,7 +312,7 @@ namespace backoffice {
    * 通らなかったときの理由は、三つに分ける: 請求できない（送り状は買っていない）、配送業者が引き受けない（請求は確定している）、
    * 届かなかった（どこまで進んだか分からない）。
    */
-  @page.interaction(page: openStation, when: StationPage.ChooseCarrier)
+  @browser.page.interaction(page: openStation, when: StationPage.ChooseCarrier)
   @staffOnly
   @recover(shipping.NoShipment | shipping.NotPacked | shipping.AlreadyLabelled, sayStale)
   @recover(payment.NoPayment | payment.NotSecured | psp.HoldExpired, sayCannotCharge)
@@ -329,7 +329,7 @@ namespace backoffice {
   fn printLabel(document: type.Url);
 
   /** 配送業者に渡した */
-  @page.interaction(page: openStation, when: StationPage.HandOver)
+  @browser.page.interaction(page: openStation, when: StationPage.HandOver)
   @staffOnly
   @recover(shipping.NoShipment | shipping.NotPacked | shipping.NotLabelled | shipping.AlreadyHandedOver | ordering.NoOrder, sayStale)
   @recover(http.NetworkError | http.ServerError, sayUnknownOutcome)
@@ -356,7 +356,7 @@ namespace backoffice {
 
   @staffOnly
   @unavailableOnFailure
-  @page.route("/carriers")
+  @browser.page.route("/carriers")
   fn openCarriers(): CarriersPage {
     val carriers = staffApi.carriers({});
     return carriersVm(carriers, problem);
@@ -373,11 +373,11 @@ namespace backoffice {
   }
 
   /** 配送業者の名前と、契約の番号を聞く */
-  @page.dialog("CarrierDialog")
+  @browser.page.dialog("CarrierDialog")
   fn askCarrier(): carrier.Carrier;
 
   /** 配送業者を使う、使わないを切り替える */
-  @page.interaction(page: openCarriers, when: CarriersPage.Ready)
+  @browser.page.interaction(page: openCarriers, when: CarriersPage.Ready)
   @staffOnly
   @recover(carrier.UnknownCarrier, sayStale)
   @recover(http.NetworkError | http.ServerError, sayUnknownOutcome)

@@ -91,7 +91,7 @@ func escapeKeyword(s string) string {
 // セグメントを、それぞれ先頭を大文字にして連結する:
 //
 //	TypeName("server.User", "server")               → "User"
-//	TypeName("browser.OrderPage.Ready", "browser")  → "OrderPageReady"
+//	TypeName("client.OrderPage.Ready", "client")  → "OrderPageReady"
 //	TypeName("server.ClientError.Value", "server")  → "ClientErrorValue"
 //	TypeName("db", "")                              → "Db"
 //

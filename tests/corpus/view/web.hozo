@@ -2,11 +2,11 @@
 
 /** ユーザーページを持つフロントエンド */
 namespace web {
-  // docs/ir.md「原則」: 別の名前空間の宣言は FQN で参照する（api.Token、page.Route）
-  @localStorage
+  // docs/ir.md「原則」: 別の名前空間の宣言は FQN で参照する（api.Token、browser.page.Route）
+  @browser.localStorage
   state token: nullable<api.Token>;
-  @page.path
-  state location: single<page.Route>;
+  @browser.page.path
+  state location: single<browser.page.Route>;
 
   // docs/check.md「bind」: web の bind は api.* への呼び出しの Token? の位置を埋める
   bind token to api.*;

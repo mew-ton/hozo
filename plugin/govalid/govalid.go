@@ -115,7 +115,7 @@ func validated(p *ir.Program) map[string]bool {
 	return has
 }
 
-// constrained は、decorators に `@valid.*`（標準の制約と、利用者が valid に足した制約。validvocab.Applied）があるか。
+// constrained は、decorators に `@valid.*`（標準の制約と、標準でない valid の制約。validvocab.Applied）があるか。
 func constrained(decorators []ir.Application) bool {
 	for _, app := range decorators {
 		if validvocab.Applied(app.Decorator) {

@@ -284,7 +284,7 @@ func TestOpsWith(t *testing.T) {
 			op("web.open", app("t.entry", "")),
 			op("web.plain"),
 			&ir.Model{DeclBase: ir.DeclBase{Name: "web.M", Decorators: []ir.Application{app("t.entry", "")}, Span: ir.Span{File: "web.hozo"}}},
-			op("web.viaNamed", app("page.route", "t.entry")),
+			op("web.viaNamed", app("browser.page.route", "t.entry")),
 			// in の外（batch.hozo）で宣言された op は、デコレータが付いていても返さない
 			opIn("batch.hozo", "web.nightly", app("t.entry", "")),
 			op("web.both", app("t.entry", ""), app("t.other", "")),

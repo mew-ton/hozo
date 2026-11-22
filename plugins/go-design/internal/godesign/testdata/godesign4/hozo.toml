@@ -1,7 +1,7 @@
 [options.go]
 module = "example.com/app"
 
-# plugins/go-design の単体テストの入力（docs/testing.md「単体テスト」）: GODESIGN-4（フローを持つ名前空間に、@usecase.of の付いた op がある）。
+# plugins/go-design の単体テストの入力（docs/testing.md「単体テスト」）: GODESIGN-4（フローを持つ名前空間に、@prd.usecase.of の付いた op がある）。
 [[emit]]
 namespace   = "act"
 transpilers = ["go"]
@@ -12,7 +12,7 @@ namespace   = "flows"
 transpilers = ["go", "go-design"]
 out         = "gen/flows"
 
-# フローを持たない名前空間の @usecase.of は、当たらない（go-design を並べても。出すものがないので、warning）
+# フローを持たない名前空間の @prd.usecase.of は、当たらない（go-design を並べても。出すものがないので、warning）
 [[emit]]
 namespace   = "plain"
 transpilers = ["go", "go-design"]

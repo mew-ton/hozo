@@ -8,20 +8,20 @@
 /** 画面の側。客の、一つずつの操作（ユースケース） */
 namespace client {
   /** 客が、ログインする */
-  @usecase.of(design.Actor.Customer)
+  @prd.usecase.of(design.Actor.Customer)
   export fn signIn(email: type.Email, password: type.Password): type.Token {
     val ok = server.login({ body: { email: email, password: password } });
     return ok.token;
   }
 
   /** 客が、注文する */
-  @usecase.of(design.Actor.Customer)
+  @prd.usecase.of(design.Actor.Customer)
   export fn order(token: type.Token, lines: type.OrderLine[]): type.Order {
     return server.placeOrder({ token: token, lines: lines });
   }
 
   /** 客が、自分の注文の一覧を見る */
-  @usecase.of(design.Actor.Customer)
+  @prd.usecase.of(design.Actor.Customer)
   export fn viewOrders(token: type.Token): type.Order[] {
     return server.getOrders({ token: token, page: 1 });
   }

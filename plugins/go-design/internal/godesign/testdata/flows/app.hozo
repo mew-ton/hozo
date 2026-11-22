@@ -3,8 +3,8 @@
 /** 設計の図が持つ名前 */
 namespace design {
   classify Actor of never {
-    @actor.human User;
-    @actor.bot Timer;
+    @prd.actor.human User;
+    @prd.actor.bot Timer;
   }
 
   /** 要求 */
@@ -50,32 +50,32 @@ namespace act {
   model Receipt { item: string; count: int; }
 
   /** 買う */
-  @usecase.of(design.Actor.User)
+  @prd.usecase.of(design.Actor.User)
   @prd.ref(design.Req.R1)
   export fn buy(item: string, count: int): Receipt;
 
-  @usecase.of(design.Actor.User, design.Actor.Timer)
+  @prd.usecase.of(design.Actor.User, design.Actor.Timer)
   export fn touch();
 
-  @usecase.of(design.Actor.User)
+  @prd.usecase.of(design.Actor.User)
   export fn echo(a: string, b: string): string;
 
-  @usecase.of()
+  @prd.usecase.of()
   export fn find(name: string): string?;
 
   // 同じ要求を、一つの @prd.ref に二度書いても、指している設計には、一度だけ
-  @usecase.of(design.Actor.Timer)
+  @prd.usecase.of(design.Actor.Timer)
   @prd.ref(design.Req.R1, design.Req.R1)
   export fn count(items: string[]): int;
 
-  @usecase.of(design.Actor.User)
+  @prd.usecase.of(design.Actor.User)
   export fn note(text: string);
 }
 
 /** フロー */
 namespace flows {
   /** 買って、控えを受け取る */
-  @business.flow
+  @prd.business.flow
   @prd.ref(design.Req.R1, design.Extra.X1)
   export fn checkout(item: string, count: int): act.Receipt {
     act.touch();
@@ -83,7 +83,7 @@ namespace flows {
   }
 
   // 値を返さない、引数のない、説明のないフロー
-  @business.flow
+  @prd.business.flow
   export fn ping() {
     act.touch();
   }
@@ -92,13 +92,13 @@ namespace flows {
    * 二行以上の説明を持つフロー。
    * 引数の名前が、Given、Then と当たる。
    */
-  @business.flow
+  @prd.business.flow
   export fn rename(given: string, then: string): string {
     return act.echo(given, then);
   }
 
   /** match、for、disjoint の中から、操作の op を呼ぶ */
-  @business.flow
+  @prd.business.flow
   export fn branch(name: string, items: string[]): string {
     val found = act.find(name);
     for (val item of items) {
@@ -115,7 +115,7 @@ namespace flows {
   }
 
   // 省略可能な値を返すフロー
-  @business.flow
+  @prd.business.flow
   export fn lookup(name: string?): string? {
     return act.find("x");
   }
@@ -123,11 +123,11 @@ namespace flows {
 
 /** 葉を持つ名前空間のフロー */
 namespace mixed {
-  // @usecase.of のない葉: 基底が、テストのパッケージ（doc.go、leaves.go）を作る
+  // @prd.usecase.of のない葉: 基底が、テストのパッケージ（doc.go、leaves.go）を作る
   fn helper(x: int): int;
 
   /** 葉と同じ名前空間のフロー */
-  @business.flow
+  @prd.business.flow
   export fn run(items: string[]): int {
     return act.count(items);
   }
@@ -142,7 +142,7 @@ namespace reqonly {
 namespace k {
   model Out { text: string; }
 
-  @business.flow
+  @prd.business.flow
   export fn go(text: string): Out {
     val s = act.echo(text, text);
     return { text: s };

@@ -61,7 +61,7 @@ type LookupFlowCase struct {
 	Then func(t *testing.T, got *string)
 }
 
-// FlowCases は、@business.flow の付いた op の、E2E テストのケース。フローごとに、メソッド一つ（宣言順）。
+// FlowCases は、@prd.business.flow の付いた op の、E2E テストのケース。フローごとに、メソッド一つ（宣言順）。
 // メソッドが一つでも足りない値は、RunFlows に渡すところでコンパイルできない。
 type FlowCases interface {
 	Checkout() CheckoutFlowCase

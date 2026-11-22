@@ -2,11 +2,11 @@
 namespace design {
   classify Actor of never {
     /** 店で買う人 */
-    @actor.human Customer;
+    @prd.actor.human Customer;
     /** 決済代行 */
-    @actor.bot PaymentProvider;
+    @prd.actor.bot PaymentProvider;
     /** 注文を代わりに行う、AI のエージェント */
-    @actor.ai Agent;
+    @prd.actor.ai Agent;
   }
   classify Requirement of never {
     /** 同じ申し込みを、二度送っても、注文は一つ */
@@ -30,15 +30,15 @@ namespace a {
 }
 namespace web {
   /** 客が、注文を確定する */
-  @usecase.of(design.Actor.Customer)
+  @prd.usecase.of(design.Actor.Customer)
   export fn order(order: a.Order) { a.confirm(order); }
   /** 客か、エージェントが、注文を見る */
-  @usecase.of(design.Actor.Customer, design.Actor.Agent)
+  @prd.usecase.of(design.Actor.Customer, design.Actor.Agent)
   export fn look(id: string): a.Order? { return a.find(id); }
 }
 namespace flows {
   /** 注文してから、見るまで */
-  @business.flow
+  @prd.business.flow
   fn orderAndLook(order: a.Order, id: string): a.Order? {
     web.order(order);
     return web.look(id);

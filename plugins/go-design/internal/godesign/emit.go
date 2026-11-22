@@ -15,10 +15,10 @@ import (
 
 // 診断のコード（docs/plugin-go-design.md「診断」）。
 const (
-	codeFlowExport = "GODESIGN-1" // @business.flow の付いた op に export がない
-	codeFlowShape  = "GODESIGN-2" // @business.flow の付いた op が、本体を持たない（葉）、または never を返す
-	codeFlowCalls  = "GODESIGN-3" // フローの op の配線が、操作の op（@usecase.of の付いた op）でないものを呼ぶ
-	codeFlowHome   = "GODESIGN-4" // フローを持つ名前空間に、@usecase.of の付いた op がある
+	codeFlowExport = "GODESIGN-1" // @prd.business.flow の付いた op に export がない
+	codeFlowShape  = "GODESIGN-2" // @prd.business.flow の付いた op が、本体を持たない（葉）、または never を返す
+	codeFlowCalls  = "GODESIGN-3" // フローの op の配線が、操作の op（@prd.usecase.of の付いた op）でないものを呼ぶ
+	codeFlowHome   = "GODESIGN-4" // フローを持つ名前空間に、@prd.usecase.of の付いた op がある
 	codeOption     = "GODESIGN-5" // [emit.options.go-design] に、知らないキーか、型の違う値か、要求の分類でない FQN がある
 	codeTestName   = "GODESIGN-6" // テストのパッケージに足す名前が、当たる、または Go の公開の名前にならない
 	codeTestDir    = "GODESIGN-7" // テストのパッケージのディレクトリが、同じ単位が出力する子の名前空間の出力先と重なる
@@ -29,8 +29,8 @@ const FileName = "design.go"
 
 // 読む語彙（標準の business、usecase、prd。docs/plugin-go-design.md「マニフェスト」）。actor の語彙は読まない（印）。
 const (
-	businessFlow = "business.flow"
-	usecaseOf    = "usecase.of"
+	businessFlow = "prd.business.flow"
+	usecaseOf    = "prd.usecase.of"
 	prdRef       = "prd.ref"
 )
 
@@ -157,7 +157,7 @@ func has(d *ir.DeclBase, decorator string) bool {
 	return false
 }
 
-// flow は、フロー一つ: @business.flow の付いた、単位の対象の op。
+// flow は、フロー一つ: @prd.business.flow の付いた、単位の対象の op。
 type flow struct {
 	op *ir.Op
 }
@@ -222,7 +222,7 @@ func (g *generator) flows() []flow {
 }
 
 // checkCalls は GODESIGN-3: フロー op の配線の呼び出し（文と、match のアームの本体。for と disjoint の中も）の先が、どれも、
-// @usecase.of の付いた op であること。呼んだ先ごとに、診断を一つ（同じ先を二度呼んでも、一つ）。
+// @prd.usecase.of の付いた op であること。呼んだ先ごとに、診断を一つ（同じ先を二度呼んでも、一つ）。
 func (g *generator) checkCalls(op *ir.Op) {
 	check := func(call ir.Call) {
 		switch c := call.Callee.(type) {

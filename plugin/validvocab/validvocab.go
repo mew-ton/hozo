@@ -46,7 +46,7 @@ const NameCount = "count"
 var standard = map[string]bool{Min: true, Max: true, Length: true, Pattern: true, Format: true}
 
 // Standard は、decorator（汎用デコレータの FQN。Application.Decorator）が valid の標準の制約
-// （min / max / length / pattern / format）か。利用者が valid に足した制約は false。
+// （min / max / length / pattern / format）か。標準でない valid の制約（ほかのプラグインの語彙が足したもの）は false。
 func Standard(decorator string) bool { return standard[decorator] }
 
 // Applied は、decorator が valid の語彙のデコレータ（`@valid.*`）か: 名前空間 valid に宣言されたもの。標準のものも、
@@ -131,7 +131,7 @@ func unwrap(t ir.Type) ir.Type {
 }
 
 // Scalar は、scalar s に付いた標準の制約（書かれた順）と、使い方の誤り。誤りのある制約は、cons に入らない。
-// 利用者が valid に足した制約は、読まない（docs/plugin-valid.md「対象」）。
+// 標準でない valid の制約は、読まない（docs/plugin-valid.md「対象」）。
 func Scalar(p *ir.Program, s *ir.Scalar) (cons []Constraint, problems []Problem) {
 	core, ok := CoreOf(p, s.Base)
 	subject := "scalar " + s.Name
@@ -152,7 +152,7 @@ func Scalar(p *ir.Program, s *ir.Scalar) (cons []Constraint, problems []Problem)
 
 // Field は、model m のフィールド f に付いた標準の制約（書かれた順）と、使い方の誤り。誤りのある制約は、cons に入らない。
 // 配列のフィールドに付けた length は、要素の数に掛かる（Count が true で、Name は count）。
-// 利用者が valid に足した制約は、読まない（docs/plugin-valid.md「対象」）。
+// 標準でない valid の制約は、読まない（docs/plugin-valid.md「対象」）。
 func Field(p *ir.Program, m *ir.Model, f *ir.Field) (cons []Constraint, problems []Problem) {
 	subject := fmt.Sprintf("model %s のフィールド %s", m.Name, f.Name)
 	value := unwrap(f.Type)

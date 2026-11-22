@@ -206,7 +206,7 @@ type (
 func (withoutPRD002) PRD_001(*testing.T) {}
 
 // RunIncomplete は、ケースか、入れ物を欠いた型が、口を満たさないこと。欠いた型を渡す行（flowstest.RunFlows(t, ops, withoutFlow{})）は、
-// コンパイルできないので、ここには書けない。代わりに、口が求めるメソッドを、リフレクションで確かめる: FlowCases は、@business.flow の
+// コンパイルできないので、ここには書けない。代わりに、口が求めるメソッドを、リフレクションで確かめる: FlowCases は、@prd.business.flow の
 // 付いた op ごとに一つ。Requirements は、要求ごとに一つ。コンパイルできないことそのものは、リポジトリの plugins/go-design の
 // TestIncompleteDoNotCompile が、生成したコードをコンパイルして確かめる。
 func RunIncomplete(t *testing.T) {

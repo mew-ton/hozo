@@ -183,28 +183,28 @@ func TestWrittenEffects(t *testing.T) {
 // 葉の op が直に持つ効果（自分で書いたものと、デコレータが運ぶもの）の分は、名前の位置を持つ internal/sema が出す
 // （internal/sema の testdata/rules/STATE-2.hozo と tests/rules/STATE-2 が確かめる）ので、ここでは重ねて出さない。
 func TestState2(t *testing.T) {
-	foreign := leaf("browser.l", nil)
+	foreign := leaf("client.l", nil)
 	foreign.Effects = ir.NamedEffects("server.e1")
 	own := leaf("server.l", nil)
 	own.Effects = ir.NamedEffects("server.e1")
 	h := decorator("server.halt")
 	h.Catches = []ir.CatchesClause{catches(ir.Halts, "server.h", "server.X")}
-	decorated := leaf("browser.m", nil)
+	decorated := leaf("client.m", nil)
 	decorated.Throws = []ir.ThrowsClause{throws([]string{"server.X"})}
 	decorated.Decorators = []ir.Application{app("server.halt")}
 	ok := leaf("server.m", nil)
 	ok.Throws = []ir.ThrowsClause{throws([]string{"server.X"})}
 	ok.Decorators = []ir.Application{app("server.halt")}
 	// 伝播した効果は別の名前空間の配線に現れてよい
-	wiring := wire("browser.w", nil, nil, cs(call("server.l")))
+	wiring := wire("client.w", nil, nil, cs(call("server.l")))
 	wiring.Effects = ir.NamedEffects("server.e1")
-	p := program(nil, namespace("server", append(serverBase(), own, h, ok)...), namespace("browser", foreign, decorated, wiring))
-	diags := Check(p, cfgFor("server", "browser"))
+	p := program(nil, namespace("server", append(serverBase(), own, h, ok)...), namespace("client", foreign, decorated, wiring))
+	diags := Check(p, cfgFor("server", "client"))
 	s2 := withCode(diags, "STATE-2")
 	if len(s2) != 1 {
 		t.Fatalf("STATE-2 count = %d, want 1\n%s", len(s2), messages(diags))
 	}
-	if !strings.Contains(s2[0].Message, "browser.m") {
+	if !strings.Contains(s2[0].Message, "client.m") {
 		t.Errorf("STATE-2 message: %q", s2[0].Message)
 	}
 }
@@ -434,14 +434,14 @@ func TestCfg6(t *testing.T) {
 	m := model("server.M", field("f", ir.String()))
 	m.Fields[0].Decorators = []ir.Application{app("valid.min")}
 	o := leaf("server.o", nil)
-	o.Decorators = []ir.Application{app("http.get"), {Decorator: "browser.redirectOn", Via: "browser.redirectToLogin", Span: sp("@via")}}
+	o.Decorators = []ir.Application{app("http.get"), {Decorator: "client.redirectOn", Via: "client.redirectToLogin", Span: sp("@via")}}
 	batch := leaf("server.batch", nil)
 	batch.Decorators = []ir.Application{app("http.get")}
 	batch.Span.File = "batch.hozo"
-	other := leaf("browser.o", nil)
+	other := leaf("client.o", nil)
 	other.Decorators = []ir.Application{app("http.get")}
-	p := program(nil, namespace("server", m, o, batch), namespace("browser", other))
-	unsupported := []string{"http.get", "valid.min", "browser.redirectToLogin"}
+	p := program(nil, namespace("server", m, o, batch), namespace("client", other))
+	unsupported := []string{"http.get", "valid.min", "client.redirectToLogin"}
 	// files が nil なら名前空間のすべての宣言
 	diags := CheckUnsupported(p, "server", nil, unsupported)
 	if n := len(withCode(diags, "CFG-6")); n != 4 {

@@ -1,7 +1,7 @@
 // SYN-2: DocComment → デコレータ → 宣言の順
 namespace a {
   /** 状態 */
-  @localStorage
+  @browser.localStorage
   state s: list<string>;
   fn f();
 }

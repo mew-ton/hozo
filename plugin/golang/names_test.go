@@ -6,12 +6,12 @@ func TestTypeName(t *testing.T) {
 	tests := []struct{ fqn, ns, want string }{
 		{"server.User", "server", "User"},
 		{"server.user", "server", "User"},
-		{"browser.OrderPage.Ready", "browser", "OrderPageReady"},
+		{"client.OrderPage.Ready", "client", "OrderPageReady"},
 		{"server.LoginFailed.Value", "server", "LoginFailedValue"},
 		{"server.admin.Report", "server.admin", "Report"},
 		{"db", "", "Db"},
 		{"server.ClientError.Value", "server", "ClientErrorValue"},
-		{"server.User", "browser", "ServerUser"},
+		{"server.User", "client", "ServerUser"},
 		{"server.OrderPage.Ready", "server", "OrderPageReady"},
 		{"server.type", "server", "Type"},
 	}

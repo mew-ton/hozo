@@ -16,8 +16,8 @@ namespace   = "web"
 transpilers = ["view-dump"]
 out         = "gen/web"
 
-# web は語彙 page の型（page.Route）も使うので、page にも同じ基底の単位を置く（docs/config.md「型の置き場」）
+# web は語彙 browser.page の型（browser.page.Route）も使うので、browser.page にも同じ基底の単位を置く（docs/config.md「型の置き場」）
 [[emit]]
-namespace   = "page"
+namespace   = "browser.page"
 transpilers = ["view-dump"]
 out         = "gen/page"

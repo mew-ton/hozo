@@ -1,8 +1,12 @@
+[hozo]
+plugin_dirs = ["plugins"]
+
 [options.go]
 module = "example.com/app"
 
 # plugins/go-valid の単体テストの入力（docs/testing.md「単体テスト」）: GOVALID-5（標準でない valid の制約が付いている）。
+# 制約を valid に足すのは、fixture のプラグイン morevalid の語彙のファイル（語彙を読ませるために、そのトランスパイラを、単位に並べる）。
 [[emit]]
 namespace   = "app"
-transpilers = ["go", "go-valid"]
+transpilers = ["go", "go-valid", "go-morevalid"]
 out         = "gen/app"

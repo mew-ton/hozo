@@ -42,7 +42,7 @@ func TestCheckLiteral(t *testing.T) {
 			constrainedScalar("type.Name", ir.String(), app("valid.length", "min", num(1), "max", num(3))),
 			constrainedScalar("type.Email", ir.String(), app("valid.format", "name", str("email"))),
 			constrainedScalar("type.Plain", ir.String()),
-			// 利用者が valid に足した制約は、中身を人が書く: ここでは確かめない
+			// 標準でない valid の制約は、中身を人が書く: ここでは確かめない
 			constrainedScalar("type.Code", ir.String(), app("valid.checkDigit")),
 		},
 	}, "type")

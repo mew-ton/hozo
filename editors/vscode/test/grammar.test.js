@@ -11,9 +11,9 @@ const { loadGrammar, tokenize } = require('./tokenize');
 const root = path.join(__dirname, '..', '..', '..');
 const files = {
   server: path.join(root, 'tests', 'corpus', 'design', 'server.hozo'),
-  browser: path.join(root, 'tests', 'corpus', 'design', 'browser.hozo'),
+  client: path.join(root, 'tests', 'corpus', 'design', 'client.hozo'),
   http: path.join(root, 'vocab', 'http.hozo'),
-  page: path.join(root, 'vocab', 'page.hozo'),
+  page: path.join(root, 'vocab', 'browser.hozo'),
   valid: path.join(root, 'vocab', 'valid.hozo'),
   cli: path.join(root, 'cli.hozo'),
   // 状態の分類・遷移の効果・状態での match（docs/grammar.md「exception / effect / read」「classify」「配線」）
@@ -79,7 +79,7 @@ test('予約語（宣言の頭、節の頭、核の型、リテラル）', () =>
   assertScope(s, 'state users: list<User>;', 'list', 'support.type.primitive.hozo');
   assertScope(s, 'throws RateLimited prevents effects', 'prevents', 'keyword.control.hozo');
   assertScope(s, 'throws RateLimited prevents effects', 'effects', 'keyword.control.hozo');
-  const b = linesOf(files.browser);
+  const b = linesOf(files.client);
   assertScope(b, 'bind token to server.*;', 'bind', 'keyword.declaration.hozo');
   assertScope(b, 'bind token to server.*;', 'to', 'keyword.control.hozo');
   assertScope(b, 'val line = server.addToCart', 'val', 'keyword.control.hozo');
@@ -109,13 +109,13 @@ test('予約語（宣言の頭、節の頭、核の型、リテラル）', () =>
   assert.ok(!gone.tokens.some((tk) => tk.text.includes('const') && tk.scopes.length > 1), 'なくした const に scope が付いている');
   // 対象のない分類と、ケースを対象にするデコレータ（docs/grammar.md「classify」「decorator の宣言」）
   const c = tokensOf([
-    'classify Actor of never { @actor.human Customer; }',
+    'classify Actor of never { @prd.actor.human Customer; }',
     'decorator human for case of Actor;',
     'decorator seen(what: any case of any) for model, case of Order;',
     'decorator fn by(who: any case of never);',
   ].join('\n'));
   assertScope(c, 'classify Actor', 'never', 'support.type.primitive.hozo');
-  assertScope(c, 'classify Actor', '@actor.human', 'entity.name.function.decorator.hozo');
+  assertScope(c, 'classify Actor', '@prd.actor.human', 'entity.name.function.decorator.hozo');
   assertScope(c, 'decorator human', 'case', 'keyword.control.hozo');
   assertScope(c, 'decorator fn by', 'case', 'keyword.control.hozo');
   assertScope(c, 'decorator fn by', 'never', 'support.type.primitive.hozo');
@@ -149,7 +149,7 @@ test('文脈キーワードは位置でだけ色が付く', () => {
   assertScope(s, 'effect fn createSession(login: LoginOk): effects sessions.post;', 'effects', 'keyword.control.hozo');
   assertScope(s, 'effect fn createSession(login: LoginOk): effects sessions.post;', 'post', 'keyword.other.hozo');
   assertScope(s, 'effect fn deleteSession(token: Token?): effects sessions.delete;', 'delete', 'keyword.other.hozo');
-  const b = linesOf(files.browser);
+  const b = linesOf(files.client);
   assertScope(b, 'effect fn transitionToLogin(): effects location.put;', 'put', 'keyword.other.hozo');
   // model Violation { field: string; } の field は識別子
   const violation = s.find((l) => l.text.includes('model Violation {'));
@@ -262,7 +262,7 @@ test('宣言の名前', () => {
   assertScope(s, 'effect fn createSession(login: LoginOk): effects sessions.post;', 'createSession', 'entity.name.function.hozo');
   assertScope(s, 'decorator fn requiresAuth(): throws', 'requiresAuth', 'entity.name.function.hozo');
   assertScope(s, 'state users: list<User>;', 'users', 'variable.other.hozo');
-  const b = linesOf(files.browser);
+  const b = linesOf(files.client);
   assertScope(b, 'union ApiError {', 'ApiError', 'entity.name.type.hozo');
   assertScope(b, 'classify WarrantyKind of server.Item {', 'WarrantyKind', 'entity.name.type.hozo');
   assertScope(b, 'classify WarrantyAvailable of server.Item { Available; Unavailable; }', 'WarrantyAvailable', 'entity.name.type.hozo');
@@ -282,7 +282,7 @@ test('型の位置の名前', () => {
   assertScope(s, 'throws InvalidCredentials, NotVerified', 'NotVerified', 'entity.name.type.hozo');
   // 例外の宣言の名前と、引数の名前（引数名には scope を付けない）
   assertScope(s, 'exception ClientError(value: Violations);', 'ClientError', 'entity.name.type.hozo');
-  const b = linesOf(files.browser);
+  const b = linesOf(files.client);
   assertScope(b, 'classify WarrantyKind of server.Item {', 'server.Item', 'entity.name.type.hozo');
   assertScope(b, 'catches http.NetworkError, http.ServerError ignores;', 'http.ServerError', 'entity.name.type.hozo');
   assertScope(b, 'state token: nullable<server.Token>;', 'server.Token', 'entity.name.type.hozo');
@@ -293,8 +293,8 @@ test('型の位置の名前', () => {
   assertScope(st, 'match (token by nullable) {', 'nullable', 'support.type.primitive.hozo');
   assertScope(st, 'match (carts by list) {', 'list', 'support.type.primitive.hozo');
   assertScope(st, 'match (carts by list) {', 'by', 'keyword.control.hozo');
-  assertScope(b, 'state query: single<page.Query>;', 'single', 'support.type.primitive.hozo');
-  assertScope(b, 'state query: single<page.Query>;', 'page.Query', 'entity.name.type.hozo');
+  assertScope(b, 'state query: single<browser.page.Query>;', 'single', 'support.type.primitive.hozo');
+  assertScope(b, 'state query: single<browser.page.Query>;', 'browser.page.Query', 'entity.name.type.hozo');
   // インデックスの model（docs/grammar.md「model」）: キーと値の型は、型の位置。Record は、予約語ではなくなった（ふつうの名前）
   const ix = tokensOf('model Attrs { [name: string]: Item[]; }\nmodel Holder { attrs: Record; }');
   assertScope(ix, 'model Attrs', 'model', 'keyword.declaration.hozo');
@@ -305,11 +305,11 @@ test('型の位置の名前', () => {
   assertScope(b, 'fn chooseYamadaWarranty(item: server.Item on WarrantyKind.Yamada', 'WarrantyKind.Yamada', 'entity.name.type.hozo');
   // 複数行にまたがる返り値の型と throws
   assertScope(b, /^\s*: server\.WarrantyLine$/, 'server.WarrantyLine', 'entity.name.type.hozo');
-  assertScope(b, 'throws page.Aborted, http.NetworkError, http.ServerError', 'page.Aborted', 'entity.name.type.hozo');
+  assertScope(b, 'throws browser.page.Aborted, http.NetworkError, http.ServerError', 'browser.page.Aborted', 'entity.name.type.hozo');
   // 値の位置（レコードリテラル、名前付き引数）の小文字の名前は型にしない
   const orders = b.find((l) => l.text.includes('return server.getOrders({ page: query.page'));
   assert.ok(!orders.tokens.some((t) => t.scopes.includes('entity.name.type.hozo')));
-  const route = b.find((l) => l.text.includes('@page.route("/orders", from: query, onInvalid: transitionToOrders)'));
+  const route = b.find((l) => l.text.includes('@browser.page.route("/orders", from: query, onInvalid: transitionToOrders)'));
   assert.ok(!route.tokens.some((t) => t.scopes.includes('entity.name.type.hozo')));
 });
 
@@ -407,7 +407,7 @@ test('矢印（遷移の -> と match のアームの =>）', () => {
   assertScope(st, 'Ordered  => none;', '=>', 'keyword.operator.arrow.hozo');
   assertScope(st, 'else     => showLogin();', '=>', 'keyword.operator.arrow.hozo');
   assertScope(st, 'else     => showLogin();', 'else', 'keyword.control.hozo');
-  const b = linesOf(files.browser);
+  const b = linesOf(files.client);
   assertScope(b, 'NoWarranty => none;', '=>', 'keyword.operator.arrow.hozo');
   // 矢印の両側は今まで通り
   assertScope(st, 'effect fn startOver(): effects Checkout as any -> Shopping;', 'any', 'keyword.control.hozo');
@@ -785,7 +785,7 @@ test('コメントとドキュメンテーションコメント', () => {
   assertScope(s, '* @see login', '@see', 'storage.type.class.jsdoc');
   assertScope(s, '* @see login', 'login', 'variable.other.jsdoc');
   // 複数行の doc comment の本文
-  const b = linesOf(files.browser);
+  const b = linesOf(files.client);
   assertScope(b, '* 商品に適用される保証の種類。', '   * 商品に適用される保証の種類。', 'comment.block.documentation.hozo');
   // ブロックコメントと、行の途中から始まる doc comment
   const t = tokensOf('/* a */ /**/ model X {} /** @param x */ fn f(x: int);');

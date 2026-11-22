@@ -245,7 +245,7 @@ func TestValidVocabularyDiagnostics(t *testing.T) {
 	}
 	wantVocabularyDiagnostics(t, stderr.String(), "VALID-1", lines)
 
-	// 制約を、正しく使っている仕様（利用者が valid に足した制約を含む。plugin/validvocab の入力 clean）は、単位がなくても、通る
+	// 制約を、正しく使っている仕様（plugin/validvocab の入力 clean）は、単位がなくても、通る
 	ok, err := os.ReadFile(filepath.Join("..", "plugin", "validvocab", "testdata", "clean", "app.hozo"))
 	if err != nil {
 		t.Fatal(err)

@@ -51,7 +51,7 @@ func TestHasValidate(t *testing.T) {
 		"type": {
 			// 1: @valid.* が付いた scalar
 			scalar("type.Email", ir.String(), "valid.format"),
-			// 利用者が valid に足した制約も、@valid.* の一つ（使われていれば、go-valid が GOVALID-5 を返す）
+			// 標準でない valid の制約（ほかのプラグインの語彙が足したもの）も、@valid.* の一つ（使われていれば、go-valid が GOVALID-5 を返す）
 			scalar("type.Code", ir.String(), "valid.checkDigit"),
 			// valid の語彙でないデコレータは数えない（名前空間 valid.sub、valid で始まるだけの名前空間、グローバル）
 			scalar("type.Plain", ir.String(), "db.key", "valid.sub.x", "validx.min", "valid"),

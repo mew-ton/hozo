@@ -16,7 +16,7 @@ import (
 
 var update = flag.Bool("update", false, "update golden files (docs/testing.md「コーパス」)")
 
-// TestViewsGolden は §9 の例に深い bind を足した小さなプログラムの View（browser から見たもの）がゴールデンと一致すること。
+// TestViewsGolden は §9 の例に深い bind を足した小さなプログラムの View（client から見たもの）がゴールデンと一致すること。
 // 更新は go test ./internal/check -update。
 func TestViewsGolden(t *testing.T) {
 	lineCounter = 1000 // 位置を決定的にする
@@ -28,9 +28,9 @@ func TestViewsGolden(t *testing.T) {
 		model("server.Outer", field("inner", ir.Ref("server.Inner")), field("note", ir.String())),
 		leaf("server.deep", ir.String(), param("in", ir.Ref("server.Outer")), param("t", ir.Optional(ir.Ref("server.Token")))),
 	)
-	// 単位は四つ: server、browser（トランスパイラ react-router）、同じ browser の二つ目（別のトランスパイラと out）、
+	// 単位は四つ: server、client（トランスパイラ react-router）、同じ client の二つ目（別のトランスパイラと out）、
 	// Program にない server.admin（CFG-10 は check の別の規則。出力はない）
-	cfg := cfgFor("server", "browser", "browser", "server.admin")
+	cfg := cfgFor("server", "client", "client", "server.admin")
 	cfg.Units[1].Transpilers = []string{"react-router"}
 	cfg.Units[2].Transpilers = []string{"vue-router", "pinia"}
 	cfg.Units[2].Out = "gen/browser2"
@@ -40,33 +40,33 @@ func TestViewsGolden(t *testing.T) {
 	units[2].Seams = map[string]string{"cache.cached": "pinia"}
 	all := Views(p, cfg, units)
 	if len(all) != 4 || len(all[0]) != 1 || len(all[1]) != 1 || len(all[2]) != 1 || len(all[3]) != 0 {
-		t.Fatalf("views = %v, want one view each for the units of server, browser, browser, and none for server.admin", all)
+		t.Fatalf("views = %v, want one view each for the units of server, client, client, and none for server.admin", all)
 	}
-	views := map[string]*ir.View{"server": all[0]["server"], "browser": all[1]["browser"]}
-	v := views["browser"]
+	views := map[string]*ir.View{"server": all[0]["server"], "client": all[1]["client"]}
+	v := views["client"]
 	// config は、単位の番号、言語、基底、out、Dir(U, N)、transpilers、options、seams（docs/ir.md「その名前空間から見た IR」）
-	want1 := ir.NamespaceConfig{Index: 2, Language: "go", Base: "go", Out: "gen/browser", Dir: "gen/browser", Transpilers: []string{"react-router"},
+	want1 := ir.NamespaceConfig{Index: 2, Language: "go", Base: "go", Out: "gen/client", Dir: "gen/client", Transpilers: []string{"react-router"},
 		Options: map[string]map[string]any{}, Seams: map[string]string{}}
-	if v.Viewer != "browser" || !reflect.DeepEqual(v.Config, want1) {
+	if v.Viewer != "client" || !reflect.DeepEqual(v.Config, want1) {
 		t.Errorf("config = %+v", v.Config)
 	}
-	if !reflect.DeepEqual(v.Files, []string{"browser.hozo", "server.hozo", "hozo:vocab/http.hozo"}) {
+	if !reflect.DeepEqual(v.Files, []string{"client.hozo", "server.hozo", "hozo:vocab/http.hozo"}) {
 		t.Errorf("files = %v", v.Files)
 	}
 	// namespaces は出力のあるすべての名前空間（viewer を含む）。値は、その名前空間を出力する単位ごとの設定（設定の順）
-	if len(v.Namespaces) != 2 || len(v.Namespaces["server"]) != 1 || len(v.Namespaces["browser"]) != 2 {
+	if len(v.Namespaces) != 2 || len(v.Namespaces["server"]) != 1 || len(v.Namespaces["client"]) != 2 {
 		t.Errorf("namespaces = %+v", v.Namespaces)
 	}
 	// namespaces[viewer] のうち index が config.index と同じ要素が、この View の単位のもの
-	if !reflect.DeepEqual(v.Namespaces["browser"][0], v.Config) {
-		t.Errorf("namespaces[viewer][0] = %+v, config = %+v", v.Namespaces["browser"][0], v.Config)
+	if !reflect.DeepEqual(v.Namespaces["client"][0], v.Config) {
+		t.Errorf("namespaces[viewer][0] = %+v, config = %+v", v.Namespaces["client"][0], v.Config)
 	}
 	// 同じ名前空間の二つ目の単位の View は、config だけが違う
-	second := all[2]["browser"]
+	second := all[2]["client"]
 	want2 := ir.NamespaceConfig{Index: 3, Language: "go", Base: "go", Out: "gen/browser2", Dir: "gen/browser2", Transpilers: []string{"vue-router", "pinia"},
 		Options: map[string]map[string]any{"pinia": {"strict": true}}, Seams: map[string]string{"cache.cached": "pinia"}}
-	if !reflect.DeepEqual(second.Config, want2) || !reflect.DeepEqual(v.Namespaces["browser"][1], want2) {
-		t.Errorf("second unit: config = %+v, namespaces = %+v", second.Config, v.Namespaces["browser"])
+	if !reflect.DeepEqual(second.Config, want2) || !reflect.DeepEqual(v.Namespaces["client"][1], want2) {
+		t.Errorf("second unit: config = %+v, namespaces = %+v", second.Config, v.Namespaces["client"])
 	}
 	if !reflect.DeepEqual(second.Ops, v.Ops) || !reflect.DeepEqual(second.Namespaces, v.Namespaces) {
 		t.Error("views of the same namespace must differ only in config and files")
@@ -74,25 +74,25 @@ func TestViewsGolden(t *testing.T) {
 	if !reflect.DeepEqual(views["server"].Namespaces, v.Namespaces) {
 		t.Error("every view must carry the same namespaces")
 	}
-	// 合成した model は browser の decls の末尾にだけ足され、元の Program は変わらない
+	// 合成した model は client の decls の末尾にだけ足され、元の Program は変わらない
 	// logout$in（token を除いた LogoutInput）、deep$in、deep$in$inner の三つ
-	if n := len(v.Program.Namespace("browser").Decls); n != len(p.Namespace("browser").Decls)+3 {
-		t.Errorf("browser decls = %d, want +3 synthesized", n)
+	if n := len(v.Program.Namespace("client").Decls); n != len(p.Namespace("client").Decls)+3 {
+		t.Errorf("client decls = %d, want +3 synthesized", n)
 	}
-	if m := v.Program.Lookup("browser.logout$in").(*ir.Model); len(m.Fields) != 0 || m.SynthesizedFrom != "server.logout" {
+	if m := v.Program.Lookup("client.logout$in").(*ir.Model); len(m.Fields) != 0 || m.SynthesizedFrom != "server.logout" {
 		t.Errorf("logout$in = %+v", m)
 	}
-	if len(views["server"].Program.Namespace("browser").Decls) != len(p.Namespace("browser").Decls) {
-		t.Error("server view has browser's synthesized models")
+	if len(views["server"].Program.Namespace("client").Decls) != len(p.Namespace("client").Decls) {
+		t.Error("server view has client's synthesized models")
 	}
 	deep := v.Ops["server.deep"]
-	if len(deep.Params) != 1 || deep.Params[0].Type.String() != "browser.deep$in" {
+	if len(deep.Params) != 1 || deep.Params[0].Type.String() != "client.deep$in" {
 		t.Errorf("deep params = %+v", deep.Params)
 	}
 	if len(deep.Bound) != 2 {
 		t.Errorf("deep bound = %+v", deep.Bound)
 	}
-	synth := v.Program.Lookup("browser.deep$in$inner").(*ir.Model)
+	synth := v.Program.Lookup("client.deep$in$inner").(*ir.Model)
 	if len(synth.Fields) != 1 || synth.Fields[0].Name != "n" || synth.SynthesizedFrom != "server.deep" {
 		t.Errorf("synthesized inner = %+v", synth)
 	}

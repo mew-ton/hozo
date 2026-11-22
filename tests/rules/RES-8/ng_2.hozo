@@ -1,0 +1,13 @@
+// RES-8: 語彙の名前空間の下に、名前空間も、足せない（中身が空でも）。入れ子のブロックでは、いちばん外側に、一つ。
+namespace browser.shop {               // ERROR: RES-8
+  model Cart { id: string; }
+}
+namespace prd.x { }                    // ERROR: RES-8
+namespace prd {                        // ERROR: RES-8
+  namespace actor {
+    decorator robot for case of never;
+  }
+}
+namespace a {
+  model M { id: string; }
+}

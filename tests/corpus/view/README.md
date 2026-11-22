@@ -4,7 +4,7 @@
 
 | ファイル | 中身 |
 |---|---|
-| `hozo.toml` | `[hozo] plugin_dirs = ["plugins"]` と、単位が三つ: `namespace = "api"`、`"web"`、`"page"`。どれも `transpilers = ["view-dump"]`（TS の基底はまだないので、`api` と `web` を同じ基底にする）。`api` と `page` の単位は、`web` が使う型の置き場（`docs/config.md`「型の置き場」。なければ CFG-22） |
+| `hozo.toml` | `[hozo] plugin_dirs = ["plugins"]` と、単位が三つ: `namespace = "api"`、`"web"`、`"browser.page"`（出力先は `gen/page`）。どれも `transpilers = ["view-dump"]`（TS の基底はまだないので、`api` と `web` を同じ基底にする）。`api` と `page` の単位は、`web` が使う型の置き場（`docs/config.md`「型の置き場」。なければ CFG-22） |
 | `t.hozo` | テストの語彙 `namespace t { decorator fn entry(); }`。`plugin.OpsWith` が探す op の印。標準の語彙にない名前空間で、どの単位の対象でもないので出力しない（`docs/config.md`「単位の対象」） |
 | `api.hozo` | サーバー側 `namespace api`。`web` から呼ばれる（呼ばれる op は `export`）。`docs/ir.md`「版」の 0.3 で足した形（継承した model の `override`、形の語、状態の型、`reads`、op の分類とケースの `as`、状態の参照、アームの値と `throw`、`never`）と、0.6 で足した形（`read` の宣言、引数を持つ例外と効果、`read` と効果の呼び出し、直に呼ぶ組み込みの効果、引数を渡す `throw`、`@repeatable`）と、0.7 で足した形（残りのケース `対象 as else`。`presence` と `variant`）と、0.8 で足した形（`else` のアーム、残りのケースを書かない型で決まる分類）はここに置く |
 | `web.hozo` | ブラウザ側 `namespace web`。テストが見る `View` の viewer。`@t.entry` の付いた op が、`plugin.OpsWith` の対象 |
@@ -21,8 +21,8 @@
 
 | 文書の見出し | 構文（ファイル） | 確かめること |
 |---|---|---|
-| `docs/ir.md`「原則」 | `nullable<api.Token>`、`single<page.Route>`、`fetchUser({ id })`（`web.hozo`） | 参照はすべて FQN。名前空間の順は `""`、`api`、`t`、`web`（ファイルの辞書順）、その後に語彙 `db` `fs` `http` `page` `valid` |
-| `docs/ir.md`「Program」 | `/** ... */ namespace api { }` など三つの名前空間、`page.Route` | `Namespace.description`、`Span.file` の形（ユーザーは相対パス、語彙は `hozo:vocab/<名前>.hozo`）、位置は 1 始まり、宣言の位置は最初のデコレータから |
+| `docs/ir.md`「原則」 | `nullable<api.Token>`、`single<browser.page.Route>`、`fetchUser({ id })`（`web.hozo`） | 参照はすべて FQN。名前空間の順は `""`、`api`、`t`、`web`（ファイルの辞書順）、その後に語彙 `browser` `browser.page` `db` `fs` `http` `prd` `prd.actor` `prd.usecase` `prd.business` `valid`（語彙のファイルの辞書順。入れ子の名前空間は、親の直後） |
+| `docs/ir.md`「Program」 | `/** ... */ namespace api { }` など三つの名前空間、`browser.page.Route` | `Namespace.description`、`Span.file` の形（ユーザーは相対パス、語彙は `hozo:vocab/<名前>.hozo`）、位置は 1 始まり、宣言の位置は最初のデコレータから |
 | `docs/ir.md`「Doc」、`docs/check.md`「名前空間」DOC-1 | `openUser` / `fetchUser` / `api.getUser` の `@param` `@throws` `@see`、フィールド・アーム・ケースの DocComment | `summary` と `body`、`@throws` と `@see` は FQN、説明のない宣言は `description` なし。`api.getUser` の `@throws Timeout` は `external` なデコレータの例外（`Signature.exceptions` にない）で、DOC-1 にならない |
 | `docs/ir.md`「型」 | `api.User`（`string??` `string[]` `Attrs`）、インデックスの model `api.Attrs`、`scalar AdminToken extends Token`、`api.PublicUser on UserKind.Admin`、`fn signOut()` | `T??` → `T?`、array / case、インデックスの model（`Model.index`）、void は `returns: null`、状態の形 `list` / `nullable` / `single`（型の最も外側から決まる。`docs/decisions.md`「設計書から離れた決定」S21） |
 | `docs/ir.md`「正規化」`namespace` | `web.hozo` の二つの `namespace web { }` | 一つの `Namespace`、decls は出現順に連結 |

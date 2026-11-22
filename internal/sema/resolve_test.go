@@ -2,6 +2,7 @@ package sema
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 	"testing"
 
@@ -284,7 +285,7 @@ namespace a {
 func TestResolveBindNamespace(t *testing.T) {
 	res, fs := analyzeProject(t, project{"a.hozo": `
 namespace server { model Token { v: string; } }
-namespace browser {
+namespace client {
   state token: nullable<server.Token>;
   bind token to server.*;
   bind token to server.**;
@@ -294,15 +295,17 @@ namespace browser {
 		t.Errorf("binds = %+v", res.Program.Binds)
 	}
 	hasRef(t, res, fs, "a.hozo:5:17 namespace server")
-	hasRef(t, res, fs, "a.hozo:5:8 decl browser.token")
+	hasRef(t, res, fs, "a.hozo:5:8 decl client.token")
 }
 
 // TestDuplicatePosition は RES-6 の位置: ユーザーのファイルの側、両方ユーザーなら原則の順で後の方。NS-3 は両方が語彙。
+// 語彙とユーザーの重複は、グローバルで起こす（語彙の名前空間には、仕様から足せない: RES-8）。
 func TestDuplicatePosition(t *testing.T) {
 	res, fs := analyzeProject(t, project{
-		"b.hozo":                   "namespace a { model X { id: string; } }\nnamespace http { exception NetworkError; }\n",
+		"b.hozo":                   "namespace a { model X { id: string; } }\ndecorator mark for state;\n",
 		"a.hozo":                   "namespace a { model X { id: string; } }\n",
-		"hozo:plugin/p/vocab.hozo": "decorator localStorage for state;\n",
+		"hozo:plugin/p/vocab.hozo": "decorator mark for state;\ndecorator shared for state;\n",
+		"hozo:plugin/q/vocab.hozo": "\ndecorator shared for state;\n",
 	}, true)
 	got := map[string]string{}
 	for _, d := range res.Diags {
@@ -314,10 +317,10 @@ func TestDuplicatePosition(t *testing.T) {
 	if got["RES-6"] == "" {
 		t.Fatalf("RES-6 がない: %v", codes(res))
 	}
-	if got["NS-3"] != "hozo:vocab/localstorage.hozo:2" { // 語彙どうしは順で後の方（hozo:vocab は hozo:plugin の後）
+	if got["NS-3"] != "hozo:plugin/q/vocab.hozo:2" { // 語彙どうしは順で後の方
 		t.Errorf("NS-3 の位置 = %s", got["NS-3"])
 	}
-	// b.hozo の二つ: a.X（a.hozo が先なので b.hozo 側）と http.NetworkError（ユーザーの側）
+	// b.hozo の二つ: a.X（a.hozo が先なので b.hozo 側）と、グローバルの mark（ユーザーの側）
 	n := 0
 	for _, d := range res.Diags {
 		if d.Code == "RES-6" && fs.Path(d.Span.File) == "b.hozo" {
@@ -327,9 +330,50 @@ func TestDuplicatePosition(t *testing.T) {
 	if n != 2 {
 		t.Errorf("b.hozo の RES-6 が %d 件", n)
 	}
-	// 表に残るのは語彙の側: http.NetworkError は語彙の宣言
-	if d := res.Program.Lookup("http.NetworkError"); d == nil || !strings.HasPrefix(d.Common().Span.File, "hozo:") {
-		t.Errorf("http.NetworkError が語彙の宣言でない")
+	// 表に残るのは語彙の側: グローバルの mark は語彙の宣言
+	if d := res.Program.Lookup("mark"); d == nil || !strings.HasPrefix(d.Common().Span.File, "hozo:") {
+		t.Errorf("mark が語彙の宣言でない")
+	}
+}
+
+// TestClosedVocabularyNamespace は RES-8: 語彙の名前空間と、その下には、仕様から、宣言も、名前空間も、足せない。
+// 位置は、仕様の側の namespace の名前で、ブロック一つに、一つ。足した宣言は、表には残る（使う所に RES-1 を重ねない）。
+// 語彙のファイルどうし（プラグインの語彙が、標準の語彙の名前空間に足す）は、当たらない。
+func TestClosedVocabularyNamespace(t *testing.T) {
+	res, fs := analyzeProject(t, project{
+		"a.hozo": `namespace http { exception Mine; }
+namespace browser.shop { model Cart { id: string; } }
+namespace prd { namespace x { decorator d for state; } decorator e for state; }
+namespace valid.inner { }
+namespace app {
+  namespace http { exception Local; }
+  @valid.extra
+  scalar Code extends string;
+  fn f(): void throws http.Mine;
+}
+`,
+		"hozo:plugin/p/vocab.hozo": "namespace valid { decorator extra for scalar, field; }\nnamespace mine.sub { decorator own for state; }\n",
+		"b.hozo":                   "namespace mine { model M { id: string; } }\nnamespace mine.sub.deep { }\n",
+	}, true)
+	var got []string
+	for _, d := range res.Diags {
+		if d.Severity == diag.Error {
+			got = append(got, fmt.Sprintf("%s:%d %s", fs.Path(d.Span.File), fs.Position(d.Span.File, d.Span.Start).Line, d.Code))
+		}
+	}
+	sort.Strings(got)
+	// mine は、語彙が宣言したのが mine.sub だけなので、閉じていない。mine.sub.deep は、その下
+	want := []string{"a.hozo:1 RES-8", "a.hozo:2 RES-8", "a.hozo:3 RES-8", "a.hozo:4 RES-8", "b.hozo:2 RES-8"}
+	if strings.Join(got, ", ") != strings.Join(want, ", ") {
+		t.Errorf("error = %v, want %v", got, want)
+	}
+	for _, d := range res.Diags {
+		if d.Code == "RES-8" && fs.Path(d.Span.File) == "a.hozo" && fs.Position(d.Span.File, d.Span.Start).Line == 2 && !strings.Contains(d.Message, "browser の下") {
+			t.Errorf("下の名前空間の RES-8 の文面 = %q", d.Message)
+		}
+	}
+	if res.Program.Lookup("http.Mine") == nil {
+		t.Errorf("足した宣言 http.Mine が、表にない")
 	}
 }
 

@@ -1,5 +1,5 @@
 # 設計書 §5〜§11 の例のコーパス（docs/testing.md「コーパス」）。
-# 設計書 §4.5 では browser は TS だが、TS の基底はまだないので、今は両方とも Go の基底 go で出力する（README.md）。
+# 設計書 §4.5 では、ブラウザの側の名前空間（設計書では browser。ここでは client: README.md の 24）は TS だが、TS の基底はまだないので、今は両方とも Go の基底 go で出力する（README.md）。
 # go は、リポジトリの plugins/ のプラグイン。テストが HOZO_PLUGIN_PATH として渡す（docs/testing.md「コーパス」）。
 # 設計書のプラグイン（http のサーバー、ルーター、db）は並べないので、語彙のデコレータは、出力では、印のまま（docs/plugin-go.md「デコレータ」）。
 # http、valid、db の語彙の検査は、語彙のプラグイン http、valid、db が、単位に依らず、行う（docs/plugin-http.md、docs/plugin-valid.md、docs/plugin-db.md）。
@@ -17,17 +17,17 @@ transpilers = ["go"]
 out         = "gen/server"
 
 [[emit]]
-namespace   = "browser"
+namespace   = "client"
 transpilers = ["go"]
-out         = "gen/browser"
+out         = "gen/client"
 
-# 使う型の置き場（docs/config.md「型の置き場」）: browser と server が、語彙 http と page の型（例外、page.Route）を使う
+# 使う型の置き場（docs/config.md「型の置き場」）: client と server が、語彙 http と browser.page の型（例外、browser.page.Route）を使う
 [[emit]]
 namespace   = "http"
 transpilers = ["go"]
 out         = "gen/http"
 
 [[emit]]
-namespace   = "page"
+namespace   = "browser.page"
 transpilers = ["go"]
 out         = "gen/page"

@@ -31,7 +31,7 @@ Hozo の言語と、その実装（このリポジトリ）の設計。言語の
 | [`plugin-http.md`](plugin-http.md) | 語彙のプラグイン `http`: `http` の語彙の、言語に依らない決まり（経路、HTTP の通信の上の形、使い方の検査 HTTP-*） | `plugins/http`、`plugin/httpvocab` |
 | [`plugin-go-http.md`](plugin-go-http.md) | `http` の op を `net/http` のハンドラにする相乗り `go-http` | `plugins/go-http` |
 | [`plugin-go-cli.md`](plugin-go-cli.md) | `cli` の語彙を Go の CLI にする相乗り `go-cli` | `plugins/go-cli` |
-| [`plugin-go-design.md`](plugin-go-design.md) | 設計の図の語彙（`business.flow`、`usecase.of`、`prd.ref`）から、フローの E2E テストの口と、要求ごとの、テストの入れ物の口を出す相乗り `go-design` | `plugins/go-design` |
+| [`plugin-go-design.md`](plugin-go-design.md) | 設計の図の語彙（`prd.business.flow`、`prd.usecase.of`、`prd.ref`）から、フローの E2E テストの口と、要求ごとの、テストの入れ物の口を出す相乗り `go-design` | `plugins/go-design` |
 | [`diagnostics.md`](diagnostics.md) | 診断の形、表示、終了コード | `internal/diag` |
 | [`cli.md`](cli.md) | `hozoc` の振る舞いと `cli.hozo` | `cli.hozo`、`internal/app`、`cmd/hozoc` |
 | [`lsp.md`](lsp.md) | 言語サーバー | `internal/lsp` |

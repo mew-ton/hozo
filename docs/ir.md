@@ -498,7 +498,7 @@ interface Bind {
 | ユニオンのメンバーにユニオン | メンバーを展開して平らにする |
 | `throws A, B` にユニオン | 例外の FQN に展開 |
 | `effects a, b`、複数の `effects` | `EffectRef` の列一つ（書かれた順に連結）。`effect` の宣言の名前は `named`（ユニオンは展開）、`状態.操作` は `direct` |
-| `@redirectToLogin`（名前付き） | `decorator: "browser.redirectOn"`、`via: "browser.redirectToLogin"`、`args` は固定した引数 |
+| `@redirectToLogin`（名前付き） | `decorator: "client.redirectOn"`、`via: "client.redirectToLogin"`、`args` は固定した引数 |
 | デコレータの位置で書いた引数 | `param` に対応付け |
 | 残りの引数に渡した値（`decorator effects(...targets: any effect)` に `@effects(a, b)`） | 残りの引数の名前の `Arg` 一つ。`value` は `list` で、`items` は渡した値を書いた順に（一つずつ `ref` か `refs`） |
 | デコレータの宣言の `reads a, b`、`effects a, b`、複数の節 | `Decorator.reads` / `Decorator.effects` の列一つずつ（書かれた順に連結。効果のユニオンは展開。引数名は `$param:名前`） |
@@ -585,7 +585,7 @@ interface ViewedSignature extends Signature {   // Signature は Sig(O, viewer)
   params: OpParam[];              // bind で埋まる位置（docs/check.md「bind」の Pos(b, O)）を取り除いた引数。
                                   // 位置が model のフィールドなら、そのフィールドを除いた model を
                                   // `<viewer>.<op 名>$<引数名>` の FQN（synthesizedFrom は op の FQN）で合成し、ref にする。
-                                  // 位置が入れ子の model の中なら、パスのセグメントを `$` でつないだ名前（`browser.deep$in$inner`）で、親を先に合成する
+                                  // 位置が入れ子の model の中なら、パスのセグメントを `$` でつないだ名前（`client.deep$in$inner`）で、親を先に合成する
   bound: BoundPosition[];         // 取り除いた位置
 }
 ```

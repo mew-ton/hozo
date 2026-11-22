@@ -1,0 +1,8 @@
+// プラグインの語彙（docs/vocab.md「読み込み」）。標準の語彙の名前空間 valid に、制約を足す（語彙のファイルどうしは、足せる）
+namespace valid {
+  decorator even for scalar, field;
+}
+// 下の名前空間だけを宣言する: 閉じるのは acme.auth と、その下で、acme は、閉じない
+namespace acme.auth {
+  decorator signed for state;
+}

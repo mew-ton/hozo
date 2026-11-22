@@ -299,7 +299,7 @@ func TestWarnings(t *testing.T) {
 		t.Fatalf("empty: files=%v 診断=%+v warnings=%+v, want warning が二つだけ", sortedPaths(files), diags, warnings)
 	}
 	for i, at := range []string{"app", "other"} {
-		if warnings[i].At != at || !strings.Contains(warnings[i].Message, "@business.flow") || !strings.Contains(warnings[i].Message, "requirements") {
+		if warnings[i].At != at || !strings.Contains(warnings[i].Message, "@prd.business.flow") || !strings.Contains(warnings[i].Message, "requirements") {
 			t.Errorf("empty: warning = %+v", warnings[i])
 		}
 	}
@@ -328,10 +328,10 @@ func TestWarnings(t *testing.T) {
 // diagnosticFixtures は、診断を返す入力と、そのコード。期待する診断は testdata/<名前>/expected/errors.txt
 // （一行に、コード、位置、メッセージをタブで区切って。View の順、その中は返した順）。
 var diagnosticFixtures = []struct{ name, code string }{
-	{"godesign1", codeFlowExport}, // @business.flow の付いた op に export がない
-	{"godesign2", codeFlowShape},  // @business.flow の付いた op が、本体を持たない、または never を返す
+	{"godesign1", codeFlowExport}, // @prd.business.flow の付いた op に export がない
+	{"godesign2", codeFlowShape},  // @prd.business.flow の付いた op が、本体を持たない、または never を返す
 	{"godesign3", codeFlowCalls},  // フローの op の配線が、操作の op でないものを呼ぶ
-	{"godesign4", codeFlowHome},   // フローを持つ名前空間に、@usecase.of の付いた op がある
+	{"godesign4", codeFlowHome},   // フローを持つ名前空間に、@prd.usecase.of の付いた op がある
 	{"godesign5", codeOption},     // [emit.options.go-design] の誤り
 	{"godesign6", codeTestName},   // テストのパッケージに足す名前が、当たる、または Go の公開の名前にならない
 	{"godesign7", codeTestDir},    // テストのパッケージのディレクトリが、同じ単位が出力する子の名前空間の出力先と重なる
@@ -382,7 +382,7 @@ func TestDiagnosticPositions(t *testing.T) {
 		"godesign2": {"flows.leaf": 1, "flows.fail": 1},
 		// 呼んだ先ごとに、一つ（同じ先を二度呼んでも、一つ）。位置は、フローの op
 		"godesign3": {"flows.callsPlain": 1, "flows.callsHelper": 1, "flows.callsFlow": 1, "flows.callsState": 3, "flows.nested": 3},
-		// @usecase.of の付いた op（フローでもある op を含む）。フローを持たない名前空間の op は、当たらない
+		// @prd.usecase.of の付いた op（フローでもある op を含む）。フローを持たない名前空間の op は、当たらない
 		"godesign4": {"flows.local": 1, "flows.both": 1},
 		"godesign5": {"": 8},
 		// 当たった自分の名前を生んだフローの op か、要求の分類。決まった名前が当たったなら、相手の名前を生んだ宣言（葉の op、分類）
@@ -452,7 +452,7 @@ func TestNoModule(t *testing.T) {
 }
 
 // TestUnitTargets は「対象」: フローは、単位の対象の op（View.files にあるファイルの op。docs/config.md「in」）だけ。
-// 単位の対象でない op は、@business.flow が付いていても、フローにならない。
+// 単位の対象でない op は、@prd.business.flow が付いていても、フローにならない。
 func TestUnitTargets(t *testing.T) {
 	var flows *ir.View
 	for _, v := range loadViews(t, "flows") {

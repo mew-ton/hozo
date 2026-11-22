@@ -442,63 +442,63 @@ func TestSigOuterThrows(t *testing.T) {
 	getMe := leaf("server.getMe", ir.String())
 	getMe.Decorators = []ir.Application{app("http.get", ir.Arg{Param: "path", Value: ir.LiteralValue{Literal: ir.StringLiteral{Value: "/me"}}})}
 	inside := wire("server.inside", ir.String(), nil, ret(call("server.getMe")))
-	outside := wire("browser.fetchMe", ir.String(), nil, ret(call("server.getMe")))
-	p := program(nil, httpVocab(), namespace("server", getMe, inside), namespace("browser", outside))
-	diags := Check(p, cfgFor("server", "browser"))
+	outside := wire("client.fetchMe", ir.String(), nil, ret(call("server.getMe")))
+	p := program(nil, httpVocab(), namespace("server", getMe, inside), namespace("client", outside))
+	diags := Check(p, cfgFor("server", "client"))
 	wantStrings(t, "Sig(getMe, server).E", sigOf(t, p, "server.getMe").Exceptions, nil)
 	wantStrings(t, "Sig(inside, server).E", sigOf(t, p, "server.inside").Exceptions, nil)
-	wantStrings(t, "Sig(fetchMe, browser).E", sigOf(t, p, "browser.fetchMe").Exceptions, []string{"http.ServerError", "http.NetworkError"})
+	wantStrings(t, "Sig(fetchMe, client).E", sigOf(t, p, "client.fetchMe").Exceptions, []string{"http.ServerError", "http.NetworkError"})
 	// throws の節を書いていない配線に、節についての診断は、出ない（docs/check.md「状態に触れるもの」の「節に書く要素」）
 	wantCodes(t, diags)
 	// 節を書いた配線も、同じ: 節に書くのは、その関数が足す分で、伝わってくる例外を、書いていなくてよい。書いた例外は、足される
-	written := wire("browser.fetchMe", ir.String(), nil, ret(call("server.getMe")))
-	written.Throws = []ir.ThrowsClause{throws([]string{"browser.Offline"})}
-	pw := program(nil, httpVocab(), namespace("server", getMe, inside), namespace("browser", exc("browser.Offline"), written))
-	wantCodes(t, Check(pw, cfgFor("server", "browser")))
-	wantStrings(t, "Sig(fetchMe 節あり, browser).E", sigOf(t, pw, "browser.fetchMe").Exceptions, []string{"http.ServerError", "http.NetworkError", "browser.Offline"})
-	views := viewsOf(p, cfgFor("server", "browser"))
-	wantStrings(t, "View(browser).ops[server.getMe].E", views["browser"].Ops["server.getMe"].Exceptions, []string{"http.ServerError", "http.NetworkError"})
+	written := wire("client.fetchMe", ir.String(), nil, ret(call("server.getMe")))
+	written.Throws = []ir.ThrowsClause{throws([]string{"client.Offline"})}
+	pw := program(nil, httpVocab(), namespace("server", getMe, inside), namespace("client", exc("client.Offline"), written))
+	wantCodes(t, Check(pw, cfgFor("server", "client")))
+	wantStrings(t, "Sig(fetchMe 節あり, client).E", sigOf(t, pw, "client.fetchMe").Exceptions, []string{"http.ServerError", "http.NetworkError", "client.Offline"})
+	views := viewsOf(p, cfgFor("server", "client"))
+	wantStrings(t, "View(client).ops[server.getMe].E", views["client"].Ops["server.getMe"].Exceptions, []string{"http.ServerError", "http.NetworkError"})
 	wantStrings(t, "View(server).ops[server.getMe].E", views["server"].Ops["server.getMe"].Exceptions, nil)
 }
 
 // TestSigParamSubstitution は `$param:` の置き換え（ref / refs / list）と、別名のデコレータを通した適用。
 func TestSigParamSubstitution(t *testing.T) {
-	redirectOn := decorator("browser.redirectOn",
+	redirectOn := decorator("client.redirectOn",
 		ir.Param{Name: "error", Type: ir.AnyParam{Of: ir.AnyException}},
 		ir.Param{Name: "to", Type: ir.AnyParam{Of: ir.AnyEffect}})
 	redirectOn.Catches = []ir.CatchesClause{catches(ir.Halts, "$param:to", "$param:error")}
-	alias := decorator("browser.redirectToLogin")
-	alias.Alias = &ir.DecoratorAlias{Target: "browser.redirectOn", Args: []ir.Arg{
-		refArg("error", "server.X"), refArg("to", "browser.go")}}
-	l := leaf("browser.l", nil)
+	alias := decorator("client.redirectToLogin")
+	alias.Alias = &ir.DecoratorAlias{Target: "client.redirectOn", Args: []ir.Arg{
+		refArg("error", "server.X"), refArg("to", "client.go")}}
+	l := leaf("client.l", nil)
 	l.Throws = []ir.ThrowsClause{throws([]string{"server.X", "server.Y", "server.Z"})}
-	l.Decorators = []ir.Application{app("browser.redirectOn", refsArg("error", "server.X", "server.Y"), refArg("to", "browser.go"))}
-	viaAlias := leaf("browser.m", nil)
+	l.Decorators = []ir.Application{app("client.redirectOn", refsArg("error", "server.X", "server.Y"), refArg("to", "client.go"))}
+	viaAlias := leaf("client.m", nil)
 	viaAlias.Throws = []ir.ThrowsClause{throws([]string{"server.X", "server.Y"})}
-	viaAlias.Decorators = []ir.Application{{Decorator: "browser.redirectToLogin", Span: sp("@alias")}}
-	expanded := leaf("browser.n", nil)
+	viaAlias.Decorators = []ir.Application{{Decorator: "client.redirectToLogin", Span: sp("@alias")}}
+	expanded := leaf("client.n", nil)
 	expanded.Throws = []ir.ThrowsClause{throws([]string{"server.X", "server.Y"})}
-	expanded.Decorators = []ir.Application{{Decorator: "browser.redirectOn", Via: "browser.redirectToLogin",
-		Args: []ir.Arg{refArg("error", "server.X"), refArg("to", "browser.go")}, Span: sp("@expanded")}}
-	listed := leaf("browser.o", nil)
+	expanded.Decorators = []ir.Application{{Decorator: "client.redirectOn", Via: "client.redirectToLogin",
+		Args: []ir.Arg{refArg("error", "server.X"), refArg("to", "client.go")}, Span: sp("@expanded")}}
+	listed := leaf("client.o", nil)
 	listed.Throws = []ir.ThrowsClause{throws([]string{"server.X", "server.Y"})}
-	listed.Decorators = []ir.Application{app("browser.redirectOn",
+	listed.Decorators = []ir.Application{app("client.redirectOn",
 		ir.Arg{Param: "error", Value: ir.ListValue{Items: []ir.ArgValue{ir.RefValue{Target: "server.X"}, ir.RefValue{Target: "server.Y"}}}},
-		refArg("to", "browser.go"))}
+		refArg("to", "client.go"))}
 	p := program(nil,
 		namespace("server", exc("server.X"), exc("server.Y"), exc("server.Z")),
-		namespace("browser", state("browser.loc", ir.StateSingle, ir.String()), eff("browser.go", "browser.loc", ir.OpPut),
+		namespace("client", state("client.loc", ir.StateSingle, ir.String()), eff("client.go", "client.loc", ir.OpPut),
 			redirectOn, alias, l, viaAlias, expanded, listed))
 	Compute(p)
-	sig := sigOf(t, p, "browser.l")
+	sig := sigOf(t, p, "client.l")
 	wantStrings(t, "E", sig.Exceptions, []string{"server.Z"})
-	wantStrings(t, "F", effectNames(sig.Effects), []string{"browser.go"})
-	if got := relOf(t, sig, "server.Z", "browser.go"); got != ir.Prevented {
+	wantStrings(t, "F", effectNames(sig.Effects), []string{"client.go"})
+	if got := relOf(t, sig, "server.Z", "client.go"); got != ir.Prevented {
 		t.Errorf("rel(Z, go) = %s, want prevented", got)
 	}
-	wantStrings(t, "alias E", sigOf(t, p, "browser.m").Exceptions, []string{"server.Y"})
-	wantStrings(t, "expanded E", sigOf(t, p, "browser.n").Exceptions, []string{"server.Y"})
-	wantStrings(t, "list E", sigOf(t, p, "browser.o").Exceptions, nil)
+	wantStrings(t, "alias E", sigOf(t, p, "client.m").Exceptions, []string{"server.Y"})
+	wantStrings(t, "expanded E", sigOf(t, p, "client.n").Exceptions, []string{"server.Y"})
+	wantStrings(t, "list E", sigOf(t, p, "client.o").Exceptions, nil)
 }
 
 // TestSigDecoratorOrder は Op.decorators の末尾が最も内側で最初に適用されること。

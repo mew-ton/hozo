@@ -1,7 +1,7 @@
 // Package godesign は、設計の図の語彙からテストを受け取る口を出すトランスパイラ go-design の中身（docs/plugin-go-design.md）。
 //
 // Handler が plugin.Handler を実装し、View（出力ごとに一つ。見る側は出力する名前空間 N）から、N のテストのパッケージの design.go を
-// 作る: `@business.flow` の付いた op（フロー）ごとの、E2E テストのケースを受け取る口と、オプション requirements に並べた分類の
+// 作る: `@prd.business.flow` の付いた op（フロー）ごとの、E2E テストのケースを受け取る口と、オプション requirements に並べた分類の
 // ケース（要求）ごとの、テストの入れ物を受け取る口と、それぞれを走らせる関数。置き場と名前は公開の SDK plugin/golang で求める
 // （基底の出力は見ない。docs/plugin-protocol.md「相乗りが基底の形を知る方法」）。
 //

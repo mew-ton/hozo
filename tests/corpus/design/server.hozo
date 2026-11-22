@@ -2,8 +2,8 @@
 // 設計書の言葉をそのまま写す。写せなかった箇所と足した宣言は、同じディレクトリの README.md に一覧する。
 // 各ブロックの上の `// §n.m` は、設計書のどの節の例かを示す。`// 追加:` は設計書にない宣言。
 
-// §6.5: valid が持たない制約は、ユーザーが valid の名前空間にデコレータとして足す（§3.2）
-namespace valid {
+// §6.5: valid が持たない制約。設計書は valid の名前空間に足すが、語彙の名前空間には足せないので、server に宣言する（README.md の 10）
+namespace server {
   /** 末尾の 1 桁が、前の 4 桁から計算したチェックディジットと一致する */
   decorator checkDigit for scalar, field;
 }
@@ -27,7 +27,7 @@ namespace server {
 
   /** 社員番号（英大文字 3 字 + 数字 5 桁。末尾はチェックディジット） */
   @valid.pattern("^[A-Z]{3}[0-9]{5}$")
-  @valid.checkDigit
+  @checkDigit
   scalar EmployeeCode extends string;
 
   // 追加: §5.2 の User.status が参照する型
@@ -341,9 +341,9 @@ namespace server {
     deleteSession(in.token);
   }
 
-  // ---- 追加: browser（§10.2、§11）が呼ぶ server の op ----
+  // ---- 追加: client（§10.2、§11）が呼ぶ server の op ----
   // §11.1 の fetchMe に付く @redirectToLogin がスコープ外（docs/decisions.md）なので、
-  // getMe / getOrders には @requiresAuth を付けない（付ければ browser.fetchMe の例外が増える。README.md）。
+  // getMe / getOrders には @requiresAuth を付けない（付ければ client.fetchMe の例外が増える。README.md）。
 
   /** 自分の情報を取る入力 */
   model MeInput {

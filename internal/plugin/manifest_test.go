@@ -26,7 +26,7 @@ language    = "ts"
 requires    = ["ts", "ts-valid"]
 unsupported = []
 seams       = ["rate.limited"]
-interprets  = ["page.route", "page.dialog"]
+interprets  = ["browser.page.route", "browser.page.dialog"]
 requires_vocabulary = ["http"]
 
 [read]
@@ -83,7 +83,7 @@ func TestLoadManifestExample(t *testing.T) {
 	want := &Manifest{
 		Name: "react-router", Wasm: "dist/plugin.wasm", Protocol: "1.0",
 		Vocabulary:  []string{"vocab/page.hozo"},
-		Transpilers: []Transpiler{{Name: "react-router", Language: "ts", Requires: []string{"ts", "ts-valid"}, Unsupported: []string{}, Seams: []string{"rate.limited"}, Interprets: []string{"page.route", "page.dialog"}, RequiresVocabulary: []string{"http"}}},
+		Transpilers: []Transpiler{{Name: "react-router", Language: "ts", Requires: []string{"ts", "ts-valid"}, Unsupported: []string{}, Seams: []string{"rate.limited"}, Interprets: []string{"browser.page.route", "browser.page.dialog"}, RequiresVocabulary: []string{"http"}}},
 		Read:        Read{Namespaces: []string{"page"}},
 		Import:      Import{Formats: []string{}},
 		Coverage:    Coverage{Enabled: true},

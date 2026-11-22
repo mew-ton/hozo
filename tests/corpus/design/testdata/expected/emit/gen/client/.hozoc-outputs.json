@@ -1,0 +1,21 @@
+[
+  "gen/client/classify.go",
+  "gen/client/clienttest/classify.go",
+  "gen/client/clienttest/doc.go",
+  "gen/client/clienttest/fakes.go",
+  "gen/client/clienttest/hozo-tests.go.json",
+  "gen/client/clienttest/leaves.go",
+  "gen/client/doc.go",
+  "gen/client/inner/classify.go",
+  "gen/client/inner/doc.go",
+  "gen/client/inner/ops.go",
+  "gen/client/inner/states.go",
+  "gen/client/inner/types.go",
+  "gen/client/inner/wiring.go",
+  "gen/client/ops.go",
+  "gen/client/states.go",
+  "gen/client/types.go",
+  "gen/client/types/classify.go",
+  "gen/client/types/doc.go",
+  "gen/client/types/types.go"
+]

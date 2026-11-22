@@ -33,12 +33,12 @@ func TestCorpusDesign(t *testing.T) {
 		t.Fatal("JSON が空")
 	}
 	// 設計書の例の要点が IR に残っている。
-	for _, fqn := range []string{"server.User", "server.PublicUser", "browser.OrderPage.Ready", "browser.openOrders", "browser.WarrantyAvailable", "db.table", "localStorage", "page.fallback"} {
+	for _, fqn := range []string{"server.User", "server.PublicUser", "client.OrderPage.Ready", "client.openOrders", "client.WarrantyAvailable", "db.table", "browser.localStorage", "browser.page.fallback"} {
 		if res.Program.Lookup(fqn) == nil {
 			t.Errorf("%s が Program にない", fqn)
 		}
 	}
-	if len(res.Program.Binds) != 1 || res.Program.Binds[0].State != "browser.token" || res.Program.Binds[0].Target.Namespace != "server" {
+	if len(res.Program.Binds) != 1 || res.Program.Binds[0].State != "client.token" || res.Program.Binds[0].Target.Namespace != "server" {
 		t.Errorf("bind が正規化されていない: %+v", res.Program.Binds)
 	}
 	if len(res.Refs) == 0 {

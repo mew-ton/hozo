@@ -1,3 +1,3 @@
-// プラグインの語彙（docs/vocab.md「読み込み」）。標準の語彙 vocab/localstorage.hozo と同じ名前をグローバルに宣言する
-decorator localStorage for state;
+// プラグインの語彙（docs/vocab.md「読み込み」）。もう一つのプラグイン vocplug2 の語彙と、同じ名前（shared）をグローバルに宣言する
+decorator shared for state;
 decorator vocplugMark for state;

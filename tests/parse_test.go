@@ -111,7 +111,7 @@ func docBlock(t *testing.T, doc, marker string) string {
 // 「ここに置く .hozo はそれを写したもの」）。文書が持ち主で、片方だけを直せばここで分かる。
 //   - vocab/db.hozo は、docs/vocab.md「`db` の読み書きのデコレータ」の全文と、バイト単位で同じ。
 //   - vocab/http.hozo は、docs/vocab.md「`http` の語彙」のブロック（「この部分」）を、そのまま含む。
-//   - vocab/actor.hozo、usecase.hozo、business.hozo、prd.hozo は、docs/vocab.md「設計の図の語彙」の、それぞれの全文と、
+//   - vocab/prd.hozo（prd と、その下の actor、usecase、business）は、docs/vocab.md「設計の図の語彙」の全文と、
 //     バイト単位で同じ。
 //   - plugins/go-cli/cli.hozo は、docs/plugin-go-cli.md「語彙」のブロックの宣言（説明のコメントは略してある）を、
 //     同じ順に、過不足なく持つ。
@@ -136,7 +136,7 @@ func TestDocsEmbedVocabulary(t *testing.T) {
 			t.Errorf("vocab/http.hozo が、docs/vocab.md「`http` の語彙」のブロックを、そのままは含まない（文書に合わせる）:\n%s", block)
 		}
 	})
-	for _, name := range []string{"actor", "usecase", "business", "prd"} {
+	for _, name := range []string{"prd"} {
 		t.Run("vocab/"+name+".hozo", func(t *testing.T) {
 			block := docBlock(t, "../docs/vocab.md", "`vocab/"+name+".hozo` の全文は次のとおり")
 			if got := read("../vocab/" + name + ".hozo"); got != block {

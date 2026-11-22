@@ -122,9 +122,9 @@ ArgValue  = ArgTerm { "|" ArgTerm }
 ArgTerm   = Literal | QualifiedName ;
 ```
 
-- 位置で渡す引数（`@http.status(401)`）と名前で渡す引数（`@http.header(name: "Authorization")`）を混ぜられる（`@page.route("/orders", from: query, onInvalid: transitionToOrders)`）。名前で渡す引数の後ろに位置で渡す引数は書けない（「決めたこと」）。
+- 位置で渡す引数（`@http.status(401)`）と名前で渡す引数（`@http.header(name: "Authorization")`）を混ぜられる（`@browser.page.route("/orders", from: query, onInvalid: transitionToOrders)`）。名前で渡す引数の後ろに位置で渡す引数は書けない（「決めたこと」）。
 - `ArgTerm` の `|` は、一つの引数に渡す、その場で書いた union（`http.NetworkError | http.ServerError`: 「このどれか」。§11.2。`docs/decisions.md`「決めたこと」358）。名前を付けた union（`union U { A; B; }`）を渡すのと、同じ意味。引数の並びの `,` は引数を区切るので、一つの引数の中の union は `|` で書く（節の並びの区切りは `,`。「op」）。`[ ]` はリスト（`["orders", query]`。§11.1）。
-- `QualifiedName` が何を指すか（宣言、op の引数、デコレータの引数、ユニオンのアーム、分類のケース）は名前の解決が決める。分類のケースは、分類の名前に続けて書く（`@usecase.of(Actor.Customer)`）。
+- `QualifiedName` が何を指すか（宣言、op の引数、デコレータの引数、ユニオンのアーム、分類のケース）は名前の解決が決める。分類のケースは、分類の名前に続けて書く（`@prd.usecase.of(Actor.Customer)`）。
 - 宣言が残りの引数（「decorator の宣言」の `RestParam`）を持つデコレータには、ほかの引数の数を超えて位置で渡した値が、書いた順に、残りの引数に入る（`decorator effects(...targets: any effect)` に `@effects(createOrder, notifyUser)`）。0 個でもよい。残りの引数には、名前では渡せない（DEC-11。`docs/types.md`「デコレータの引数」）。
 
 ### model
@@ -307,7 +307,7 @@ ClassifySubject = "never" | "any" "exception" | Type { "," Type } ;
 - 状態の分類は、一つのケースに複数の対象の型を `,` で並べられる（`Ready: token as Token, profile as Profile;`）。
 - 例外の分類のケースは、`any exception as` の後ろに、そのケースに当たる例外を、`|` で並べる（`Refused: any exception as psp.Declined | psp.Expired;`）。例外のユニオンの名前も書け、その要素に展開する。残りを言うケースは `any exception as else;`。`as none` は、書けない（構文エラー: 受けた例外に、「値がない」は、ない）。ケースごとに、`as` は一つで、省けない（`docs/check.md`「分類」の「例外の分類」）。
 - 対象のない分類は、`of` を省かず、`of never` と書く。ケースは、名前だけ（`CaseTyping` を書けば CLS-9）。その分類は、名前を並べるだけで、型にも、`match` にも、効果の遷移にも、書けない（書けない所と診断は `docs/check.md`「分類」の「対象のない分類」）。
-- ケースの前に、デコレータを書ける（`@actor.human Customer;`）。順は、`DocComment` → デコレータ → ケースの名前。どの種類の分類のケースにも書け、付けられるデコレータは、宣言の `for` が、分類のケース（「decorator の宣言」の `CaseKind`）を並べたもの（検査 DEC-1）。
+- ケースの前に、デコレータを書ける（`@prd.actor.human Customer;`）。順は、`DocComment` → デコレータ → ケースの名前。どの種類の分類のケースにも書け、付けられるデコレータは、宣言の `for` が、分類のケース（「decorator の宣言」の `CaseKind`）を並べたもの（検査 DEC-1）。
 - なくした書き方は、新しい書き方をメッセージで示して SYNTAX にする: ケースの位置の `default;`（名前のないケース。ケースには名前を付ける。値がない側や、union の残りのアームなら、残りのケース `<名前>: <対象> as else;`）、宣言の頭の `condition C of T;`（両側に名前を付けた `classify C of T { <成り立つ側>; <成り立たない側>; }` と書く）。
 
 ### decorator の宣言

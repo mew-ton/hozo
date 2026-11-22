@@ -1,6 +1,7 @@
-// NS-3（docs/check.md「名前空間」）: 標準の語彙とプラグインの語彙が同じ名前（localStorage）をグローバルに宣言した
-// （plugins/vocplug/v.hozo の decorator localStorage）。位置は標準の語彙 vocab/localstorage.hozo の側で、プラグインの側は Related に出る
-// ERROR(hozo:vocab/localstorage.hozo:2): NS-3
+// NS-3（docs/check.md「名前空間」）: 二つのプラグインの語彙が、同じ名前（shared）を、グローバルに宣言した
+// （plugins/vocplug/v.hozo と plugins/vocplug2/v.hozo）。位置は、順で後の語彙の側で、もう一方は Related に出る。
+// 標準の語彙は、グローバルに宣言を持たない（どれも、名前空間の中）ので、標準の語彙とは、当たらない
+// ERROR(hozo:plugin/vocplug2/v.hozo:2): NS-3
 namespace a {
   @vocplugMark
   state s: list<string>;

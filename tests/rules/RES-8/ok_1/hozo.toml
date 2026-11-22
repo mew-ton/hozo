@@ -1,0 +1,8 @@
+# プラグイン morevalid の語彙を読ませるために、そのトランスパイラを、単位に並べる（docs/vocab.md「読み込み」）
+[hozo]
+plugin_dirs = ["plugins"]
+
+[[emit]]
+namespace   = "a"
+transpilers = ["go", "go-morevalid"]
+out         = "gen/a"

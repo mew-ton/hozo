@@ -182,7 +182,7 @@ func TestSession(t *testing.T) {
 	}
 
 	serverPath := filepath.Join(root, "server.hozo")
-	browserPath := filepath.Join(root, "browser.hozo")
+	browserPath := filepath.Join(root, "client.hozo")
 	serverURI, browserURI := fileURI(serverPath), fileURI(browserPath)
 	serverText, browserText := readFile(t, serverPath), readFile(t, browserPath)
 
@@ -214,7 +214,7 @@ func TestSession(t *testing.T) {
 	})
 	diags := c.waitDiagnostics(browserURI)
 	if !hasCode(diags, "RES-1") {
-		t.Fatalf("didChange の後の browser.hozo の診断 = %v", codes(diags))
+		t.Fatalf("didChange の後の client.hozo の診断 = %v", codes(diags))
 	}
 	var res1 protocol.Diagnostic
 	for _, d := range diags {
@@ -239,7 +239,7 @@ func TestSession(t *testing.T) {
 		t.Fatalf("直した後の診断 = %v", codes(diags))
 	}
 
-	// 定義へジャンプ: 別の名前空間の宣言（browser の server.Token → server.hozo の scalar Token）
+	// 定義へジャンプ: 別の名前空間の宣言（client の server.Token → server.hozo の scalar Token）
 	var loc *protocol.Location
 	c.result(protocol.MethodDefinition, protocol.TextDocumentPositionParams{TextDocument: textDoc(browserURI), Position: positionOf(t, enc, browserText, "server.Token>", 0)}, &loc)
 	// 位置は "server." の先頭なので名前空間 server のブロック
@@ -298,11 +298,11 @@ func TestSession(t *testing.T) {
 		}
 	}
 	// ホバー: 名前付きデコレータの適用は、宣言と固定した引数（docs/lsp.md「ホバー」の 4）
-	c.result(protocol.MethodHover, protocol.TextDocumentPositionParams{TextDocument: textDoc(browserURI), Position: positionOf(t, enc, browserText, "unavailableOnFailure\n  @page.route(\"/profile\")", 0)}, &hov)
+	c.result(protocol.MethodHover, protocol.TextDocumentPositionParams{TextDocument: textDoc(browserURI), Position: positionOf(t, enc, browserText, "unavailableOnFailure\n  @browser.page.route(\"/profile\")", 0)}, &hov)
 	if hov == nil {
 		t.Fatal("hover(@unavailableOnFailure) = nil")
 	}
-	for _, want := range []string{"decorator unavailableOnFailure = page.fallback(error: http.NetworkError | http.ServerError, view: Unavailable)", "decorator fn page.fallback(error: any exception, view: any model): catches error recovers", "固定した引数:", "- `error: http.NetworkError | http.ServerError`", "- `view: Unavailable`"} {
+	for _, want := range []string{"decorator unavailableOnFailure = browser.page.fallback(error: http.NetworkError | http.ServerError, view: Unavailable)", "decorator fn browser.page.fallback(error: any exception, view: any model): catches error recovers", "固定した引数:", "- `error: http.NetworkError | http.ServerError`", "- `view: Unavailable`"} {
 		if !strings.Contains(hov.Contents.Value, want) {
 			t.Errorf("hover(@unavailableOnFailure) に %q がない:\n%s", want, hov.Contents.Value)
 		}
@@ -342,7 +342,7 @@ func TestSession(t *testing.T) {
 	// ドキュメントのシンボル（docs/lsp.md「ドキュメントのシンボル」）
 	var syms []protocol.DocumentSymbol
 	c.result(protocol.MethodDocumentSymbol, protocol.DocumentSymbolParams{TextDocument: textDoc(browserURI)}, &syms)
-	if len(syms) != 1 || syms[0].Name != "browser" || syms[0].Kind != protocol.SymbolNamespace {
+	if len(syms) != 1 || syms[0].Name != "client" || syms[0].Kind != protocol.SymbolNamespace {
 		t.Fatalf("documentSymbol top = %+v", summarize(syms))
 	}
 	kinds := map[string]protocol.SymbolKind{}

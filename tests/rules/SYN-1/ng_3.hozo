@@ -2,7 +2,7 @@
 namespace a {
   state s: nullable<string>;
   fn f();
-  @localStorage                        // ERROR: SYNTAX
+  @browser.localStorage                        // ERROR: SYNTAX
   bind s to b.*;
 }
 namespace b {

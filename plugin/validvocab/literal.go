@@ -30,7 +30,7 @@ type Mismatch struct {
 // 省略可能なフィールドは、中の型で見る（docs/plugin-valid.md「値一つを確かめる」）。
 //
 // リテラルがフィールドの型に渡せることは、呼ぶ側が先に確かめる（http の HTTP-14）。ここで確かめられないものは、合わないとは
-// 言わない: リテラルの型に当たらない制約と、解釈できない正規表現（VALID-1、VALID-3 が、別に知らせる）、利用者が valid に足した制約。
+// 言わない: リテラルの型に当たらない制約と、解釈できない正規表現（VALID-1、VALID-3 が、別に知らせる）、標準でない valid の制約。
 // p が nil なら、フィールドに付いた制約だけを確かめる。
 func CheckLiteral(p *ir.Program, field *ir.Field, lit ir.Literal) []Mismatch {
 	if field == nil || lit == nil {

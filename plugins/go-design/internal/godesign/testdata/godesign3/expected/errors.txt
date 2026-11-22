@@ -1,9 +1,9 @@
-GODESIGN-3	flows.callsPlain	フローの op flows.callsPlain が、op act.plain を呼ぶが、@usecase.of が付いていない（フローが呼べるのは、操作の op だけ）
-GODESIGN-3	flows.callsHelper	フローの op flows.callsHelper が、op flows.helper を呼ぶが、@usecase.of が付いていない（フローが呼べるのは、操作の op だけ）
-GODESIGN-3	flows.callsFlow	フローの op flows.callsFlow が、op flows.callsHelper を呼ぶが、@usecase.of が付いていない（フローが呼べるのは、操作の op だけ）
+GODESIGN-3	flows.callsPlain	フローの op flows.callsPlain が、op act.plain を呼ぶが、@prd.usecase.of が付いていない（フローが呼べるのは、操作の op だけ）
+GODESIGN-3	flows.callsHelper	フローの op flows.callsHelper が、op flows.helper を呼ぶが、@prd.usecase.of が付いていない（フローが呼べるのは、操作の op だけ）
+GODESIGN-3	flows.callsFlow	フローの op flows.callsFlow が、op flows.callsHelper を呼ぶが、@prd.usecase.of が付いていない（フローが呼べるのは、操作の op だけ）
 GODESIGN-3	flows.callsState	フローの op flows.callsState が、効果 flows.addNote を呼ぶ（フローが呼べるのは、操作の op だけ）
 GODESIGN-3	flows.callsState	フローの op flows.callsState が、効果 flows.notes.post を呼ぶ（フローが呼べるのは、操作の op だけ）
 GODESIGN-3	flows.callsState	フローの op flows.callsState が、read flows.firstNote を呼ぶ（フローが呼べるのは、操作の op だけ）
-GODESIGN-3	flows.nested	フローの op flows.nested が、op flows.helper を呼ぶが、@usecase.of が付いていない（フローが呼べるのは、操作の op だけ）
-GODESIGN-3	flows.nested	フローの op flows.nested が、op act.plain を呼ぶが、@usecase.of が付いていない（フローが呼べるのは、操作の op だけ）
-GODESIGN-3	flows.nested	フローの op flows.nested が、op act.text を呼ぶが、@usecase.of が付いていない（フローが呼べるのは、操作の op だけ）
+GODESIGN-3	flows.nested	フローの op flows.nested が、op flows.helper を呼ぶが、@prd.usecase.of が付いていない（フローが呼べるのは、操作の op だけ）
+GODESIGN-3	flows.nested	フローの op flows.nested が、op act.plain を呼ぶが、@prd.usecase.of が付いていない（フローが呼べるのは、操作の op だけ）
+GODESIGN-3	flows.nested	フローの op flows.nested が、op act.text を呼ぶが、@prd.usecase.of が付いていない（フローが呼べるのは、操作の op だけ）

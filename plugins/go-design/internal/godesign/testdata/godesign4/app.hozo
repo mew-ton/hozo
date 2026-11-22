@@ -1,32 +1,32 @@
-// GODESIGN-4: 位置は、@usecase.of の付いた op。
+// GODESIGN-4: 位置は、@prd.usecase.of の付いた op。
 namespace design {
-  classify Actor of never { @actor.human User; }
+  classify Actor of never { @prd.actor.human User; }
 }
 
 namespace act {
-  @usecase.of(design.Actor.User)
+  @prd.usecase.of(design.Actor.User)
   export fn touch();
 }
 
 namespace flows {
   // フローと同じ名前空間の、操作の op
-  @usecase.of(design.Actor.User)
+  @prd.usecase.of(design.Actor.User)
   export fn local();
 
   // フローでもあり、操作の op でもある
-  @business.flow
-  @usecase.of(design.Actor.User)
+  @prd.business.flow
+  @prd.usecase.of(design.Actor.User)
   export fn both() {
     act.touch();
   }
 
-  @business.flow
+  @prd.business.flow
   export fn fine() {
     act.touch();
   }
 }
 
 namespace plain {
-  @usecase.of(design.Actor.User)
+  @prd.usecase.of(design.Actor.User)
   export fn only();
 }

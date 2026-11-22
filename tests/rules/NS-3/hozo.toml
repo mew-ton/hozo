@@ -3,5 +3,5 @@ plugin_dirs = ["plugins"]
 
 [[emit]]
 namespace   = "a"
-transpilers = ["vocplug"]
+transpilers = ["vocplug", "vocplug2"]
 out         = "gen/a"

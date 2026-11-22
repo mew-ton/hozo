@@ -1,0 +1,18 @@
+// RES-8（docs/resolve.md「名前空間の併合と重複」、docs/vocab.md「語彙の名前空間」）: 語彙の名前空間に、仕様から、宣言を足せない。
+// 位置は、仕様の側の namespace の名前。ブロックごとに一つ（中の宣言の数に、よらない）。
+namespace http {                       // ERROR: RES-8
+  exception Mine;
+  model Extra { id: string; }
+}
+namespace valid {                      // ERROR: RES-8
+  decorator checkDigit for scalar, field;
+}
+namespace a {
+  // 足した宣言は、表には残る（使う所に、RES-1 を重ねない）。解釈するトランスパイラは、いないので、CFG-26
+  @valid.checkDigit                    // WARN: CFG-26
+  scalar Code extends string;
+  // 自分の名前空間の中の、同じ名前の名前空間は、別の名前空間（a.http）
+  namespace http {
+    exception Local;
+  }
+}

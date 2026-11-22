@@ -1,0 +1,10 @@
+# テストの fixture: 語彙を提供する、もう一つのプラグイン（vocplug に相乗りする）。起動しない
+name       = "vocplug2"
+wasm       = "plugin.wasm"
+protocol = "1.0"
+vocabulary = ["v.hozo"]
+
+[[transpiler]]
+name     = "vocplug2"
+language = "go"
+requires = ["vocplug"]

@@ -8,5 +8,5 @@ name     = "go-design"
 language = "go"
 requires = ["go"]
 interprets = [
-  "business.flow", "usecase.of", "prd.ref",
+  "prd.business.flow", "prd.usecase.of", "prd.ref",
 ]

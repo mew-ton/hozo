@@ -1,2 +1,2 @@
-GODESIGN-1	flows.hidden	op flows.hidden に @business.flow が付いているが、export がない（走らせる側は、入口の Ops のメソッドとして、フローを呼ぶ）
-GODESIGN-1	flows.also	op flows.also に @business.flow が付いているが、export がない（走らせる側は、入口の Ops のメソッドとして、フローを呼ぶ）
+GODESIGN-1	flows.hidden	op flows.hidden に @prd.business.flow が付いているが、export がない（走らせる側は、入口の Ops のメソッドとして、フローを呼ぶ）
+GODESIGN-1	flows.also	op flows.also に @prd.business.flow が付いているが、export がない（走らせる側は、入口の Ops のメソッドとして、フローを呼ぶ）

@@ -95,11 +95,11 @@ func TestViewFromEntry(t *testing.T) {
 		// files は、単位の in に合ったユーザーのファイルと、読み込んだすべての語彙のファイル。web の単位は in を省いているので、
 		// 読み込んだすべてのファイル（ユーザーのファイルを辞書順に、その後に語彙のファイルを辞書順に）
 		expect(t, "files", v.Files, []string{"api.hozo", "t.hozo", "web.hozo",
-			"hozo:vocab/actor.hozo", "hozo:vocab/business.hozo", "hozo:vocab/db.hozo", "hozo:vocab/fs.hozo", "hozo:vocab/http.hozo", "hozo:vocab/localstorage.hozo", "hozo:vocab/page.hozo", "hozo:vocab/prd.hozo", "hozo:vocab/usecase.hozo", "hozo:vocab/valid.hozo"})
+			"hozo:vocab/browser.hozo", "hozo:vocab/db.hozo", "hozo:vocab/fs.hozo", "hozo:vocab/http.hozo", "hozo:vocab/prd.hozo", "hozo:vocab/valid.hozo"})
 		expect(t, "InUnit（viewer の宣言で、span.file が files にある）", []bool{v.InUnit("web.openUser"), v.InUnit("api.getUser"), v.InUnit("web.nope")}, []bool{true, false, false})
 		// namespaces は出力のあるすべての名前空間（viewer を含む）。値は、その名前空間を出力する単位ごとの設定。
-		// t はどの単位の対象でもないので入らない。page は、web が使う語彙の型（page.Route）の置き場の単位が出力する
-		expect(t, "namespaces のキー", keysOf(v.Namespaces), []string{"api", "page", "web"})
+		// t はどの単位の対象でもないので入らない。page は、web が使う語彙の型（browser.page.Route）の置き場の単位が出力する
+		expect(t, "namespaces のキー", keysOf(v.Namespaces), []string{"api", "browser.page", "web"})
 		expect(t, "namespaces[api]", v.Namespaces["api"], []ir.NamespaceConfig{{Index: 1, Language: "go", Base: "view-dump", Out: "gen/api", Dir: "gen/api",
 			Transpilers: []string{"view-dump"}, Options: map[string]map[string]any{}, Seams: map[string]string{}}})
 		expect(t, "namespaces[web] は config だけ", v.Namespaces["web"], []ir.NamespaceConfig{v.Config})
@@ -125,10 +125,10 @@ func TestViewFromEntry(t *testing.T) {
 			names = append(names, ns.Name)
 		}
 		// グローバルが先頭、ユーザーのファイル（api.hozo、t.hozo、web.hozo）の順、その後に語彙（hozo:vocab/*.hozo）の辞書順
-		expect(t, "名前空間の順", names, []string{"", "api", "t", "web", "actor", "business", "db", "fs", "http", "page", "prd", "usecase", "valid"})
+		expect(t, "名前空間の順", names, []string{"", "api", "t", "web", "browser", "browser.page", "db", "fs", "http", "prd", "prd.actor", "prd.usecase", "prd.business", "valid"})
 		// nullable<api.Token>: 空になりうることは形が持ち、要素の型は optional にならない（docs/ir.md「state / exception / effect」）
 		expect(t, "web.token の要素（別の名前空間の scalar は FQN）", typeStr(declOf(t, prog, "web.token").(*ir.State).Element), "api.Token")
-		expect(t, "web.location の要素（語彙の型は FQN）", typeStr(declOf(t, prog, "web.location").(*ir.State).Element), "page.Route")
+		expect(t, "web.location の要素（語彙の型は FQN）", typeStr(declOf(t, prog, "web.location").(*ir.State).Element), "browser.page.Route")
 		expect(t, "fetchUser が呼ぶ op（修飾なしの参照も FQN）", renderBody(opOf(t, prog, "web.openUser").Body)[0], "val user = web.fetchUser(q: {id: id})")
 		expect(t, "web.goLogin の宛先（状態は FQN）", declOf(t, prog, "web.goLogin").(*ir.Effect).Target, ir.EffectTarget(ir.BuiltinTarget{State: "web.location", Operation: ir.OpPut}))
 		expect(t, "web.goLogin が書き込む状態", declOf(t, prog, "web.goLogin").(*ir.Effect).Writes, []string{"web.location"})
@@ -143,7 +143,7 @@ func TestViewFromEntry(t *testing.T) {
 	t.Run("ir.md Program/Span", func(t *testing.T) {
 		expect(t, "api.getUser の Span.file（hozo.toml からの相対パス）", opOf(t, prog, "api.getUser").Span.File, "api.hozo")
 		expect(t, "web.openUser の Span.file", opOf(t, prog, "web.openUser").Span.File, "web.hozo")
-		expect(t, "page.Route の Span.file（標準の語彙）", declOf(t, prog, "page.Route").Common().Span.File, "hozo:vocab/page.hozo")
+		expect(t, "browser.page.Route の Span.file（標準の語彙）", declOf(t, prog, "browser.page.Route").Common().Span.File, "hozo:vocab/browser.hozo")
 		// 宣言の位置はデコレータから（docs/grammar.md「ファイルと宣言」の Decl = [DocComment] {Decorator} Declaration。DocComment は含まない）
 		expect(t, "web.openUser の Span の行は最初のデコレータの行", opOf(t, prog, "web.openUser").Span.Start.Line, lineOf(t, "web.hozo", "@t.entry"))
 		expect(t, "web.greet の Span の行は op の行", opOf(t, prog, "web.greet").Span.Start.Line, lineOf(t, "web.hozo", "fn greet("))
@@ -238,7 +238,7 @@ func TestViewFromEntry(t *testing.T) {
 		expect(t, "state current: Token?（nullable<Token> と同じ）", state("api.current"), []string{"api.Token?", "nullable", "api.Token"})
 		expect(t, "state motd: string（single<string> と同じ）", state("api.motd"), []string{"string", "single", "string"})
 		expect(t, "state token: nullable<api.Token>", state("web.token"), []string{"api.Token?", "nullable", "api.Token"})
-		expect(t, "state location: single<page.Route>", state("web.location"), []string{"page.Route", "single", "page.Route"})
+		expect(t, "state location: single<browser.page.Route>", state("web.location"), []string{"browser.page.Route", "single", "browser.page.Route"})
 	})
 
 	t.Run("ir.md 正規化/export と reads と never", func(t *testing.T) {
@@ -1115,7 +1115,7 @@ func TestViewDeliveredToPlugin(t *testing.T) {
 	expect(t, "view.config.transpilers", got.Config.Transpilers, []string{"view-dump"})
 	expect(t, "view.config.base", got.Config.Base, "view-dump")
 	expect(t, "view.files（ユーザーのファイル）", got.Files[:3], []string{"api.hozo", "t.hozo", "web.hozo"})
-	expect(t, "view.namespaces のキー", keysOf(got.Namespaces), []string{"api", "page", "web"})
+	expect(t, "view.namespaces のキー", keysOf(got.Namespaces), []string{"api", "browser.page", "web"})
 	expect(t, "@t.entry の付いた op", entryOps(&got), []string{"web.openUser", "web.signOut"})
 
 	// docs/plugin-protocol.md「emit」: 応答は files と warnings だけ（select はない）。hozoc 本体はコードを出力しないので、

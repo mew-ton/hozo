@@ -232,7 +232,7 @@ func (g *generator) checkScalar(s *ir.Scalar) {
 
 // custom は GOVALID-5: 標準でない valid の制約 app が、at（subject）に付いている。
 func (g *generator) custom(app *ir.Application, at, subject string) {
-	g.errorf(codeValidCustom, at, "%s に、標準でない %s の制約 @%s が付いている（利用者が %s に足した制約を確かめる形は、まだない）",
+	g.errorf(codeValidCustom, at, "%s に、標準でない %s の制約 @%s が付いている（%s の、標準の五つのほかの制約を確かめる形は、まだない）",
 		subject, vocabulary, app.Decorator, vocabulary)
 }
 

@@ -3,9 +3,9 @@ namespace a {
   model Order { id: string; }
   classify Size of Order { Small; Large; }
   classify Actor of never { Customer; }
-  @usecase.of(Size.Small)              // ERROR: DEC-7
+  @prd.usecase.of(Size.Small)              // ERROR: DEC-7
   fn f();
-  @usecase.of(Actor.Customer, Size.Large)   // ERROR: DEC-7
+  @prd.usecase.of(Actor.Customer, Size.Large)   // ERROR: DEC-7
   fn g();
   @prd.ref(Size.Small)                 // ERROR: DEC-7
   fn h();

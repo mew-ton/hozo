@@ -243,8 +243,8 @@ namespace ordering {
   // ---- 注文する ----
 
   /** 注文する。同じ送信（requestId）が二度届いても、注文は一つ。在庫の行は、ここで取り置く */
-  @prd.promise("客", "同じ申し込みを二度送っても、注文は一つ")
-  @prd.promise("客", "注文できたなら、在庫の品目は取り置いてある")
+  @pact.promise("客", "同じ申し込みを二度送っても、注文は一つ")
+  @pact.promise("客", "注文できたなら、在庫の品目は取り置いてある")
   @db.transaction
   export fn place(checkout: Checkout): Order {
     val sent = orderByRequest(checkout.requestId);
@@ -271,7 +271,7 @@ namespace ordering {
    * 識別子と鍵を決めて、注文を作る（人が書く）。
    * 箱で送る部分があるのに、客が同意した上限（agreedCeiling）がいまの上限と違えば、いまの約束を運ぶ TermsChanged。
    */
-  @prd.promise("客", "客が見て同意した送料の上限と、注文に記録する上限は、同じ額")
+  @pact.promise("客", "客が見て同意した送料の上限と、注文に記録する上限は、同じ額")
   fn draft(checkout: Checkout, priced: Priced, now: datetime): Order
     throws TermsChanged;
 

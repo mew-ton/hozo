@@ -1,2 +1,0 @@
-/** この状態をブラウザの localStorage が持つ */
-decorator localStorage for state;

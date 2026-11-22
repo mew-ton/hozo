@@ -1,8 +1,6 @@
-// 診断にならない仕様: 標準の制約の、正しい使い方と、利用者が valid に足した制約（読まない。docs/plugin-valid.md「対象」）。
-namespace valid {
-  /** 末尾の 1 桁が、チェックディジットと一致する */
-  decorator checkDigit for scalar, field;
-}
+// 診断にならない仕様: 標準の制約の、正しい使い方。標準でない valid の制約（読まない。docs/plugin-valid.md「対象」）は、仕様からは、
+// valid に足せない（RES-8）ので、単体テストが、読んだ後の IR の、app.Jan と、フィールド code に、@valid.checkDigit を足す
+// （validvocab_test.go の loadSpec）。
 
 namespace app {
   @valid.length(min: 1, max: 20)
@@ -12,7 +10,6 @@ namespace app {
   // 元の scalar を辿った核の型で見る
   @valid.max(10)
   scalar SmallPage extends Page;
-  @valid.checkDigit
   scalar Jan extends string;
 
   model Attrs { [name: string]: Tag; }
@@ -22,7 +19,7 @@ namespace app {
     @valid.length(min: 1) later: string[]?;
     @valid.pattern("^[a-z]+$") @valid.format("email") name: string?;
     @valid.min(0.5) ratio: float;
-    @valid.checkDigit code: int;
+    code: int;
     attrs: Attrs;
     page: SmallPage;
   }

@@ -1,9 +1,5 @@
-// GOVALID-5: 位置は、付いた scalar か model。
-namespace valid {
-  /** 末尾の 1 桁が、チェックディジットと一致する */
-  decorator checkDigit for scalar, field;
-  decorator even(strict: boolean) for scalar, field;
-}
+// GOVALID-5: 位置は、付いた scalar か model。標準でない valid の制約（checkDigit、even）は、プラグイン morevalid の語彙のファイル
+// （plugins/morevalid/valid.hozo）が、valid に足している（仕様からは、足せない: RES-8）。
 
 namespace app {
   @valid.checkDigit

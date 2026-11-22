@@ -439,7 +439,7 @@ const Namespace = "valid"                              // この語彙の名前�
 const Min, Max, Length, Pattern, Format                // 標準の制約のデコレータの FQN
 const NameCount = "count"                              // 配列のフィールドに付けた length の、違反の名前
 func Standard(decorator string) bool                   // valid の標準の制約（min / max / length / pattern / format）の FQN か
-func Applied(decorator string) bool                    // `@valid.*` か（標準の制約と、利用者が valid に足した制約）
+func Applied(decorator string) bool                    // `@valid.*` か（標準の制約と、標準でない valid の制約）
 func Formats() []string                                // format の name として書ける名前
 func Check(p *ir.Program) []plugin.Diagnostic          // すべての名前空間の scalar と model のフィールドの制約を読み解いた診断（VALID-*）
 type Constraint struct { Decorator, Name string; Core ir.CoreName; Bound float64; BoundText string; HasMin, HasMax bool; Min, Max int64; Regex, Format string; Count bool }   // 読んだ制約一つ。Name は、違反の名前

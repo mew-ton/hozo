@@ -1,10 +1,43 @@
-/** 要求を指す語彙（要求の文書、要求トレーサビリティマトリクス）。要求は、対象のない分類のケース */
+/** 製品の要求（PRD）の語彙: 要求を指す印と、担い手（prd.actor）、ユースケース（prd.usecase）、業務フロー（prd.business） */
 namespace prd {
   /**
-   * この宣言は、この要求のためのもの。
+   * この宣言は、この要求のためのもの（要求の文書、要求トレーサビリティマトリクス）。要求は、対象のない分類のケース。
    *
    * @param requirements 指す要求。対象のない分類のケース
    */
   @hint
   decorator ref(...requirements: any case of never) for op, model, state, effect, read;
+
+  /** 担い手の種類の語彙（ユースケース図）。担い手は、対象のない分類のケースで、種類は、そのケースに付ける */
+  namespace actor {
+    /** 人が、呼び出す */
+    @hint
+    decorator human for case of never;
+
+    /** 機械的な動機で、呼び出す（外の仕組みからの知らせ、時刻で動く処理） */
+    @hint
+    decorator bot for case of never;
+
+    /** 生成 AI の判断で、呼び出す */
+    @hint
+    decorator ai for case of never;
+  }
+
+  /** ユースケースの語彙（ユースケース図） */
+  namespace usecase {
+    /**
+     * この op は、ユースケース（担い手の、一つの操作）。actors が、行う。
+     *
+     * @param actors 行う担い手。対象のない分類のケース
+     */
+    @hint
+    decorator fn of(...actors: any case of never);
+  }
+
+  /** 業務フローの語彙（業務フロー図） */
+  namespace business {
+    /** この op は、業務フロー。操作の op（ユースケース）を、順に行う */
+    @hint
+    decorator fn flow();
+  }
 }

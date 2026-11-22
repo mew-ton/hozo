@@ -175,7 +175,7 @@
 - **対象の種類は、増やさない。** 値の分類で、対象の型が `never`（`Classify.subject` は `type`）。
 - **判定するものが、ない。** 述語を持たず、人が実装する述語も、ない（`Classify.decidedBy` は `none`。「ケースの判定」の 1〜3 は、当てない）。
 - **ケースは、名前だけ。** `as` を書けば CLS-9。ケースは一つ以上（CLS-2）で、名前は重ならない（CLS-1）。
-- **置けるのは、デコレータの所だけ。** ケースの前のデコレータ（`docs/grammar.md`「classify」）と、デコレータの引数（`@usecase.of(Actor.Customer)`。`docs/types.md`「デコレータの引数」）。どの名前空間からも、修飾して指せる。
+- **置けるのは、デコレータの所だけ。** ケースの前のデコレータ（`docs/grammar.md`「classify」）と、デコレータの引数（`@prd.usecase.of(Actor.Customer)`。`docs/types.md`「デコレータの引数」）。どの名前空間からも、修飾して指せる。
 - **値の位置には、書けない。**
 
   | 書いた所 | 診断 |

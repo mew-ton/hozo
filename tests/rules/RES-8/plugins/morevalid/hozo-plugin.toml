@@ -1,0 +1,11 @@
+# テストの fixture: 語彙のファイルで、標準の語彙の名前空間 valid に、制約を足すプラグイン。起動しない
+name       = "morevalid"
+wasm       = "plugin.wasm"
+protocol   = "1.0"
+vocabulary = ["valid.hozo"]
+
+[[transpiler]]
+name       = "go-morevalid"
+language   = "go"
+requires   = ["go"]
+interprets = ["valid.even", "acme.auth.signed"]   # 自分の語彙のデコレータを、解釈する（なければ、付けた所に CFG-26）

@@ -1,0 +1,6 @@
+// プラグイン morevalid の語彙: 標準の語彙の名前空間 valid に、制約を足す
+namespace valid {
+  /** 末尾の 1 桁が、チェックディジットと一致する */
+  decorator checkDigit for scalar, field;
+  decorator even(strict: boolean) for scalar, field;
+}

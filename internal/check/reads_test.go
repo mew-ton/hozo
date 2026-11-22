@@ -244,43 +244,43 @@ func TestThrowArm(t *testing.T) {
 // TestBindExport は docs/check.md「bind」の 1: 別の名前空間の、export のない op には位置を作らない
 // （呼べない op のために BIND-1 / BIND-2 を出さない）。同じ名前空間の op には export がなくても作る。
 func TestBindExport(t *testing.T) {
-	token := ir.Ref("browser.Token")
+	token := ir.Ref("client.Token")
 	exported := leaf("server.exported", nil, param("token", ir.Optional(token)))
 	hidden := internal(leaf("server.hidden", nil, param("a", token), param("b", token))) // 位置が二つ（export なら BIND-1）
-	own := internal(leaf("browser.own", nil, param("token", ir.Optional(token))))
-	p := program([]ir.Bind{bind("browser", "browser.token", "server", false), bind("browser", "browser.token", "browser", false)},
+	own := internal(leaf("client.own", nil, param("token", ir.Optional(token))))
+	p := program([]ir.Bind{bind("client", "client.token", "server", false), bind("client", "client.token", "client", false)},
 		namespace("server", exported, hidden),
-		namespace("browser", scalar("browser.Token", ir.String()), state("browser.token", ir.StateNullable, token), own),
+		namespace("client", scalar("client.Token", ir.String()), state("client.token", ir.StateNullable, token), own),
 	)
-	diags := Check(p, cfgFor("server", "browser"))
+	diags := Check(p, cfgFor("server", "client"))
 	wantNoCode(t, diags, "BIND-1")
 	wantNoCode(t, diags, "BIND-2")
 	wantPaths(t, "export の付いた op", positionsOf(t, p, 0, "server.exported"), "token")
 	wantPaths(t, "別の名前空間の内部の op", positionsOf(t, p, 0, "server.hidden"))
-	wantPaths(t, "同じ名前空間の内部の op", positionsOf(t, p, 1, "browser.own"), "token")
+	wantPaths(t, "同じ名前空間の内部の op", positionsOf(t, p, 1, "client.own"), "token")
 
 	// export を付ければ BIND-1 が出る
 	hidden.Exported = true
-	wantOneCode(t, Check(p, cfgFor("server", "browser")), "BIND-1")
+	wantOneCode(t, Check(p, cfgFor("server", "client")), "BIND-1")
 }
 
 // TestCallBoundStateAtom は、引数に状態を名前で渡した位置は明示した位置で、bind は埋めないこと（docs/check.md「状態の参照」）。
 func TestCallBoundStateAtom(t *testing.T) {
-	token := ir.Ref("browser.Token")
-	take := leaf("browser.take", nil, param("token", ir.Optional(token)))
-	implicit := wire("browser.implicit", nil, nil, cs(call("browser.take")))
-	explicit := wire("browser.explicit", nil, nil, cs(call("browser.take", carg("token", stateAtom("browser.token")))))
-	p := program([]ir.Bind{bind("browser", "browser.token", "browser", false)},
-		namespace("browser", scalar("browser.Token", ir.String()), state("browser.token", ir.StateNullable, token), take, implicit, explicit),
+	token := ir.Ref("client.Token")
+	take := leaf("client.take", nil, param("token", ir.Optional(token)))
+	implicit := wire("client.implicit", nil, nil, cs(call("client.take")))
+	explicit := wire("client.explicit", nil, nil, cs(call("client.take", carg("token", stateAtom("client.token")))))
+	p := program([]ir.Bind{bind("client", "client.token", "client", false)},
+		namespace("client", scalar("client.Token", ir.String()), state("client.token", ir.StateNullable, token), take, implicit, explicit),
 	)
 	Compute(p)
-	if b := p.Lookup("browser.implicit").(*ir.Op).Body.Statements[0].(ir.CallStmt).Call.Bound; len(b) != 1 {
+	if b := p.Lookup("client.implicit").(*ir.Op).Body.Statements[0].(ir.CallStmt).Call.Bound; len(b) != 1 {
 		t.Errorf("書かなければ bind が埋める: %+v", b)
 	}
-	if b := p.Lookup("browser.explicit").(*ir.Op).Body.Statements[0].(ir.CallStmt).Call.Bound; len(b) != 0 {
+	if b := p.Lookup("client.explicit").(*ir.Op).Body.Statements[0].(ir.CallStmt).Call.Bound; len(b) != 0 {
 		t.Errorf("状態を名前で渡した位置は明示: %+v", b)
 	}
 	// どちらも token を読む
-	wantStrings(t, "R(implicit)", sigOf(t, p, "browser.implicit").Reads, []string{"browser.token"})
-	wantStrings(t, "R(explicit)", sigOf(t, p, "browser.explicit").Reads, []string{"browser.token"})
+	wantStrings(t, "R(implicit)", sigOf(t, p, "client.implicit").Reads, []string{"client.token"})
+	wantStrings(t, "R(explicit)", sigOf(t, p, "client.explicit").Reads, []string{"client.token"})
 }

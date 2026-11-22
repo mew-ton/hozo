@@ -66,12 +66,12 @@ func unit(namespace, out, transpilers string) string {
 	return "[[emit]]\nnamespace = \"" + namespace + "\"\ntranspilers = [" + transpilers + "]\nout = \"" + out + "\"\n\n"
 }
 
-// corpusConfig は copyCorpus が置く hozo.toml: server、browser と、使う型の置き場の http、page の四つの単位
+// corpusConfig は copyCorpus が置く hozo.toml: server、client と、使う型の置き場の http、page の四つの単位
 // （docs/config.md「型の置き場」）。out は gen/<名前空間>。serverTranspilers は server の単位の transpilers の中身
 // （`"base"`、`"base", "fake"` など）。ほかの三つは基底 base だけ。
 func corpusConfig(serverTranspilers string) string {
-	return pluginDirs + unit("server", "gen/server", serverTranspilers) + unit("browser", "gen/browser", `"base"`) +
-		unit("http", "gen/http", `"base"`) + unit("page", "gen/page", `"base"`)
+	return pluginDirs + unit("server", "gen/server", serverTranspilers) + unit("client", "gen/client", `"base"`) +
+		unit("http", "gen/http", `"base"`) + unit("browser.page", "gen/page", `"base"`)
 }
 
 // copyCorpus は設計書のコーパスの .hozo を一時ディレクトリに写し、warning を一つ出す warn.hozo（warnFile）を足す。
@@ -351,9 +351,9 @@ func TestCheckLanguageMismatch(t *testing.T) {
 	// 基底のない単位（CFG-20）、足りない依存（CFG-19）、型の置き場のない単位（CFG-22）も、設定の誤り
 	for cfg, want := range map[string]string{
 		corpusConfig(`"tsp"`): "error[CFG-19]",
-		pluginDirs + unit("server", "gen/server", `"base", "none"`) + unit("browser", "gen/browser", `"base"`) +
-			unit("http", "gen/http", `"base"`) + unit("page", "gen/page", `"base"`): "error[CFG-20]",
-		pluginDirs + unit("browser", "gen/browser", `"base"`): "error[CFG-22]",
+		pluginDirs + unit("server", "gen/server", `"base", "none"`) + unit("client", "gen/client", `"base"`) +
+			unit("http", "gen/http", `"base"`) + unit("browser.page", "gen/page", `"base"`): "error[CFG-20]",
+		pluginDirs + unit("client", "gen/client", `"base"`): "error[CFG-22]",
 	} {
 		write(t, filepath.Join(dir, "hozo.toml"), cfg)
 		if code, _, stderr = run(t, dir, nil, "build", "--no-emit"); code != exitConfigInvalid || !strings.Contains(stderr, want) {
@@ -408,7 +408,7 @@ func TestEmit(t *testing.T) {
 	if _, err := os.Stat(gen); !os.IsNotExist(err) {
 		t.Fatalf("dry-run がファイルを書いた: %v", listFiles(t, gen))
 	}
-	if !strings.Contains(stdout, "written: gen/server/out.txt\n") || !strings.Contains(stdout, "written: gen/browser/out.txt\n") {
+	if !strings.Contains(stdout, "written: gen/server/out.txt\n") || !strings.Contains(stdout, "written: gen/client/out.txt\n") {
 		t.Fatalf("dry-run stdout=%q", stdout)
 	}
 
@@ -418,7 +418,7 @@ func TestEmit(t *testing.T) {
 		t.Fatalf("emit: code=%d stderr=%q", code, stderr)
 	}
 	files := listFiles(t, gen)
-	want := []string{"browser/.hozoc-outputs.json", "browser/out.txt", "http/.hozoc-outputs.json", "http/out.txt",
+	want := []string{"client/.hozoc-outputs.json", "client/out.txt", "http/.hozoc-outputs.json", "http/out.txt",
 		"page/.hozoc-outputs.json", "page/out.txt", "server/.hozoc-outputs.json", "server/out.txt"}
 	if !reflect.DeepEqual(files, want) {
 		t.Fatalf("files = %v, want %v", files, want)
@@ -449,8 +449,8 @@ func TestEmit(t *testing.T) {
 	}
 
 	// 名前空間を指定すれば、それだけ
-	code, stdout3, stderr := run(t, dir, nil, "build", "--dry-run", "browser")
-	if code != 0 || strings.Contains(stdout3, "gen/server/") || !strings.Contains(stdout3, "gen/browser/") {
+	code, stdout3, stderr := run(t, dir, nil, "build", "--dry-run", "client")
+	if code != 0 || strings.Contains(stdout3, "gen/server/") || !strings.Contains(stdout3, "gen/client/") {
 		t.Fatalf("code=%d stdout=%q stderr=%q", code, stdout3, stderr)
 	}
 
@@ -511,7 +511,7 @@ func TestEmitStaleAndConflict(t *testing.T) {
 	// ならない（docs/plugin-protocol.md「emit」）: ルートの外、絶対パス、ルートの中の別のディレクトリ、別の出力の
 	// Dir、Dir そのもの。何も書かない。
 	outside := filepath.Join(filepath.Dir(dir), "x.go")
-	for _, path := range []string{"../x.go", "gen/server/../../../x.go", "/abs/x.go", "", "x.go", "gen/x.go", "gen/browser/x.go", "gen/server", "gen/server/"} {
+	for _, path := range []string{"../x.go", "gen/server/../../../x.go", "/abs/x.go", "", "x.go", "gen/x.go", "gen/client/x.go", "gen/server", "gen/server/"} {
 		fakeRider(t, dir, "fake", "go", `"base"`, `{"files":[{"path":"`+path+`","content":"x"}],"warnings":[]}`, 0)
 		before := mtimes(t, dir)
 		if code, stdout, stderr = run(t, dir, nil, "build"); code != exitSoftwareOrCrash || stdout != "" || !strings.Contains(stderr, "PLG-1") {
@@ -674,14 +674,14 @@ func TestEmitStaleRecordStaysInDir(t *testing.T) {
 		t.Fatalf("記録を読めない: %v %s", err, data)
 	}
 
-	// 消してはならないファイル: ルートの外、ルートの直下、ルートの中の別のディレクトリ、別の出力（browser の単位）の Dir の下
+	// 消してはならないファイル: ルートの外、ルートの直下、ルートの中の別のディレクトリ、別の出力（client の単位）の Dir の下
 	outsideRoot := filepath.Join(filepath.Dir(dir), "victim-outside.txt")
 	victims := map[string]string{
 		outsideRoot:                                    "../victim-outside.txt",
 		filepath.Join(dir, "victim.txt"):               "victim.txt",
 		filepath.Join(dir, "docs", "victim.txt"):       "gen/server/../../docs/victim.txt",
 		filepath.Join(dir, "gen", "victim.txt"):        "gen/victim.txt",
-		filepath.Join(dir, "gen", "browser", "v.txt"):  "gen/browser/v.txt",
+		filepath.Join(dir, "gen", "client", "v.txt"):   "gen/client/v.txt",
 		filepath.Join(dir, "gen", "serverx", "v.txt"):  "gen/serverx/v.txt",             // 名前が Dir で始まるだけの別のディレクトリ
 		filepath.Join(dir, "warn.hozo"):                filepath.Join(dir, "warn.hozo"), // 絶対パス
 		filepath.Join(dir, "gen", "server", "keep.go"): "",                              // 記録にないファイルは、Dir の下でも消さない
@@ -753,14 +753,14 @@ func TestEmitNothing(t *testing.T) {
 	if code, _, stderr := run(t, dir, nil, "build"); code != 0 {
 		t.Fatalf("emit: code=%d stderr=%q", code, stderr)
 	}
-	if files := listFiles(t, gen); !containsStr(files, "server/out.txt") || !containsStr(files, "server/.hozoc-outputs.json") || !containsStr(files, "browser/out.txt") {
+	if files := listFiles(t, gen); !containsStr(files, "server/out.txt") || !containsStr(files, "server/.hozoc-outputs.json") || !containsStr(files, "client/out.txt") {
 		t.Fatalf("files = %v", files)
 	}
 
 	// 基底が、どの出力にもファイルを返さなくなる。前回の出力は消え、記録も残らない
 	fakePlugin(t, dir, "base", "go", "", `{"files":[],"warnings":[]}`, 0)
 	code, stdout, stderr := run(t, dir, nil, "build")
-	if code != 0 || strings.Contains(stdout, "written: ") || !strings.Contains(stdout, "removed: gen/server/out.txt\n") || !strings.Contains(stdout, "removed: gen/browser/out.txt\n") {
+	if code != 0 || strings.Contains(stdout, "written: ") || !strings.Contains(stdout, "removed: gen/server/out.txt\n") || !strings.Contains(stdout, "removed: gen/client/out.txt\n") {
 		t.Fatalf("code=%d stdout=%q stderr=%q", code, stdout, stderr)
 	}
 	// warning は check のもの（warn.hozo の REL-2）だけ
@@ -782,8 +782,8 @@ func TestEmitNothing(t *testing.T) {
 	if code, _, stderr := run(t, dir, nil, "build"); code != 0 {
 		t.Fatalf("emit: code=%d stderr=%q", code, stderr)
 	}
-	// （browser は server の型を使うので、server の単位を消すなら、browser の単位も消す。docs/config.md「型の置き場」）
-	write(t, filepath.Join(dir, "hozo.toml"), pluginDirs+unit("http", "gen/http", `"base"`)+unit("page", "gen/page", `"base"`))
+	// （client は server の型を使うので、server の単位を消すなら、client の単位も消す。docs/config.md「型の置き場」）
+	write(t, filepath.Join(dir, "hozo.toml"), pluginDirs+unit("http", "gen/http", `"base"`)+unit("browser.page", "gen/page", `"base"`))
 	code, stdout, stderr = run(t, dir, nil, "build")
 	if code != 0 || strings.Contains(stdout, "removed: ") || strings.Contains(stdout, "gen/server/") {
 		t.Fatalf("unit removed: code=%d stdout=%q stderr=%q", code, stdout, stderr)
@@ -927,7 +927,7 @@ func TestWriteOutputsSteps(t *testing.T) {
 			t.Fatalf("%s が、生成したファイルに触れた", what)
 		}
 	}
-	paths := []hozoc.Path{"gen/browser/out.txt", "gen/http/out.txt", "gen/page/out.txt", "gen/server/out.txt"}
+	paths := []hozoc.Path{"gen/client/out.txt", "gen/http/out.txt", "gen/page/out.txt", "gen/server/out.txt"}
 
 	// collectOutputs: トランスパイラのファイル（パスの辞書順）と、check の warning（トランスパイラの warning を含む: check が、
 	// プラグインに頼んで、もう受け取っている。四つの出力の基底が返す、同じ warning は、一度だけ。docs/plugin-protocol.md「emit」）

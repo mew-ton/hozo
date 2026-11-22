@@ -92,7 +92,7 @@
 | `assets`、`mailer` | ファイルの置き場、メールの配送 | — | — | — | 1 ずつ | 外部 |
 | `storefront` | **客の画面** | `cart`、`lastOrder`、`offer`、`problem`、`location`、`query` | — | 17 | 33（0 / 20 / 13） | ブラウザ |
 | `backoffice` | **担当者の画面** | `token`、`problem`、`location`、`query` | — | 13 | 33（0 / 18 / 15） | ブラウザ |
-| `clock`、`nav`、`outside`、`prd`、`smtp`、`webhook` | このサンプルの語彙 | — | — | — | `clock.now` だけ | — |
+| `clock`、`nav`、`outside`、`pact`、`smtp`、`webhook` | このサンプルの語彙 | — | — | — | `clock.now` だけ | — |
 
 名前空間どうしの呼び出しの向き:
 
@@ -110,7 +110,7 @@ psp, carriergw ─▶ hooks ┘     │                 ├─▶ payment  ─�
 
 ## 画面
 
-画面は、ページの op（`@page.route`。返す union のアームが、画面の状態）と、操作の op（`@page.interaction`。どのページの、どのアームでできるか）で書いた。描き方（部品、文言、見た目、入力の途中の状態）は書いていない。
+画面は、ページの op（`@browser.page.route`。返す union のアームが、画面の状態）と、操作の op（`@browser.page.interaction`。どのページの、どのアームでできるか）で書いた。描き方（部品、文言、見た目、入力の途中の状態）は書いていない。
 
 ### 客の画面（`web/storefront.hozo`）
 
@@ -143,7 +143,7 @@ psp, carriergw ─▶ hooks ┘     │                 ├─▶ payment  ─�
 | `outside` | `failsAs(error)` | 相手に届かない失敗（`http.NetworkError`、`http.ServerError`）を、別の例外に言い換える | 効く（`catches … recovers`、`throws`）。金が動く呼び出しには使えなかった（F5） |
 | `clock` | `system`、`tick(every)`、op `now()` | 時計を読む op、誰にも呼ばれずに動く op | 印。`now()` は、時刻を配線に出すための葉 |
 | `webhook` | `signed(sender)`、例外 `BadSignature` | 外部の仕組みが呼ぶ入口で、署名を確かめる | 効く（`throws BadSignature prevents effects`） |
-| `prd` | `promise(whom, what)` | その op が守る、PRD の約束 | 印。約束の中身は確かめない（F11） |
+| `pact` | `promise(whom, what)` | その op が守る、PRD の約束 | 印。約束の中身は確かめない（F11）。標準の語彙 `prd` には、足せないので、自分の名前空間に置く（`docs/vocab.md`「語彙の名前空間」） |
 | `smtp` | `sendMail` | SMTP でメールを送る op | 印 |
 | `nav` | `leave`、`save` | ブラウザを、アプリの外へ移す。ファイルを保存させる | 印 |
 
@@ -212,8 +212,8 @@ export fn boxOptions(shipment: Shipment on Gathered.Complete): BoxOption[] {
   return fitting(shipment, boxes, tariffs);
 }
 
-@prd.promise("店", "箱は、送る品目がすべてそろうまで決めない")
-@prd.promise("客", "送料は、梱包した箱の大きさと届け先だけで決まる")
+@pact.promise("店", "箱は、送る品目がすべてそろうまで決めない")
+@pact.promise("客", "送料は、梱包した箱の大きさと届け先だけで決まる")
 @db.transaction
 export fn pack(id: ShipmentId, box: BoxCode, weight: type.Grams): Parcel
   throws NoShipment, NotGathered, AlreadyPacked, UnknownBox, OverWeight, Undeliverable
@@ -239,7 +239,7 @@ fn packGathered(shipment: Shipment, box: BoxCode, weight: type.Grams): Parcel
 `domain/fulfilment.hozo` から。請求の確定が、送り状より先:
 
 ```ts
-@prd.promise("店", "請求を確定できない荷物には、送り状を買わない")
+@pact.promise("店", "請求を確定できない荷物には、送り状を買わない")
 export fn dispatch(id: shipping.ShipmentId, choice: carrier.Choice): shipping.Label
   throws …
 {
@@ -368,7 +368,7 @@ export fn start(id: JobId): Job throws NoJob, NotQueued {
 
 | 言えなかったこと | 代わりにしたこと | 項目 |
 |---|---|---|
-| 請求は上限を超えない、請求する送料 = min(送料, 上限) | 葉のコメントと、印 `@prd.promise` | F11 |
+| 請求は上限を超えない、請求する送料 = min(送料, 上限) | 葉のコメントと、印 `@pact.promise` | F11 |
 | 行のケースを、宣言した向きのほかには変えないこと | 効果の中身は、人が書く。宣言と、呼ぶ側の検査（引数の型: TYPE-4、MATCH-4）まで | F1、F51 |
 | いくつかの行のケースを、一度に変える | 時計で、一行ずつ | F50 |
 | 後のケースが、引数の値で決まる遷移 | 何も約束しない `as else`（行の引数は、絞り込まない） | F53 |
@@ -395,7 +395,7 @@ export fn start(id: JobId): Job throws NoJob, NotQueued {
 - **F8 値の集合を言う型（列挙）がない。** リテラルを scalar の引数に渡せない（TYPE-1）ので、`authorize(token, "packer")` は書けない。→ 仕事は、三つの真偽値と、仕事ごとの分類三つ（`staff.MakerDuty`、`PackerDuty`、`AdminDuty`）と、三つの op（`staff.asMaker`、`asPacker`、`asAdmin`）。商品の種類は、union と、型で決まる分類で書けた（`catalog.Fulfilment`、`catalog.Kind`）。`psp.Event.kind`、`shipping.SizeClass`、`shipping.Zone`、`Problem.reason` は文字列で、値の集合はコメント。
 - **F9 「この段階では、この値がある」を、一つの model では言えない。** `model Packed extends Shipment { override parcel: Parcel; }` は TYPE-15。model を別の model に絞るケースは CLS-6。→ 事実を別の表にして（`parcels`、`labels`）、存在の分類（`Packing`、`Labelling`）で絞り、そろった組を model にした（`Sealed`、`Dispatched`）。
 - **F10 `T on C.Case` の引数は、別の名前空間からも効いた。作り方は縛れない。** `shipping.boxOptions(shipment: Shipment on Gathered.Complete)` を `fulfilment.optionsIfGathered` が呼ぶ。そろっていない出荷を渡すと MATCH-4（`Awaiting` のアームから `boxOptions(shipment)` を呼んで確かめた）。ただし、効果 `createParcel(parcel: Parcel)` は、どの `Parcel` でも受け取る。「荷物は、そろった出荷からしか作れない」は、`Parcel` を返す葉が `weighed` だけであることに依り、検査されない。
-- **F11 不変条件を書けない。** 「請求は上限を超えない」「請求する送料 = min(送料, 上限)」「`limit` = `itemsTotal` + `shippingCeiling`」「見積もり ≤ 上限」は、葉（`payment.charged`、`shipping.foresee`）のコメント。→ 印 `@prd.promise` を、約束を守る op に付けた。約束と op が結ばれるだけで、中身は確かめない。この仕様でいちばん大事な客への約束が、検査の外にある。
+- **F11 不変条件を書けない。** 「請求は上限を超えない」「請求する送料 = min(送料, 上限)」「`limit` = `itemsTotal` + `shippingCeiling`」「見積もり ≤ 上限」は、葉（`payment.charged`、`shipping.foresee`）のコメント。→ 印 `@pact.promise` を、約束を守る op に付けた。約束と op が結ばれるだけで、中身は確かめない。この仕様でいちばん大事な客への約束が、検査の外にある。
 - **F12 分類の対象に `read` を書けない**（RES-4）。op の分類にするには、`read` をそのまま呼ぶ op が要る（`shop-server/README.md` の N119）。→ 型の分類にした（`classify Known of Order?`）。「引いたものがあるか」の分類が、名前空間ごとに並ぶ（`Known` が四つ、`Held`、`Stocked`、`Registered`、`Account`、`Entitlement`、`Login`）。どれも同じ意味（同 N4）。「ない」側の名前も、分類ごとに付けた（F44）。
 - **F13 空でない一覧の型がない。** `carrier.Fleet`（使っている配送業者があるか）は、述語で決まる分類になり、「空でない」（`Available`）と「空」（`Unavailable`）を、人が二つとも書く（F45）。`by list` なら書かずに済むが、場合に業務の名前が付かない。
 - **F14 設定の値を言う宣言がない。** → `single` の状態にした（`ordering.paymentWindow`、`payment.holdMargin`、`download.grantLifetime`、`shopApi.site`、`shipping.origin`）。誰が書き込むのかは、仕様にない。時計の間隔だけは、デコレータの引数に数字で書いた（`@clock.tick(every: 5m)`）。PRD の数字を、どちらに書くかの基準がない。
@@ -405,7 +405,7 @@ export fn start(id: JobId): Job throws NoJob, NotQueued {
 - **F18 配線が、二つの値を一度に運べない。** → 運ぶためだけの model（`shipping.Sealed`、`shipping.Dispatched`、`shipping.Progress`、`inventory.Allocation`）。
 - **F19 トランザクションの範囲を、仕様は言えない。** `hooks.paymentEvent` の `@db.transaction` は、六つの名前空間の表と、外部の呼び出し（`payment.release`）と、メールを含む。どの状態が同じ DB にあるかを言う宣言はない。入れ子（`fulfilment.acceptAndBegin`、`ordering.place`）の意味は、語彙を読むトランスパイラが決める（`docs/vocab.md`「`db` の read と効果」）。
 - **F20 誰にも呼ばれない op の例外には、受け手がない。** `payment.prepayExpiring` は `throws psp.HoldExpired, http.NetworkError, http.ServerError`。検査器は何も言わない。
-- **F21 「外から呼ばれる入口」と `export` は、別のもの。** 時計で動く op（`ordering.expireUnpaid`）と、画面の操作の op は、`export` を持たない内部の op。入口であることは、デコレータ（`@clock.tick`、`@page.interaction`）にしかない。操作の op のうち、ページのどのアームでもできるもの（`backoffice.onLogout`、`onRegisterCarrier`）は、印もない。
+- **F21 「外から呼ばれる入口」と `export` は、別のもの。** 時計で動く op（`ordering.expireUnpaid`）と、画面の操作の op は、`export` を持たない内部の op。入口であることは、デコレータ（`@clock.tick`、`@browser.page.interaction`）にしかない。操作の op のうち、ページのどのアームでもできるもの（`backoffice.onLogout`、`onRegisterCarrier`）は、印もない。
 
 ### 語彙
 
@@ -417,9 +417,9 @@ export fn start(id: JobId): Job throws NoJob, NotQueued {
 - **F27 `db` の語彙で言えなかった読み書き。** サーバーの 34 の `read` のうち 7、30 の効果のうち 21 に、デコレータを付けられなかった: 集合に入っているか（`productsBySkus`、`levelsOf`）、比較（`oldestUnpaidBefore`）、値がないこと（`toPick`、`shipmentsInHouse`、`openJobs`）、まとめて書く（`saveLevels`、`addJobs`）、キーでない列で書き換える（`confirmReservations`）。効果の 21 のうち 16 は、行のケースを変える効果で、`@db.update` と `@db.delete` の形に合わない（F51、F54）。列のしまい方（`@db.text` など）は、一つも書いていない（G1）。
 - **F28 「後で、必ず」がない。** 通知の入口は、受け付けて、分けて、メールを送るまでを、その場で行う（`hooks.paymentEvent`）。失敗したら、相手がもう一度送ることに頼る。
 - **F29 金額。** `type.Yen` は整数の scalar。足し算も比較も配線にないので、合計と差額は、どれも葉（`payment.limitOf`、`payment.charged`、`payment.refundOf`）。
-- **F30 `page` の語彙。**
-  - `@page.fallback` は、一つの op に一つ（DEC-13）。→ 二つ目は、内側の op に付けた（`storefront.filledCart` の `@outdatedOnFailure`）。
-  - `@page.interaction` も一つの op に一つで、`when` はアーム一つ。→ **ページの union のアームを、できる操作で切ることになった**（`storefront.OrderPage.Accepted` は、進み具合を、アームではなく中の値に畳んだ）。
+- **F30 `browser.page` の語彙。**
+  - `@browser.page.fallback` は、一つの op に一つ（DEC-13）。→ 二つ目は、内側の op に付けた（`storefront.filledCart` の `@outdatedOnFailure`）。
+  - `@browser.page.interaction` も一つの op に一つで、`when` はアーム一つ。→ **ページの union のアームを、できる操作で切ることになった**（`storefront.OrderPage.Accepted` は、進み具合を、アームではなく中の値に畳んだ）。
   - 状態が変わったとき、ページを描き直すかを言えない。→ 効果 `reload()`（`location.put`）を、操作の最後に呼ぶ。
   - 待つ、定期的に見直す、がない。→ 同意の通知を待つ間は、客が `onRefresh` を押す。
   - 操作の op が投げた例外が、画面でどうなるかを言う語彙がない。→ `recover(error, then)` を、画面の名前空間ごとに作った。
@@ -532,7 +532,7 @@ export fn start(id: JobId): Job throws NoJob, NotQueued {
 - 説明できる: `fulfilment.begin` の分け方、`fulfilment.dispatch` の順、`payment.settle` の場合分け、H6。
 - 外れる: PRD に名前のない段（H5）と葉（H2〜H4）を、大量に書かせる（葉は 90）。PRD の中心の約束（F11）は、葉の中に残る。「PRD に名前があるか」を決める人が要る。
 
-**R3 約束したことだけ。** 誰か（客、担当者、外部の仕組み）への約束と、それを破りうる順番だけを書く。このサンプルでは、`@prd.promise` を付けた七つの op と、そこから辿れる配線。
+**R3 約束したことだけ。** 誰か（客、担当者、外部の仕組み）への約束と、それを破りうる順番だけを書く。このサンプルでは、`@pact.promise` を付けた七つの op と、そこから辿れる配線。
 - 説明できる: 難しい問題の全部、同じ申し込みは一つ、`TermsChanged`、G2〜G5 を書かないこと。
 - 外れる: 何が約束かを決める規則がない。今の言語は、約束の中身（金額の不等式）を書けず、約束でない段（H1〜H5）を書かせるので、言語の形と合っていない。`staff` と `carrier` の管理のように、約束らしい約束のない概念が、何も書かれなくなる。
 
@@ -567,7 +567,7 @@ export fn start(id: JobId): Job throws NoJob, NotQueued {
     reads shipments, boxes, tariffs effects createParcel
     throws NotGathered, AlreadyPacked;
   ```
-- **(c) R2 を下限、R3 を上限にする。** 配線は、約束（`@prd.promise` のような印）から辿れるところまで下ろし、その先は、葉にしてよい。
+- **(c) R2 を下限、R3 を上限にする。** 配線は、約束（`@pact.promise` のような印）から辿れるところまで下ろし、その先は、葉にしてよい。
 
 勧め: **(c)**。(b) は、`docs/requirements.md`「出力を推論しない」の「人が書くコードを、できるだけ減らす」と当たる。(c) は、どこで止めるかに、理由を書かせる。
 
@@ -664,7 +664,7 @@ export fn start(id: JobId): Job throws NoJob, NotQueued {
 
 ### Q10 不変条件を、検査できる形で書けるようにするか
 
-今は、葉のコメントと、印 `@prd.promise`（F11）。
+今は、葉のコメントと、印 `@pact.promise`（F11）。
 
 - **(a) 印のまま。** 約束と op を結ぶだけ。
 - **(b) 葉の op に、結果の条件を書ける。** アサーションの材料にする。
@@ -712,7 +712,7 @@ R6 の、言語の部分（`docs/requirements.md`「R6 の、言語の部分」�
 - **`payment.prepayExpiring` は、失敗を、状態に残す形にしてから、繰り返しにした**（`docs/decisions.md`「決めたこと」345）。そのまま繰り返しにすると、一つの支払いで、外の仕組みが失敗したとき、残りの支払いが、その回では、扱われない（`docs/wiring-trial.md` の W5）。`prepay` は、本体で、想定した失敗を受けて、支払いに残す: `try { … } catch (e by PrepayFailure) { Expected => notePrepayFailure(payment, now); Unexpected => throw e; }`（`docs/decisions.md`「決めたこと」419、422）。前は、デコレータ `payment.noteFailure`（`catches … halts …`）を、例外ごとに三度付けていた: そこでは、効果は、引数を受け取れず、どの行に書くかを、デコレータの中身（継ぎ目）が決めていた。受ける文にして、効果 `notePrepayFailure` に、行（`payment`）と時刻（`now`）を、配線が渡すので、どの支払いに残すかが、仕様に書かれる。`noteFailure` は、なくした。例外の分類 `PrepayFailure` が、想定した失敗（`Expected`）と、そうでないもの（`Unexpected`）を分ける。繰り返しの中身は、想定した失敗を出さなくなり、一つが失敗しても、残りは、続く。残した失敗は、次に時計が動いたときに、もう一度、試される。想定していない失敗は、ここまで届き、繰り返しを、止める。
 - **`notice.bestEffort` に、本体を書いた**（同 419、422）: `catches mailer.Undelivered ignores` の節を、`try { next(); } catch (e by Delivery) { Undelivered => none; Other => throw e; }` にした。受ける例外は、例外の分類 `notice.Delivery` が言う。
 - `ordering.expireUnpaid` は、外の仕組みを呼ばず、`@db.transaction` を持つ: 途中で失敗したら、それまでの分も、戻る。
-- **`Record<K, V>` をなくした**（`docs/decisions.md`「決めたこと」360）のに合わせて、二つの画面（`storefront`、`backoffice`）の、URL のクエリの状態を、`state query: single<page.Query>;` にした。`page.Query` は、標準の語彙 `page` が宣言する、インデックスの model（`docs/vocab.md`）。
+- **`Record<K, V>` をなくした**（`docs/decisions.md`「決めたこと」360）のに合わせて、二つの画面（`storefront`、`backoffice`）の、URL のクエリの状態を、`state query: single<browser.page.Query>;` にした。`browser.page.Query` は、標準の語彙 `browser.page` が宣言する、インデックスの model（`docs/vocab.md`）。
 - **標準の分類 `nullable` のケースの名前を、`None` / `Some` に替えた**（`docs/decisions.md`「決めたこと」362）のに合わせて、二つの画面（`storefront`、`backoffice`）の、形が `nullable` の状態の遷移（`effects token as None -> Some`、`effects offer as None -> Some`）と、`match (… by nullable)` のアームを、書き直した。形が `list` の所（`Empty` / `HasItems`）は、変えていない。
 - **絞り込んだ型を `T on C.K` と書き、行の遷移の、前のケースを、行の引数の型で言う**（`docs/decisions.md`「決めたこと」368〜370）のに合わせて、絞り込んだ型（`C.K<T>`）と、行の遷移を持つ 24 の効果を、書き直した（`effect fn startJob(job: Job, …): effects jobs.put as Progress.Queued -> Progress.InProduction;` を、`effect fn startJob(job: Job on Progress.Queued, …): effects jobs.put as Progress.InProduction;` に）。`post` の効果の「前」（`as Packing.Unpacked -> Packing.Packed`）と、`as any` は、なくなった（F57、F53）。配線で変えたのは、`payment.markSecured` の一か所（F59）。
 

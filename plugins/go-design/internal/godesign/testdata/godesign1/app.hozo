@@ -1,26 +1,26 @@
 // GODESIGN-1: 位置は、その op。
 namespace design {
-  classify Actor of never { @actor.human User; }
+  classify Actor of never { @prd.actor.human User; }
 }
 
 namespace act {
-  @usecase.of(design.Actor.User)
+  @prd.usecase.of(design.Actor.User)
   export fn touch();
 }
 
 namespace flows {
-  @business.flow
+  @prd.business.flow
   fn hidden() {
     act.touch();
   }
 
-  @business.flow
+  @prd.business.flow
   fn also() {
     act.touch();
   }
 
   // export があれば、当たらない
-  @business.flow
+  @prd.business.flow
   export fn shown() {
     act.touch();
   }

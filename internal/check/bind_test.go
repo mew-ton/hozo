@@ -7,7 +7,7 @@ import (
 	"github.com/mew-ton/hozo/ir"
 )
 
-// bindFixture は §5.3 の形: browser.token（nullable<server.Token>。docs/decisions.md「設計書から離れた決定」S2）を
+// bindFixture は §5.3 の形: client.token（nullable<server.Token>。docs/decisions.md「設計書から離れた決定」S2）を
 // server.* に bind する。
 func bindFixture(serverOps []ir.Decl, browserOps []ir.Decl, binds ...ir.Bind) *ir.Program {
 	server := []ir.Decl{
@@ -19,16 +19,16 @@ func bindFixture(serverOps []ir.Decl, browserOps []ir.Decl, binds ...ir.Bind) *i
 		// インデックスの model: 値の型が τ でも、その先は辿らない
 		&ir.Model{DeclBase: ir.DeclBase{Name: "server.Tokens"}, Fields: []ir.Field{}, Index: &ir.ModelIndex{Name: "name", Key: ir.String(), Value: ir.Ref("server.Token")}},
 	}
-	browser := []ir.Decl{
-		state("browser.token", ir.StateNullable, ir.Ref("server.Token")),
-		state("browser.token2", ir.StateNullable, ir.Ref("server.Token")),
-		state("browser.tokens", ir.StateList, ir.Ref("server.Token")),
-		state("browser.session", ir.StateSingle, ir.Ref("server.Token")),
+	client := []ir.Decl{
+		state("client.token", ir.StateNullable, ir.Ref("server.Token")),
+		state("client.token2", ir.StateNullable, ir.Ref("server.Token")),
+		state("client.tokens", ir.StateList, ir.Ref("server.Token")),
+		state("client.session", ir.StateSingle, ir.Ref("server.Token")),
 	}
 	return program(binds,
 		namespace("server", append(server, serverOps...)...),
 		namespace("server.admin", leaf("server.admin.x", nil, param("t", ir.Optional(ir.Ref("server.Token"))))),
-		namespace("browser", append(browser, browserOps...)...))
+		namespace("client", append(client, browserOps...)...))
 }
 
 func positionsOf(t *testing.T, p *ir.Program, bi int, op string) [][]string {
@@ -62,7 +62,7 @@ func TestBindPositions(t *testing.T) {
 		leaf("server.node", nil, param("n", ir.Ref("server.Node"))),
 		leaf("server.opt", nil, param("in", ir.Optional(ir.Ref("server.LoginInput")))),
 	}
-	p := bindFixture(ops, nil, bind("browser", "browser.token", "server", false), bind("browser", "browser.token", "server", true))
+	p := bindFixture(ops, nil, bind("client", "client.token", "server", false), bind("client", "client.token", "server", true))
 	wantPaths(t, "none", positionsOf(t, p, 0, "server.none"))
 	wantPaths(t, "login", positionsOf(t, p, 0, "server.login"), "in.token")
 	wantPaths(t, "two", positionsOf(t, p, 0, "server.two"), "a", "b")
@@ -82,9 +82,9 @@ func TestBindShapes(t *testing.T) {
 		leaf("server.two", nil, param("a", ir.Ref("server.Token")), param("b", ir.Optional(ir.Ref("server.Token")))),
 	}
 	p := bindFixture(ops, nil,
-		bind("browser", "browser.token", "server", false),   // nullable
-		bind("browser", "browser.session", "server", false), // single
-		bind("browser", "browser.tokens", "server", false),  // list
+		bind("client", "client.token", "server", false),   // nullable
+		bind("client", "client.session", "server", false), // single
+		bind("client", "client.tokens", "server", false),  // list
 	)
 	for bi, shape := range []string{"nullable", "single"} {
 		wantPaths(t, shape+": optional(τ) の位置", positionsOf(t, p, bi, "server.login"), "in.token")
@@ -104,15 +104,15 @@ func TestBindRules(t *testing.T) {
 		leaf("server.strict", nil, param("in", ir.Ref("server.StrictInput"))),
 	}
 	t.Run("ok", func(t *testing.T) {
-		p := bindFixture([]ir.Decl{ops[0]}, nil, bind("browser", "browser.token", "server", false))
-		diags := Check(p, cfgFor("server", "browser"))
+		p := bindFixture([]ir.Decl{ops[0]}, nil, bind("client", "client.token", "server", false))
+		diags := Check(p, cfgFor("server", "client"))
 		for _, c := range []string{"BIND-1", "BIND-2", "BIND-5", "BIND-6"} {
 			wantNoCode(t, diags, c)
 		}
 	})
 	t.Run("BIND-1", func(t *testing.T) {
-		p := bindFixture([]ir.Decl{ops[1]}, nil, bind("browser", "browser.token", "server", false))
-		d := wantOneCode(t, Checker{Locate: locatorFor()}.Check(p, cfgFor("server", "browser")), "BIND-1")
+		p := bindFixture([]ir.Decl{ops[1]}, nil, bind("client", "client.token", "server", false))
+		d := wantOneCode(t, Checker{Locate: locatorFor()}.Check(p, cfgFor("server", "client")), "BIND-1")
 		if len(d.Related) != 2 {
 			t.Errorf("BIND-1 related = %d, want 2 positions", len(d.Related))
 		}
@@ -122,35 +122,35 @@ func TestBindRules(t *testing.T) {
 	})
 	t.Run("BIND-2", func(t *testing.T) {
 		// 状態の形が nullable で、位置（StrictInput.token）が optional でない
-		p := bindFixture([]ir.Decl{ops[2]}, nil, bind("browser", "browser.token", "server", false))
-		wantOneCode(t, Check(p, cfgFor("server", "browser")), "BIND-2")
+		p := bindFixture([]ir.Decl{ops[2]}, nil, bind("client", "client.token", "server", false))
+		wantOneCode(t, Check(p, cfgFor("server", "client")), "BIND-2")
 		// 状態の形が single なら、同じ位置でも BIND-2 にならない（常に一列）
-		p2 := bindFixture([]ir.Decl{ops[2]}, nil, bind("browser", "browser.session", "server", false))
-		wantNoCode(t, Check(p2, cfgFor("server", "browser")), "BIND-2")
+		p2 := bindFixture([]ir.Decl{ops[2]}, nil, bind("client", "client.session", "server", false))
+		wantNoCode(t, Check(p2, cfgFor("server", "client")), "BIND-2")
 		// nullable でも、位置が optional（LoginInput.token）なら通る
-		p3 := bindFixture([]ir.Decl{ops[0]}, nil, bind("browser", "browser.token", "server", false))
-		wantNoCode(t, Check(p3, cfgFor("server", "browser")), "BIND-2")
+		p3 := bindFixture([]ir.Decl{ops[0]}, nil, bind("client", "client.token", "server", false))
+		wantNoCode(t, Check(p3, cfgFor("server", "client")), "BIND-2")
 	})
 	t.Run("BIND-5", func(t *testing.T) {
 		p := bindFixture([]ir.Decl{ops[0]}, nil,
-			bind("browser", "browser.token", "server", false), bind("browser", "browser.token2", "server", false))
-		d := wantOneCode(t, Check(p, cfgFor("server", "browser")), "BIND-5")
-		if d.File != "browser.hozo" {
+			bind("client", "client.token", "server", false), bind("client", "client.token2", "server", false))
+		d := wantOneCode(t, Check(p, cfgFor("server", "client")), "BIND-5")
+		if d.File != "client.hozo" {
 			t.Errorf("BIND-5 file = %q", d.File)
 		}
 		// 別の名前空間の bind は衝突しない
 		p2 := bindFixture([]ir.Decl{ops[0]}, nil,
-			bind("browser", "browser.token", "server", false), bind("other", "browser.token2", "server", false))
-		wantNoCode(t, Check(p2, cfgFor("server", "browser")), "BIND-5")
+			bind("client", "client.token", "server", false), bind("other", "client.token2", "server", false))
+		wantNoCode(t, Check(p2, cfgFor("server", "client")), "BIND-5")
 	})
 	t.Run("BIND-6", func(t *testing.T) {
-		p := bindFixture([]ir.Decl{ops[0]}, nil, bind("browser", "browser.tokens", "server", false))
-		wantOneCode(t, Check(p, cfgFor("server", "browser")), "BIND-6")
+		p := bindFixture([]ir.Decl{ops[0]}, nil, bind("client", "client.tokens", "server", false))
+		wantOneCode(t, Check(p, cfgFor("server", "client")), "BIND-6")
 		wantPaths(t, "list state has no positions", positionsOf(t, p, 0, "server.login"))
 		// bind できるのは single と nullable
-		for _, s := range []string{"browser.token", "browser.session"} {
-			ok := bindFixture([]ir.Decl{ops[0]}, nil, bind("browser", s, "server", false))
-			wantNoCode(t, Check(ok, cfgFor("server", "browser")), "BIND-6")
+		for _, s := range []string{"client.token", "client.session"} {
+			ok := bindFixture([]ir.Decl{ops[0]}, nil, bind("client", s, "server", false))
+			wantNoCode(t, Check(ok, cfgFor("server", "client")), "BIND-6")
 		}
 	})
 }
@@ -159,7 +159,7 @@ func TestBindRules(t *testing.T) {
 func TestCallBound(t *testing.T) {
 	login := leaf("server.login", nil, param("in", ir.Ref("server.LoginInput")))
 	two := leaf("server.two", nil, param("a", ir.Ref("server.Token")), param("b", ir.Optional(ir.Ref("server.Token"))))
-	w := wire("browser.w", nil, []ir.OpParam{param("t", ir.Optional(ir.Ref("server.Token")))},
+	w := wire("client.w", nil, []ir.OpParam{param("t", ir.Optional(ir.Ref("server.Token")))},
 		cs(call("server.login", carg("in", rec()))),
 		cs(call("server.login", carg("in", rec(rf("token", nameAtom("t")))))),
 		cs(call("server.login", carg("in", nameAtom("t")))),
@@ -167,9 +167,9 @@ func TestCallBound(t *testing.T) {
 		cs(call("server.login")),
 		cs(call("server.two", carg("a", nameAtom("t")))),
 	)
-	p := bindFixture([]ir.Decl{login, two}, []ir.Decl{w}, bind("browser", "browser.token", "server", false))
+	p := bindFixture([]ir.Decl{login, two}, []ir.Decl{w}, bind("client", "client.token", "server", false))
 	Compute(p)
-	rows := rowsOf(p.Lookup("browser.w").(*ir.Op).Body)
+	rows := rowsOf(p.Lookup("client.w").(*ir.Op).Body)
 	bound := func(i int) []ir.BoundPosition { return rows[i].calls[0].call.Bound }
 	wantBound := func(i int, want ...string) {
 		t.Helper()
@@ -179,16 +179,16 @@ func TestCallBound(t *testing.T) {
 		}
 		wantStrings(t, sprintf("row %d bound", i), got, want)
 	}
-	wantBound(0, "in.token=browser.token")
+	wantBound(0, "in.token=client.token")
 	wantBound(1)
 	wantBound(2)
-	wantBound(3, "in.token=browser.token")
-	wantBound(4, "in.token=browser.token")
-	wantBound(5, "b=browser.token")
+	wantBound(3, "in.token=client.token")
+	wantBound(4, "in.token=client.token")
+	wantBound(5, "b=client.token")
 
-	// 別の名前空間（server の中）からの呼び出しには browser の bind は効かない
+	// 別の名前空間（server の中）からの呼び出しには client の bind は効かない
 	inner := wire("server.inner", nil, nil, cs(call("server.login", carg("in", rec()))))
-	p2 := bindFixture([]ir.Decl{login, inner}, nil, bind("browser", "browser.token", "server", false))
+	p2 := bindFixture([]ir.Decl{login, inner}, nil, bind("client", "client.token", "server", false))
 	Compute(p2)
 	if b := rowsOf(p2.Lookup("server.inner").(*ir.Op).Body)[0].calls[0].call.Bound; len(b) != 0 {
 		t.Errorf("server.inner bound = %v, want none", b)
@@ -202,7 +202,7 @@ func TestBind4(t *testing.T) {
 	deep := leaf("server.deep", nil, param("in", ir.Ref("server.Outer")))
 	outer := model("server.Outer", field("inner", ir.Ref("server.Inner")), field("opt", ir.Optional(ir.String())))
 	inner := model("server.Inner", field("token", ir.Optional(ir.Ref("server.Token"))), field("email", ir.String()), field("page", ir.Optional(ir.Int())))
-	w := wire("browser.w", nil, nil,
+	w := wire("client.w", nil, nil,
 		cs(call("server.login", carg("in", rec()))),                                            // body がない
 		cs(call("server.login", carg("in", rec(rf("body", rec()))))),                           // body.email がない
 		cs(call("server.login")),                                                               // in がない
@@ -211,8 +211,8 @@ func TestBind4(t *testing.T) {
 		cs(call("server.deep", carg("in", rec(rf("inner", rec(rf("email", nameAtom("x")))))))), // ok
 		cs(call("server.login", carg("in", rec(rf("body", nameAtom("b")))))),                   // name は中身が分からないので ok
 	)
-	p := bindFixture([]ir.Decl{login, tok, deep, outer, inner}, []ir.Decl{w}, bind("browser", "browser.token", "server", false))
-	diags := Check(p, cfgFor("server", "browser"))
+	p := bindFixture([]ir.Decl{login, tok, deep, outer, inner}, []ir.Decl{w}, bind("client", "client.token", "server", false))
+	diags := Check(p, cfgFor("server", "client"))
 	b4 := withCode(diags, "BIND-4")
 	if len(b4) != 4 {
 		t.Fatalf("BIND-4 count = %d, want 4\n%s", len(b4), messages(diags))

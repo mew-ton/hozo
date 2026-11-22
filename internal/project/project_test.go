@@ -116,18 +116,18 @@ func TestDesignCorpus(t *testing.T) {
 	if len(p.Diags) == 0 {
 		t.Fatal("CFG-26 が一つも出ていない（基底 go だけの単位で、語彙のデコレータは、解釈されない）")
 	}
-	if got := strings.Join(p.Sources, ","); got != "browser.hozo,server.hozo" {
+	if got := strings.Join(p.Sources, ","); got != "client.hozo,server.hozo" {
 		t.Fatalf("Sources = %v", p.Sources)
 	}
-	// 単位は四つ（server、browser と、使う型の置き場の http、page）。どれも基底 go で、in を省いているので
+	// 単位は四つ（server、client と、使う型の置き場の http、page）。どれも基底 go で、in を省いているので
 	// Files は Sources のすべてと、語彙のファイル
 	if len(p.Units) != 4 || p.Units[0].Namespace != "server" || p.Units[0].Language != "go" || p.Units[0].Base != "go" ||
 		len(p.Units[0].Transpilers) != 1 || p.Units[0].Transpilers[0].Name != "go" || p.Units[0].Transpilers[0].Plugin.Name != "go" ||
-		!strings.HasPrefix(strings.Join(p.Units[0].Files, ","), "browser.hozo,server.hozo,hozo:vocab/") {
+		!strings.HasPrefix(strings.Join(p.Units[0].Files, ","), "client.hozo,server.hozo,hozo:vocab/") {
 		t.Fatalf("Units = %+v", p.Units)
 	}
 	views := p.Views()
-	if len(views) != 4 || views[0]["server"] == nil || views[1]["browser"] == nil || len(views[0]) != 1 {
+	if len(views) != 4 || views[0]["server"] == nil || views[1]["client"] == nil || len(views[0]) != 1 {
 		t.Fatalf("Views = %v", views)
 	}
 	if d := views[0]["server"].Config.Dir; d != "gen/server" {
@@ -254,7 +254,7 @@ func TestOverlay(t *testing.T) {
 		"gen/server/ignored.hozo":          []byte("garbage"), // out の下は除く
 		filepath.Join(dir, "..", "x.hozo"): []byte("garbage"), // ルートの外
 	})
-	if got := strings.Join(p.Sources, ","); got != "browser.hozo,extra.hozo,server.hozo" {
+	if got := strings.Join(p.Sources, ","); got != "client.hozo,extra.hozo,server.hozo" {
 		t.Fatalf("Sources = %v", p.Sources)
 	}
 	if p.Errors() == 0 || !strings.Contains(strings.Join(codes(p.Diags), ","), "SYNTAX") {
@@ -391,10 +391,10 @@ func asked(t *testing.T, dir, name string) string {
 func TestPluginAnswers(t *testing.T) {
 	dir := t.TempDir()
 	write(t, filepath.Join(dir, "server.hozo"), "namespace server {\n  model M { id: string; }\n  /** 注文する */\n  fn placeOrder(m: M);\n}\n")
-	write(t, filepath.Join(dir, "browser.hozo"), "namespace browser {\n  fn open();\n}\n")
+	write(t, filepath.Join(dir, "client.hozo"), "namespace client {\n  fn open();\n}\n")
 	fakePlugin(t, dir, "pick", "go", "", `{"files":[{"path":"@DIR@/pick.txt","content":"@NS@"}],"warnings":[]}`, 0)
 	config := func(serverTranspilers ...string) string {
-		return pluginDirs + unit("server", "gen/server", serverTranspilers...) + unit("browser", "gen/browser", "pick")
+		return pluginDirs + unit("server", "gen/server", serverTranspilers...) + unit("client", "gen/client", "pick")
 	}
 	write(t, filepath.Join(dir, "hozo.toml"), config("chk"))
 	resp := `{"files":[],"warnings":[{"at":"server.placeOrder","message":"by fqn"}],"errors":[{"code":"CHK-2","at":"server.hozo:3:5","message":"by pos"},{"severity":"warning","code":"CHK-3","at":"nowhere","message":"unknown"}]}`
@@ -430,12 +430,12 @@ func TestPluginAnswers(t *testing.T) {
 			t.Errorf("want %q in:\n%s", want, got)
 		}
 	}
-	// 答えは、単位の設定の順（server の chk、browser の pick）。files も、残る（書き出す実行が、使う）
+	// 答えは、単位の設定の順（server の chk、client の pick）。files も、残る（書き出す実行が、使う）
 	if len(p.Answers) != 2 || p.Answers[0].Transpiler.Name != "chk" || p.Answers[0].Namespace != "server" || p.Answers[1].Unit != 1 {
 		t.Fatalf("Answers = %+v", p.Answers)
 	}
-	if r := p.Answer(1, "browser", "pick"); r == nil || len(r.Files) != 1 || r.Files[0].Path != "gen/browser/pick.txt" || r.Files[0].Content != "browser" {
-		t.Errorf("browser の pick の答え = %+v", r)
+	if r := p.Answer(1, "client", "pick"); r == nil || len(r.Files) != 1 || r.Files[0].Path != "gen/client/pick.txt" || r.Files[0].Content != "client" {
+		t.Errorf("client の pick の答え = %+v", r)
 	}
 	if r := p.Answer(0, "server", "chk"); r == nil || len(r.Errors) != 2 || p.Answer(0, "server", "pick") != nil || p.Answer(1, "server", "chk") != nil {
 		t.Errorf("server の chk の答え = %+v", r)
@@ -474,7 +474,7 @@ func TestPluginAnswers(t *testing.T) {
 	if len(p.Plugins) != 2 {
 		t.Errorf("Plugins = %d, want 2（入っているプラグインは探す）", len(p.Plugins))
 	}
-	// pick は、server と browser の二つの出力を受け持つが、起動は一回
+	// pick は、server と client の二つの出力を受け持つが、起動は一回
 	if n := launches(t, dir, "pick"); n != 1 || len(p.Answers) != 2 {
 		t.Errorf("pick の起動 %d 回、Answers %d 個（want 1、2）", n, len(p.Answers))
 	}
@@ -510,7 +510,7 @@ func TestPluginAnswers(t *testing.T) {
 	write(t, filepath.Join(dir, "plugins", "chk", "exit"), "2")
 	launches(t, dir, "pick")
 	p = LoadWith(Options{Root: dir})
-	if p.RunErr != nil || !strings.Contains(text(p), "error[MAN-5]") || launches(t, dir, "pick") != 1 || p.Answer(1, "browser", "pick") == nil || p.Answer(0, "server", "chk") != nil {
+	if p.RunErr != nil || !strings.Contains(text(p), "error[MAN-5]") || launches(t, dir, "pick") != 1 || p.Answer(1, "client", "pick") == nil || p.Answer(0, "server", "chk") != nil {
 		t.Errorf("unsupported: RunErr = %v\n%s", p.RunErr, text(p))
 	}
 }

@@ -109,13 +109,13 @@ func PlaceAt(path string) error {
 // そのテストが見たい診断に、混ざる。コーパスに、新しいデコレータを足したら、ここに足す（足し忘れは、CFG-26 が、テストに出て分かる）。
 // コーパス自身の設定（基底 go だけ）での CFG-26 は、ゴールデン tests/corpus/design/testdata/expected/check.txt が持つ。
 var DesignDecorators = []string{
-	"browser.ignoreFailure", "browser.unavailableOnFailure",
+	"client.ignoreFailure", "client.unavailableOnFailure",
 	"db.key", "db.ref", "db.table", "db.unique",
 	"http.body", "http.bodyObj", "http.default", "http.get", "http.header", "http.post", "http.query", "http.status",
-	"localStorage",
-	"page.dialog", "page.fallback", "page.interaction", "page.path", "page.query", "page.route",
-	"server.validated",
-	"valid.checkDigit", "valid.format", "valid.length", "valid.min", "valid.pattern",
+	"browser.localStorage",
+	"browser.page.dialog", "browser.page.fallback", "browser.page.interaction", "browser.page.path", "browser.page.query", "browser.page.route",
+	"server.checkDigit", "server.validated",
+	"valid.format", "valid.length", "valid.min", "valid.pattern",
 }
 
 // Interprets は、マニフェストの [[transpiler]] に足す一行: interprets = [fqns...]（docs/plugin-protocol.md「マニフェスト」）。

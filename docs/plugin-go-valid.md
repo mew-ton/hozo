@@ -130,7 +130,7 @@ func (m User) Validate() error {
 
 - 「元の型」は、`docs/plugin-valid.md`「制約」の言うもの。
 - 違反は `violations = append(violations, runtime.Violation{Path: "<パス>", Constraint: "<違反の名前>"})`。違反の名前は、同「制約」の表（デコレータの名前。配列のフィールドに付けた `length` だけ、`count`）。
-- **利用者が `valid` に足した制約**（設計書 §6.5）は、中身を人が書くもので、`Validate()` に実装を渡す形がまだない。使われていれば GOVALID-5。
+- **標準でない `valid` の制約**（名前空間 `valid` の、標準の五つのほかのデコレータ）は、中身を人が書くもので、`Validate()` に実装を渡す形がまだない。使われていれば GOVALID-5。`valid` は、語彙の名前空間なので、仕様からは、足せない（`docs/vocab.md`「語彙の名前空間」。RES-8）: 足せるのは、ほかのプラグインの語彙のファイルだけ（`docs/decisions.md`「決めたこと」463）。設計書 §6.5 の、利用者の自前の制約は、利用者の名前空間のデコレータ（`@server.checkDigit`）で、このトランスパイラは、読まない。
 
 ## runtime
 
@@ -158,7 +158,7 @@ func CheckFormat(name, v string) bool                   // valid.format の四�
 |---|---|---|
 | GOVALID-3 | error | `Validate` を持つ別の名前空間の型を、フィールドに持つか、scalar の元の型にするが、その名前空間の型の置き場の単位が `go-valid` を並べていない。メッセージに、その単位（何番目の `[[emit]]` か）を示す。位置は model（元の型なら、その scalar） |
 | GOVALID-4 | error | フィールドの型が union で、そのアームの型が、`ref` でないか、インデックスの model か、別の union への `ref` で、その中に `Validate` を持つ型がある（「Validate を持つ型」。確かめる形が、まだない）。位置は model |
-| GOVALID-5 | error | 標準でない `valid` の制約（利用者が `valid` に足したデコレータ）が付いている。位置は、付いた scalar か model |
+| GOVALID-5 | error | 標準でない `valid` の制約（ほかのプラグインの語彙のファイルが `valid` に足したデコレータ）が付いている。位置は、付いた scalar か model |
 | GOVALID-6 | error | `Validate` を持つ model が、`validate` という名前のフィールドを持つ（Go で、フィールド `Validate` とメソッド `Validate` が当たる）。位置は model |
 | GOVALID-7 | error | `[emit.options.go-valid]` に、知らないキーがある。位置なし |
 

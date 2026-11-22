@@ -29,7 +29,7 @@ var corpora = []struct {
 	noOutput   bool
 	noGoOutput bool
 }{
-	{name: "design", needsGo: true}, // 設計書の例。server と browser と、使う型の置き場の http と page
+	{name: "design", needsGo: true}, // 設計書の例。server と client と、使う型の置き場の http と page
 	// plugins/view-dump（テストのための基底）が、受け取った View を view.json に書き出す
 	{name: "view", needsGo: true, noGoOutput: true},
 	{name: "state", needsGo: true}, // 状態の分類・遷移の効果・状態での match

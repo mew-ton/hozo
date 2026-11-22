@@ -4,7 +4,8 @@ namespace a {
   model Y { id: string; }
   fn Y(): void;                        // ERROR: RES-6
 }
-namespace http {
+namespace a.sub {
+  exception ServerError;
   exception ServerError;               // ERROR: RES-6
 }
 model g { id: string; }                // WARN: NAME-1

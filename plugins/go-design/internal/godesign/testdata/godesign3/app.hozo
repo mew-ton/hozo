@@ -1,16 +1,16 @@
 // GODESIGN-3: 位置は、フローの op。呼んだ先ごとに、一つ（同じ先を二度呼んでも、一つ）。
 namespace design {
-  classify Actor of never { @actor.human User; }
+  classify Actor of never { @prd.actor.human User; }
 }
 
 namespace act {
-  @usecase.of(design.Actor.User)
+  @prd.usecase.of(design.Actor.User)
   export fn touch();
 
-  @usecase.of(design.Actor.User)
+  @prd.usecase.of(design.Actor.User)
   export fn find(name: string): string?;
 
-  // @usecase.of のない op
+  // @prd.usecase.of のない op
   export fn plain();
   export fn text(name: string): string;
 }
@@ -21,31 +21,31 @@ namespace flows {
   read fn firstNote(): string? reads notes;
   effect fn addNote(note: string): effects notes.post;
 
-  // 同じ名前空間の、@usecase.of のない op（葉）
+  // 同じ名前空間の、@prd.usecase.of のない op（葉）
   fn helper();
 
-  // 別の名前空間の、@usecase.of のない op。二度呼んでも、診断は、一つ
-  @business.flow
+  // 別の名前空間の、@prd.usecase.of のない op。二度呼んでも、診断は、一つ
+  @prd.business.flow
   export fn callsPlain() {
     act.touch();
     act.plain();
     act.plain();
   }
 
-  // 同じ名前空間の、@usecase.of のない op
-  @business.flow
+  // 同じ名前空間の、@prd.usecase.of のない op
+  @prd.business.flow
   export fn callsHelper() {
     helper();
   }
 
   // 別のフロー
-  @business.flow
+  @prd.business.flow
   export fn callsFlow() {
     callsHelper();
   }
 
   // read と、効果と、直に呼ぶ組み込みの効果
-  @business.flow
+  @prd.business.flow
   export fn callsState(note: string): string? {
     addNote(note);
     notes.post(note);
@@ -53,7 +53,7 @@ namespace flows {
   }
 
   // match のアームの本体と、for、disjoint の中
-  @business.flow
+  @prd.business.flow
   export fn nested(name: string, items: string[]): string {
     val found = act.find(name);
     for (val item of items) {
@@ -70,7 +70,7 @@ namespace flows {
   }
 
   // 操作の op だけを呼ぶフローは、当たらない
-  @business.flow
+  @prd.business.flow
   export fn fine() {
     act.touch();
   }

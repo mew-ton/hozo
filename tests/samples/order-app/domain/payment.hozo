@@ -256,7 +256,7 @@ namespace payment {
    * 相手からの通知を扱う。同じ通知が二度届いても、二度は扱わない。
    * この通知で、新しく、客の同意が取れた注文があれば、その識別子を返す。なければ、ない。
    */
-  @prd.promise("客", "同じ通知が二度届いても、注文を二度は受け付けない")
+  @pact.promise("客", "同じ通知が二度届いても、注文を二度は受け付けない")
   export fn record(event: psp.Event): type.OrderId? {
     val delivered = seenEvent(event.id);
     return match (delivered by Redelivery) {
@@ -330,8 +330,8 @@ namespace payment {
    * 枠を確保してあれば、商品の代金 + 請求する送料で、請求を確定する。上限の額で先に確定してあれば、差額を返す。
    * もう決まっていれば、何もしない（二度呼んでも、請求は一度）。
    */
-  @prd.promise("客", "請求は、同意した額（商品の代金 + 送料の上限）を超えない")
-  @prd.promise("客", "請求の確定は、注文一つに一度だけ")
+  @pact.promise("客", "請求は、同意した額（商品の代金 + 送料の上限）を超えない")
+  @pact.promise("客", "請求の確定は、注文一つに一度だけ")
   export fn settle(orderId: type.OrderId, fee: type.Yen) {
     val payment = require(orderId);
     match (payment by Standing) {

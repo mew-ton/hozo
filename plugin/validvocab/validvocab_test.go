@@ -44,7 +44,39 @@ func loadSpec(t *testing.T, name string) *ir.Spec {
 	if spec.Program == nil {
 		t.Fatalf("testdata/%s/spec.json に program がない", name)
 	}
+	if name == "clean" {
+		addCustom(t, spec.Program)
+	}
 	return &spec
+}
+
+// addCustom は、入力 clean の IR に、標準でない valid の制約 @valid.checkDigit を足す: scalar app.Jan と、app.Form / app.More の
+// フィールド code（受け継いだ、展開済みのフィールドにも）。標準でない valid の制約は、ほかのプラグインの語彙のファイルが、valid に
+// 足したもので、仕様（.hozo）からは、足せない（docs/vocab.md「語彙の名前空間」。RES-8）ので、読んだ後の IR に足す。
+func addCustom(t *testing.T, p *ir.Program) {
+	t.Helper()
+	custom := ir.Application{Decorator: "valid.checkDigit"}
+	jan, ok := p.Lookup("app.Jan").(*ir.Scalar)
+	if !ok {
+		t.Fatal("clean に app.Jan がない")
+	}
+	jan.Decorators = append(jan.Decorators, custom)
+	n := 0
+	for _, fqn := range []string{"app.Form", "app.More"} {
+		m, ok := p.Lookup(fqn).(*ir.Model)
+		if !ok {
+			t.Fatalf("clean に %s がない", fqn)
+		}
+		for i := range m.Fields {
+			if m.Fields[i].Name == "code" {
+				m.Fields[i].Decorators = append(m.Fields[i].Decorators, custom)
+				n++
+			}
+		}
+	}
+	if n != 2 {
+		t.Fatalf("clean の、フィールド code が %d 個（app.Form と、受け継いだ app.More の二つのはず）", n)
+	}
 }
 
 // diagnosticFixtures は、診断を返す入力（testdata/<名前>/）と、その診断のコード。
@@ -102,7 +134,7 @@ func TestDiagnostics(t *testing.T) {
 	}
 }
 
-// TestClean は「対象」: 標準の制約の、正しい使い方と、利用者が valid に足した制約（読まない）は、診断にならない。
+// TestClean は「対象」: 標準の制約の、正しい使い方と、標準でない valid の制約（読まない）は、診断にならない。
 // 受け継いだ制約も、同じに読む（展開済みのフィールド）。
 func TestClean(t *testing.T) {
 	p := loadSpec(t, "clean").Program
@@ -140,7 +172,7 @@ func TestClean(t *testing.T) {
 			"later": {NameCount},           // 省略可能な配列も
 			"name":  {"pattern", "format"}, // 省略可能は、中の型で見る。書かれた順
 			"ratio": {"min"},
-			"code":  nil, // 利用者が足した制約は、読まない
+			"code":  nil, // 標準でない valid の制約（addCustom が足した）は、読まない
 			"attrs": nil,
 			"page":  nil, // 型の scalar に付いた制約は、フィールドの制約ではない
 		} {
@@ -193,7 +225,7 @@ func TestNames(t *testing.T) {
 		}
 	}
 	if Standard("valid.checkDigit") || !Applied("valid.checkDigit") {
-		t.Error("利用者が足した制約は、標準でない `@valid.*`")
+		t.Error("標準の五つのほかの制約は、標準でない `@valid.*`")
 	}
 	for _, d := range []string{"valid.sub.x", "valid.sub.min", "validx.min", "x.valid.min", "valid", "valid.", "min", "http.query", "db.key", ""} {
 		if Standard(d) || Applied(d) {

@@ -1,0 +1,19 @@
+// RES-8 に当たらない: 語彙の名前空間を、使うだけ。語彙のファイルどうし（プラグイン morevalid の語彙が、標準の語彙の名前空間
+// valid に、制約 even を足す。plugins/morevalid/valid.hozo）は、当たらない。語彙が宣言したのが、下の名前空間だけ（acme.auth）なら、
+// 上（acme）は、閉じていない
+namespace a {
+  @valid.min(1) @valid.even
+  scalar Count extends int;
+
+  @browser.localStorage
+  state token: nullable<string>;
+
+  @acme.auth.signed
+  state session: nullable<string>;
+
+  @http.status(404)
+  exception NotFound;
+}
+namespace acme {
+  model Mine { id: string; }
+}

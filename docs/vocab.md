@@ -8,14 +8,20 @@ hozoc が同梱して常に読み込む語彙（`vocab/*.hozo`）と、その読
 
 - `vocab/*.hozo` は hozoc のバイナリに埋め込む（Go の `embed`）。`hozoc build --no-emit` / `emit` / `lsp` は、これらをプロジェクトのファイルの一部として読む（順序は `docs/ir.md`「原則」）。同梱して常に読むのは、仕様の検査に展開のプラグインを要求しないため（宣言は実行環境を持たない。§4.5）。`Span.file` の形は `docs/ir.md`「Program」。
 - プラグインのマニフェストの `vocabulary`（`docs/plugin-protocol.md`「マニフェスト」）の `.hozo` も同じ扱い。読むのは使うプラグイン（そのプラグインのトランスパイラが、どれかの単位の `transpilers` に書かれている。`docs/plugin-protocol.md`「探索」）のものだけ。入っているだけのプラグインの語彙は読まない。入れただけで、使っていないプラグインの宣言がプロジェクトの名前に加わらないようにするため（名前の衝突は NS-3 / RES-6）。
-- ユーザーは同じ名前空間に宣言を足せる（§3.2、§6.5）。標準の語彙の宣言と同じ名前を足せば RES-6。
+- **語彙の名前空間には、仕様から、宣言を足せない**（「語彙の名前空間」。RES-8）。出発点の例（§3.2、§6.5: `valid` に、自前の制約を足す）は、書けない: 自前の宣言は、自分の名前空間に置く（`docs/decisions.md`「決めたこと」456、463）。語彙のファイルどうしは、同じ名前空間に宣言できる（プラグインの語彙が、標準の語彙の名前空間に足す。名前が当たれば RES-6 / NS-3）。
 - 標準の語彙は `hozoc lsp` の定義へジャンプの飛び先になる。埋め込んだ内容を読み取り専用の仮想文書として返す（`docs/lsp.md`）。
 
 ## 語彙の名前空間
 
-**語彙の名前空間**は、宣言のすべてが語彙のファイル（`Span.file` が `hozo:` で始まる。`docs/ir.md`「Program」）にある名前空間。標準の語彙（`valid`、`http`、`page` など）も、使うプラグインの語彙（`cli`）も同じに数える。宣言を一つも持たない名前空間は数えない。ユーザーが同じ名前空間に宣言を一つでも足せば（§6.5 の `valid` への制約の追加など）、その名前空間はもう語彙の名前空間ではない。
+**語彙の名前空間**は、語彙のファイル（`Span.file` が `hozo:` で始まる。`docs/ir.md`「Program」）が、`namespace` のブロックで宣言した名前空間と、その下の名前空間。標準の語彙（`valid`、`http`、`browser`、`browser.page`、`prd` など）も、使うプラグインの語彙（`cli`）も、同じに数える。
 
-語彙の名前空間も、単位の `namespace` に書ける（`docs/config.md`「単位の対象」）。語彙の型（`http` の例外、`page.Route` など）を使う出力は、その語彙の名前空間に、同じ基底の単位を要る（`docs/config.md`「型の置き場」）。語彙のファイルの宣言は、単位の `in` によらず、いつも単位の対象の宣言（`docs/config.md`「in」）。デコレータだけの語彙（`valid`、`db`、`cli` など）は、型を持たないので、単位は要らない。
+**語彙の名前空間は、閉じている**（`docs/decisions.md`「決めたこと」456）: プロジェクトの仕様のファイルは、語彙の名前空間と、その下に、宣言も、名前空間も、足せない（`namespace http { … }`、`namespace browser.shop { … }` は RES-8。`docs/resolve.md`「名前空間の併合と重複」）。使うこと（`@http.post`、`throws http.BadRequest`、単位の `namespace = "http"`）は、できる。
+
+- 理由: 語彙に宣言を足しても、仕様が、重複（RES-6）で壊れない（足すのは、小さい版: `docs/ir.md`「版」）。
+- 語彙が宣言したのが、下の名前空間だけなら、上は、閉じない（プラグインの語彙が `namespace acme.auth` を宣言しても、仕様は `namespace acme` を書ける）。
+- 語彙のファイルどうしが、同じ名前空間を宣言したときは、今は、併合する（決めていない点: `docs/open.md`「語彙とプラグイン」）。
+
+語彙の名前空間も、単位の `namespace` に書ける（`docs/config.md`「単位の対象」）。語彙の型（`http` の例外、`browser.page.Route` など）を使う出力は、その語彙の名前空間に、同じ基底の単位を要る（`docs/config.md`「型の置き場」）。語彙のファイルの宣言は、単位の `in` によらず、いつも単位の対象の宣言（`docs/config.md`「in」）。デコレータだけの語彙（`valid`、`db`、`cli` など）は、型を持たないので、単位は要らない。
 
 ## 同梱する語彙
 
@@ -24,17 +30,14 @@ hozoc が同梱して常に読み込む語彙（`vocab/*.hozo`）と、その読
 | `vocab/valid.hozo` | `namespace valid { min / max / length / pattern / format }` | §4.2、§6.5 |
 | `vocab/http.hozo` | `namespace http { ServerError / NetworkError / BadRequest / Violation / get / post / status / header / query / body / headerObj / queryObj / bodyObj / required / default / retry }` | §4.2。`BadRequest` と `Violation` は足したもの（下）。`header` / `query` / `body` の引数と、`headerObj` / `queryObj` / `bodyObj`、`required`、`default` は、出典から変えたか、足したもの（「`http` の語彙」） |
 | `vocab/db.hozo` | `namespace db { table / text / int / float / bool / datetime / date / time / json / key / unique / ref / find / list / where / latest / insert / update / delete / conflict / transaction }` | §4.2。`key` / `unique` / `ref` のほかは、出典から変えたか、足したもの（「`db` の語彙」「`db` の表と、しまい方」「`db` の read と効果」） |
-| `vocab/localstorage.hozo` | グローバルの `decorator localStorage for state;` | §4.2 |
-| `vocab/page.hozo` | `namespace page { Aborted / Route / Query / path / query / route / dialog / fallback / interaction }` | §4.2 |
+| `vocab/browser.hozo` | `namespace browser { localStorage }` と、その下の `namespace page { Aborted / Route / Query / path / query / route / dialog / fallback / interaction }`（FQN は `browser.page.*`） | §4.2。出典は、グローバルの `localStorage` と、名前空間 `page`。`browser` の下に動かした（`docs/decisions.md`「決めたこと」455、462） |
 | `vocab/fs.hozo` | `namespace fs { files }` | `examples/hozoc.hozo` |
-| `vocab/actor.hozo` | `namespace actor { human / bot / ai }` | `docs/decisions.md`「決めたこと」364 |
-| `vocab/usecase.hozo` | `namespace usecase { of }` | 同 364 |
-| `vocab/business.hozo` | `namespace business { flow }` | 同 366 |
-| `vocab/prd.hozo` | `namespace prd { ref }` | 同 377、378 |
+| `vocab/prd.hozo` | `namespace prd { ref }` と、その下の `namespace actor { human / bot / ai }`、`namespace usecase { of }`、`namespace business { flow }`（FQN は `prd.actor.*`、`prd.usecase.*`、`prd.business.*`） | `docs/decisions.md`「決めたこと」364、366、377、378。三つを `prd` の下に動かした（同 455） |
 
+- **ファイルは、いちばん外側の名前空間ごとに、一つ**（`browser.hozo` が `browser` と `browser.page`、`prd.hozo` が `prd` と、その下の三つ）。下の名前空間は、入れ子の `namespace` で書く。
 - 各ファイルの中身は出典の宣言をそのまま写す。ドキュメンテーションコメントも写す（ホバーに出るため）。ただし、出典の書き方のうち、言語からなくしたものは直す: 省略可能な引数の `x?: T` は `x: T?` に（`length(min: int?, max: int?)`、`route(path: string, from: any state?, onInvalid: any effect?)`）、節に並べるものの区切りの `|` は `,` に（`decorator fn get(path: string): throws ServerError, NetworkError;`。`docs/decisions.md`「設計書から離れた決定」S25）。どちらも `docs/grammar.md`「決めたこと」。
 - `valid.length` は、付けた先で、数えるものが変わる: 文字列（scalar か、フィールド）なら、文字の数。配列のフィールドなら、要素の数。配列の要素に掛けるなら、要素の型（scalar）に付ける。意味の持ち主は `docs/plugin-valid.md`「制約」（`docs/decisions.md`「決めたこと」400、401）。
-- `actor`、`usecase`、`business`、`prd` は、設計書にはない。設計の図（ユースケース図、業務フロー図、要求の文書）から決めたもので、中身は「設計の図の語彙」。
+- `prd` と、その下の `prd.actor`、`prd.usecase`、`prd.business` は、設計書にはない。設計の図（ユースケース図、業務フロー図、要求の文書）から決めたもので、中身は「設計の図の語彙」。
 - `fs` は `examples/hozoc.hozo` では同じファイルの中に語彙として書かれているが、hozoc 自身の境界（ファイル）なので標準に入れる。`cli.hozo` からは、その宣言を外す（二重に宣言すると RES-6）。
 - 出典の `examples/hozoc.hozo` の語彙 `proc`（外部プロセスの起動: `stdio`、`Crashed`、`MalformedOutput`）は、標準に入れない（`docs/decisions.md`「決めたこと」434）: プラグインは、hozoc の中の WASM の実行環境で動き、外部プロセスを起動しない。二つの例外は、hozoc 自身の仕様の、名前空間 `hozoc` の例外（`docs/cli.md`「cli.hozo」）。
 - `@http.get` / `@http.post` は、境界の入口（`@entry`）で、通信の途中の失敗（`ServerError`、`NetworkError`）は、fn の外で起きる例外（`outer throws`）として、宣言する（出典の `@external` は、なくした: `docs/grammar.md`「decorator の宣言」）。
@@ -194,13 +197,13 @@ effect fn deleteSession(token: type.Token): effects sessions.delete;
 
 ### 設計の図の語彙
 
-設計の図で描いたもののうち、言語に書き方がないものを、仕様に残すためのデコレータ（`docs/ide-chain.md`「書けない作図の、反映の先」）。四つの名前空間は、図ごとに分けてある。
+設計の図で描いたもののうち、言語に書き方がないものを、仕様に残すためのデコレータ（`docs/ide-chain.md`「書けない作図の、反映の先」）。どれも、製品の要求（PRD）に書く中身なので、名前空間 `prd` の下に置く（`docs/decisions.md`「決めたこと」455）。`prd` の直下に、要求を指す印があり、下の三つの名前空間は、図ごとに分けてある。
 
 | 名前空間 | 図 | 言うこと | 決定 |
 |---|---|---|---|
-| `actor` | ユースケース図 | 担い手の種類（人、ボット、AI） | `docs/decisions.md`「決めたこと」255、270、364 |
-| `usecase` | ユースケース図 | その op が、ユースケース（担い手の、一つの操作）であることと、行う担い手 | 同 364、365 |
-| `business` | 業務フロー図 | その op が、業務フロー（操作の op を、順に行う）であること | 同 366 |
+| `prd.actor` | ユースケース図 | 担い手の種類（人、ボット、AI） | `docs/decisions.md`「決めたこと」255、270、364 |
+| `prd.usecase` | ユースケース図 | その op が、ユースケース（担い手の、一つの操作）であることと、行う担い手 | 同 364、365 |
+| `prd.business` | 業務フロー図 | その op が、業務フロー（操作の op を、順に行う）であること | 同 366 |
 | `prd` | 要求の文書、要求トレーサビリティマトリクス | その宣言が、どの要求のためのものか | 同 264、265、377 |
 
 - **同梱する理由**: 図と検査が、プラグインを入れていなくても、担い手、ユースケース、フロー、要求を、読めるようにする（同 364）。
@@ -209,63 +212,51 @@ effect fn deleteSession(token: type.Token): effects sessions.delete;
 - **検査が見るのは、付ける先（DEC-1）と、引数のケース（DEC-7）だけ。** 読むトランスパイラは「語彙の意味の実装」。
 - **六つのデコレータは、核の印 `@hint` を持つ**（「解釈されなくてよいデコレータ」）。
 
-`vocab/actor.hozo` の全文は次のとおり。
-
-```ts
-/** 担い手の種類の語彙（ユースケース図）。担い手は、対象のない分類のケースで、種類は、そのケースに付ける */
-namespace actor {
-  /** 人が、呼び出す */
-  @hint
-  decorator human for case of never;
-
-  /** 機械的な動機で、呼び出す（外の仕組みからの知らせ、時刻で動く処理） */
-  @hint
-  decorator bot for case of never;
-
-  /** 生成 AI の判断で、呼び出す */
-  @hint
-  decorator ai for case of never;
-}
-```
-
-`vocab/usecase.hozo` の全文は次のとおり。
-
-```ts
-/** ユースケースの語彙（ユースケース図） */
-namespace usecase {
-  /**
-   * この op は、ユースケース（担い手の、一つの操作）。actors が、行う。
-   *
-   * @param actors 行う担い手。対象のない分類のケース
-   */
-  @hint
-  decorator fn of(...actors: any case of never);
-}
-```
-
-`vocab/business.hozo` の全文は次のとおり。
-
-```ts
-/** 業務フローの語彙（業務フロー図） */
-namespace business {
-  /** この op は、業務フロー。操作の op（ユースケース）を、順に行う */
-  @hint
-  decorator fn flow();
-}
-```
-
 `vocab/prd.hozo` の全文は次のとおり。
 
 ```ts
-/** 要求を指す語彙（要求の文書、要求トレーサビリティマトリクス）。要求は、対象のない分類のケース */
+/** 製品の要求（PRD）の語彙: 要求を指す印と、担い手（prd.actor）、ユースケース（prd.usecase）、業務フロー（prd.business） */
 namespace prd {
   /**
-   * この宣言は、この要求のためのもの。
+   * この宣言は、この要求のためのもの（要求の文書、要求トレーサビリティマトリクス）。要求は、対象のない分類のケース。
    *
    * @param requirements 指す要求。対象のない分類のケース
    */
   @hint
   decorator ref(...requirements: any case of never) for op, model, state, effect, read;
+
+  /** 担い手の種類の語彙（ユースケース図）。担い手は、対象のない分類のケースで、種類は、そのケースに付ける */
+  namespace actor {
+    /** 人が、呼び出す */
+    @hint
+    decorator human for case of never;
+
+    /** 機械的な動機で、呼び出す（外の仕組みからの知らせ、時刻で動く処理） */
+    @hint
+    decorator bot for case of never;
+
+    /** 生成 AI の判断で、呼び出す */
+    @hint
+    decorator ai for case of never;
+  }
+
+  /** ユースケースの語彙（ユースケース図） */
+  namespace usecase {
+    /**
+     * この op は、ユースケース（担い手の、一つの操作）。actors が、行う。
+     *
+     * @param actors 行う担い手。対象のない分類のケース
+     */
+    @hint
+    decorator fn of(...actors: any case of never);
+  }
+
+  /** 業務フローの語彙（業務フロー図） */
+  namespace business {
+    /** この op は、業務フロー。操作の op（ユースケース）を、順に行う */
+    @hint
+    decorator fn flow();
+  }
 }
 ```
 
@@ -275,9 +266,9 @@ namespace prd {
 namespace design {
   classify Actor of never {
     /** 店で買う人 */
-    @actor.human Customer;
+    @prd.actor.human Customer;
     /** 決済代行 */
-    @actor.bot PaymentProvider;
+    @prd.actor.bot PaymentProvider;
   }
   classify Requirement of never {
     /** 同じ申し込みを、二度送っても、注文は一つ */
@@ -287,30 +278,30 @@ namespace design {
 
 namespace web {
   /** 客が、注文を確定する */
-  @usecase.of(design.Actor.Customer)
+  @prd.usecase.of(design.Actor.Customer)
   @prd.ref(design.Requirement.PRD_001)
   export fn order(): Order { … }
 }
 
 namespace flows {
   /** 選んでから、注文するまで */
-  @business.flow
+  @prd.business.flow
   fn selectAndOrder(item: web.Item): web.Order { … }
 }
 ```
 
-- **`actor.human` / `actor.bot` / `actor.ai`** は、担い手のケースに付ける。分けるのは、何が、処理を呼び出すことを決めるか（`docs/ide-chain.md`「ユースケース図」）。
-- **`usecase.of`** は、op に付ける。担い手は、一つのユースケースに、いくつでも書ける。
-- **`business.flow`** は、op に付ける。その op の配線が呼べるのは、操作の op（`@usecase.of` を付けた op）だけ、という決まり（同「業務フロー図」）は、検査器は見ない。見るのは、この語彙を読むプラグイン（`go-design` の GODESIGN-3。`docs/plugin-go-design.md`「フローの op の決まり」）。
+- **`prd.actor.human` / `prd.actor.bot` / `prd.actor.ai`** は、担い手のケースに付ける。分けるのは、何が、処理を呼び出すことを決めるか（`docs/ide-chain.md`「ユースケース図」）。
+- **`prd.usecase.of`** は、op に付ける。担い手は、一つのユースケースに、いくつでも書ける。
+- **`prd.business.flow`** は、op に付ける。その op の配線が呼べるのは、操作の op（`@prd.usecase.of` を付けた op）だけ、という決まり（同「業務フロー図」）は、検査器は見ない。見るのは、この語彙を読むプラグイン（`go-design` の GODESIGN-3。`docs/plugin-go-design.md`「フローの op の決まり」）。
 - **`prd.ref`** は、op、model、状態、効果、`read` に付ける。辿るための印で、テストの中身は、ここから作らない（`docs/decisions.md`「決めたこと」377）。
-- 使う人が、同じ名前の名前空間（`actor`、`usecase`、`business`、`prd`）に、宣言を足してもよい（「読み込み」）。同じ名前の宣言（`actor.human` など）を足せば RES-6。
+- 使う人は、`prd` と、その下の名前空間に、宣言を足せない（「語彙の名前空間」。RES-8）。要求に関する、自前の印は、自分の名前空間に宣言する（サンプル `order-app` の `@pact.promise`）。
 
 ### 解釈されなくてよいデコレータ
 
-標準の語彙で、核の印 `@hint`（`docs/grammar.md`「decorator の宣言」）を持つのは、設計の図の語彙の六つ: `prd.ref`、`actor.human`、`actor.bot`、`actor.ai`、`usecase.of`、`business.flow`（`docs/decisions.md`「決めたこと」433）。読むトランスパイラ（`go-design`）を並べていない設定で書いても、warning（CFG-26。`docs/config.md`「解釈するトランスパイラ」）は、出ない。
+標準の語彙で、核の印 `@hint`（`docs/grammar.md`「decorator の宣言」）を持つのは、設計の図の語彙の六つ: `prd.ref`、`prd.actor.human`、`prd.actor.bot`、`prd.actor.ai`、`prd.usecase.of`、`prd.business.flow`（`docs/decisions.md`「決めたこと」433）。読むトランスパイラ（`go-design`）を並べていない設定で書いても、warning（CFG-26。`docs/config.md`「解釈するトランスパイラ」）は、出ない。
 
 - 理由: 六つは、振る舞いにも、出力の中身にも効かず、設計を説明するだけ。読まれなくても、落ちるものがない。
-- ほかの標準のデコレータ（`db`、`http`、`valid`、`page`、`localstorage`、`fs`）は、持たない。状態の置き場（`fs.files`、`localStorage`）も、振る舞いに効くので、持たない: 解釈するトランスパイラのいない設定で、単位の対象に書けば、CFG-26 が出る（人が中身を書いている、という事実の提示）。
+- ほかの標準のデコレータ（`db`、`http`、`valid`、`browser`、`browser.page`、`fs`）は、持たない。状態の置き場（`fs.files`、`browser.localStorage`）も、振る舞いに効くので、持たない: 解釈するトランスパイラのいない設定で、単位の対象に書けば、CFG-26 が出る（人が中身を書いている、という事実の提示）。
 
 ## 同梱しない語彙
 
@@ -330,6 +321,6 @@ namespace flows {
 | `http`（言語に依らない決まり: 経路、通信の上の形、使い方の検査） | 語彙のプラグイン `http`（`docs/plugin-http.md`） |
 | `http`（サーバー） | `go-http`（`docs/plugin-go-http.md`） |
 | `db` | `go-sqlite`（`docs/plugin-go-sqlite.md`） |
-| `http`（クライアント）/ `localStorage` / `page` | 段階 5 のプラグイン |
-| `usecase` / `business` / `prd` | `go-design`（`docs/plugin-go-design.md`）: `business.flow` の op に、E2E テストの口。`usecase.of` は、フローが呼べる op の印。`prd.ref` は、要求を指している設計の一覧（要求ごとの、テストの入れ物の口のコメントと、どこからも指されていない要求の warning）。`go-design` を並べない単位では、印のまま |
-| `actor` | まだ、ない。読むトランスパイラがなく、印のまま（`@hint` を持つので、CFG-26 は出ない。「解釈されなくてよいデコレータ」） |
+| `http`（クライアント）/ `browser.localStorage` / `browser.page` | 段階 5 のプラグイン |
+| `prd.usecase` / `prd.business` / `prd` | `go-design`（`docs/plugin-go-design.md`）: `prd.business.flow` の op に、E2E テストの口。`prd.usecase.of` は、フローが呼べる op の印。`prd.ref` は、要求を指している設計の一覧（要求ごとの、テストの入れ物の口のコメントと、どこからも指されていない要求の warning）。`go-design` を並べない単位では、印のまま |
+| `prd.actor` | まだ、ない。読むトランスパイラがなく、印のまま（`@hint` を持つので、CFG-26 は出ない。「解釈されなくてよいデコレータ」） |

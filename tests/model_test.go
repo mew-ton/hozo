@@ -312,6 +312,6 @@ func TestDesignPlaceOrderRelations(t *testing.T) {
 		E: []string{"server.NotificationFailed"}, F: []string{"server.notifyUser"},
 		Rel: []string{"server.NotificationFailed / server.notifyUser = prevented"}, Succ: []string{"server.notifyUser = kept"},
 	})
-	// browser から見ても同じ（external なデコレータは付いていない）
-	expect(t, "View(browser) の placeOrder", sigOf(viewsOf(p)["browser"].Ops["server.placeOrder"].Signature), want)
+	// client から見ても同じ（external なデコレータは付いていない）
+	expect(t, "View(client) の placeOrder", sigOf(viewsOf(p)["client"].Ops["server.placeOrder"].Signature), want)
 }

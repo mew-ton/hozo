@@ -1,7 +1,7 @@
 // GODESIGN-6: 位置は、当たった自分の名前を生んだフローの op か、要求の分類。決まった名前（FlowCases、RunFlows、RunRequirements）が
 // 当たったなら、相手の名前を生んだ宣言。
 namespace design {
-  classify Actor of never { @actor.human User; }
+  classify Actor of never { @prd.actor.human User; }
   classify Req of never { R1; Dup; }
   // Req と、同じ名前のケースを持つ。大文字化で同じになるケース（dup と Dup）も
   classify Other of never { R1; dup; }
@@ -10,7 +10,7 @@ namespace design {
 }
 
 namespace act {
-  @usecase.of(design.Actor.User)
+  @prd.usecase.of(design.Actor.User)
   @prd.ref(design.Req.R1, design.Req.Dup, design.Other.R1, design.Other.dup, design.Hidden._R, design.Hidden.Fine)
   export fn touch();
 }
@@ -21,7 +21,7 @@ namespace leafy {
   // 葉 xFlow の、基底のケース XFlowCase が、フロー x のケース XFlowCase と当たる
   fn xFlow(): int;
 
-  @business.flow
+  @prd.business.flow
   export fn x() { act.touch(); }
 }
 
@@ -31,28 +31,28 @@ namespace typed {
   // 分類 Requirements の例を走らせる、基底の RunRequirements が、走らせる関数 RunRequirements と当たる
   classify Requirements of string { Must; May; }
 
-  @business.flow
+  @prd.business.flow
   export fn run() { act.touch(); }
 }
 
 namespace fields {
   // 引数 given のフィールド Given_ と、引数 given_ のフィールド Given_
-  @business.flow
+  @prd.business.flow
   export fn clash(given: string, given_: string) { act.touch(); }
 
   // 大文字化で同じになる引数
-  @business.flow
+  @prd.business.flow
   export fn caps(id: string, Id: string) { act.touch(); }
 }
 
 namespace hidden {
   // _ で始まるフローの op
-  @business.flow
+  @prd.business.flow
   export fn _secret() { act.touch(); }
 }
 
 namespace twice {
-  @business.flow
+  @prd.business.flow
   export fn run() { act.touch(); }
 }
 

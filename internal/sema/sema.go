@@ -116,8 +116,10 @@ type analyzer struct {
 	global  *namespace
 	nss     map[string]*namespace // FQN → 名前空間（暗黙の親を含む）
 	nsOrder []*namespace          // 出現順。先頭はグローバル
-	syms    map[string]*symbol    // FQN → 表に残った宣言
-	models  map[string]*ir.Model  // すべての model（合成したものを含む）
+	// vocabNS は、語彙のファイルが宣言した名前空間の FQN → はじめに宣言した語彙のファイル（RES-8）。
+	vocabNS map[string]source.FileID
+	syms    map[string]*symbol   // FQN → 表に残った宣言
+	models  map[string]*ir.Model // すべての model（合成したものを含む）
 	fields  map[string]map[string]source.Span
 
 	pendingBinds []pendingBind

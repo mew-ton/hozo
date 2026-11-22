@@ -1,2 +1,2 @@
-GODESIGN-4	flows.local	op flows.local に @usecase.of が付いているが、名前空間 flows は、フロー（flows.both）を持つ（操作の op は、フローとは、別の名前空間に置く）
-GODESIGN-4	flows.both	op flows.both に @usecase.of が付いているが、名前空間 flows は、フロー（flows.both）を持つ（操作の op は、フローとは、別の名前空間に置く）
+GODESIGN-4	flows.local	op flows.local に @prd.usecase.of が付いているが、名前空間 flows は、フロー（flows.both）を持つ（操作の op は、フローとは、別の名前空間に置く）
+GODESIGN-4	flows.both	op flows.both に @prd.usecase.of が付いているが、名前空間 flows は、フロー（flows.both）を持つ（操作の op は、フローとは、別の名前空間に置く）

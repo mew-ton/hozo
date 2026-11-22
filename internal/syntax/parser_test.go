@@ -1171,8 +1171,8 @@ func TestRelationObject(t *testing.T) {
 }
 
 func TestDecoratorDeclAlias(t *testing.T) {
-	d := firstDecl[*ast.DecoratorDecl](t, "decorator unavailableOnFailure = page.fallback(http.NetworkError | http.ServerError, Unavailable);")
-	if d.Alias == nil || d.Alias.Name.String() != "page.fallback" || len(d.Alias.Args) != 2 || len(d.Alias.Args[0].Value.Terms) != 2 {
+	d := firstDecl[*ast.DecoratorDecl](t, "decorator unavailableOnFailure = browser.page.fallback(http.NetworkError | http.ServerError, Unavailable);")
+	if d.Alias == nil || d.Alias.Name.String() != "browser.page.fallback" || len(d.Alias.Args) != 2 || len(d.Alias.Args[0].Value.Terms) != 2 {
 		t.Fatalf("Alias = %+v", d.Alias)
 	}
 	d = firstDecl[*ast.DecoratorDecl](t, "decorator a = b();")

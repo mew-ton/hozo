@@ -29,7 +29,7 @@ func fileOf(fqn string) string {
 	switch {
 	case ns == "":
 		return "global.hozo"
-	case strings.HasPrefix(ns, "http") || strings.HasPrefix(ns, "page") || strings.HasPrefix(ns, "valid"):
+	case strings.HasPrefix(ns, "http") || strings.HasPrefix(ns, "browser") || strings.HasPrefix(ns, "valid"):
 		return "hozo:vocab/" + strings.SplitN(ns, ".", 2)[0] + ".hozo"
 	}
 	return strings.SplitN(ns, ".", 2)[0] + ".hozo"
@@ -285,7 +285,7 @@ func httpVocab() ir.Namespace {
 func locatorFor() Locator {
 	fs := source.NewFileSet()
 	content := []byte(strings.Repeat("xxxxxxxxxxxxxxxxxxxx\n", 20000))
-	for _, f := range []string{"global.hozo", "server.hozo", "browser.hozo", "hozo:vocab/http.hozo", "hozo:vocab/page.hozo"} {
+	for _, f := range []string{"global.hozo", "server.hozo", "client.hozo", "hozo:vocab/http.hozo", "hozo:vocab/browser.hozo"} {
 		fs.Add(f, content)
 	}
 	return FileSetLocator(fs)

@@ -204,9 +204,9 @@ R6 の、プラグインの部分の、段 4（`docs/requirements.md`「R6 の�
 
 | 足したもの | 中身 | 文書 |
 |---|---|---|
-| `design.hozo` | 名前空間 `design`（単位を置かない）: 担い手の分類 `Actor`（`@actor.human Customer`）と、要求の分類 `Requirement`（`PRD_001`、`PRD_002`）。どちらも、対象のない分類 | `docs/vocab.md`「設計の図の語彙」、`docs/check.md`「分類」の「対象のない分類」 |
-| `client.hozo` | 名前空間 `client`: 操作の op（ユースケース）三つ（`signIn`、`order`、`viewOrders`。どれも `@usecase.of(design.Actor.Customer)` と `export`）。どれも、機能入口の op（`server.login`、`server.placeOrder`、`server.getOrders`）を、一つ呼ぶ配線 | `docs/ide-chain.md`「ユースケース図」 |
-| `flows.hozo` | 名前空間 `flows`: フロー `signInAndOrder`（`@business.flow` と `export`）と、その結果の model `Ordered`。三つの操作の op を、順に呼ぶ配線 | `docs/ide-chain.md`「業務フロー図」 |
+| `design.hozo` | 名前空間 `design`（単位を置かない）: 担い手の分類 `Actor`（`@prd.actor.human Customer`）と、要求の分類 `Requirement`（`PRD_001`、`PRD_002`）。どちらも、対象のない分類 | `docs/vocab.md`「設計の図の語彙」、`docs/check.md`「分類」の「対象のない分類」 |
+| `client.hozo` | 名前空間 `client`: 操作の op（ユースケース）三つ（`signIn`、`order`、`viewOrders`。どれも `@prd.usecase.of(design.Actor.Customer)` と `export`）。どれも、機能入口の op（`server.login`、`server.placeOrder`、`server.getOrders`）を、一つ呼ぶ配線 | `docs/ide-chain.md`「ユースケース図」 |
+| `flows.hozo` | 名前空間 `flows`: フロー `signInAndOrder`（`@prd.business.flow` と `export`）と、その結果の model `Ordered`。三つの操作の op を、順に呼ぶ配線 | `docs/ide-chain.md`「業務フロー図」 |
 | `server.hozo` | `@prd.ref` を、三つの op に付けた: `authenticate`（`PRD_001`）、`getOrders`（`PRD_002`）、`placeOrder`（`PRD_001` と `PRD_002`）。op の宣言と配線は、変えていない | `docs/vocab.md`「設計の図の語彙」 |
 | `hozo.toml` | 単位を三つ足した（6: `http`、7: `client`、8: `flows`）。単位 8 に、`[emit.options.go-design]` の `requirements = ["design.Requirement"]` | `docs/plugin-go-design.md`「オプション」 |
 | `gen/http/doc.go`、`types.go` | 標準の語彙 `http` の型（例外三つと、model `Violation`） | `docs/plugin-go.md`「型」 |
@@ -664,7 +664,7 @@ v1 の規則から変えたのは三つ: `r.Context()` を渡す（P29）、制�
 持ち主は `docs/plugin-go-design.md`。出すファイルは、単位 7 の、テストのパッケージの `gen/flows/flowstest/design.go` と、その、テストの対応表 `hozo-tests.go-design.json`（「R6 のプラグインの部分で足したこと」「走ったかの確かめで足したこと」）。
 
 - **フローは一つ**（同「E2E テストの口」）: `flows.signInAndOrder`。`SignInAndOrderFlowCase` のフィールドは、フローの三つの引数（`Email`、`Password`、`Lines`）と、`Given`、`Then`。フローは、値（`flows.Ordered`）を返すので、`Then` は `func(t *testing.T, got flows.Ordered)`。
-- **フローの op の決まり**（同「フローの op の決まり」）は、どれも満たしている: `export` が付き、配線で、呼ぶ先の三つ（`client.signIn`、`client.order`、`client.viewOrders`）は、どれも `@usecase.of` の付いた op で、`flows` には、`@usecase.of` の付いた op がない。
+- **フローの op の決まり**（同「フローの op の決まり」）は、どれも満たしている: `export` が付き、配線で、呼ぶ先の三つ（`client.signIn`、`client.order`、`client.viewOrders`）は、どれも `@prd.usecase.of` の付いた op で、`flows` には、`@prd.usecase.of` の付いた op がない。
 - **要求は二つ**（同「要求の、テストの入れ物の口」）: オプション `requirements` に並べた分類 `design.Requirement` のケース `PRD_001`、`PRD_002`。分類 `design.Actor` は、並べていないので、要求ではない。
 - **指している設計**（同「指している設計」）は、`server` の三つの op から: `PRD_001` は `server.authenticate`、`server.placeOrder`。`PRD_002` は `server.getOrders`、`server.placeOrder`（宣言順）。どちらも指されているので、warning は、出ない。
 - `flows` は、葉の op も、述語で決まる値の分類も持たないので、基底が、テストのパッケージに出すのは、`doc.go` と `fakes.go`（「テストのにせもので足したこと」）だけ。`flowstest` の、テストの口は、`design.go` で、対応表は、`go-design` のものだけ。

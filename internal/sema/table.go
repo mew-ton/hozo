@@ -74,20 +74,71 @@ type symbol struct {
 }
 
 // buildTable はすべてのファイルから名前空間の表を作る（docs/resolve.md「名前空間の併合と重複」）。
+// 先に、語彙のファイルが宣言した名前空間を集める（RES-8 が、ファイルの順によらないように）。
 func (a *analyzer) buildTable() {
+	a.vocabNS = map[string]source.FileID{}
 	for _, f := range a.files {
-		a.collectDecls(a.global, f.Decls, f.Span.File)
+		if a.isVocab(f.Span.File) {
+			a.collectVocabNamespaces("", f.Decls, f.Span.File)
+		}
+	}
+	for _, f := range a.files {
+		a.collectDecls(a.global, f.Decls, f.Span.File, false)
 	}
 }
 
+// collectVocabNamespaces は、語彙のファイルの namespace のブロックの FQN を、vocabNS に足す（入れ子も）。
+func (a *analyzer) collectVocabNamespaces(prefix string, decls []ast.Decl, file source.FileID) {
+	for _, d := range decls {
+		n, ok := d.(*ast.NamespaceDecl)
+		if !ok || n == nil {
+			continue
+		}
+		fqn := prefix
+		for _, seg := range n.Name.Segments {
+			fqn = qualify(fqn, seg.Name)
+		}
+		if _, seen := a.vocabNS[fqn]; !seen {
+			a.vocabNS[fqn] = file
+		}
+		a.collectVocabNamespaces(fqn, n.Decls, file)
+	}
+}
+
+// vocabOwner は、名前空間 fqn が、語彙の名前空間か、その下なら、いちばん外側の、語彙の名前空間の FQN を返す
+// （docs/vocab.md「語彙の名前空間」）。そうでなければ ""。
+func (a *analyzer) vocabOwner(fqn string) string {
+	owner := ""
+	for v := range a.vocabNS {
+		if (fqn == v || strings.HasPrefix(fqn, v+".")) && (owner == "" || len(v) < len(owner)) {
+			owner = v
+		}
+	}
+	return owner
+}
+
 // collectDecls は宣言の列を名前空間 ns に登録する。namespace は再帰、bind は Binds に足す。
-func (a *analyzer) collectDecls(ns *namespace, decls []ast.Decl, file source.FileID) {
+// closed は、外側の namespace のブロックが、もう RES-8 を報告したか（内側のブロックで、重ねて報告しない）。
+func (a *analyzer) collectDecls(ns *namespace, decls []ast.Decl, file source.FileID, closed bool) {
 	for _, d := range decls {
 		switch d := d.(type) {
 		case nil:
 		case *ast.NamespaceDecl:
 			child := a.declareNamespace(ns, d, file)
-			a.collectDecls(child, d.Decls, file)
+			inner := closed
+			// RES-8（docs/resolve.md「名前空間の併合と重複」）: 語彙の名前空間と、その下には、仕様から、宣言も、名前空間も、足せない。
+			// 宣言は、表には登録する（その宣言を使う所に、RES-1 を重ねない）
+			if !closed && !a.isVocab(file) {
+				if owner := a.vocabOwner(child.fqn); owner != "" {
+					where := "の名前空間"
+					if child.fqn != owner {
+						where = "の名前空間 " + owner + " の下"
+					}
+					a.errorf("RES-8", d.Name.Span, "名前空間 %s は、%s%sで、仕様からは、宣言を足せない（語彙の名前空間は、使うだけ。自分の名前空間に宣言する）", child.fqn, a.vocabSource(a.vocabNS[owner]), where)
+					inner = true
+				}
+			}
+			a.collectDecls(child, d.Decls, file, inner)
 		case *ast.BindDecl:
 			a.collectBind(ns, d, file)
 		default:

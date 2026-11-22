@@ -21,14 +21,12 @@ var expected = map[string][]string{
 		"@repeatable\n  decorator where(column: string, value: string | int | float | boolean) for read;", "decorator latest(column: string) for read;",
 		"decorator insert for effect;", "decorator update for effect;", "decorator delete for effect;",
 		"decorator fn transaction();"},
-	"hozo:vocab/localstorage.hozo": {"decorator localStorage for state;"},
-	"hozo:vocab/page.hozo":         {"namespace page {", "exception Aborted;", "scalar Route extends string;", "decorator path for state;", "decorator query for state;", "decorator fn route(path: string, from: any state?, onInvalid: any effect?);", "decorator fn dialog(", "decorator fn fallback(", "decorator fn interaction("},
-	"hozo:vocab/fs.hozo":           {"namespace fs {", "decorator files(glob: string) for state;"},
-	// 設計の図の語彙（docs/vocab.md「設計の図の語彙」）
-	"hozo:vocab/actor.hozo":    {"namespace actor {", "decorator human for case of never;", "decorator bot for case of never;", "decorator ai for case of never;"},
-	"hozo:vocab/usecase.hozo":  {"namespace usecase {", "decorator fn of(...actors: any case of never);"},
-	"hozo:vocab/business.hozo": {"namespace business {", "decorator fn flow();"},
-	"hozo:vocab/prd.hozo":      {"namespace prd {", "decorator ref(...requirements: any case of never) for op, model, state, effect, read;"},
+	"hozo:vocab/browser.hozo": {"namespace browser {", "decorator localStorage for state;", "namespace page {", "exception Aborted;", "scalar Route extends string;", "decorator path for state;", "decorator query for state;", "decorator fn route(path: string, from: any state?, onInvalid: any effect?);", "decorator fn dialog(", "decorator fn fallback(", "decorator fn interaction("},
+	"hozo:vocab/fs.hozo":      {"namespace fs {", "decorator files(glob: string) for state;"},
+	// 設計の図の語彙（docs/vocab.md「設計の図の語彙」）は、prd の下
+	"hozo:vocab/prd.hozo": {"namespace prd {", "decorator ref(...requirements: any case of never) for op, model, state, effect, read;",
+		"namespace actor {", "decorator human for case of never;", "decorator bot for case of never;", "decorator ai for case of never;",
+		"namespace usecase {", "decorator fn of(...actors: any case of never);", "namespace business {", "decorator fn flow();"},
 }
 
 func TestFiles(t *testing.T) {

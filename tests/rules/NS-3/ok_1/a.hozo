@@ -1,5 +1,5 @@
-// NS-3（docs/check.md「名前空間」）: 標準の語彙だけ（プラグインを読まない）なら衝突しない
+// NS-3（docs/check.md「名前空間」）: 語彙のプラグインを読まなければ（単位が、そのトランスパイラを書いていない）、衝突しない
 namespace a {
-  @localStorage
+  @browser.localStorage
   state s: list<string>;
 }

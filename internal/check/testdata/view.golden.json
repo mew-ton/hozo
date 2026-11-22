@@ -1,12 +1,12 @@
 {
   "version": "1.0",
-  "viewer": "browser",
+  "viewer": "client",
   "config": {
     "index": 2,
     "language": "go",
     "base": "go",
-    "out": "gen/browser",
-    "dir": "gen/browser",
+    "out": "gen/client",
+    "dir": "gen/client",
     "transpilers": [
       "react-router"
     ],
@@ -14,18 +14,18 @@
     "seams": {}
   },
   "files": [
-    "browser.hozo",
+    "client.hozo",
     "server.hozo",
     "hozo:vocab/http.hozo"
   ],
   "namespaces": {
-    "browser": [
+    "client": [
       {
         "index": 2,
         "language": "go",
         "base": "go",
-        "out": "gen/browser",
-        "dir": "gen/browser",
+        "out": "gen/client",
+        "dir": "gen/client",
         "transpilers": [
           "react-router"
         ],
@@ -683,14 +683,14 @@
         ]
       },
       {
-        "name": "browser",
+        "name": "client",
         "decls": [
           {
             "kind": "state",
-            "name": "browser.token",
+            "name": "client.token",
             "decorators": [],
             "span": {
-              "file": "browser.hozo",
+              "file": "client.hozo",
               "start": {
                 "line": 1025,
                 "col": 1
@@ -715,10 +715,10 @@
           },
           {
             "kind": "effect",
-            "name": "browser.removeToken",
+            "name": "client.removeToken",
             "decorators": [],
             "span": {
-              "file": "browser.hozo",
+              "file": "client.hozo",
               "start": {
                 "line": 1026,
                 "col": 1
@@ -732,19 +732,19 @@
             "throws": [],
             "target": {
               "kind": "builtin",
-              "state": "browser.token",
+              "state": "client.token",
               "operation": "delete"
             },
             "writes": [
-              "browser.token"
+              "client.token"
             ]
           },
           {
             "kind": "op",
-            "name": "browser.clearToken",
+            "name": "client.clearToken",
             "decorators": [],
             "span": {
-              "file": "browser.hozo",
+              "file": "client.hozo",
               "start": {
                 "line": 1005,
                 "col": 1
@@ -760,7 +760,7 @@
             "effects": [
               {
                 "kind": "named",
-                "effect": "browser.removeToken"
+                "effect": "client.removeToken"
               }
             ],
             "reads": [],
@@ -775,7 +775,7 @@
               "effects": [
                 {
                   "kind": "named",
-                  "effect": "browser.removeToken"
+                  "effect": "client.removeToken"
                 }
               ],
               "relations": [],
@@ -783,7 +783,7 @@
                 {
                   "effect": {
                     "kind": "named",
-                    "effect": "browser.removeToken"
+                    "effect": "client.removeToken"
                   },
                   "state": "kept"
                 }
@@ -794,10 +794,10 @@
           },
           {
             "kind": "decorator",
-            "name": "browser.ignoreFailure",
+            "name": "client.ignoreFailure",
             "decorators": [],
             "span": {
-              "file": "browser.hozo",
+              "file": "client.hozo",
               "start": {
                 "line": 1001,
                 "col": 1
@@ -832,13 +832,13 @@
           },
           {
             "kind": "op",
-            "name": "browser.requestLogout",
+            "name": "client.requestLogout",
             "decorators": [
               {
-                "decorator": "browser.ignoreFailure",
+                "decorator": "client.ignoreFailure",
                 "args": [],
                 "span": {
-                  "file": "browser.hozo",
+                  "file": "client.hozo",
                   "start": {
                     "line": 1008,
                     "col": 1
@@ -851,7 +851,7 @@
               }
             ],
             "span": {
-              "file": "browser.hozo",
+              "file": "client.hozo",
               "start": {
                 "line": 1007,
                 "col": 1
@@ -906,7 +906,7 @@
                           "in",
                           "token"
                         ],
-                        "state": "browser.token"
+                        "state": "client.token"
                       }
                     ],
                     "span": {
@@ -954,17 +954,17 @@
                 }
               ],
               "reads": [
-                "browser.token"
+                "client.token"
               ],
               "pure": false
             }
           },
           {
             "kind": "op",
-            "name": "browser.logout",
+            "name": "client.logout",
             "decorators": [],
             "span": {
-              "file": "browser.hozo",
+              "file": "client.hozo",
               "start": {
                 "line": 1011,
                 "col": 1
@@ -991,12 +991,12 @@
                   "call": {
                     "callee": {
                       "kind": "op",
-                      "op": "browser.requestLogout"
+                      "op": "client.requestLogout"
                     },
                     "args": [],
                     "bound": [],
                     "span": {
-                      "file": "browser.hozo",
+                      "file": "client.hozo",
                       "start": {
                         "line": 1009,
                         "col": 1
@@ -1008,7 +1008,7 @@
                     }
                   },
                   "span": {
-                    "file": "browser.hozo",
+                    "file": "client.hozo",
                     "start": {
                       "line": 1009,
                       "col": 1
@@ -1024,12 +1024,12 @@
                   "call": {
                     "callee": {
                       "kind": "op",
-                      "op": "browser.clearToken"
+                      "op": "client.clearToken"
                     },
                     "args": [],
                     "bound": [],
                     "span": {
-                      "file": "browser.hozo",
+                      "file": "client.hozo",
                       "start": {
                         "line": 1010,
                         "col": 1
@@ -1041,7 +1041,7 @@
                     }
                   },
                   "span": {
-                    "file": "browser.hozo",
+                    "file": "client.hozo",
                     "start": {
                       "line": 1010,
                       "col": 1
@@ -1063,7 +1063,7 @@
                 },
                 {
                   "kind": "named",
-                  "effect": "browser.removeToken"
+                  "effect": "client.removeToken"
                 }
               ],
               "relations": [],
@@ -1078,20 +1078,20 @@
                 {
                   "effect": {
                     "kind": "named",
-                    "effect": "browser.removeToken"
+                    "effect": "client.removeToken"
                   },
                   "state": "kept"
                 }
               ],
               "reads": [
-                "browser.token"
+                "client.token"
               ],
               "pure": false
             }
           },
           {
             "kind": "model",
-            "name": "browser.logout$in",
+            "name": "client.logout$in",
             "decorators": [],
             "span": {
               "file": "global.hozo",
@@ -1109,7 +1109,7 @@
           },
           {
             "kind": "model",
-            "name": "browser.deep$in",
+            "name": "client.deep$in",
             "decorators": [],
             "span": {
               "file": "global.hozo",
@@ -1127,7 +1127,7 @@
                 "name": "inner",
                 "type": {
                   "kind": "ref",
-                  "target": "browser.deep$in$inner"
+                  "target": "client.deep$in$inner"
                 },
                 "decorators": [],
                 "span": {
@@ -1166,7 +1166,7 @@
           },
           {
             "kind": "model",
-            "name": "browser.deep$in$inner",
+            "name": "client.deep$in$inner",
             "decorators": [],
             "span": {
               "file": "server.hozo",
@@ -1207,14 +1207,14 @@
     ],
     "binds": [
       {
-        "namespace": "browser",
-        "state": "browser.token",
+        "namespace": "client",
+        "state": "client.token",
         "target": {
           "namespace": "server",
           "deep": false
         },
         "span": {
-          "file": "browser.hozo",
+          "file": "client.hozo",
           "start": {
             "line": 1012,
             "col": 1
@@ -1229,12 +1229,12 @@
   },
   "entries": [],
   "ops": {
-    "browser.clearToken": {
+    "client.clearToken": {
       "exceptions": [],
       "effects": [
         {
           "kind": "named",
-          "effect": "browser.removeToken"
+          "effect": "client.removeToken"
         }
       ],
       "relations": [],
@@ -1242,7 +1242,7 @@
         {
           "effect": {
             "kind": "named",
-            "effect": "browser.removeToken"
+            "effect": "client.removeToken"
           },
           "state": "kept"
         }
@@ -1252,7 +1252,7 @@
       "params": [],
       "bound": []
     },
-    "browser.logout": {
+    "client.logout": {
       "exceptions": [],
       "effects": [
         {
@@ -1261,7 +1261,7 @@
         },
         {
           "kind": "named",
-          "effect": "browser.removeToken"
+          "effect": "client.removeToken"
         }
       ],
       "relations": [],
@@ -1276,19 +1276,19 @@
         {
           "effect": {
             "kind": "named",
-            "effect": "browser.removeToken"
+            "effect": "client.removeToken"
           },
           "state": "kept"
         }
       ],
       "reads": [
-        "browser.token"
+        "client.token"
       ],
       "pure": false,
       "params": [],
       "bound": []
     },
-    "browser.requestLogout": {
+    "client.requestLogout": {
       "exceptions": [],
       "effects": [
         {
@@ -1307,7 +1307,7 @@
         }
       ],
       "reads": [
-        "browser.token"
+        "client.token"
       ],
       "pure": false,
       "params": [],
@@ -1325,7 +1325,7 @@
           "name": "in",
           "type": {
             "kind": "ref",
-            "target": "browser.deep$in"
+            "target": "client.deep$in"
           },
           "span": {
             "file": "global.hozo",
@@ -1347,13 +1347,13 @@
             "inner",
             "token"
           ],
-          "state": "browser.token"
+          "state": "client.token"
         },
         {
           "path": [
             "t"
           ],
-          "state": "browser.token"
+          "state": "client.token"
         }
       ]
     },
@@ -1402,7 +1402,7 @@
           "name": "in",
           "type": {
             "kind": "ref",
-            "target": "browser.logout$in"
+            "target": "client.logout$in"
           },
           "span": {
             "file": "global.hozo",
@@ -1423,7 +1423,7 @@
             "in",
             "token"
           ],
-          "state": "browser.token"
+          "state": "client.token"
         }
       ]
     }

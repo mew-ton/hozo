@@ -2,7 +2,7 @@
 
 ## この文書が決めること
 
-設計の図の語彙（`docs/vocab.md`「設計の図の語彙」）のうち、`business.flow`、`usecase.of`、`prd.ref` を読んで、テストを受け取る口を出すトランスパイラ `go-design`。Go の基底 `go`（`docs/plugin-go.md`）に相乗りする。プラグインは `plugins/go-design/`。期待する出力の実物は、サンプル `tests/samples/shop-server/` の `gen/flows/flowstest/design.go`。
+設計の図の語彙（`docs/vocab.md`「設計の図の語彙」）のうち、`prd.business.flow`、`prd.usecase.of`、`prd.ref` を読んで、テストを受け取る口を出すトランスパイラ `go-design`。Go の基底 `go`（`docs/plugin-go.md`）に相乗りする。プラグインは `plugins/go-design/`。期待する出力の実物は、サンプル `tests/samples/shop-server/` の `gen/flows/flowstest/design.go`。
 
 この文書は二つを決める: フローごとの E2E テストを受け取る口（「E2E テストの口」）と、要求ごとの、テストの入れ物を受け取る口（「要求の、テストの入れ物の口」）。言語によらない決まり（何を担保するか、誰が何を書くか）の持ち主は `docs/ide-chain.md`「テストの規約」の「E2E テスト」「要求のテスト」で、この文書は、その Go の形。
 
@@ -27,12 +27,12 @@ name     = "go-design"
 language = "go"
 requires = ["go"]
 interprets = [
-  "business.flow", "usecase.of", "prd.ref",
+  "prd.business.flow", "prd.usecase.of", "prd.ref",
 ]
 ```
 
 - `interprets`（`docs/plugin-protocol.md`「マニフェスト `hozo-plugin.toml`」）は、読む三つ。三つとも `@hint` を持つので、このトランスパイラを並べなくても、CFG-26 は出ない（`docs/vocab.md`「解釈されなくてよいデコレータ」）。
-- 読む語彙は、標準の `business`（op の `@business.flow`）、`usecase`（op の `@usecase.of`）、`prd`（`@prd.ref`）。`actor` の語彙（担い手の種類）は、読まない（印のまま）。マニフェストの `interprets` は、読む三つ（`business.flow`、`usecase.of`、`prd.ref`）。語彙は提供しない。
+- 読む語彙は、標準の `prd.business`（op の `@prd.business.flow`）、`prd.usecase`（op の `@prd.usecase.of`）、`prd`（`@prd.ref`）。`prd.actor` の語彙（担い手の種類）は、読まない（印のまま）。マニフェストの `interprets` は、読む三つ（`prd.business.flow`、`prd.usecase.of`、`prd.ref`）。語彙は提供しない。
 - 継ぎ目は宣言しない。基底の出力（配線、`Ops`、`New`）は、変えない。
 
 ## オプション
@@ -55,9 +55,9 @@ requirements = ["design.Requirement"]
 
 ## 対象
 
-- **フロー**は、出力 (U, N) の、単位の対象の op（`View.files` にあるファイルの op。`docs/config.md`「in」）のうち、`@business.flow` の付いたもの。宣言順。
+- **フロー**は、出力 (U, N) の、単位の対象の op（`View.files` にあるファイルの op。`docs/config.md`「in」）のうち、`@prd.business.flow` の付いたもの。宣言順。
 - **要求**は、オプション `requirements` に並べた分類のケース。分類は、どの名前空間のものでもよい（単位を置かない名前空間のものも）。N のものである必要はない。
-- フローも、要求もない単位（`@business.flow` の op がなく、`requirements` が空）は、ファイルを出さず、warning を一つ返す。
+- フローも、要求もない単位（`@prd.business.flow` の op がなく、`requirements` が空）は、ファイルを出さず、warning を一つ返す。
 - フローの名前空間は、テスト用の単位だけの対象にする（`docs/ide-chain.md`「業務フロー図」）。`go-design` を並べる単位が、そのテスト用の単位。
 
 ## 出力
@@ -74,13 +74,13 @@ requirements = ["design.Requirement"]
 
 ## E2E テストの口
 
-`@business.flow` の付いた op（フロー）ごとに、E2E テストのケースを一つ受け取る口と、それを走らせる関数を出す（`docs/decisions.md`「決めたこと」366、367）。Hozo が担保するのは、フローごとに、ケースが用意されていて、通っていること（確かめる所は `docs/ide-chain.md`「テストの規約」の「担保すること」）。
+`@prd.business.flow` の付いた op（フロー）ごとに、E2E テストのケースを一つ受け取る口と、それを走らせる関数を出す（`docs/decisions.md`「決めたこと」366、367）。Hozo が担保するのは、フローごとに、ケースが用意されていて、通っていること（確かめる所は `docs/ide-chain.md`「テストの規約」の「担保すること」）。
 
 ### 口の形
 
 ```ts
 /** ログインして、注文し、自分の注文の一覧を見る */
-@business.flow
+@prd.business.flow
 export fn signInAndOrder(email: type.Email, password: type.Password, lines: type.OrderLine[]): Ordered
   throws type.InvalidCredentials, rate.LimitExceeded, type.Unauthorized, type.NotificationFailed, http.ServerError, http.NetworkError
 {
@@ -104,7 +104,7 @@ type SignInAndOrderFlowCase struct {
 	Then func(t *testing.T, got flows.Ordered)
 }
 
-// FlowCases は、@business.flow の付いた op の、E2E テストのケース。フローごとに、メソッド一つ（宣言順）。
+// FlowCases は、@prd.business.flow の付いた op の、E2E テストのケース。フローごとに、メソッド一つ（宣言順）。
 // メソッドが一つでも足りない値は、RunFlows に渡すところでコンパイルできない。
 type FlowCases interface {
 	SignInAndOrder() SignInAndOrderFlowCase
@@ -148,10 +148,10 @@ func RunFlows(t *testing.T, ops flows.Ops, c FlowCases) {
 
 - **`export` が要る**（GODESIGN-1）。走らせる側は、入口の `Ops` のメソッドとして、フローを呼ぶ。
 - **配線で、値か、何も返さないもの**（GODESIGN-2）。本体のない op（葉）は、順を持たない。`never` を返す op は、正常に終わる道を持たない。
-- **呼べるのは、操作の op だけ**（GODESIGN-3。`docs/ide-chain.md`「業務フロー図」）: 配線の呼び出し（`Call.callee`）の先は、どれも、`@usecase.of` の付いた op。`@usecase.of` のない op（同じ名前空間のものも、別のフローも）、`read`、効果（直に呼ぶ組み込みの効果を含む）は、呼べない。`match` のアームの本体の呼び出しと、`for`、`disjoint` の中の呼び出しも、見る。
-- **操作の op とは、別の名前空間**（GODESIGN-4）: フローを持つ名前空間 N に、`@usecase.of` の付いた op があれば、その op に、error。
+- **呼べるのは、操作の op だけ**（GODESIGN-3。`docs/ide-chain.md`「業務フロー図」）: 配線の呼び出し（`Call.callee`）の先は、どれも、`@prd.usecase.of` の付いた op。`@prd.usecase.of` のない op（同じ名前空間のものも、別のフローも）、`read`、効果（直に呼ぶ組み込みの効果を含む）は、呼べない。`match` のアームの本体の呼び出しと、`for`、`disjoint` の中の呼び出しも、見る。
+- **操作の op とは、別の名前空間**（GODESIGN-4）: フローを持つ名前空間 N に、`@prd.usecase.of` の付いた op があれば、その op に、error。
 
-`@usecase.of` の引数（担い手）は、見ない。引数のない `@usecase.of()` も、操作の op の印として数える。
+`@prd.usecase.of` の引数（担い手）は、見ない。引数のない `@prd.usecase.of()` も、操作の op の印として数える。
 
 ## 要求の、テストの入れ物の口
 
@@ -219,10 +219,10 @@ func RunRequirements(t *testing.T, c Requirements) {
 
 | ID | 重さ | 条件 |
 |---|---|---|
-| GODESIGN-1 | error | `@business.flow` の付いた op に `export` がない（「フローの op の決まり」）。位置は、その op |
-| GODESIGN-2 | error | `@business.flow` の付いた op が、本体を持たない（葉）、または `never` を返す。位置は、その op |
-| GODESIGN-3 | error | フローの op の配線が、操作の op（`@usecase.of` の付いた op）でないものを呼ぶ: `@usecase.of` のない op、`read`、効果。位置は、フローの op。呼んだ先ごとに、一つ |
-| GODESIGN-4 | error | フローを持つ名前空間 N に、`@usecase.of` の付いた op がある。位置は、その op |
+| GODESIGN-1 | error | `@prd.business.flow` の付いた op に `export` がない（「フローの op の決まり」）。位置は、その op |
+| GODESIGN-2 | error | `@prd.business.flow` の付いた op が、本体を持たない（葉）、または `never` を返す。位置は、その op |
+| GODESIGN-3 | error | フローの op の配線が、操作の op（`@prd.usecase.of` の付いた op）でないものを呼ぶ: `@prd.usecase.of` のない op、`read`、効果。位置は、フローの op。呼んだ先ごとに、一つ |
+| GODESIGN-4 | error | フローを持つ名前空間 N に、`@prd.usecase.of` の付いた op がある。位置は、その op |
 | GODESIGN-5 | error | `[emit.options.go-design]` に、知らないキーがある。`requirements` が、文字列の配列でない。`requirements` の項目が、対象のない分類の FQN でない（宣言がない、分類でない、対象を持つ分類）。同じ FQN を、二度書いた。位置なし |
 | GODESIGN-6 | error | テストのパッケージに足す公開の名前（`<Op>FlowCase`、`FlowCases`、`RunFlows`、`Requirements`、`RunRequirements`）が、そのパッケージの、基底の公開の名前か、自分のほかの名前と当たる。一つの `<Op>FlowCase` のフィールドの名前どうしが当たる。`Requirements` のメソッドの名前どうしが当たる。フローの op の名前か、要求のケースの名前が `_` で始まる（「出力」）。位置は、当たった自分の名前を生んだフローの op か、要求の分類。決まった名前が当たったなら、相手の名前を生んだ宣言 |
 | GODESIGN-7 | error | テストのパッケージのディレクトリが、同じ単位が出力する、子の名前空間 `N.<N のパッケージ名>test` の出力先と重なる（「出力」）。基底が、同じことを GO-4 で返す出力（基底も、テストのパッケージを作る）では、返さない。置き場が要るので、`go.mod` がないときも、返さない。位置は、最初のフローの op。フローがなければ、最初の要求の分類 |

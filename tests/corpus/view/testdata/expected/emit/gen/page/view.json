@@ -1,6 +1,6 @@
 {
   "version": "1.0",
-  "viewer": "page",
+  "viewer": "browser.page",
   "config": {
     "index": 3,
     "language": "go",
@@ -17,15 +17,11 @@
     "api.hozo",
     "t.hozo",
     "web.hozo",
-    "hozo:vocab/actor.hozo",
-    "hozo:vocab/business.hozo",
+    "hozo:vocab/browser.hozo",
     "hozo:vocab/db.hozo",
     "hozo:vocab/fs.hozo",
     "hozo:vocab/http.hozo",
-    "hozo:vocab/localstorage.hozo",
-    "hozo:vocab/page.hozo",
     "hozo:vocab/prd.hozo",
-    "hozo:vocab/usecase.hozo",
     "hozo:vocab/valid.hozo"
   ],
   "namespaces": {
@@ -43,7 +39,7 @@
         "seams": {}
       }
     ],
-    "page": [
+    "browser.page": [
       {
         "index": 3,
         "language": "go",
@@ -77,45 +73,7 @@
     "namespaces": [
       {
         "name": "",
-        "decls": [
-          {
-            "kind": "decorator",
-            "name": "localStorage",
-            "description": {
-              "summary": "この状態をブラウザの localStorage が持つ",
-              "body": "この状態をブラウザの localStorage が持つ",
-              "params": [],
-              "throws": [],
-              "see": []
-            },
-            "decorators": [],
-            "span": {
-              "file": "hozo:vocab/localstorage.hozo",
-              "start": {
-                "line": 2,
-                "col": 1
-              },
-              "end": {
-                "line": 2,
-                "col": 34
-              }
-            },
-            "params": [],
-            "fn": false,
-            "targets": [
-              "state"
-            ],
-            "caseTargets": [],
-            "entry": false,
-            "hint": false,
-            "repeatable": false,
-            "throws": [],
-            "outerThrows": [],
-            "catches": [],
-            "reads": [],
-            "effects": []
-          }
-        ]
+        "decls": []
       },
       {
         "name": "api",
@@ -11275,7 +11233,7 @@
             "name": "web.token",
             "decorators": [
               {
-                "decorator": "localStorage",
+                "decorator": "browser.localStorage",
                 "args": [],
                 "span": {
                   "file": "web.hozo",
@@ -11285,7 +11243,7 @@
                   },
                   "end": {
                     "line": 6,
-                    "col": 16
+                    "col": 24
                   }
                 }
               }
@@ -11319,7 +11277,7 @@
             "name": "web.location",
             "decorators": [
               {
-                "decorator": "page.path",
+                "decorator": "browser.page.path",
                 "args": [],
                 "span": {
                   "file": "web.hozo",
@@ -11329,7 +11287,7 @@
                   },
                   "end": {
                     "line": 8,
-                    "col": 13
+                    "col": 21
                   }
                 }
               }
@@ -11342,17 +11300,17 @@
               },
               "end": {
                 "line": 9,
-                "col": 38
+                "col": 46
               }
             },
             "type": {
               "kind": "ref",
-              "target": "page.Route"
+              "target": "browser.page.Route"
             },
             "shape": "single",
             "element": {
               "kind": "ref",
-              "target": "page.Route"
+              "target": "browser.page.Route"
             }
           },
           {
@@ -14238,10 +14196,10 @@
         ]
       },
       {
-        "name": "actor",
+        "name": "browser",
         "description": {
-          "summary": "担い手の種類の語彙（ユースケース図）。担い手は、対象のない分類のケースで、種類は、そのケースに付ける",
-          "body": "担い手の種類の語彙（ユースケース図）。担い手は、対象のない分類のケースで、種類は、そのケースに付ける",
+          "summary": "ブラウザの語彙: ブラウザが持つ状態の置き場と、ページ（名前空間 browser.page）",
+          "body": "ブラウザの語彙: ブラウザが持つ状態の置き場と、ページ（名前空間 browser.page）",
           "params": [],
           "throws": [],
           "see": []
@@ -14249,126 +14207,34 @@
         "decls": [
           {
             "kind": "decorator",
-            "name": "actor.human",
+            "name": "browser.localStorage",
             "description": {
-              "summary": "人が、呼び出す",
-              "body": "人が、呼び出す",
+              "summary": "この状態をブラウザの localStorage が持つ",
+              "body": "この状態をブラウザの localStorage が持つ",
               "params": [],
               "throws": [],
               "see": []
             },
             "decorators": [],
             "span": {
-              "file": "hozo:vocab/actor.hozo",
+              "file": "hozo:vocab/browser.hozo",
               "start": {
                 "line": 4,
                 "col": 3
               },
               "end": {
-                "line": 5,
-                "col": 37
+                "line": 4,
+                "col": 36
               }
             },
             "params": [],
             "fn": false,
             "targets": [
-              "case"
+              "state"
             ],
-            "caseTargets": [
-              {
-                "subject": {
-                  "kind": "never"
-                }
-              }
-            ],
+            "caseTargets": [],
             "entry": false,
-            "hint": true,
-            "repeatable": false,
-            "throws": [],
-            "outerThrows": [],
-            "catches": [],
-            "reads": [],
-            "effects": []
-          },
-          {
-            "kind": "decorator",
-            "name": "actor.bot",
-            "description": {
-              "summary": "機械的な動機で、呼び出す（外の仕組みからの知らせ、時刻で動く処理）",
-              "body": "機械的な動機で、呼び出す（外の仕組みからの知らせ、時刻で動く処理）",
-              "params": [],
-              "throws": [],
-              "see": []
-            },
-            "decorators": [],
-            "span": {
-              "file": "hozo:vocab/actor.hozo",
-              "start": {
-                "line": 8,
-                "col": 3
-              },
-              "end": {
-                "line": 9,
-                "col": 35
-              }
-            },
-            "params": [],
-            "fn": false,
-            "targets": [
-              "case"
-            ],
-            "caseTargets": [
-              {
-                "subject": {
-                  "kind": "never"
-                }
-              }
-            ],
-            "entry": false,
-            "hint": true,
-            "repeatable": false,
-            "throws": [],
-            "outerThrows": [],
-            "catches": [],
-            "reads": [],
-            "effects": []
-          },
-          {
-            "kind": "decorator",
-            "name": "actor.ai",
-            "description": {
-              "summary": "生成 AI の判断で、呼び出す",
-              "body": "生成 AI の判断で、呼び出す",
-              "params": [],
-              "throws": [],
-              "see": []
-            },
-            "decorators": [],
-            "span": {
-              "file": "hozo:vocab/actor.hozo",
-              "start": {
-                "line": 12,
-                "col": 3
-              },
-              "end": {
-                "line": 13,
-                "col": 34
-              }
-            },
-            "params": [],
-            "fn": false,
-            "targets": [
-              "case"
-            ],
-            "caseTargets": [
-              {
-                "subject": {
-                  "kind": "never"
-                }
-              }
-            ],
-            "entry": false,
-            "hint": true,
+            "hint": false,
             "repeatable": false,
             "throws": [],
             "outerThrows": [],
@@ -14379,45 +14245,402 @@
         ]
       },
       {
-        "name": "business",
+        "name": "browser.page",
         "description": {
-          "summary": "業務フローの語彙（業務フロー図）",
-          "body": "業務フローの語彙（業務フロー図）",
+          "summary": "ページの語彙: URL から決まる状態、ルート、ダイアログ、操作",
+          "body": "ページの語彙: URL から決まる状態、ルート、ダイアログ、操作",
           "params": [],
           "throws": [],
           "see": []
         },
         "decls": [
           {
-            "kind": "decorator",
-            "name": "business.flow",
+            "kind": "exception",
+            "name": "browser.page.Aborted",
             "description": {
-              "summary": "この op は、業務フロー。操作の op（ユースケース）を、順に行う",
-              "body": "この op は、業務フロー。操作の op（ユースケース）を、順に行う",
+              "summary": "ダイアログが閉じられた",
+              "body": "ダイアログが閉じられた",
               "params": [],
               "throws": [],
               "see": []
             },
             "decorators": [],
             "span": {
-              "file": "hozo:vocab/business.hozo",
+              "file": "hozo:vocab/browser.hozo",
               "start": {
-                "line": 4,
-                "col": 3
+                "line": 9,
+                "col": 5
               },
               "end": {
-                "line": 5,
+                "line": 9,
                 "col": 23
               }
             },
+            "params": []
+          },
+          {
+            "kind": "scalar",
+            "name": "browser.page.Route",
+            "description": {
+              "summary": "ルートの位置（path と params）",
+              "body": "ルートの位置（path と params）",
+              "params": [],
+              "throws": [],
+              "see": []
+            },
+            "decorators": [],
+            "span": {
+              "file": "hozo:vocab/browser.hozo",
+              "start": {
+                "line": 12,
+                "col": 5
+              },
+              "end": {
+                "line": 12,
+                "col": 33
+              }
+            },
+            "base": {
+              "kind": "core",
+              "name": "string"
+            }
+          },
+          {
+            "kind": "model",
+            "name": "browser.page.Query",
+            "description": {
+              "summary": "URL のクエリ。名前から、値の並びを引く",
+              "body": "URL のクエリ。名前から、値の並びを引く",
+              "params": [],
+              "throws": [],
+              "see": []
+            },
+            "decorators": [],
+            "span": {
+              "file": "hozo:vocab/browser.hozo",
+              "start": {
+                "line": 15,
+                "col": 5
+              },
+              "end": {
+                "line": 15,
+                "col": 46
+              }
+            },
+            "fields": [],
+            "index": {
+              "name": "name",
+              "key": {
+                "kind": "core",
+                "name": "string"
+              },
+              "value": {
+                "kind": "array",
+                "of": {
+                  "kind": "core",
+                  "name": "string"
+                }
+              },
+              "span": {
+                "file": "hozo:vocab/browser.hozo",
+                "start": {
+                  "line": 15,
+                  "col": 19
+                },
+                "end": {
+                  "line": 15,
+                  "col": 44
+                }
+              }
+            }
+          },
+          {
+            "kind": "decorator",
+            "name": "browser.page.path",
+            "decorators": [],
+            "span": {
+              "file": "hozo:vocab/browser.hozo",
+              "start": {
+                "line": 17,
+                "col": 5
+              },
+              "end": {
+                "line": 17,
+                "col": 30
+              }
+            },
             "params": [],
+            "fn": false,
+            "targets": [
+              "state"
+            ],
+            "caseTargets": [],
+            "entry": false,
+            "hint": false,
+            "repeatable": false,
+            "throws": [],
+            "outerThrows": [],
+            "catches": [],
+            "reads": [],
+            "effects": []
+          },
+          {
+            "kind": "decorator",
+            "name": "browser.page.query",
+            "decorators": [],
+            "span": {
+              "file": "hozo:vocab/browser.hozo",
+              "start": {
+                "line": 18,
+                "col": 5
+              },
+              "end": {
+                "line": 18,
+                "col": 31
+              }
+            },
+            "params": [],
+            "fn": false,
+            "targets": [
+              "state"
+            ],
+            "caseTargets": [],
+            "entry": false,
+            "hint": false,
+            "repeatable": false,
+            "throws": [],
+            "outerThrows": [],
+            "catches": [],
+            "reads": [],
+            "effects": []
+          },
+          {
+            "kind": "decorator",
+            "name": "browser.page.route",
+            "decorators": [],
+            "span": {
+              "file": "hozo:vocab/browser.hozo",
+              "start": {
+                "line": 19,
+                "col": 5
+              },
+              "end": {
+                "line": 20,
+                "col": 80
+              }
+            },
+            "params": [
+              {
+                "name": "path",
+                "type": {
+                  "kind": "type",
+                  "types": [
+                    {
+                      "kind": "core",
+                      "name": "string"
+                    }
+                  ]
+                },
+                "optional": false,
+                "rest": false
+              },
+              {
+                "name": "from",
+                "type": {
+                  "kind": "any",
+                  "of": "state"
+                },
+                "optional": true,
+                "rest": false
+              },
+              {
+                "name": "onInvalid",
+                "type": {
+                  "kind": "any",
+                  "of": "effect"
+                },
+                "optional": true,
+                "rest": false
+              }
+            ],
+            "fn": true,
+            "targets": [
+              "op"
+            ],
+            "caseTargets": [],
+            "entry": true,
+            "hint": false,
+            "repeatable": false,
+            "throws": [],
+            "outerThrows": [],
+            "catches": [],
+            "reads": [],
+            "effects": []
+          },
+          {
+            "kind": "decorator",
+            "name": "browser.page.dialog",
+            "description": {
+              "summary": "ダイアログで入力を待つ。component はコンポーネントの実装の名前（例: \"YamadaWarrantyModal\"）。\nどの実装を指すかは展開器が解決する（表層は責務外）。",
+              "body": "ダイアログで入力を待つ。component はコンポーネントの実装の名前（例: \"YamadaWarrantyModal\"）。\nどの実装を指すかは展開器が解決する（表層は責務外）。",
+              "params": [],
+              "throws": [],
+              "see": []
+            },
+            "decorators": [],
+            "span": {
+              "file": "hozo:vocab/browser.hozo",
+              "start": {
+                "line": 25,
+                "col": 5
+              },
+              "end": {
+                "line": 25,
+                "col": 60
+              }
+            },
+            "params": [
+              {
+                "name": "component",
+                "type": {
+                  "kind": "type",
+                  "types": [
+                    {
+                      "kind": "core",
+                      "name": "string"
+                    }
+                  ]
+                },
+                "optional": false,
+                "rest": false
+              }
+            ],
             "fn": true,
             "targets": [
               "op"
             ],
             "caseTargets": [],
             "entry": false,
-            "hint": true,
+            "hint": false,
+            "repeatable": false,
+            "throws": [
+              {
+                "exceptions": [
+                  "browser.page.Aborted"
+                ],
+                "relations": []
+              }
+            ],
+            "outerThrows": [],
+            "catches": [],
+            "reads": [],
+            "effects": []
+          },
+          {
+            "kind": "decorator",
+            "name": "browser.page.fallback",
+            "description": {
+              "summary": "error を受けて、ページの VM の代わりに view のアームを描画する（URL は変わらない。view の型の規則は §11.2）",
+              "body": "error を受けて、ページの VM の代わりに view のアームを描画する（URL は変わらない。view の型の規則は §11.2）",
+              "params": [],
+              "throws": [],
+              "see": []
+            },
+            "decorators": [],
+            "span": {
+              "file": "hozo:vocab/browser.hozo",
+              "start": {
+                "line": 27,
+                "col": 5
+              },
+              "end": {
+                "line": 27,
+                "col": 90
+              }
+            },
+            "params": [
+              {
+                "name": "error",
+                "type": {
+                  "kind": "any",
+                  "of": "exception"
+                },
+                "optional": false,
+                "rest": false
+              },
+              {
+                "name": "view",
+                "type": {
+                  "kind": "any",
+                  "of": "model"
+                },
+                "optional": false,
+                "rest": false
+              }
+            ],
+            "fn": true,
+            "targets": [
+              "op"
+            ],
+            "caseTargets": [],
+            "entry": false,
+            "hint": false,
+            "repeatable": false,
+            "throws": [],
+            "outerThrows": [],
+            "catches": [
+              {
+                "exceptions": [
+                  "$param:error"
+                ],
+                "mode": "recovers"
+              }
+            ],
+            "reads": [],
+            "effects": []
+          },
+          {
+            "kind": "decorator",
+            "name": "browser.page.interaction",
+            "decorators": [],
+            "span": {
+              "file": "hozo:vocab/browser.hozo",
+              "start": {
+                "line": 28,
+                "col": 5
+              },
+              "end": {
+                "line": 28,
+                "col": 63
+              }
+            },
+            "params": [
+              {
+                "name": "page",
+                "type": {
+                  "kind": "any",
+                  "of": "op"
+                },
+                "optional": false,
+                "rest": false
+              },
+              {
+                "name": "when",
+                "type": {
+                  "kind": "any",
+                  "of": "variant"
+                },
+                "optional": false,
+                "rest": false
+              }
+            ],
+            "fn": true,
+            "targets": [
+              "op"
+            ],
+            "caseTargets": [],
+            "entry": false,
+            "hint": false,
             "repeatable": false,
             "throws": [],
             "outerThrows": [],
@@ -16089,409 +16312,10 @@
         ]
       },
       {
-        "name": "page",
-        "decls": [
-          {
-            "kind": "exception",
-            "name": "page.Aborted",
-            "description": {
-              "summary": "ダイアログが閉じられた",
-              "body": "ダイアログが閉じられた",
-              "params": [],
-              "throws": [],
-              "see": []
-            },
-            "decorators": [],
-            "span": {
-              "file": "hozo:vocab/page.hozo",
-              "start": {
-                "line": 3,
-                "col": 3
-              },
-              "end": {
-                "line": 3,
-                "col": 21
-              }
-            },
-            "params": []
-          },
-          {
-            "kind": "scalar",
-            "name": "page.Route",
-            "description": {
-              "summary": "ルートの位置（path と params）",
-              "body": "ルートの位置（path と params）",
-              "params": [],
-              "throws": [],
-              "see": []
-            },
-            "decorators": [],
-            "span": {
-              "file": "hozo:vocab/page.hozo",
-              "start": {
-                "line": 6,
-                "col": 3
-              },
-              "end": {
-                "line": 6,
-                "col": 31
-              }
-            },
-            "base": {
-              "kind": "core",
-              "name": "string"
-            }
-          },
-          {
-            "kind": "model",
-            "name": "page.Query",
-            "description": {
-              "summary": "URL のクエリ。名前から、値の並びを引く",
-              "body": "URL のクエリ。名前から、値の並びを引く",
-              "params": [],
-              "throws": [],
-              "see": []
-            },
-            "decorators": [],
-            "span": {
-              "file": "hozo:vocab/page.hozo",
-              "start": {
-                "line": 9,
-                "col": 3
-              },
-              "end": {
-                "line": 9,
-                "col": 44
-              }
-            },
-            "fields": [],
-            "index": {
-              "name": "name",
-              "key": {
-                "kind": "core",
-                "name": "string"
-              },
-              "value": {
-                "kind": "array",
-                "of": {
-                  "kind": "core",
-                  "name": "string"
-                }
-              },
-              "span": {
-                "file": "hozo:vocab/page.hozo",
-                "start": {
-                  "line": 9,
-                  "col": 17
-                },
-                "end": {
-                  "line": 9,
-                  "col": 42
-                }
-              }
-            }
-          },
-          {
-            "kind": "decorator",
-            "name": "page.path",
-            "decorators": [],
-            "span": {
-              "file": "hozo:vocab/page.hozo",
-              "start": {
-                "line": 11,
-                "col": 3
-              },
-              "end": {
-                "line": 11,
-                "col": 28
-              }
-            },
-            "params": [],
-            "fn": false,
-            "targets": [
-              "state"
-            ],
-            "caseTargets": [],
-            "entry": false,
-            "hint": false,
-            "repeatable": false,
-            "throws": [],
-            "outerThrows": [],
-            "catches": [],
-            "reads": [],
-            "effects": []
-          },
-          {
-            "kind": "decorator",
-            "name": "page.query",
-            "decorators": [],
-            "span": {
-              "file": "hozo:vocab/page.hozo",
-              "start": {
-                "line": 12,
-                "col": 3
-              },
-              "end": {
-                "line": 12,
-                "col": 29
-              }
-            },
-            "params": [],
-            "fn": false,
-            "targets": [
-              "state"
-            ],
-            "caseTargets": [],
-            "entry": false,
-            "hint": false,
-            "repeatable": false,
-            "throws": [],
-            "outerThrows": [],
-            "catches": [],
-            "reads": [],
-            "effects": []
-          },
-          {
-            "kind": "decorator",
-            "name": "page.route",
-            "decorators": [],
-            "span": {
-              "file": "hozo:vocab/page.hozo",
-              "start": {
-                "line": 13,
-                "col": 3
-              },
-              "end": {
-                "line": 14,
-                "col": 78
-              }
-            },
-            "params": [
-              {
-                "name": "path",
-                "type": {
-                  "kind": "type",
-                  "types": [
-                    {
-                      "kind": "core",
-                      "name": "string"
-                    }
-                  ]
-                },
-                "optional": false,
-                "rest": false
-              },
-              {
-                "name": "from",
-                "type": {
-                  "kind": "any",
-                  "of": "state"
-                },
-                "optional": true,
-                "rest": false
-              },
-              {
-                "name": "onInvalid",
-                "type": {
-                  "kind": "any",
-                  "of": "effect"
-                },
-                "optional": true,
-                "rest": false
-              }
-            ],
-            "fn": true,
-            "targets": [
-              "op"
-            ],
-            "caseTargets": [],
-            "entry": true,
-            "hint": false,
-            "repeatable": false,
-            "throws": [],
-            "outerThrows": [],
-            "catches": [],
-            "reads": [],
-            "effects": []
-          },
-          {
-            "kind": "decorator",
-            "name": "page.dialog",
-            "description": {
-              "summary": "ダイアログで入力を待つ。component はコンポーネントの実装の名前（例: \"YamadaWarrantyModal\"）。\nどの実装を指すかは展開器が解決する（表層は責務外）。",
-              "body": "ダイアログで入力を待つ。component はコンポーネントの実装の名前（例: \"YamadaWarrantyModal\"）。\nどの実装を指すかは展開器が解決する（表層は責務外）。",
-              "params": [],
-              "throws": [],
-              "see": []
-            },
-            "decorators": [],
-            "span": {
-              "file": "hozo:vocab/page.hozo",
-              "start": {
-                "line": 19,
-                "col": 3
-              },
-              "end": {
-                "line": 19,
-                "col": 58
-              }
-            },
-            "params": [
-              {
-                "name": "component",
-                "type": {
-                  "kind": "type",
-                  "types": [
-                    {
-                      "kind": "core",
-                      "name": "string"
-                    }
-                  ]
-                },
-                "optional": false,
-                "rest": false
-              }
-            ],
-            "fn": true,
-            "targets": [
-              "op"
-            ],
-            "caseTargets": [],
-            "entry": false,
-            "hint": false,
-            "repeatable": false,
-            "throws": [
-              {
-                "exceptions": [
-                  "page.Aborted"
-                ],
-                "relations": []
-              }
-            ],
-            "outerThrows": [],
-            "catches": [],
-            "reads": [],
-            "effects": []
-          },
-          {
-            "kind": "decorator",
-            "name": "page.fallback",
-            "description": {
-              "summary": "error を受けて、ページの VM の代わりに view のアームを描画する（URL は変わらない。view の型の規則は §11.2）",
-              "body": "error を受けて、ページの VM の代わりに view のアームを描画する（URL は変わらない。view の型の規則は §11.2）",
-              "params": [],
-              "throws": [],
-              "see": []
-            },
-            "decorators": [],
-            "span": {
-              "file": "hozo:vocab/page.hozo",
-              "start": {
-                "line": 21,
-                "col": 3
-              },
-              "end": {
-                "line": 21,
-                "col": 88
-              }
-            },
-            "params": [
-              {
-                "name": "error",
-                "type": {
-                  "kind": "any",
-                  "of": "exception"
-                },
-                "optional": false,
-                "rest": false
-              },
-              {
-                "name": "view",
-                "type": {
-                  "kind": "any",
-                  "of": "model"
-                },
-                "optional": false,
-                "rest": false
-              }
-            ],
-            "fn": true,
-            "targets": [
-              "op"
-            ],
-            "caseTargets": [],
-            "entry": false,
-            "hint": false,
-            "repeatable": false,
-            "throws": [],
-            "outerThrows": [],
-            "catches": [
-              {
-                "exceptions": [
-                  "$param:error"
-                ],
-                "mode": "recovers"
-              }
-            ],
-            "reads": [],
-            "effects": []
-          },
-          {
-            "kind": "decorator",
-            "name": "page.interaction",
-            "decorators": [],
-            "span": {
-              "file": "hozo:vocab/page.hozo",
-              "start": {
-                "line": 22,
-                "col": 3
-              },
-              "end": {
-                "line": 22,
-                "col": 61
-              }
-            },
-            "params": [
-              {
-                "name": "page",
-                "type": {
-                  "kind": "any",
-                  "of": "op"
-                },
-                "optional": false,
-                "rest": false
-              },
-              {
-                "name": "when",
-                "type": {
-                  "kind": "any",
-                  "of": "variant"
-                },
-                "optional": false,
-                "rest": false
-              }
-            ],
-            "fn": true,
-            "targets": [
-              "op"
-            ],
-            "caseTargets": [],
-            "entry": false,
-            "hint": false,
-            "repeatable": false,
-            "throws": [],
-            "outerThrows": [],
-            "catches": [],
-            "reads": [],
-            "effects": []
-          }
-        ]
-      },
-      {
         "name": "prd",
         "description": {
-          "summary": "要求を指す語彙（要求の文書、要求トレーサビリティマトリクス）。要求は、対象のない分類のケース",
-          "body": "要求を指す語彙（要求の文書、要求トレーサビリティマトリクス）。要求は、対象のない分類のケース",
+          "summary": "製品の要求（PRD）の語彙: 要求を指す印と、担い手（prd.actor）、ユースケース（prd.usecase）、業務フロー（prd.business）",
+          "body": "製品の要求（PRD）の語彙: 要求を指す印と、担い手（prd.actor）、ユースケース（prd.usecase）、業務フロー（prd.business）",
           "params": [],
           "throws": [],
           "see": []
@@ -16501,8 +16325,8 @@
             "kind": "decorator",
             "name": "prd.ref",
             "description": {
-              "summary": "この宣言は、この要求のためのもの。",
-              "body": "この宣言は、この要求のためのもの。",
+              "summary": "この宣言は、この要求のためのもの（要求の文書、要求トレーサビリティマトリクス）。要求は、対象のない分類のケース。",
+              "body": "この宣言は、この要求のためのもの（要求の文書、要求トレーサビリティマトリクス）。要求は、対象のない分類のケース。",
               "params": [
                 {
                   "name": "requirements",
@@ -16561,7 +16385,148 @@
         ]
       },
       {
-        "name": "usecase",
+        "name": "prd.actor",
+        "description": {
+          "summary": "担い手の種類の語彙（ユースケース図）。担い手は、対象のない分類のケースで、種類は、そのケースに付ける",
+          "body": "担い手の種類の語彙（ユースケース図）。担い手は、対象のない分類のケースで、種類は、そのケースに付ける",
+          "params": [],
+          "throws": [],
+          "see": []
+        },
+        "decls": [
+          {
+            "kind": "decorator",
+            "name": "prd.actor.human",
+            "description": {
+              "summary": "人が、呼び出す",
+              "body": "人が、呼び出す",
+              "params": [],
+              "throws": [],
+              "see": []
+            },
+            "decorators": [],
+            "span": {
+              "file": "hozo:vocab/prd.hozo",
+              "start": {
+                "line": 14,
+                "col": 5
+              },
+              "end": {
+                "line": 15,
+                "col": 39
+              }
+            },
+            "params": [],
+            "fn": false,
+            "targets": [
+              "case"
+            ],
+            "caseTargets": [
+              {
+                "subject": {
+                  "kind": "never"
+                }
+              }
+            ],
+            "entry": false,
+            "hint": true,
+            "repeatable": false,
+            "throws": [],
+            "outerThrows": [],
+            "catches": [],
+            "reads": [],
+            "effects": []
+          },
+          {
+            "kind": "decorator",
+            "name": "prd.actor.bot",
+            "description": {
+              "summary": "機械的な動機で、呼び出す（外の仕組みからの知らせ、時刻で動く処理）",
+              "body": "機械的な動機で、呼び出す（外の仕組みからの知らせ、時刻で動く処理）",
+              "params": [],
+              "throws": [],
+              "see": []
+            },
+            "decorators": [],
+            "span": {
+              "file": "hozo:vocab/prd.hozo",
+              "start": {
+                "line": 18,
+                "col": 5
+              },
+              "end": {
+                "line": 19,
+                "col": 37
+              }
+            },
+            "params": [],
+            "fn": false,
+            "targets": [
+              "case"
+            ],
+            "caseTargets": [
+              {
+                "subject": {
+                  "kind": "never"
+                }
+              }
+            ],
+            "entry": false,
+            "hint": true,
+            "repeatable": false,
+            "throws": [],
+            "outerThrows": [],
+            "catches": [],
+            "reads": [],
+            "effects": []
+          },
+          {
+            "kind": "decorator",
+            "name": "prd.actor.ai",
+            "description": {
+              "summary": "生成 AI の判断で、呼び出す",
+              "body": "生成 AI の判断で、呼び出す",
+              "params": [],
+              "throws": [],
+              "see": []
+            },
+            "decorators": [],
+            "span": {
+              "file": "hozo:vocab/prd.hozo",
+              "start": {
+                "line": 22,
+                "col": 5
+              },
+              "end": {
+                "line": 23,
+                "col": 36
+              }
+            },
+            "params": [],
+            "fn": false,
+            "targets": [
+              "case"
+            ],
+            "caseTargets": [
+              {
+                "subject": {
+                  "kind": "never"
+                }
+              }
+            ],
+            "entry": false,
+            "hint": true,
+            "repeatable": false,
+            "throws": [],
+            "outerThrows": [],
+            "catches": [],
+            "reads": [],
+            "effects": []
+          }
+        ]
+      },
+      {
+        "name": "prd.usecase",
         "description": {
           "summary": "ユースケースの語彙（ユースケース図）",
           "body": "ユースケースの語彙（ユースケース図）",
@@ -16572,7 +16537,7 @@
         "decls": [
           {
             "kind": "decorator",
-            "name": "usecase.of",
+            "name": "prd.usecase.of",
             "description": {
               "summary": "この op は、ユースケース（担い手の、一つの操作）。actors が、行う。",
               "body": "この op は、ユースケース（担い手の、一つの操作）。actors が、行う。",
@@ -16587,14 +16552,14 @@
             },
             "decorators": [],
             "span": {
-              "file": "hozo:vocab/usecase.hozo",
+              "file": "hozo:vocab/prd.hozo",
               "start": {
-                "line": 8,
-                "col": 3
+                "line": 33,
+                "col": 5
               },
               "end": {
-                "line": 9,
-                "col": 49
+                "line": 34,
+                "col": 51
               }
             },
             "params": [
@@ -16613,6 +16578,55 @@
                 "rest": true
               }
             ],
+            "fn": true,
+            "targets": [
+              "op"
+            ],
+            "caseTargets": [],
+            "entry": false,
+            "hint": true,
+            "repeatable": false,
+            "throws": [],
+            "outerThrows": [],
+            "catches": [],
+            "reads": [],
+            "effects": []
+          }
+        ]
+      },
+      {
+        "name": "prd.business",
+        "description": {
+          "summary": "業務フローの語彙（業務フロー図）",
+          "body": "業務フローの語彙（業務フロー図）",
+          "params": [],
+          "throws": [],
+          "see": []
+        },
+        "decls": [
+          {
+            "kind": "decorator",
+            "name": "prd.business.flow",
+            "description": {
+              "summary": "この op は、業務フロー。操作の op（ユースケース）を、順に行う",
+              "body": "この op は、業務フロー。操作の op（ユースケース）を、順に行う",
+              "params": [],
+              "throws": [],
+              "see": []
+            },
+            "decorators": [],
+            "span": {
+              "file": "hozo:vocab/prd.hozo",
+              "start": {
+                "line": 40,
+                "col": 5
+              },
+              "end": {
+                "line": 41,
+                "col": 25
+              }
+            },
+            "params": [],
             "fn": true,
             "targets": [
               "op"

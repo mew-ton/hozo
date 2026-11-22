@@ -29,7 +29,7 @@ interprets = [
   "a.writing", "b.haltOnX", "b.haltWith", "b.mark", "db.delete", "db.find",
   "db.insert", "db.key", "db.latest", "db.list", "db.table", "db.text",
   "db.transaction", "db.update", "db.where", "http.get", "http.retry", "http.status",
-  "localStorage", "valid.min", "vocplugMark",
+  "browser.localStorage", "valid.min", "vocplugMark",
 ]
 
 [[transpiler]]

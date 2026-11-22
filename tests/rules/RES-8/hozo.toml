@@ -1,0 +1,8 @@
+# RES-8 の例の設定: 既定と同じ単位（名前空間 a を、トランスパイラ go で gen/a に）。
+[hozo]
+plugin_dirs = ["plugins"]
+
+[[emit]]
+namespace   = "a"
+transpilers = ["go"]
+out         = "gen/a"

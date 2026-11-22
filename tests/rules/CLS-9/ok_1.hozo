@@ -3,9 +3,9 @@
 namespace a {
   classify Actor of never {
     /** 客 */
-    @actor.human Customer;
+    @prd.actor.human Customer;
     Staff;
   }
-  @usecase.of(Actor.Customer)
+  @prd.usecase.of(Actor.Customer)
   fn order();
 }

@@ -1,0 +1,12 @@
+# 単体テストの入力のためのプラグイン: 語彙のファイルで、標準の語彙の名前空間 valid に、制約を足す（docs/vocab.md「語彙の名前空間」:
+# 仕様からは、足せない。足せるのは、語彙のファイルだけ）。go-valid の単体テストが読むのは View だけで、このプラグインは起動しない
+# （wasm のファイルは、置いていない）。
+name       = "morevalid"
+wasm       = "plugin.wasm"
+protocol   = "1.0"
+vocabulary = ["valid.hozo"]
+
+[[transpiler]]
+name     = "go-morevalid"
+language = "go"
+requires = ["go"]

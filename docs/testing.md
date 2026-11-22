@@ -22,7 +22,7 @@
 `tests/corpus/<名前>/` に、設計書の例を集めたプロジェクト（`hozo.toml` と `.hozo`）を置く。
 
 - `design/`: 設計書 §5〜§11 の例を名前空間ごとに一つのファイルにまとめたもの。設計書の言葉をそのまま写し、写せなかった箇所と足した宣言は、そのディレクトリの `README.md` に一覧する。
-- `view/`: プラグインが受け取る `View`（`docs/ir.md`「その名前空間から見た IR」）を端から端まで確かめるためのサンプル。`docs/ir.md`「正規化」の各行と `docs/check.md`「計算」の各手順を一か所ずつ使う。プラグイン `plugins/view-dump` のトランスパイラ `view-dump`（`requires` を持たない、テストのための基底）が、受け取った `View` を `view.json` として書き出す。`api`、`web`、`page` の三つの単位が、どれもそれを使う（`web` は `api` の型と、語彙 `page` の型を使うので、その二つも同じ基底の出力を持つ。`docs/config.md`「型の置き場」）。`tests/view_test.go` が、`internal/project` の `web` の `View` をゴールデン `testdata/expected/view.web.json` と比べ、要求ごとの期待値を文書の見出しの名前のサブテストで明示し、実物の `hozoc build` がプラグインに渡した `View` が同じであることを確かめる。見出し → 構文の対応と想定する warning は `README.md`。
+- `view/`: プラグインが受け取る `View`（`docs/ir.md`「その名前空間から見た IR」）を端から端まで確かめるためのサンプル。`docs/ir.md`「正規化」の各行と `docs/check.md`「計算」の各手順を一か所ずつ使う。プラグイン `plugins/view-dump` のトランスパイラ `view-dump`（`requires` を持たない、テストのための基底）が、受け取った `View` を `view.json` として書き出す。`api`、`web`、`page` の三つの単位が、どれもそれを使う（`web` は `api` の型と、語彙 `browser.page` の型を使うので、その二つも同じ基底の出力を持つ。`docs/config.md`「型の置き場」）。`tests/view_test.go` が、`internal/project` の `web` の `View` をゴールデン `testdata/expected/view.web.json` と比べ、要求ごとの期待値を文書の見出しの名前のサブテストで明示し、実物の `hozoc build` がプラグインに渡した `View` が同じであることを確かめる。見出し → 構文の対応と想定する warning は `README.md`。
 - 各コーパスについて、`hozoc build --no-emit` の text 出力をゴールデン `tests/corpus/<名前>/testdata/expected/check.txt` と比べる。warning も含む（`tests/corpus_emit_test.go` の `TestCorpusCheckGolden`）。
   - コーパスの単位のトランスパイラは、基底だけなので、語彙のデコレータと、コーパスが自分で宣言したデコレータには、付けた所ごとに CFG-26 が出る（`design` で 64、`view` で 35、`units` で 5、`model` で 1）。ゴールデンが、その一覧を持つ。コーパスの `.hozo` を、診断のない入力として使うテスト（`internal/app`、`internal/lsp`）は、にせもののトランスパイラに、コーパスのデコレータを `interprets` として名乗らせる（`internal/fakeplugin` の `DesignDecorators`）。
 - `emit` のゴールデン: `tests/corpus/<名前>/testdata/expected/emit/` に書き出したファイルの木（`.hozoc-outputs.json` を含む）を置き、実際に一時ディレクトリに書いて比べる。単位のトランスパイラは、リポジトリの `plugins/` の本物（基底 `go`）で、`HOZO_PLUGIN_PATH` として渡す（`view` だけは、コーパスの `plugins/view-dump`）。差分はファイルごとに示す（同 `TestCorpusEmitGolden`）。ゴールデンをすべて `testdata/` の下に置くのは、ゴールデンの `.go` を `go build ./...` / `go vet ./...` がパッケージとして拾わないため（Go は `testdata` を無視する）。一時ディレクトリにはリポジトリの `go.mod` を写し、`ir/` `plugin/` `plugins/` `tests/` をシンボリックリンクで足す（`tests/generated_test.go` と同じ）。プラグインのマニフェストの `go run` がそこから解決でき、生成したコードの import パスも `github.com/mew-ton/hozo/<out>` に決まる。比べた後、書き出した Go のパッケージをその一時ディレクトリで `go vet` に通す（`runtime/` をシンボリックリンクで足す。ゴールデンと一致していても、コンパイルできない出力を見逃さないため）。
@@ -33,7 +33,7 @@
 
 | コーパス | 単位のトランスパイラ | `emit` のゴールデン |
 |---|---|---|
-| `design/` | `server` と `browser` は `go`。使う型の置き場として、語彙の `http` と `page` にも `go` の単位を足す | 持つ（基底 `go` が出したものに作り直す）。利用者が `valid` に足した制約（§6.5）は、`go-valid` を並べないので出力に現れない |
+| `design/` | `server` と `client` は `go`。使う型の置き場として、語彙の `http` と `browser.page` にも `go` の単位を足す | 持つ（基底 `go` が出したものに作り直す）。利用者が `valid` に足した制約（§6.5）は、`go-valid` を並べないので出力に現れない |
 | `state/` | `go` | 持つ（作り直す）。状態の分類、遷移の効果、状態での `match`。IR の中身は `tests/view_test.go` の `TestStateCorpusIR` が見出しごとに確かめる |
 | `units/` | 四つの単位とも `go` | 持つ（作り直す）。出力の単位（`docs/config.md`「単位」「単位の対象」「in」「型の置き場」）のサンプル: 同じ名前空間の二つの単位（どちらも自分の型を持つ）、`in` で絞った単位（`in` の外の op は、呼ばれていれば `Leaves` の口だけ、呼ばれていなければ出ない。型と状態はすべて出る）、子孫を名指しする単位、単位をまたぐ一方向の import（置き場は設定の順で最初の単位）。`tests/units_test.go` の `TestUnitsCorpus` が実物の `hozoc build` の出力を確かめる |
 | `view/` | `view-dump`（上） | 持つ（`view.json` だけ。作り直す） |

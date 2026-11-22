@@ -127,7 +127,7 @@ capabilities: `textDocumentSync: { openClose: true, change: Full, save: { includ
 | `val` の名前、`for` の変数（値の位置。値を入れる文の左 `x = …`、集める文の左 `xs collect …` も） | `val` の宣言の名前、`for` の頭の名前 |
 | `catch` が受けた例外の名前（`match (e by …)` の対象、`throw e`） | `catch (e)` の頭の名前。ホバーは、op の見出しと `catch (e)` の一行 |
 | `catch (e by C)` と `match (e by C)` の分類の名前、アームのケースの名前 | ほかの `match` と同じ（分類の宣言、そのケース） |
-| デコレータの引数の、分類のケース（`@usecase.of(Actor.Customer)`） | `Actor` のセグメントは `classify` の名前、`Customer` のセグメントは、その `classify` のケース |
+| デコレータの引数の、分類のケース（`@prd.usecase.of(Actor.Customer)`） | `Actor` のセグメントは `classify` の名前、`Customer` のセグメントは、その `classify` のケース |
 | デコレータの宣言の、分類のケース（`case of Actor`、`case of Order`）の、`of` の後ろの名前 | `classify` の名前か、型の宣言。`case`、`of`、`any`、`never` の語は、宣言を持たないので `null` |
 | 引数名 | 引数 |
 | `match` のケース名 | `classify` のケース。標準の分類（`by list` / `by nullable`）のケース（`Empty` / `HasItems`、`None` / `Some`）と、`by` の後ろの `list` / `nullable` は宣言を持たないので `null`。アームの頭の `else` も、一つのケースを指さないので `null` |
