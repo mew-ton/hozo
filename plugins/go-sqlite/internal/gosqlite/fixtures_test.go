@@ -389,7 +389,7 @@ func baseFiles(t *testing.T, root string, views []*ir.View) map[string]string {
 	bin := basePlugin(t)
 	files := map[string]string{}
 	for _, v := range views {
-		req, err := json.Marshal(&plugin.EmitRequest{Protocol: ir.Version, Direction: "emit", Transpiler: v.Config.Base, View: v})
+		req, err := json.Marshal((&plugin.EmitRequest{Protocol: ir.Version, Direction: "emit", Transpiler: v.Config.Base, View: v}).Batch())
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -402,8 +402,8 @@ func baseFiles(t *testing.T, root string, views []*ir.View) map[string]string {
 		if err := cmd.Run(); err != nil {
 			t.Fatalf("基底 %s（%s）: %v\n%s%s", v.Config.Base, v.Viewer, err, stdout.String(), stderr.String())
 		}
-		var resp plugin.EmitResponse
-		if err := json.Unmarshal(stdout.Bytes(), &resp); err != nil {
+		resp, err := plugin.SingleResult(stdout.Bytes())
+		if err != nil {
 			t.Fatalf("基底 %s（%s）の応答を読めない: %v", v.Config.Base, v.Viewer, err)
 		}
 		for _, d := range resp.Errors {

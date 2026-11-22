@@ -655,7 +655,7 @@ func TestBrokenView(t *testing.T) {
 }
 
 // TestHandler は、プラグインの入口（Handler）: 要求の View から出力し、診断は応答の errors で返す
-// （docs/plugin-protocol.md「emit」）。check と import は持たない。
+// （docs/plugin-protocol.md「emit」）。import は持たない。
 func TestHandler(t *testing.T) {
 	view := loadViews(t, "routes")[1]
 	root := newRoot(t)
@@ -688,10 +688,6 @@ func TestHandler(t *testing.T) {
 	}
 	if _, err := h.Emit(&plugin.EmitRequest{Transpiler: TranspilerName}); err == nil {
 		t.Error("View のない要求で、エラーにならない")
-	}
-	// Check は、emit と同じ検査で答える（TestCheckMatchesEmit）。View のない要求は、誤り
-	if _, err := h.Check(&plugin.CheckRequest{}); err == nil || errors.Is(err, plugin.ErrUnsupported) {
-		t.Errorf("View のない Check の err = %v（期待は、unsupported でない誤り）", err)
 	}
 	if _, err := h.Import(&plugin.ImportRequest{}); err != plugin.ErrUnsupported {
 		t.Errorf("Import の err = %v, want ErrUnsupported", err)

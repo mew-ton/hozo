@@ -112,7 +112,7 @@ var runMu sync.Mutex
 // （docs/plugin-protocol.md「起動」）。dir はマニフェストのディレクトリ。
 //
 // 終了コードと返すエラー: 0 で JSON が読め、形が合えば nil。0 で JSON でない・形が違えば *MalformedOutputError
-// （形を確かめるのは、resp が *sdk.EmitResponse か *sdk.CheckResponse のとき。docs/plugin-protocol.md「応答の形」。shape.go）。
+// （形を確かめるのは、resp が *sdk.EmitBatchResponse か *sdk.CoverageResponse のとき。docs/plugin-protocol.md「応答の形」。shape.go）。
 // 2 で { "error": { "code": "protocol" | "unsupported" } } なら *PluginError。2 でそれ以外なら *MalformedOutputError。
 // ほかの終了コードと起動の失敗は *CrashedError。
 func (r Runner) Run(m *Manifest, dir string, req any, resp any) error {

@@ -45,12 +45,6 @@ func (h Handler) Emit(req *plugin.EmitRequest) (*plugin.EmitResponse, error) {
 	return &plugin.EmitResponse{Files: out.Files, Warnings: out.Warnings}, nil
 }
 
-// Check は、emit と同じ検査をして、emit が errors で返す誤りを、検査の段でも返す（docs/plugin-protocol.md「check」、
-// docs/decisions.md「決めたこと」404）。warning は、emit のときにだけ出る。
-func (h Handler) Check(req *plugin.CheckRequest) (*plugin.CheckResponse, error) {
-	return plugin.CheckByEmit(h, []string{TranspilerName}, req)
-}
-
 // Import は実装しない。
 func (Handler) Import(*plugin.ImportRequest) (*plugin.ImportResponse, error) {
 	return nil, plugin.ErrUnsupported

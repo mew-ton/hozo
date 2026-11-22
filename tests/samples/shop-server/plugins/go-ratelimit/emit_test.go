@@ -3,14 +3,12 @@ package main
 import (
 	"bytes"
 	"encoding/json"
-	"errors"
 	"flag"
 	"fmt"
 	"go/format"
 	"os"
 	"os/exec"
 	"path/filepath"
-	"reflect"
 	"sort"
 	"strings"
 	"sync"
@@ -305,7 +303,7 @@ func writeProject(t *testing.T, root, name string, files map[string]string) {
 	t.Helper()
 	bin := basePlugin(t)
 	for _, v := range loadViews(t, name) {
-		req, err := json.Marshal(&plugin.EmitRequest{Protocol: ir.Version, Direction: "emit", Transpiler: v.Config.Base, View: v})
+		req, err := json.Marshal((&plugin.EmitRequest{Protocol: ir.Version, Direction: "emit", Transpiler: v.Config.Base, View: v}).Batch())
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -318,8 +316,8 @@ func writeProject(t *testing.T, root, name string, files map[string]string) {
 		if err := cmd.Run(); err != nil {
 			t.Fatalf("基底 %s（%s）: %v\n%s%s", v.Config.Base, v.Viewer, err, stdout.String(), stderr.String())
 		}
-		var resp plugin.EmitResponse
-		if err := json.Unmarshal(stdout.Bytes(), &resp); err != nil {
+		resp, err := plugin.SingleResult(stdout.Bytes())
+		if err != nil {
 			t.Fatalf("基底 %s（%s）の応答を読めない: %v", v.Config.Base, v.Viewer, err)
 		}
 		if len(resp.Errors) > 0 {
@@ -444,7 +442,7 @@ func TestNoModule(t *testing.T) {
 }
 
 // TestHandler は、プラグインの入口（Handler）: 要求の View から出力する。ほかのトランスパイラの名前と、
-// check、import は unsupported。View の欠けた要求は、診断ではなく誤り。
+// import は unsupported。View の欠けた要求は、診断ではなく誤り。
 func TestHandler(t *testing.T) {
 	root := newRoot(t)
 	h := Handler{}
@@ -462,64 +460,11 @@ func TestHandler(t *testing.T) {
 	if _, err := h.Emit(other); err == nil {
 		t.Error("知らない transpiler で、エラーにならない")
 	}
-	// Check は、emit と同じ検査で答える（TestCheckMatchesEmit）。View のない要求は、誤り
-	if _, err := h.Check(&plugin.CheckRequest{}); err == nil || errors.Is(err, plugin.ErrUnsupported) {
-		t.Errorf("View のない Check の err = %v（期待は、unsupported でない誤り）", err)
-	}
 	if _, err := h.Import(&plugin.ImportRequest{}); err != plugin.ErrUnsupported {
 		t.Errorf("Import の err = %v, want ErrUnsupported", err)
 	}
 	if _, err := Emit(request(&ir.View{Version: ir.Version, Viewer: "shop", Config: view.Config})); err == nil {
 		t.Error("Program のない View で、誤りを返さない")
-	}
-}
-
-// TestCheckMatchesEmit は、direction "check" が、emit と同じ誤りを返すこと（docs/plugin-protocol.md「check」、
-// docs/decisions.md「決めたこと」404）: testdata のすべての入力の、このトランスパイラを並べた単位の View ごとに、
-// Check の diagnostics が、Emit の errors（severity は "error"）と、同じ並び。
-func TestCheckMatchesEmit(t *testing.T) {
-	entries, err := os.ReadDir("testdata")
-	if err != nil {
-		t.Fatal(err)
-	}
-	h := Handler{}
-	views, withErrors := 0, 0
-	for _, e := range entries {
-		if !e.IsDir() {
-			continue
-		}
-		for _, view := range loadViews(t, e.Name()) {
-			mine := false
-			for _, name := range view.Config.Transpilers {
-				mine = mine || name == TranspilerName
-			}
-			if !mine {
-				continue
-			}
-			views++
-			emit, emitErr := h.Emit(&plugin.EmitRequest{Protocol: ir.Version, Direction: "emit", Transpiler: TranspilerName, View: view})
-			check, checkErr := h.Check(&plugin.CheckRequest{Protocol: ir.Version, Direction: "check", View: view})
-			if emitErr != nil || checkErr != nil {
-				if (emitErr == nil) != (checkErr == nil) {
-					t.Errorf("%s（%s）: Emit の誤り = %v、Check の誤り = %v", e.Name(), view.Viewer, emitErr, checkErr)
-				}
-				continue
-			}
-			want := []plugin.Diagnostic{}
-			for _, d := range emit.Errors {
-				d.Severity = "error"
-				want = append(want, d)
-			}
-			if len(want) > 0 {
-				withErrors++
-			}
-			if !reflect.DeepEqual(check.Diagnostics, want) {
-				t.Errorf("%s（%s）: Check の diagnostics が、Emit の errors と違う\n got: %+v\nwant: %+v", e.Name(), view.Viewer, check.Diagnostics, want)
-			}
-		}
-	}
-	if views == 0 || withErrors == 0 {
-		t.Fatalf("確かめた View が %d、誤りを返した View が %d（どちらも、一つ以上のはず）", views, withErrors)
 	}
 }
 

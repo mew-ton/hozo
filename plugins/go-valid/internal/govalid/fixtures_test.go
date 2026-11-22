@@ -318,7 +318,7 @@ func baseFiles(t *testing.T, root string, views []*ir.View) map[string]string {
 	}
 	files := map[string]string{}
 	for _, v := range views {
-		req, err := json.Marshal(request(v, v.Config.Base))
+		req, err := json.Marshal(request(v, v.Config.Base).Batch())
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -331,8 +331,8 @@ func baseFiles(t *testing.T, root string, views []*ir.View) map[string]string {
 		if err := cmd.Run(); err != nil {
 			t.Fatalf("基底 go（%s）: %v\n%s", v.Viewer, err, stderr.String())
 		}
-		var resp plugin.EmitResponse
-		if err := json.Unmarshal(stdout.Bytes(), &resp); err != nil {
+		resp, err := plugin.SingleResult(stdout.Bytes())
+		if err != nil {
 			t.Fatalf("基底 go（%s）の応答を読めない: %v", v.Viewer, err)
 		}
 		for _, d := range resp.Errors {

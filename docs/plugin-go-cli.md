@@ -11,7 +11,7 @@
 ```toml
 name     = "go-cli"
 command  = ["go", "run", "github.com/mew-ton/hozo/plugins/go-cli"]
-protocol = "0.21"
+protocol = "0.22"
 
 vocabulary = ["cli.hozo"]
 
@@ -19,14 +19,9 @@ vocabulary = ["cli.hozo"]
 name     = "go-cli"
 language = "go"
 requires = ["go", "go-valid"]
-
-[check]
-enabled = true
 ```
 
-`[check]` は、`emit` が `errors` で返す誤りを、検査の段（`hozoc check`）でも返すためのもの（`docs/plugin-protocol.md`「check」）。
-
-- 提供するトランスパイラは `go-cli` の一つ（`hozo.toml` の `transpilers = ["go", "go-valid", "go-cli"]` で選ぶ）。要求の `transpiler` がそれ以外なら `code: "unsupported"`（`docs/plugin-protocol.md`「要求と応答」）。
+- 提供するトランスパイラは `go-cli` の一つ（`hozo.toml` の `transpilers = ["go", "go-valid", "go-cli"]` で選ぶ）。頼まれたトランスパイラがそれ以外なら `code: "unsupported"`（`docs/plugin-protocol.md`「要求と応答」）。
 - `cli` の語彙はこのプラグインが提供する（`docs/vocab.md`「同梱しない語彙」）。`plugins/go-cli/cli.hozo`（マニフェストの `vocabulary = ["cli.hozo"]` はマニフェストからの相対パス）の中身は「語彙」。
 - 読む語彙は、`cli` の `command` / `arg` / `flag` / `env` / `required` / `default` / `exitCode`（「語彙」）。`@proc.stdio` などのほかの語彙は読まない（基底が、付いた op を人が実装する葉として出す）。
 - `go-valid` に依存するのは、解釈した入力の制約を確かめるため（「引数の解釈」）。
@@ -101,7 +96,7 @@ type JSONPresenter struct{}
 - 同じフラグの名前（`@cli.flag` の引数。省いていれば、フィールドの名前）、同じ `@cli.command` の名前が二つあれば CLI-5。
 - 型についての決まり（CLI-3、CLI-4、CLI-11、CLI-13）は、書いたものの整合の検査で、出力を変えない（どの型でも、同じ補助の呼び出しになる。「コマンドごとの関数」）。
 
-CLI-* は emit の応答の `errors` で返し、同じものを、検査の段（direction `check`）でも返す（`docs/plugin-protocol.md`「emit」「check」）ので、どれも error の診断になる。
+CLI-* は emit の応答の `errors` で返す。検査だけの実行（`hozoc check`）も、同じ応答の診断を使う（`docs/plugin-protocol.md`「起動」「emit」）ので、どれも error の診断になる。
 
 ## 引数の解釈
 

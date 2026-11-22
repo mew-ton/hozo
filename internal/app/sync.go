@@ -94,13 +94,13 @@ func (s outputsSync) SyncOutputs(ctx context.Context, plan hozoc.EmitPlan) error
 // 設定から生成し直したものと一致しているか。生成したコードでは、状態の分類 OutputsSync の単位の問い合わせになり、判定関数
 // hozoc.ClassifyOutputsSync が呼ぶ。
 //
-// すべての出力について書き出す予定（[App.collect]。トランスパイラも起動する）を作り、ディスクと比べる。一致していると言うのは、
+// すべての出力について書き出す予定（[App.collect]。トランスパイラの答えから）を作り、ディスクと比べる。一致していると言うのは、
 // 書く予定のファイルがすべて同じ内容であり、.hozoc-outputs.json が今回の一覧と同じで（何も書かない出力にはなく）、
 // 前回書いて今回は書かないファイルが残っていないとき。emit を走らせても何も書かず何も消さない、ということ。
 // 仕様や設定に誤りがあって生成し直せなければ、その例外を返す（check / emit と同じもの）。
 //
-// 見るのは、直前の Check が解析した Project（同じ App で check か emit を走らせた後）。なければ、作業ディレクトリから
-// hozo.toml を探して解析する。直前の CollectOutputs の予定（a.planned）は、使わず、変えない。
+// 見るのは、直前の Check が解析した Project（同じ App で check か emit を走らせた後。プラグインの答えを含む）。なければ、
+// 作業ディレクトリから hozo.toml を探して解析し、プラグインに頼む。直前の CollectOutputs の予定（a.planned）は、使わず、変えない。
 func (s outputsSync) UpToDate(ctx context.Context) (bool, error) {
 	a := s.a
 	if err := ctx.Err(); err != nil {
@@ -109,7 +109,7 @@ func (s outputsSync) UpToDate(ctx context.Context) (bool, error) {
 	p := a.checked
 	if p == nil {
 		var err error
-		if p, err = a.load(); err != nil {
+		if p, err = a.load(true); err != nil {
 			return false, err
 		}
 	}

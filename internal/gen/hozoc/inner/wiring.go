@@ -4,14 +4,14 @@ package inner
 
 import "context"
 
-// WriteOutputs は検査を通った仕様から、出力ごとにトランスパイラを呼び、返ったファイルを書き出す。
+// WriteOutputs は検査がプラグインから受け取った答えの、出力ごとのファイルを書き出す。
 // 例外は、どれも書き出しを始める前に起きる（集めるのが先）。
 //
 // 引数:
 //   - in: コマンドの入力
 //   - checked: 検査の結果
 //
-// Throws: hozoc.CheckFailed, hozoc.OutputConflict, hozoc.UnknownNamespace, proc.Crashed, proc.MalformedOutput
+// Throws: hozoc.OutputConflict, hozoc.UnknownNamespace, proc.MalformedOutput
 // Reads: hozoc.outputs
 // Effects: hozoc.syncOutputs
 func (o *ops) WriteOutputs(ctx context.Context, in EmitInput, checked CheckResult) (EmitResult, error) {
@@ -29,7 +29,7 @@ func (o *ops) WriteOutputs(ctx context.Context, in EmitInput, checked CheckResul
 	return result, nil
 }
 
-// Emit は仕様を検査し、単位ごとにトランスパイラを呼んで、生成したファイルを書き出す。
+// Emit は仕様を検査し、プラグインから受け取ったファイルを書き出す。
 //
 // 引数:
 //   - in: コマンドの入力

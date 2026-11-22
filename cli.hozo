@@ -196,11 +196,12 @@ namespace hozoc {
   effect fn syncOutputs(plan: EmitPlan): effects OutputsSync as any -> UpToDate;
 
   /**
-   * 仕様を検査する。ファイルは書き出さない。
+   * 仕様を検査する。使うプラグインに、展開を頼み、その診断も集める。ファイルは書き出さない。
    *
    * @param in コマンドの入力
    * @throws LanguageMismatch 一つの単位のトランスパイラの language がそろっていない（docs/config.md の CFG-16）
-   * @throws proc.Crashed check を持つプラグインが異常終了した
+   * @throws CheckFailed 仕様に誤りがある、または、トランスパイラが errors を返した
+   * @throws proc.Crashed プラグインが異常終了した
    * @see emit
    */
   @cli.command("check")
@@ -209,21 +210,20 @@ namespace hozoc {
     throws proc.Crashed, proc.MalformedOutput;
 
   /**
-   * 検査を通った仕様から、出力ごとにトランスパイラを呼び、返ったファイルを集める。ファイルには触れない。
+   * 検査がプラグインから受け取った答えから、出力ごとのファイルを集める。プラグインは、起動しない。ファイルには触れない。
    *
    * @param in コマンドの入力
    * @param checked 検査の結果
-   * @throws CheckFailed トランスパイラが errors を返した
    * @throws OutputConflict 同じファイルに二つの出どころが書こうとした
    * @throws UnknownNamespace 引数の名前空間も、その子孫も、どの単位の対象でもない
-   * @throws proc.Crashed プラグインが異常終了した
+   * @throws proc.MalformedOutput トランスパイラの返したファイルのパスか、テストの対応表が、約束の形でない
    */
   fn collectOutputs(in: EmitInput, checked: CheckResult): EmitPlan
-    throws CheckFailed, OutputConflict, UnknownNamespace
-    throws proc.Crashed, proc.MalformedOutput;
+    throws OutputConflict, UnknownNamespace
+    throws proc.MalformedOutput;
 
   /**
-   * 検査を通った仕様から、出力ごとにトランスパイラを呼び、返ったファイルを書き出す。
+   * 検査がプラグインから受け取った答えの、出力ごとのファイルを書き出す。
    * 例外は、どれも書き出しを始める前に起きる（集めるのが先）。
    *
    * @param in コマンドの入力
@@ -231,8 +231,8 @@ namespace hozoc {
    */
   fn writeOutputs(in: EmitInput, checked: CheckResult): EmitResult
     effects syncOutputs
-    throws CheckFailed, OutputConflict, UnknownNamespace prevents effects
-    throws proc.Crashed, proc.MalformedOutput prevents effects
+    throws OutputConflict, UnknownNamespace prevents effects
+    throws proc.MalformedOutput prevents effects
   {
     val plan = collectOutputs(in, checked);
     val result = outputChanges(plan);
@@ -241,7 +241,7 @@ namespace hozoc {
   }
 
   /**
-   * 仕様を検査し、単位ごとにトランスパイラを呼んで、生成したファイルを書き出す。
+   * 仕様を検査し、プラグインから受け取ったファイルを書き出す。
    *
    * @param in コマンドの入力
    * @see check
@@ -256,19 +256,18 @@ namespace hozoc {
   }
 
   /**
-   * 検査を通った仕様から、テストの対応表を集め、カバレッジの「実行された行」と突き合わせる。ファイルは書き出さない。
+   * 検査がプラグインから受け取った答えから、テストの対応表を集め、カバレッジの「実行された行」と突き合わせる。ファイルは書き出さない。
    *
    * @param in コマンドの入力
    * @param checked 検査の結果
-   * @throws CheckFailed トランスパイラが errors を返した
    * @throws ConfigInvalid hozo.toml がない（docs/config.md の CFG-7）
    * @throws OutputConflict 同じファイルに二つの出どころが書こうとした
    * @throws TestsNotRun 求めるテストのうち、走ったと確かめられないものがある
    * @throws CoverageUnusable 置き場の出力が今の仕様からのものと違う、または、カバレッジを読めない
-   * @throws proc.Crashed プラグインが異常終了した
+   * @throws proc.Crashed カバレッジを読むプラグインが異常終了した
    */
   fn matchTests(in: TestsInput, checked: CheckResult): TestsResult
-    throws CheckFailed, ConfigInvalid, OutputConflict, TestsNotRun, CoverageUnusable
+    throws ConfigInvalid, OutputConflict, TestsNotRun, CoverageUnusable
     throws proc.Crashed, proc.MalformedOutput;
 
   /**
@@ -294,11 +293,17 @@ namespace hozoc {
   /** プラグインの起動のしかた（docs/plugin-protocol.md「起動」）。root は作業ディレクトリにするプロジェクトのルート、dir はマニフェストのディレクトリ */
   model Plugin { name: string; command: string[]; dir: Path; root: Path; }
 
-  /** IR（docs/ir.md「その名前空間から見た IR」）。中身はこの仕様では書かない */
-  model View {}
+  /** 仕様: IR の、出力に依らない部分（docs/ir.md「まとめた形」の Spec）。中身はこの仕様では書かない */
+  model Spec {}
 
-  /** 展開のときのプラグインへの入力（docs/plugin-protocol.md「emit」の要求）。transpiler は起動するトランスパイラの名前。単位のオプションは view の中にある */
-  model EmitRequest { protocol: string; direction: string; transpiler: string; view: View; }
+  /** IR の、出力ごとの部分（同 OutputView）。中身はこの仕様では書かない */
+  model OutputView {}
+
+  /** プラグインが受け持つ出力一つ（docs/plugin-protocol.md「emit」の要求の outputs の要素）。transpilers は、その出力で頼むトランスパイラの名前。単位のオプションは view の中にある */
+  model EmitOutput { transpilers: string[]; view: OutputView; }
+
+  /** 展開のときのプラグインへの入力（同「emit」の要求）。仕様を一度と、プラグインが受け持つ出力の並び */
+  model EmitRequest { protocol: string; direction: string; spec: Spec; outputs: EmitOutput[]; }
 
   /** トランスパイラの warning（同「emit」の応答の warnings の要素） */
   model PluginWarning { at: string; message: string; }
@@ -306,11 +311,17 @@ namespace hozoc {
   /** トランスパイラの error（同「emit」の応答の errors の要素） */
   model PluginError { code: string; at: string; message: string; }
 
-  /** 展開のときのプラグインからの出力（同「emit」の応答） */
-  model EmitResponse { files: OutputFile[]; warnings: PluginWarning[]; errors: PluginError[]; }
+  /** トランスパイラ一つの、出力一つへの答え（同「emit」の応答の results の要素） */
+  model TranspilerResult { files: OutputFile[]; warnings: PluginWarning[]; errors: PluginError[]; }
+
+  /** 出力一つへの答え（同「emit」の応答の outputs の要素）。results は、要求の、その出力の transpilers と同じ順 */
+  model OutputResult { results: TranspilerResult[]; }
+
+  /** 展開のときのプラグインからの出力（同「emit」の応答）。outputs は、要求の outputs と同じ順 */
+  model EmitResponse { outputs: OutputResult[]; }
 
   /**
-   * プラグインを一つ起動して、トランスパイラ一つに展開させる（docs/plugin-protocol.md「起動」）。
+   * プラグインを一つ起動して、受け持つ出力のすべてを、まとめて展開させる（docs/plugin-protocol.md「起動」）。
    *
    * @param plugin 起動するプラグイン
    * @param req プラグインへの入力

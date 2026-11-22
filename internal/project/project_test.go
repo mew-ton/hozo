@@ -2,15 +2,17 @@ package project
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
 	"testing"
 
 	"github.com/mew-ton/hozo/internal/diag"
+	"github.com/mew-ton/hozo/internal/fakeplugin"
+	hostplugin "github.com/mew-ton/hozo/internal/plugin"
 	"github.com/mew-ton/hozo/internal/source"
 )
 
@@ -27,12 +29,12 @@ func repoPlugins(t *testing.T) string {
 	return abs
 }
 
-// loadCorpus は dir のプロジェクトを、リポジトリの plugins/ を HOZO_PLUGIN_PATH にして解析する。プラグインの check は、起動しない:
+// loadCorpus は dir のプロジェクトを、リポジトリの plugins/ を HOZO_PLUGIN_PATH にして解析する。プラグインは、起動しない:
 // ここのテストが見るのは、読み込みと設定で、プラグインの起動（開発中のマニフェストの `go run`）は、写したコーパス（go.mod のない
-// 一時ディレクトリ）では、動かない。check の起動は、TestPluginCheck と TestPluginCheckPerOutput が、代役のプラグインで確かめる。
+// 一時ディレクトリ）では、動かない。プラグインの起動は、TestPluginAnswers と TestPluginAnswersPerOutput が、代役のプラグインで確かめる。
 func loadCorpus(t *testing.T, dir, configPath string, overlay map[string][]byte) *Project {
 	t.Helper()
-	return LoadWith(Options{Root: dir, ConfigPath: configPath, Overlay: overlay, PluginPath: repoPlugins(t), NoPluginChecks: true})
+	return LoadWith(Options{Root: dir, ConfigPath: configPath, Overlay: overlay, PluginPath: repoPlugins(t), NoPlugins: true})
 }
 
 // codes は診断のコードの列。
@@ -208,7 +210,7 @@ const pluginDirs = "[hozo]\nplugin_dirs = [\"plugins\"]\n\n"
 func TestUncoveredNamespace(t *testing.T) {
 	dir := t.TempDir()
 	write(t, filepath.Join(dir, "hozo.toml"), pluginDirs+unit("app", "gen/app"))
-	fakePlugin(t, dir, "t", "go", "", `{}`, 0)
+	fakePlugin(t, dir, "t", "go", "", okResult, 0)
 	write(t, filepath.Join(dir, "app.hozo"), "namespace app {\n  exception Busy;\n  export fn save(text: string): throws Busy;\n}\n")
 	write(t, filepath.Join(dir, "user.hozo"), "/** 利用者 */\nnamespace user {\n  state memo: nullable<string>;\n  fn write(text: string): throws app.Busy {\n    app.save(text);\n  }\n}\nfn globalOp();\n")
 	p := Load(dir, "", nil)
@@ -262,7 +264,7 @@ func TestOverlay(t *testing.T) {
 func TestExcludesOutAndPluginDirs(t *testing.T) {
 	dir := t.TempDir()
 	write(t, filepath.Join(dir, "hozo.toml"), pluginDirs+unit("a", "gen/a")+unit("a.b", "gen/b"))
-	fakePlugin(t, dir, "p", "go", "", `{}`, 0, "t")
+	fakePlugin(t, dir, "p", "go", "", okResult, 0, "t")
 	write(t, filepath.Join(dir, "spec", "a.hozo"), "namespace a {\n  fn f();\n  namespace b { fn g(); }\n}\n")
 	write(t, filepath.Join(dir, "gen", "a", "x.hozo"), "garbage")
 	write(t, filepath.Join(dir, "gen", "b", "deep", "x.hozo"), "garbage")
@@ -313,37 +315,82 @@ func TestMatchGlob(t *testing.T) {
 	}
 }
 
-// fakePlugin はシェルで動く小さなプラグインを plugins/<name> に置く。stdout は応答の JSON、exit は終了コード。
+// okResult は、何も返さない、トランスパイラ一つの答え。
+const okResult = `{"files":[],"warnings":[]}`
+
+// fakePlugin は、にせもののプラグイン（internal/fakeplugin）を plugins/<name> に置く。result は、トランスパイラ一つの、出力一つへの
+// 答えの JSON（@DIR@ と @NS@ は、その出力の Dir(U, N) と名前空間に置き換わる。にせものは、要求の出力とトランスパイラの組ごとに、
+// これを並べて、応答にする: docs/plugin-protocol.md「emit」）、exit は終了コード。
 // transpilers は提供するトランスパイラの名前（どれも言語は lang）。省けばプラグインと同じ名前の一つ。
-// extra はマニフェストに足す行（トップレベルのキーと、[check] などのテーブル）。
-func fakePlugin(t *testing.T, dir, name, lang, extra, stdout string, exit int, transpilers ...string) {
+// extra はマニフェストに足す行（トップレベルのキーと、テーブル）。
+func fakePlugin(t *testing.T, dir, name, lang, extra, result string, exit int, transpilers ...string) {
 	t.Helper()
-	if _, err := exec.LookPath("sh"); err != nil {
-		t.Skip("sh がない")
-	}
 	if len(transpilers) == 0 {
 		transpilers = []string{name}
 	}
-	script := "cat >/dev/null; printf '%s' '" + stdout + "'; exit " + string(rune('0'+exit))
-	manifest := "name = \"" + name + "\"\ncommand = [\"sh\", \"-c\", \"" + strings.ReplaceAll(script, `"`, `\"`) + "\"]\nprotocol = \"0.21\"\n" + extra
+	pluginDir := filepath.Join(dir, "plugins", name)
+	fakeplugin.Install(t, pluginDir, "")
+	write(t, filepath.Join(pluginDir, "response.json"), result)
+	write(t, filepath.Join(pluginDir, "exit"), string(rune('0'+exit)))
+	manifest := "name = \"" + name + "\"\ncommand = " + fakeplugin.CommandTOML + "\nprotocol = \"0.22\"\n" + extra
 	for _, tr := range transpilers {
 		manifest += "\n[[transpiler]]\nname = \"" + tr + "\"\nlanguage = \"" + lang + "\"\n"
 	}
-	write(t, filepath.Join(dir, "plugins", name, "hozo-plugin.toml"), manifest)
+	write(t, filepath.Join(pluginDir, "hozo-plugin.toml"), manifest)
 }
 
-// TestPluginCheck はプラグインの探索、使うプラグインの語彙の読み込み、[check] enabled の起動と診断の変換。
-func TestPluginCheck(t *testing.T) {
+// launches は、プラグイン name が、これまでに起動された回数。数えたら、記録を消す。
+func launches(t *testing.T, dir, name string) int {
+	t.Helper()
+	path := filepath.Join(dir, "plugins", name, "launches")
+	data, _ := os.ReadFile(path)
+	_ = os.Remove(path)
+	return strings.Count(string(data), "\n")
+}
+
+// asked は、プラグイン name が受け取った頼みごと（出力とトランスパイラの組ごとに一つ）を、`<名前空間>:<単位の番号>:<トランスパイラ>`
+// で、受け取った順に並べたもの。読んだら、記録を消す。
+func asked(t *testing.T, dir, name string) string {
+	t.Helper()
+	path := filepath.Join(dir, "plugins", name, "requests.jsonl")
+	data, _ := os.ReadFile(path)
+	_ = os.Remove(path)
+	var out []string
+	for _, line := range strings.Split(strings.TrimSpace(string(data)), "\n") {
+		if line == "" {
+			continue
+		}
+		var r struct {
+			Transpiler string `json:"transpiler"`
+			View       struct {
+				Viewer string `json:"viewer"`
+				Config struct {
+					Index int `json:"index"`
+				} `json:"config"`
+			} `json:"view"`
+		}
+		if err := json.Unmarshal([]byte(line), &r); err != nil {
+			t.Fatalf("%s: %v", path, err)
+		}
+		out = append(out, r.View.Viewer+":"+strconv.Itoa(r.View.Config.Index)+":"+r.Transpiler)
+	}
+	return strings.Join(out, ",")
+}
+
+// TestPluginAnswers はプラグインの探索、使うプラグインの語彙の読み込み、プラグインへの頼みごと（direction "emit"）と、その答えと
+// 診断（docs/cli.md「check」の 4、docs/plugin-protocol.md「起動」「emit」）: errors は error の診断、warnings は PLUGIN の warning。
+// 答え（files を含む）は、Project.Answers に残る。
+func TestPluginAnswers(t *testing.T) {
 	dir := t.TempDir()
 	write(t, filepath.Join(dir, "server.hozo"), "namespace server {\n  model M { id: string; }\n  /** 注文する */\n  fn placeOrder(m: M);\n}\n")
 	write(t, filepath.Join(dir, "browser.hozo"), "namespace browser {\n  fn open();\n}\n")
-	fakePlugin(t, dir, "pick", "go", "", `{}`, 0)
+	fakePlugin(t, dir, "pick", "go", "", `{"files":[{"path":"@DIR@/pick.txt","content":"@NS@"}],"warnings":[]}`, 0)
 	config := func(serverTranspilers ...string) string {
 		return pluginDirs + unit("server", "gen/server", serverTranspilers...) + unit("browser", "gen/browser", "pick")
 	}
 	write(t, filepath.Join(dir, "hozo.toml"), config("chk"))
-	resp := `{"diagnostics":[{"severity":"warning","code":"CHK-1","at":"server.placeOrder","message":"by fqn"},{"severity":"error","code":"CHK-2","at":"server.hozo:3:5","message":"by pos"},{"severity":"error","code":"CHK-3","at":"nowhere","message":"unknown"}]}`
-	fakePlugin(t, dir, "chk", "go", "vocabulary = [\"v.hozo\"]\n\n[check]\nenabled = true\n", resp, 0)
+	resp := `{"files":[],"warnings":[{"at":"server.placeOrder","message":"by fqn"}],"errors":[{"code":"CHK-2","at":"server.hozo:3:5","message":"by pos"},{"severity":"warning","code":"CHK-3","at":"nowhere","message":"unknown"}]}`
+	fakePlugin(t, dir, "chk", "go", "vocabulary = [\"v.hozo\"]\n", resp, 0)
 	write(t, filepath.Join(dir, "plugins", "chk", "v.hozo"), "/** 語彙 */\nnamespace chk {\n  decorator fn mark();\n}\n")
 	// hozoc 自身の warning（NAME-1）を一つ足し、プラグインの診断と一緒に出ることを確かめる
 	write(t, filepath.Join(dir, "extra.hozo"), "namespace server {\n  model lowerName { id: string; }\n}\n")
@@ -356,7 +403,7 @@ func TestPluginCheck(t *testing.T) {
 		return false
 	}
 
-	p := Load(dir, "", nil)
+	p := LoadWith(Options{Root: dir})
 	if p.RunErr != nil {
 		t.Fatalf("RunErr = %v", p.RunErr)
 	}
@@ -366,14 +413,27 @@ func TestPluginCheck(t *testing.T) {
 	}
 	got := text(p)
 	for _, want := range []string{
-		"server.hozo:4:3: warning[CHK-1]: by fqn", // FQN → 宣言の位置
-		"server.hozo:3:5: error[CHK-2]: by pos",   // file:line:col
-		"hozoc: error[CHK-3]: unknown",            // 位置なし
-		"extra.hozo:2:9: warning[NAME-1]",         // hozoc の診断と一緒に並ぶ
+		"server.hozo:4:3: warning[PLUGIN]: chk: by fqn", // warnings は PLUGIN の warning（トランスパイラの名前を付ける）。FQN → 宣言の位置
+		"server.hozo:3:5: error[CHK-2]: by pos",         // errors は error。file:line:col
+		"hozoc: error[CHK-3]: unknown",                  // 位置なし。errors の severity は、読まない（いつも error）
+		"extra.hozo:2:9: warning[NAME-1]",               // hozoc の診断と一緒に並ぶ
 	} {
 		if !strings.Contains(got, want) {
 			t.Errorf("want %q in:\n%s", want, got)
 		}
+	}
+	// 答えは、単位の設定の順（server の chk、browser の pick）。files も、残る（書き出す実行が、使う）
+	if len(p.Answers) != 2 || p.Answers[0].Transpiler.Name != "chk" || p.Answers[0].Namespace != "server" || p.Answers[1].Unit != 1 {
+		t.Fatalf("Answers = %+v", p.Answers)
+	}
+	if r := p.Answer(1, "browser", "pick"); r == nil || len(r.Files) != 1 || r.Files[0].Path != "gen/browser/pick.txt" || r.Files[0].Content != "browser" {
+		t.Errorf("browser の pick の答え = %+v", r)
+	}
+	if r := p.Answer(0, "server", "chk"); r == nil || len(r.Errors) != 2 || p.Answer(0, "server", "pick") != nil || p.Answer(1, "server", "chk") != nil {
+		t.Errorf("server の chk の答え = %+v", r)
+	}
+	if a, b := launches(t, dir, "chk"), launches(t, dir, "pick"); a != 1 || b != 1 {
+		t.Errorf("起動: chk %d 回、pick %d 回（want 1、1）", a, b)
 	}
 	if !hasFile(p, "hozo:plugin/chk/v.hozo") {
 		t.Error("使うプラグインの語彙 hozo:plugin/chk/v.hozo が読まれていない")
@@ -383,104 +443,133 @@ func TestPluginCheck(t *testing.T) {
 		t.Errorf("Units[1].Files = %v", files)
 	}
 
-	// check は、プラグインと出力の組ごとに一回（TestPluginCheckPerOutput）。同じ名前空間の単位が二つあって、同じ診断が、二度
-	// 返っても、報告は一度だけ（docs/plugin-protocol.md「check」）
+	// 同じ名前空間の単位が二つあって、同じ診断が、出力ごとに返っても、報告は一度だけ（docs/plugin-protocol.md「emit」）。
+	// 起動は、一回（TestPluginAnswersPerOutput）で、答えは、出力ごとに、残る
 	write(t, filepath.Join(dir, "hozo.toml"), config("chk")+unit("server", "gen/server2", "chk"))
-	p = Load(dir, "", nil)
-	if n := strings.Count(text(p), "warning[CHK-1]"); n != 1 {
-		t.Errorf("CHK-1 が %d 回出た（want 1）:\n%s", n, text(p))
+	p = LoadWith(Options{Root: dir})
+	for _, code := range []string{"warning[PLUGIN]", "error[CHK-2]", "error[CHK-3]"} {
+		if n := strings.Count(text(p), code); n != 1 {
+			t.Errorf("%s が %d 回出た（want 1）:\n%s", code, n, text(p))
+		}
 	}
+	if len(p.Answers) != 3 || p.Answer(2, "server", "chk") == nil || launches(t, dir, "chk") != 1 {
+		t.Errorf("Answers = %d 個（want 3）", len(p.Answers))
+	}
+	launches(t, dir, "pick")
 
-	// 入っているだけのプラグイン（どの単位もそのトランスパイラを書いていない）: 語彙を読まず、check も呼ばない
+	// 入っているだけのプラグイン（どの単位もそのトランスパイラを書いていない）: 語彙を読まず、起動もしない
 	write(t, filepath.Join(dir, "hozo.toml"), config("pick"))
-	p = Load(dir, "", nil)
-	if hasFile(p, "hozo:plugin/chk/v.hozo") || strings.Contains(text(p), "CHK-") || p.Errors() != 0 {
-		t.Errorf("使っていないプラグインの語彙か check が効いている:\n%s", text(p))
+	p = LoadWith(Options{Root: dir})
+	if hasFile(p, "hozo:plugin/chk/v.hozo") || strings.Contains(text(p), "CHK-") || p.Errors() != 0 || launches(t, dir, "chk") != 0 {
+		t.Errorf("使っていないプラグインの語彙か、答えが効いている:\n%s", text(p))
 	}
 	if len(p.Plugins) != 2 {
 		t.Errorf("Plugins = %d, want 2（入っているプラグインは探す）", len(p.Plugins))
 	}
+	// pick は、server と browser の二つの出力を受け持つが、起動は一回
+	if n := launches(t, dir, "pick"); n != 1 || len(p.Answers) != 2 {
+		t.Errorf("pick の起動 %d 回、Answers %d 個（want 1、2）", n, len(p.Answers))
+	}
+
+	// Load（短い形）は、プラグインを起動しない
+	if p = Load(dir, "", nil); launches(t, dir, "pick") != 0 || len(p.Answers) != 0 || p.RunErr != nil {
+		t.Errorf("Load が、プラグインを起動した（Answers %d 個、RunErr %v）", len(p.Answers), p.RunErr)
+	}
 
 	// 異常終了は RunErr
 	write(t, filepath.Join(dir, "hozo.toml"), config("chk"))
-	fakePlugin(t, dir, "chk", "go", "[check]\nenabled = true\n", "", 3)
-	p = Load(dir, "", nil)
-	if p.RunErr == nil {
-		t.Fatal("RunErr = nil, want proc.Crashed")
+	fakePlugin(t, dir, "chk", "go", "", "", 3)
+	p = LoadWith(Options{Root: dir})
+	if !errors.Is(p.RunErr, hostplugin.ErrCrashed) {
+		t.Fatalf("RunErr = %v, want proc.Crashed", p.RunErr)
+	}
+	// 応答の数が、要求と合わないのは、形の誤り（proc.MalformedOutput。docs/plugin-protocol.md「応答の形」）
+	fakePlugin(t, dir, "chk", "go", "", okResult, 0)
+	for raw, want := range map[string]string{
+		`{"outputs":[]}`:               "応答の outputs が 0 個（要求の outputs は 1 個）",
+		`{"outputs":[{"results":[]}]}`: "outputs[0].results が 0 個",
+		`{"outputs":[{"results":[` + okResult + `,` + okResult + `]}]}`: "outputs[0].results が 2 個",
+		`{"files":[],"warnings":[]}`:                                    "outputs がない",
+	} {
+		write(t, filepath.Join(dir, "plugins", "chk", "raw-response"), raw)
+		p = LoadWith(Options{Root: dir})
+		if !errors.Is(p.RunErr, hostplugin.ErrMalformedOutput) || !strings.Contains(p.RunErr.Error(), want) {
+			t.Errorf("応答 %s: RunErr = %v, want proc.MalformedOutput（%s）", raw, p.RunErr, want)
+		}
+	}
+	// 終了コード 2 の unsupported は MAN-5 の診断（RunErr ではない）。ほかのプラグインは、起動する
+	write(t, filepath.Join(dir, "plugins", "chk", "raw-response"), `{"error":{"code":"unsupported","message":"no such transpiler"}}`)
+	write(t, filepath.Join(dir, "plugins", "chk", "exit"), "2")
+	launches(t, dir, "pick")
+	p = LoadWith(Options{Root: dir})
+	if p.RunErr != nil || !strings.Contains(text(p), "error[MAN-5]") || launches(t, dir, "pick") != 1 || p.Answer(1, "browser", "pick") == nil || p.Answer(0, "server", "chk") != nil {
+		t.Errorf("unsupported: RunErr = %v\n%s", p.RunErr, text(p))
 	}
 }
 
-// TestPluginCheckPerOutput は、プラグインの check の、相手と回数（docs/plugin-protocol.md「起動」「check」）:
-// プラグインと、出力（単位と名前空間の組）の組ごとに一回で、渡す view は、その出力のもの。仕様の検査に error があれば、起動しない。
-// Options.NoPluginChecks でも、起動しない。
-func TestPluginCheckPerOutput(t *testing.T) {
-	if _, err := exec.LookPath("sh"); err != nil {
-		t.Skip("sh がない")
-	}
+// TestPluginAnswersPerOutput は、プラグインへの頼みごとの、相手と回数（docs/plugin-protocol.md「起動」）: プラグインごとに一回で、
+// 一つの要求に、そのプラグインが受け持つ出力（単位と名前空間の組）を、単位の設定の順に並べ、出力ごとに、頼むトランスパイラ
+// （その単位の transpilers のうち、そのプラグインのもの）を並べる。仕様の検査に error があれば、起動しない。
+// Options.NoPlugins でも、起動しない。
+func TestPluginAnswersPerOutput(t *testing.T) {
 	dir := t.TempDir()
 	write(t, filepath.Join(dir, "a.hozo"), "namespace a {\n  fn f();\n}\nnamespace b {\n  fn g();\n}\n")
-	// 呼ばれるたびに、要求の view の viewer と、単位の番号（view.config.index）を、ルートの calls に一行書く
-	script := filepath.Join(dir, "plugins", "chk", "run.sh")
-	write(t, script, `sed -n 's/.*"viewer":"\([a-z]*\)","config":{"index":\([0-9]*\).*/\1 \2/p' >> calls
-echo >> calls
-printf '{"diagnostics":[]}'
-`)
-	m := "name = \"chk\"\ncommand = [\"sh\", " + strconv.Quote(script) + "]\nprotocol = \"0.21\"\n\n[check]\nenabled = true\n" +
+	fakePlugin(t, dir, "chk", "go", "", `{"files":[{"path":"@DIR@/@T@.txt","content":"@NS@"}],"warnings":[]}`, 0)
+	m := "name = \"chk\"\ncommand = " + fakeplugin.CommandTOML + "\nprotocol = \"0.22\"\n" +
 		"\n[[transpiler]]\nname = \"chk\"\nlanguage = \"go\"\n\n[[transpiler]]\nname = \"chk2\"\nlanguage = \"go\"\nrequires = [\"chk\"]\n"
 	write(t, filepath.Join(dir, "plugins", "chk", "hozo-plugin.toml"), m)
-	calls := func() string {
-		data, err := os.ReadFile(filepath.Join(dir, "calls"))
-		if err != nil {
-			return ""
-		}
-		_ = os.Remove(filepath.Join(dir, "calls"))
-		return strings.Join(strings.Fields(strings.ReplaceAll(string(data), " ", ":")), ",")
-	}
 
 	// 単位は三つ: a を二つの単位に（一つは、同じプラグインのトランスパイラを二つ並べる）、b を一つに
 	write(t, filepath.Join(dir, "hozo.toml"), pluginDirs+unit("a", "gen/a1", "chk", "chk2")+unit("a", "gen/a2", "chk")+unit("b", "gen/b", "chk"))
-	p := Load(dir, "", nil)
+	p := LoadWith(Options{Root: dir})
 	if p.RunErr != nil || p.Errors() != 0 {
 		t.Fatalf("RunErr = %v\n%s", p.RunErr, text(p))
 	}
-	if got, want := calls(), "a:1,a:2,b:3"; got != want {
-		t.Errorf("check の呼び出し = %q（期待は %q: 出力ごとに一回。同じプラグインの二つのトランスパイラを並べた単位でも、一回）", got, want)
+	if n := launches(t, dir, "chk"); n != 1 {
+		t.Errorf("起動が %d 回（want 1: 三つの出力を、一つの要求に並べる）", n)
+	}
+	if got, want := asked(t, dir, "chk"), "a:1:chk,a:1:chk2,a:2:chk,b:3:chk"; got != want {
+		t.Errorf("頼みごと = %q（期待は %q: 出力ごとに、その単位の、このプラグインのトランスパイラ）", got, want)
+	}
+	// 答えは、頼んだ並びで、出力とトランスパイラに結ばれる
+	var answers []string
+	for _, a := range p.Answers {
+		answers = append(answers, a.Response.Files[0].Path)
+	}
+	if got, want := strings.Join(answers, ","), "gen/a1/chk.txt,gen/a1/chk2.txt,gen/a2/chk.txt,gen/b/chk.txt"; got != want {
+		t.Errorf("Answers = %q, want %q", got, want)
+	}
+	// 要求は、仕様を一度だけ持つ: いちばん上の spec に program、出力の view には、ない
+	raw, err := os.ReadFile(filepath.Join(dir, "plugins", "chk", "raw.jsonl"))
+	if err != nil || strings.Count(string(raw), `"program":`) != 1 || strings.Count(string(raw), `"viewer":`) != 3 {
+		t.Errorf("要求が、仕様を一度、出力を三つ、持っていない (%v)", err)
 	}
 
-	// NoPluginChecks: 起動しない
-	p = LoadWith(Options{Root: dir, NoPluginChecks: true})
-	if got := calls(); got != "" || p.Errors() != 0 {
-		t.Errorf("NoPluginChecks なのに、check を呼んだ: %q\n%s", got, text(p))
+	// NoPlugins: 起動しない
+	p = LoadWith(Options{Root: dir, NoPlugins: true})
+	if n := launches(t, dir, "chk"); n != 0 || p.Errors() != 0 || len(p.Answers) != 0 {
+		t.Errorf("NoPlugins なのに、起動した: %d 回\n%s", n, text(p))
 	}
 
-	// 仕様の検査に error があれば、起動しない（warning だけなら、起動する: TestPluginCheck）
+	// 仕様の検査に error があれば、起動しない（warning だけなら、起動する: TestPluginAnswers）
 	write(t, filepath.Join(dir, "bad.hozo"), "namespace a {\n  fn h(): Missing;\n}\n")
-	p = Load(dir, "", nil)
-	if got := calls(); got != "" || p.Errors() == 0 || p.RunErr != nil {
-		t.Errorf("仕様に error があるのに、check を呼んだ: %q（errors = %d, RunErr = %v）", got, p.Errors(), p.RunErr)
+	p = LoadWith(Options{Root: dir})
+	if n := launches(t, dir, "chk"); n != 0 || p.Errors() == 0 || p.RunErr != nil {
+		t.Errorf("仕様に error があるのに、起動した: %d 回（errors = %d, RunErr = %v）", n, p.Errors(), p.RunErr)
 	}
 }
 
-// TestPluginCheckContext は、Options.Context で、プラグインの check を、やめさせられること（言語サーバーの、裏の check。
+// TestPluginContext は、Options.Context で、プラグインの起動を、やめさせられること（言語サーバーの、裏の check。
 // docs/lsp.md「プラグインの診断」）: やめるのは、プラグインの起動と起動の間。やめたら、RunErr が、その誤りで、そこまでの
 // プラグインは、起動している。はじめから、やめてあれば、一つも、起動しない。Context が nil なら、やめさせない。
-func TestPluginCheckContext(t *testing.T) {
-	if _, err := exec.LookPath("sh"); err != nil {
-		t.Skip("sh がない")
-	}
+func TestPluginContext(t *testing.T) {
 	dir := t.TempDir()
 	write(t, filepath.Join(dir, "a.hozo"), "namespace a {\n  fn f();\n}\nnamespace b {\n  fn g();\n}\n")
-	script := filepath.Join(dir, "plugins", "chk", "run.sh")
-	// 呼ばれるたびに、ルートの calls に一行書く
-	write(t, script, "cat >/dev/null\necho x >> calls\nprintf '{\"diagnostics\":[]}'\n")
-	write(t, filepath.Join(dir, "plugins", "chk", "hozo-plugin.toml"),
-		"name = \"chk\"\ncommand = [\"sh\", "+strconv.Quote(script)+"]\nprotocol = \"0.21\"\n\n[check]\nenabled = true\n\n[[transpiler]]\nname = \"chk\"\nlanguage = \"go\"\n")
-	write(t, filepath.Join(dir, "hozo.toml"), pluginDirs+unit("a", "gen/a", "chk")+unit("b", "gen/b", "chk"))
-	calls := func() int {
-		data, _ := os.ReadFile(filepath.Join(dir, "calls"))
-		_ = os.Remove(filepath.Join(dir, "calls"))
-		return strings.Count(string(data), "x")
-	}
+	// プラグインは二つ（起動は、プラグインごとに一回）: 単位 a の one、単位 b の two
+	fakePlugin(t, dir, "one", "go", "", okResult, 0)
+	fakePlugin(t, dir, "two", "go", "", okResult, 0)
+	write(t, filepath.Join(dir, "hozo.toml"), pluginDirs+unit("a", "gen/a", "one")+unit("b", "gen/b", "two"))
+	calls := func() int { return launches(t, dir, "one") + launches(t, dir, "two") }
 
 	// はじめから、やめてある: 一つも、起動しない
 	ctx, cancel := context.WithCancel(context.Background())
@@ -496,7 +585,7 @@ func TestPluginCheckContext(t *testing.T) {
 	// 一つ目の起動の後で、やめる: 二つ目は、起動しない
 	ctx, cancel = context.WithCancel(context.Background())
 	defer cancel()
-	p = LoadWith(Options{Root: dir, Context: &cancelAfterFirst{Context: ctx, cancel: cancel, calls: filepath.Join(dir, "calls")}})
+	p = LoadWith(Options{Root: dir, Context: &cancelAfterFirst{Context: ctx, cancel: cancel, calls: filepath.Join(dir, "plugins", "one", "launches")}})
 	if n := calls(); n != 1 || !errors.Is(p.RunErr, context.Canceled) {
 		t.Errorf("一つ目の後で、やめたのに: 起動 %d 回、RunErr = %v（期待は、1 回と context.Canceled）", n, p.RunErr)
 	}
@@ -526,7 +615,7 @@ func (c *cancelAfterFirst) Err() error {
 // （name と language のほかの行: requires、seams など）を、トランスパイラの名前 → 行で。
 func manifest(t *testing.T, dir, name string, transpilers ...[2]string) {
 	t.Helper()
-	m := "name = \"" + name + "\"\ncommand = \"true\"\nprotocol = \"0.21\"\n"
+	m := "name = \"" + name + "\"\ncommand = \"true\"\nprotocol = \"0.22\"\n"
 	for _, tr := range transpilers {
 		lang := "go"
 		if strings.HasPrefix(tr[0], "ts") {
@@ -738,7 +827,7 @@ func TestHomes(t *testing.T) {
 func TestDiscoveryEnvironmentComesFromCaller(t *testing.T) {
 	dir := t.TempDir()
 	write(t, filepath.Join(dir, "a.hozo"), "namespace a {\n  fn f();\n}\n")
-	fakePlugin(t, dir, "t", "go", "", `{}`, 0)
+	fakePlugin(t, dir, "t", "go", "", okResult, 0)
 	write(t, filepath.Join(dir, "hozo.toml"), pluginDirs+unit("a", "gen/a"))
 
 	// プロセスの環境に、壊れたマニフェストのあるディレクトリを向ける。読めば MAN-4 が出る
@@ -761,7 +850,7 @@ func TestDiscoveryEnvironmentComesFromCaller(t *testing.T) {
 	envDir, home := t.TempDir(), t.TempDir()
 	// env-t と home-t は、基底 t に相乗りする（一つの単位は、基底をちょうど一つ持つ）
 	manifest := func(name, transpiler string) string {
-		return "name = \"" + name + "\"\ncommand = \"true\"\nprotocol = \"0.21\"\n\n[[transpiler]]\nname = \"" + transpiler + "\"\nlanguage = \"go\"\nrequires = [\"t\"]\n"
+		return "name = \"" + name + "\"\ncommand = \"true\"\nprotocol = \"0.22\"\n\n[[transpiler]]\nname = \"" + transpiler + "\"\nlanguage = \"go\"\nrequires = [\"t\"]\n"
 	}
 	write(t, filepath.Join(envDir, "from-env", "hozo-plugin.toml"), manifest("from-env", "env-t"))
 	write(t, filepath.Join(envDir, "t", "hozo-plugin.toml"), "name = \n") // plugin_dirs の t が先なので読まない
@@ -793,7 +882,7 @@ func TestDiscoveryEnvironmentComesFromCaller(t *testing.T) {
 func TestManifestDiagnosticsOfInstalledPlugins(t *testing.T) {
 	dir := t.TempDir()
 	write(t, filepath.Join(dir, "a.hozo"), "namespace a {\n  fn f();\n}\n")
-	fakePlugin(t, dir, "t", "go", "", `{}`, 0)
+	fakePlugin(t, dir, "t", "go", "", okResult, 0)
 	write(t, filepath.Join(dir, "plugins", "old", "hozo-plugin.toml"), "name = \"old\"\ncommand = \"old\"\nprotocol = \"0.1\"\n\n[[transpiler]]\nname = \"old\"\nlanguage = \"go\"\n")
 	write(t, filepath.Join(dir, "hozo.toml"), pluginDirs+unit("a", "gen/a"))
 	// 古いプラグインは入っているだけなら何も言わない
@@ -810,7 +899,7 @@ func TestManifestDiagnosticsOfInstalledPlugins(t *testing.T) {
 	// 読めないマニフェストと name の違うマニフェストは、使っていなくても報告する
 	write(t, filepath.Join(dir, "hozo.toml"), pluginDirs+unit("a", "gen/a"))
 	write(t, filepath.Join(dir, "plugins", "broken", "hozo-plugin.toml"), "name = \n")
-	write(t, filepath.Join(dir, "plugins", "renamed", "hozo-plugin.toml"), "name = \"other\"\ncommand = \"x\"\nprotocol = \"0.21\"\n")
+	write(t, filepath.Join(dir, "plugins", "renamed", "hozo-plugin.toml"), "name = \"other\"\ncommand = \"x\"\nprotocol = \"0.22\"\n")
 	p = Load(dir, "", nil)
 	if got := strings.Join(codes(p.Diags), ","); got != "MAN-4,MAN-3" {
 		t.Fatalf("codes = %v, want [MAN-4 MAN-3]\n%s", got, text(p))
@@ -821,7 +910,7 @@ func TestManifestDiagnosticsOfInstalledPlugins(t *testing.T) {
 // in に合うファイルに宣言を持たない名前空間は、その単位では出力しない。どのファイルにも合わなければ CFG-18。
 func TestUnitIn(t *testing.T) {
 	dir := t.TempDir()
-	fakePlugin(t, dir, "t", "go", "", `{}`, 0)
+	fakePlugin(t, dir, "t", "go", "", okResult, 0)
 	write(t, filepath.Join(dir, "shop", "api.hozo"), "namespace shop {\n  model Item { id: string; }\n  fn open(item: Item);\n}\n")
 	// batch.hozo は同じ名前空間 shop の続きと、子の名前空間 shop.jobs。検査は in によらず全体に掛かる（Item を参照できる）
 	write(t, filepath.Join(dir, "shop", "batch.hozo"), "namespace shop {\n  fn nightly(item: Item);\n}\nnamespace shop.jobs {\n  fn sweep();\n}\n")
@@ -892,7 +981,7 @@ func userFiles(files []string) string {
 func TestUnsupported(t *testing.T) {
 	dir := t.TempDir()
 	write(t, filepath.Join(dir, "plugins", "t", "hozo-plugin.toml"),
-		"name = \"t\"\ncommand = \"true\"\nprotocol = \"0.21\"\n\n[[transpiler]]\nname = \"t\"\nlanguage = \"go\"\nunsupported = [\"a.legacy\"]\n\n[[transpiler]]\nname = \"u\"\nlanguage = \"go\"\n")
+		"name = \"t\"\ncommand = \"true\"\nprotocol = \"0.22\"\n\n[[transpiler]]\nname = \"t\"\nlanguage = \"go\"\nunsupported = [\"a.legacy\"]\n\n[[transpiler]]\nname = \"u\"\nlanguage = \"go\"\n")
 	write(t, filepath.Join(dir, "a.hozo"), "namespace a {\n  decorator fn legacy();\n  @legacy fn f();\n}\n")
 	write(t, filepath.Join(dir, "b.hozo"), "namespace a {\n  @legacy fn g();\n}\n")
 	count := func(units string) int {

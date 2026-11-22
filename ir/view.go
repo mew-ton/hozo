@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"sort"
+	"strings"
 )
 
 // View はその名前空間から見た IR（docs/ir.md「その名前空間から見た IR」の View）。
@@ -304,3 +305,105 @@ func (s EntryStep) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON は docs/ir.md「JSON」の形を読む。
 func (s *EntryStep) UnmarshalJSON(data []byte) error { return unmarshalStruct(data, s) }
+
+// Spec は、View の、出力に依らない部分（docs/ir.md「まとめた形」の Spec）。プラグインへの要求に、一度だけ入る
+// （docs/plugin-protocol.md「emit」）。
+type Spec struct {
+	// Version は IR の版（View.Version）。空なら JSON には [Version] を書く。
+	Version string `json:"version"`
+	// Namespaces は View.Namespaces。
+	Namespaces map[string][]NamespaceConfig `json:"namespaces"`
+	// Program は全体そのまま。合成した model（ViewedSignature.Params）は、含まない。
+	Program *Program `json:"program"`
+}
+
+// OutputView は、View の、出力（単位と名前空間の組）ごとの部分（docs/ir.md「まとめた形」の OutputView）。
+type OutputView struct {
+	// Viewer、Config、Files は、View の同じ名前のもの。
+	Viewer string          `json:"viewer"`
+	Config NamespaceConfig `json:"config"`
+	Files  []string        `json:"files"`
+	// Synthesized は、Ops の Params が合成した model（親を先に）。View.Program では、viewer の Namespace.Decls の末尾にある。
+	Synthesized []Decl `json:"synthesized"`
+	// Entries と Ops は、View の同じ名前のもの。
+	Entries []Entry                     `json:"entries"`
+	Ops     map[string]*ViewedSignature `json:"ops"`
+}
+
+// MarshalJSON は docs/ir.md「JSON」の形で書く。Version が空なら [Version] を書く。
+func (s Spec) MarshalJSON() ([]byte, error) {
+	if s.Version == "" {
+		s.Version = Version
+	}
+	type alias Spec
+	return marshalStruct(alias(s))
+}
+
+// UnmarshalJSON は docs/ir.md「JSON」の形を読む。版の照合はしない。
+func (s *Spec) UnmarshalJSON(data []byte) error { return unmarshalStruct(data, s) }
+
+// MarshalJSON は docs/ir.md「JSON」の形で書く。ops のキーは FQN の辞書順（encoding/json は、写像のキーを辞書順に書く）。
+func (o OutputView) MarshalJSON() ([]byte, error) {
+	type alias OutputView
+	return marshalStruct(alias(o))
+}
+
+// UnmarshalJSON は docs/ir.md「JSON」の形を読む。
+func (o *OutputView) UnmarshalJSON(data []byte) error { return unmarshalStruct(data, o) }
+
+// Split は、View v を、出力に依らない部分と、出力ごとの部分に分ける（docs/ir.md「まとめた形」）。Synthesized は、viewer の
+// Namespace.Decls の末尾に並ぶ、ops の params が合成した model（FQN が `<viewer>.<op 名>$<パス>`）で、Spec の Program は、それを除いたもの
+// （v.Program は、変えない）。同じ仕様の View の Spec は、どれも、同じ中身になる。
+func (v *View) Split() (*Spec, *OutputView) {
+	spec := &Spec{Version: v.Version, Namespaces: v.Namespaces, Program: v.Program}
+	out := &OutputView{Viewer: v.Viewer, Config: v.Config, Files: v.Files, Synthesized: []Decl{}, Entries: v.Entries, Ops: v.Ops}
+	if v.Program == nil {
+		return spec, out
+	}
+	for i := range v.Program.Namespaces {
+		ns := &v.Program.Namespaces[i]
+		if ns.Name != v.Viewer {
+			continue
+		}
+		n := len(ns.Decls)
+		for n > 0 {
+			// ops の params が合成した model の FQN は、`<viewer>.<op 名>$<パス>`（docs/ir.md「その名前空間から見た IR」）。
+			// その場で書いた model（SynthesizedFrom を持つが、名前に `$` がない）は、仕様のもの
+			m, isModel := ns.Decls[n-1].(*Model)
+			if !isModel || m.SynthesizedFrom == "" || !strings.Contains(m.Name, "$") {
+				break
+			}
+			n--
+		}
+		if n == len(ns.Decls) {
+			break
+		}
+		out.Synthesized = append(out.Synthesized, ns.Decls[n:]...)
+		prog := *v.Program
+		prog.Namespaces = append([]Namespace(nil), v.Program.Namespaces...)
+		prog.Namespaces[i].Decls = ns.Decls[:n:n]
+		spec.Program = &prog
+		break
+	}
+	return spec, out
+}
+
+// View は、Spec s と、出力ごとの部分 o を合わせた View（docs/ir.md「まとめた形」の「合わせ方」）: Program は、s.Program の、
+// viewer の Namespace.Decls の末尾に、o.Synthesized を足したもの。s.Program は、変えない（名前空間の並びを写して、viewer の
+// ものだけを差し替える）。
+func (s *Spec) View(o *OutputView) *View {
+	v := &View{Version: s.Version, Viewer: o.Viewer, Config: o.Config, Files: o.Files, Namespaces: s.Namespaces,
+		Program: s.Program, Entries: o.Entries, Ops: o.Ops}
+	if s.Program == nil || len(o.Synthesized) == 0 {
+		return v
+	}
+	prog := *s.Program
+	prog.Namespaces = append([]Namespace(nil), s.Program.Namespaces...)
+	for i := range prog.Namespaces {
+		if prog.Namespaces[i].Name == o.Viewer {
+			prog.Namespaces[i].Decls = append(append([]Decl(nil), prog.Namespaces[i].Decls...), o.Synthesized...)
+		}
+	}
+	v.Program = &prog
+	return v
+}

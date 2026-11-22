@@ -613,72 +613,6 @@
       ],
       "type": "object"
     },
-    "CheckDiagnostic": {
-      "additionalProperties": false,
-      "description": "check の diagnostics の要素（docs/plugin-protocol.md「check」）。severity を必ず持つ。",
-      "properties": {
-        "at": {
-          "type": "string"
-        },
-        "code": {
-          "type": "string"
-        },
-        "message": {
-          "type": "string"
-        },
-        "severity": {
-          "enum": [
-            "error",
-            "warning"
-          ],
-          "type": "string"
-        }
-      },
-      "required": [
-        "severity",
-        "code",
-        "at",
-        "message"
-      ],
-      "type": "object"
-    },
-    "CheckRequest": {
-      "additionalProperties": false,
-      "description": "direction \"check\" の要求（docs/plugin-protocol.md「check」）。",
-      "properties": {
-        "direction": {
-          "const": "check"
-        },
-        "protocol": {
-          "const": "0.21"
-        },
-        "view": {
-          "$ref": "#/$defs/View"
-        }
-      },
-      "required": [
-        "protocol",
-        "direction",
-        "view"
-      ],
-      "type": "object"
-    },
-    "CheckResponse": {
-      "additionalProperties": false,
-      "description": "\"check\" の応答（docs/plugin-protocol.md「check」）。",
-      "properties": {
-        "diagnostics": {
-          "items": {
-            "$ref": "#/$defs/CheckDiagnostic"
-          },
-          "type": "array"
-        }
-      },
-      "required": [
-        "diagnostics"
-      ],
-      "type": "object"
-    },
     "Classify": {
       "additionalProperties": false,
       "description": "classify 宣言（docs/ir.md「classify」）。cases は、宣言したケースのすべて。absent は、ない側のケースの名前（あるときだけ持つ）。",
@@ -878,7 +812,7 @@
           "type": "array"
         },
         "protocol": {
-          "const": "0.21"
+          "const": "0.22"
         }
       },
       "required": [
@@ -1416,34 +1350,73 @@
         }
       ]
     },
-    "EmitRequest": {
+    "EmitBatch": {
       "additionalProperties": false,
-      "description": "direction \"emit\" の要求（docs/plugin-protocol.md「emit」）。transpiler は起動するトランスパイラの名前。",
+      "description": "direction \"emit\" の要求（docs/plugin-protocol.md「emit」）。spec は仕様（一度だけ）、outputs はプラグインが受け持つ出力。",
       "properties": {
         "direction": {
           "const": "emit"
         },
+        "outputs": {
+          "items": {
+            "$ref": "#/$defs/EmitOutput"
+          },
+          "type": "array"
+        },
         "protocol": {
-          "const": "0.21"
+          "const": "0.22"
         },
-        "transpiler": {
-          "type": "string"
-        },
-        "view": {
-          "$ref": "#/$defs/View"
+        "spec": {
+          "$ref": "#/$defs/Spec"
         }
       },
       "required": [
         "protocol",
         "direction",
-        "transpiler",
+        "spec",
+        "outputs"
+      ],
+      "type": "object"
+    },
+    "EmitBatchResponse": {
+      "additionalProperties": false,
+      "description": "\"emit\" の応答（docs/plugin-protocol.md「emit」）。outputs は、要求の outputs と、同じ数、同じ順。",
+      "properties": {
+        "outputs": {
+          "items": {
+            "$ref": "#/$defs/OutputResult"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "outputs"
+      ],
+      "type": "object"
+    },
+    "EmitOutput": {
+      "additionalProperties": false,
+      "description": "emit の要求の outputs の要素（docs/plugin-protocol.md「emit」）。transpilers は、その出力で頼むトランスパイラの名前。",
+      "properties": {
+        "transpilers": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "view": {
+          "$ref": "#/$defs/OutputView"
+        }
+      },
+      "required": [
+        "transpilers",
         "view"
       ],
       "type": "object"
     },
     "EmitResponse": {
       "additionalProperties": false,
-      "description": "\"emit\" の応答（docs/plugin-protocol.md「emit」）。errors が一つでもあれば書き出さない。",
+      "description": "トランスパイラ一つの、出力一つへの答え（docs/plugin-protocol.md「emit」の応答の results の要素）。errors が一つでもあれば書き出さない。",
       "properties": {
         "errors": {
           "items": {
@@ -1730,7 +1703,7 @@
     },
     "File": {
       "additionalProperties": false,
-      "description": "書き出す（取り込む）ファイル（docs/plugin-protocol.md「emit」）。path はルートからの相対パス（emit の応答では、その起動の view.config.dir の下。そうでなければ PLG-1）、content は UTF-8 の文字列。",
+      "description": "書き出す（取り込む）ファイル（docs/plugin-protocol.md「emit」）。path はルートからの相対パス（emit の応答では、その出力の view.config.dir の下。そうでなければ PLG-1）、content は UTF-8 の文字列。",
       "properties": {
         "content": {
           "type": "string"
@@ -1817,7 +1790,7 @@
           "type": "string"
         },
         "protocol": {
-          "const": "0.21"
+          "const": "0.22"
         }
       },
       "required": [
@@ -2525,6 +2498,67 @@
       ],
       "type": "object"
     },
+    "OutputResult": {
+      "additionalProperties": false,
+      "description": "emit の応答の outputs の要素（docs/plugin-protocol.md「emit」）。results は、その出力の transpilers と、同じ数、同じ順。",
+      "properties": {
+        "results": {
+          "items": {
+            "$ref": "#/$defs/EmitResponse"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "results"
+      ],
+      "type": "object"
+    },
+    "OutputView": {
+      "additionalProperties": false,
+      "description": "View の、出力（単位と名前空間の組）ごとの部分（docs/ir.md「まとめた形」の OutputView）。",
+      "properties": {
+        "config": {
+          "$ref": "#/$defs/NamespaceConfig"
+        },
+        "entries": {
+          "items": {
+            "$ref": "#/$defs/Entry"
+          },
+          "type": "array"
+        },
+        "files": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "ops": {
+          "additionalProperties": {
+            "$ref": "#/$defs/ViewedSignature"
+          },
+          "type": "object"
+        },
+        "synthesized": {
+          "items": {
+            "$ref": "#/$defs/Decl"
+          },
+          "type": "array"
+        },
+        "viewer": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "viewer",
+        "config",
+        "files",
+        "synthesized",
+        "entries",
+        "ops"
+      ],
+      "type": "object"
+    },
     "Param": {
       "additionalProperties": false,
       "description": "デコレータの引数（docs/ir.md「decorator」の Param）。",
@@ -2637,7 +2671,7 @@
           "type": "array"
         },
         "version": {
-          "const": "0.21"
+          "const": "0.22"
         }
       },
       "required": [
@@ -2990,6 +3024,33 @@
         "file",
         "start",
         "end"
+      ],
+      "type": "object"
+    },
+    "Spec": {
+      "additionalProperties": false,
+      "description": "View の、出力に依らない部分（docs/ir.md「まとめた形」の Spec）。emit の要求に、一度だけ入る。",
+      "properties": {
+        "namespaces": {
+          "additionalProperties": {
+            "items": {
+              "$ref": "#/$defs/NamespaceConfig"
+            },
+            "type": "array"
+          },
+          "type": "object"
+        },
+        "program": {
+          "$ref": "#/$defs/Program"
+        },
+        "version": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "version",
+        "namespaces",
+        "program"
       ],
       "type": "object"
     },
@@ -3596,7 +3657,7 @@
           "$ref": "#/$defs/Program"
         },
         "version": {
-          "const": "0.21"
+          "const": "0.22"
         },
         "viewer": {
           "type": "string"

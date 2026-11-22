@@ -209,15 +209,24 @@ type Plugin struct {
 	Root    Path     `json:"root"`
 }
 
-// View は IR（docs/ir.md「その名前空間から見た IR」）。中身はこの仕様では書かない
-type View struct{}
+// Spec は仕様: IR の、出力に依らない部分（docs/ir.md「まとめた形」の Spec）。中身はこの仕様では書かない
+type Spec struct{}
 
-// EmitRequest は展開のときのプラグインへの入力（docs/plugin-protocol.md「emit」の要求）。transpiler は起動するトランスパイラの名前。単位のオプションは view の中にある
+// OutputView は IR の、出力ごとの部分（同 OutputView）。中身はこの仕様では書かない
+type OutputView struct{}
+
+// EmitOutput はプラグインが受け持つ出力一つ（docs/plugin-protocol.md「emit」の要求の outputs の要素）。transpilers は、その出力で頼むトランスパイラの名前。単位のオプションは view の中にある
+type EmitOutput struct {
+	Transpilers []string   `json:"transpilers"`
+	View        OutputView `json:"view"`
+}
+
+// EmitRequest は展開のときのプラグインへの入力（同「emit」の要求）。仕様を一度と、プラグインが受け持つ出力の並び
 type EmitRequest struct {
-	Protocol   string `json:"protocol"`
-	Direction  string `json:"direction"`
-	Transpiler string `json:"transpiler"`
-	View       View   `json:"view"`
+	Protocol  string       `json:"protocol"`
+	Direction string       `json:"direction"`
+	Spec      Spec         `json:"spec"`
+	Outputs   []EmitOutput `json:"outputs"`
 }
 
 // PluginWarning はトランスパイラの warning（同「emit」の応答の warnings の要素）
@@ -233,9 +242,19 @@ type PluginError struct {
 	Message string `json:"message"`
 }
 
-// EmitResponse は展開のときのプラグインからの出力（同「emit」の応答）
-type EmitResponse struct {
+// TranspilerResult はトランスパイラ一つの、出力一つへの答え（同「emit」の応答の results の要素）
+type TranspilerResult struct {
 	Files    []OutputFile    `json:"files"`
 	Warnings []PluginWarning `json:"warnings"`
 	Errors   []PluginError   `json:"errors"`
+}
+
+// OutputResult は出力一つへの答え（同「emit」の応答の outputs の要素）。results は、要求の、その出力の transpilers と同じ順
+type OutputResult struct {
+	Results []TranspilerResult `json:"results"`
+}
+
+// EmitResponse は展開のときのプラグインからの出力（同「emit」の応答）。outputs は、要求の outputs と同じ順
+type EmitResponse struct {
+	Outputs []OutputResult `json:"outputs"`
 }

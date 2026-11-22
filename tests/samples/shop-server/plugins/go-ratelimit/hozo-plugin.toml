@@ -3,7 +3,7 @@
 # 実装は、このディレクトリの main パッケージ（main.go、emit.go）。期待する出力は ../../gen/server/ratelimit.go。
 name     = "go-ratelimit"
 command  = ["go", "run", "example.com/shop-server/plugins/go-ratelimit"]
-protocol = "0.21"
+protocol = "0.22"
 
 vocabulary = ["rate.hozo"]      # 語彙 rate: 例外 LimitExceeded と、デコレータ limited
 
@@ -12,6 +12,3 @@ name     = "go-ratelimit"
 language = "go"
 requires = ["go"]               # Go の基底に相乗りする（docs/plugin-go.md「相乗りのファイル」）
 seams    = ["rate.limited"]     # @rate.limited は継ぎ目を要る: 基底 go が口（Seams のメソッド）を出し、中身はこのトランスパイラが出す
-
-[check]
-enabled = true                  # emit が errors で返す誤りを、検査の段（hozoc check）でも返す（docs/plugin-protocol.md「check」）

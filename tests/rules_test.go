@@ -245,6 +245,7 @@ func codeFor(id string) string {
 // ok なら注釈がなく、診断も一つもないこと。code は ng の例に現れるべき ID で、現れたら true を返す。
 func runSample(t *testing.T, s *sample, ok bool, code string) bool {
 	t.Helper()
+	// Load は、プラグインを、起動しない: 見るのは、hozoc 自身の規則（fixture のプラグインは、マニフェストだけで、動かない）
 	p := project.Load(s.root, "", nil)
 	if p.RunErr != nil {
 		t.Fatalf("プラグインの check が失敗: %v", p.RunErr)

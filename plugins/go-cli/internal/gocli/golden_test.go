@@ -455,7 +455,7 @@ func TestBrokenView(t *testing.T) {
 }
 
 // TestHandler は、プラグインの入口（Handler）: 要求の View から出力し、診断は応答の errors で返す
-// （docs/plugin-protocol.md「emit」）。提供するトランスパイラは go-cli の一つ。check と import は持たない。
+// （docs/plugin-protocol.md「emit」）。提供するトランスパイラは go-cli の一つ。import は持たない。
 func TestHandler(t *testing.T) {
 	view := loadViews(t, "commands")[0]
 	root := newRoot(t)
@@ -488,10 +488,6 @@ func TestHandler(t *testing.T) {
 	if _, err := h.Emit(&plugin.EmitRequest{Transpiler: TranspilerName}); err == nil {
 		t.Error("View のない要求で、エラーにならない")
 	}
-	// Check は、emit と同じ検査で答える（TestCheckMatchesEmit）。View のない要求は、誤り
-	if _, err := h.Check(&plugin.CheckRequest{}); err == nil || errors.Is(err, plugin.ErrUnsupported) {
-		t.Errorf("View のない Check の err = %v（期待は、unsupported でない誤り）", err)
-	}
 	if _, err := h.Import(&plugin.ImportRequest{}); err != plugin.ErrUnsupported {
 		t.Errorf("Import の err = %v, want ErrUnsupported", err)
 	}
@@ -502,7 +498,7 @@ func TestProtocol(t *testing.T) {
 	h := Handler{}
 	run := func(view *ir.View) string {
 		t.Helper()
-		req, err := json.Marshal(request(view, TranspilerName))
+		req, err := json.Marshal(request(view, TranspilerName).Batch())
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -514,8 +510,8 @@ func TestProtocol(t *testing.T) {
 	}
 	// 成功: warnings は空でも [] で出し、errors は省く。select は書かない（版 0.4 でなくした）
 	out := run(loadViews(t, "commands")[0])
-	var resp plugin.EmitResponse
-	if err := json.Unmarshal([]byte(out), &resp); err != nil {
+	resp, err := plugin.SingleResult([]byte(out))
+	if err != nil {
 		t.Fatalf("応答が JSON でない: %v\n%s", err, out)
 	}
 	if len(resp.Files) != 1 || resp.Files[0].Path != "gen/tool/cli/cli.go" {
@@ -526,11 +522,11 @@ func TestProtocol(t *testing.T) {
 	}
 	// 診断: files は []
 	out = run(loadViews(t, "cli6")[0])
-	if want := `{"files":[],"warnings":[],"errors":[{"code":"CLI-6","at":"app.hidden","message":`; !strings.HasPrefix(out, want) {
+	if want := `{"outputs":[{"results":[{"files":[],"warnings":[],"errors":[{"code":"CLI-6","at":"app.hidden","message":`; !strings.HasPrefix(out, want) {
 		t.Errorf("応答 = %s\nwant 先頭が %s", out, want)
 	}
-	// 実装しない direction（check は、emit と同じ検査で答える: TestCheckMatchesEmit）
-	for _, dir := range []string{"import"} {
+	// 実装しない direction。check は、なくした direction（docs/plugin-protocol.md「検査のための頼みごとを、なくしたこと」）
+	for _, dir := range []string{"import", "check"} {
 		var o, e bytes.Buffer
 		code := plugin.Run(Handler{}, strings.NewReader(`{"protocol":"`+ir.Version+`","direction":"`+dir+`"}`), &o, &e)
 		if code != 2 || !strings.Contains(o.String(), `"code":"unsupported"`) {
@@ -544,7 +540,7 @@ func TestPluginBinary(t *testing.T) {
 	goBin := goTool(t)
 	root := newRoot(t)
 	view := loadViews(t, "commands")[0]
-	req, err := json.Marshal(request(view, TranspilerName))
+	req, err := json.Marshal(request(view, TranspilerName).Batch())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -557,8 +553,8 @@ func TestPluginBinary(t *testing.T) {
 	if err := cmd.Run(); err != nil {
 		t.Fatalf("go run: %v\n%s", err, errOut.String())
 	}
-	var resp plugin.EmitResponse
-	if err := json.Unmarshal(out.Bytes(), &resp); err != nil {
+	resp, err := plugin.SingleResult(out.Bytes())
+	if err != nil {
 		t.Fatalf("応答が JSON でない: %v\n%s", err, out.String())
 	}
 	want, _, _ := emitViews(t, root, []*ir.View{view})

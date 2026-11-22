@@ -1,5 +1,5 @@
 {
-  "version": "0.21",
+  "version": "0.22",
   "viewer": "browser",
   "config": {
     "index": 1,
@@ -115,7 +115,7 @@
     ]
   },
   "program": {
-    "version": "0.21",
+    "version": "0.22",
     "namespaces": [
       {
         "name": "",

@@ -1,7 +1,6 @@
 package gosqlite
 
 import (
-	"errors"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -300,7 +299,7 @@ func TestMalformedView(t *testing.T) {
 }
 
 // TestHandler は、プラグインの入口（Handler）: 要求の View から出力し、診断は応答の errors で、warning は
-// warnings で返す（docs/plugin-protocol.md「emit」）。check と import は持たない。
+// warnings で返す（docs/plugin-protocol.md「emit」）。import は持たない。
 func TestHandler(t *testing.T) {
 	root := newRoot(t)
 	h := Handler{}
@@ -337,10 +336,6 @@ func TestHandler(t *testing.T) {
 	other.Transpiler = "go"
 	if _, err := h.Emit(other); err == nil {
 		t.Error("知らない transpiler で、エラーにならない")
-	}
-	// Check は、emit と同じ検査で答える（TestCheckMatchesEmit）。View のない要求は、誤り
-	if _, err := h.Check(&plugin.CheckRequest{}); err == nil || errors.Is(err, plugin.ErrUnsupported) {
-		t.Errorf("View のない Check の err = %v（期待は、unsupported でない誤り）", err)
 	}
 	if _, err := h.Import(&plugin.ImportRequest{}); err != plugin.ErrUnsupported {
 		t.Errorf("Import の err = %v, want ErrUnsupported", err)

@@ -28,7 +28,6 @@ type Manifest struct {
 	Protocol    string
 	Vocabulary  []string     // マニフェストからの相対パス。省略時は []
 	Transpilers []Transpiler // [[transpiler]]。書いた順。一つもなければ emit を持たない
-	Check       Check
 	Import      Import
 	Coverage    Coverage
 }
@@ -45,11 +44,6 @@ type Transpiler struct {
 
 // IsBase は、このトランスパイラが基底か（requires が空。docs/config.md「基底と相乗り」）。
 func (t *Transpiler) IsBase() bool { return len(t.Requires) == 0 }
-
-// Check は [check] テーブル。Enabled なら hozoc check / emit で direction "check" を呼ぶ。
-type Check struct {
-	Enabled bool
-}
 
 // Coverage は [coverage] テーブル。Enabled なら hozoc tests で direction "coverage" を呼ぶ
 // （docs/plugin-protocol.md「coverage」）。
@@ -91,9 +85,6 @@ type rawManifest struct {
 		Unsupported []string `toml:"unsupported"`
 		Seams       []string `toml:"seams"`
 	} `toml:"transpiler"`
-	Check struct {
-		Enabled bool `toml:"enabled"`
-	} `toml:"check"`
 	Import struct {
 		Formats []string `toml:"formats"`
 	} `toml:"import"`
@@ -225,7 +216,6 @@ func LoadManifest(path string) (*Manifest, []diag.Diagnostic) {
 		m.Transpilers = append(m.Transpilers, Transpiler{Name: t.Name, Language: *t.Language,
 			Requires: orEmpty(t.Requires), Unsupported: orEmpty(t.Unsupported), Seams: orEmpty(t.Seams)})
 	}
-	m.Check.Enabled = raw.Check.Enabled
 	m.Import.Formats = orEmpty(raw.Import.Formats)
 	m.Coverage.Enabled = raw.Coverage.Enabled
 

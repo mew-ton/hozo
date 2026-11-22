@@ -31,10 +31,6 @@ func (handler) Emit(req *plugin.EmitRequest) (*plugin.EmitResponse, error) {
 	}, nil
 }
 
-func (handler) Check(*plugin.CheckRequest) (*plugin.CheckResponse, error) {
-	return nil, plugin.ErrUnsupported
-}
-
 func (handler) Import(*plugin.ImportRequest) (*plugin.ImportResponse, error) {
 	return nil, plugin.ErrUnsupported
 }

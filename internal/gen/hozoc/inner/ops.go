@@ -6,7 +6,7 @@ import "context"
 
 // Ops は、この名前空間のすべての op（export の有無によらない）。宣言順。New が返す。テストは、内部の op をここから呼ぶ。
 type Ops interface {
-	// Check は仕様を検査する。ファイルは書き出さない。
+	// Check は仕様を検査する。使うプラグインに、展開を頼み、その診断も集める。ファイルは書き出さない。
 	//
 	// 引数:
 	//   - in: コマンドの入力
@@ -14,28 +14,28 @@ type Ops interface {
 	// Throws: hozoc.CheckFailed, hozoc.ConfigInvalid, hozoc.LanguageMismatch, proc.Crashed, proc.MalformedOutput
 	Check(ctx context.Context, in CheckInput) (CheckResult, error)
 
-	// CollectOutputs は検査を通った仕様から、出力ごとにトランスパイラを呼び、返ったファイルを集める。ファイルには触れない。
+	// CollectOutputs は検査がプラグインから受け取った答えから、出力ごとのファイルを集める。プラグインは、起動しない。ファイルには触れない。
 	//
 	// 引数:
 	//   - in: コマンドの入力
 	//   - checked: 検査の結果
 	//
-	// Throws: hozoc.CheckFailed, hozoc.OutputConflict, hozoc.UnknownNamespace, proc.Crashed, proc.MalformedOutput
+	// Throws: hozoc.OutputConflict, hozoc.UnknownNamespace, proc.MalformedOutput
 	CollectOutputs(ctx context.Context, in EmitInput, checked CheckResult) (EmitPlan, error)
 
-	// WriteOutputs は検査を通った仕様から、出力ごとにトランスパイラを呼び、返ったファイルを書き出す。
+	// WriteOutputs は検査がプラグインから受け取った答えの、出力ごとのファイルを書き出す。
 	// 例外は、どれも書き出しを始める前に起きる（集めるのが先）。
 	//
 	// 引数:
 	//   - in: コマンドの入力
 	//   - checked: 検査の結果
 	//
-	// Throws: hozoc.CheckFailed, hozoc.OutputConflict, hozoc.UnknownNamespace, proc.Crashed, proc.MalformedOutput
+	// Throws: hozoc.OutputConflict, hozoc.UnknownNamespace, proc.MalformedOutput
 	// Reads: hozoc.outputs
 	// Effects: hozoc.syncOutputs
 	WriteOutputs(ctx context.Context, in EmitInput, checked CheckResult) (EmitResult, error)
 
-	// Emit は仕様を検査し、単位ごとにトランスパイラを呼んで、生成したファイルを書き出す。
+	// Emit は仕様を検査し、プラグインから受け取ったファイルを書き出す。
 	//
 	// 引数:
 	//   - in: コマンドの入力
@@ -45,13 +45,13 @@ type Ops interface {
 	// Effects: hozoc.syncOutputs
 	Emit(ctx context.Context, in EmitInput) (EmitResult, error)
 
-	// MatchTests は検査を通った仕様から、テストの対応表を集め、カバレッジの「実行された行」と突き合わせる。ファイルは書き出さない。
+	// MatchTests は検査がプラグインから受け取った答えから、テストの対応表を集め、カバレッジの「実行された行」と突き合わせる。ファイルは書き出さない。
 	//
 	// 引数:
 	//   - in: コマンドの入力
 	//   - checked: 検査の結果
 	//
-	// Throws: hozoc.CheckFailed, hozoc.ConfigInvalid, hozoc.OutputConflict, hozoc.TestsNotRun, hozoc.CoverageUnusable, proc.Crashed, proc.MalformedOutput
+	// Throws: hozoc.ConfigInvalid, hozoc.OutputConflict, hozoc.TestsNotRun, hozoc.CoverageUnusable, proc.Crashed, proc.MalformedOutput
 	MatchTests(ctx context.Context, in TestsInput, checked CheckResult) (TestsResult, error)
 
 	// Tests は仕様を検査し、求めるテストが走ったかを、カバレッジと突き合わせて確かめる。テストは走らせない。
@@ -68,7 +68,7 @@ type Ops interface {
 	//   - in: コマンドの入力
 	Lsp(ctx context.Context, in LspInput) error
 
-	// RunEmit はプラグインを一つ起動して、トランスパイラ一つに展開させる（docs/plugin-protocol.md「起動」）。
+	// RunEmit はプラグインを一つ起動して、受け持つ出力のすべてを、まとめて展開させる（docs/plugin-protocol.md「起動」）。
 	//
 	// 引数:
 	//   - plugin: 起動するプラグイン
@@ -81,7 +81,7 @@ type Ops interface {
 // Leaves は、人が実装する葉の op: 本体のない op。状態には触れない。export の有無によらない。
 // 実装は New の引数 leaves に渡す。メソッドが一つでも足りない値は、渡すところでコンパイルできない。
 type Leaves interface {
-	// Check は仕様を検査する。ファイルは書き出さない。
+	// Check は仕様を検査する。使うプラグインに、展開を頼み、その診断も集める。ファイルは書き出さない。
 	//
 	// 引数:
 	//   - in: コマンドの入力
@@ -89,22 +89,22 @@ type Leaves interface {
 	// Throws: hozoc.CheckFailed, hozoc.ConfigInvalid, hozoc.LanguageMismatch, proc.Crashed, proc.MalformedOutput
 	Check(ctx context.Context, in CheckInput) (CheckResult, error)
 
-	// CollectOutputs は検査を通った仕様から、出力ごとにトランスパイラを呼び、返ったファイルを集める。ファイルには触れない。
+	// CollectOutputs は検査がプラグインから受け取った答えから、出力ごとのファイルを集める。プラグインは、起動しない。ファイルには触れない。
 	//
 	// 引数:
 	//   - in: コマンドの入力
 	//   - checked: 検査の結果
 	//
-	// Throws: hozoc.CheckFailed, hozoc.OutputConflict, hozoc.UnknownNamespace, proc.Crashed, proc.MalformedOutput
+	// Throws: hozoc.OutputConflict, hozoc.UnknownNamespace, proc.MalformedOutput
 	CollectOutputs(ctx context.Context, in EmitInput, checked CheckResult) (EmitPlan, error)
 
-	// MatchTests は検査を通った仕様から、テストの対応表を集め、カバレッジの「実行された行」と突き合わせる。ファイルは書き出さない。
+	// MatchTests は検査がプラグインから受け取った答えから、テストの対応表を集め、カバレッジの「実行された行」と突き合わせる。ファイルは書き出さない。
 	//
 	// 引数:
 	//   - in: コマンドの入力
 	//   - checked: 検査の結果
 	//
-	// Throws: hozoc.CheckFailed, hozoc.ConfigInvalid, hozoc.OutputConflict, hozoc.TestsNotRun, hozoc.CoverageUnusable, proc.Crashed, proc.MalformedOutput
+	// Throws: hozoc.ConfigInvalid, hozoc.OutputConflict, hozoc.TestsNotRun, hozoc.CoverageUnusable, proc.Crashed, proc.MalformedOutput
 	MatchTests(ctx context.Context, in TestsInput, checked CheckResult) (TestsResult, error)
 
 	// Lsp は言語サーバーとして標準入出力で動く（docs/lsp.md）。クライアントが exit を送るまで戻らない。
@@ -113,7 +113,7 @@ type Leaves interface {
 	//   - in: コマンドの入力
 	Lsp(ctx context.Context, in LspInput) error
 
-	// RunEmit はプラグインを一つ起動して、トランスパイラ一つに展開させる（docs/plugin-protocol.md「起動」）。
+	// RunEmit はプラグインを一つ起動して、受け持つ出力のすべてを、まとめて展開させる（docs/plugin-protocol.md「起動」）。
 	//
 	// 引数:
 	//   - plugin: 起動するプラグイン

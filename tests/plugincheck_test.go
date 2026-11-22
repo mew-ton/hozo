@@ -11,10 +11,10 @@ import (
 )
 
 // このファイルは、プラグインの診断が、hozoc check で出ることを、本物のプラグインで確かめる（docs/cli.md「check」の 4、
-// docs/plugin-protocol.md「check」、docs/decisions.md「決めたこと」404）。
+// docs/plugin-protocol.md「起動」「emit」、docs/decisions.md「決めたこと」404、416）。
 //
-// プラグインごとに、check の答えが emit の errors と同じであることは、そのプラグインの TestCheckMatchesEmit が、すべての入力で
-// 確かめる。hozoc が、出力ごとに check を呼ぶことは、internal/project の TestPluginCheckPerOutput。ここは、その二つが、
+// 検査は、プラグインに emit を頼み、その答えの診断を使う。SDK が、要求の並びを回すことは、plugin の TestRunEmitBatch、hozoc が、
+// プラグインごとに一回、受け持つ出力を並べて頼むことは、internal/project の TestPluginAnswersPerOutput。ここは、その二つが、
 // コマンドとして、つながっていること。
 
 // pluginCheckProject は、プラグインの単体テストの入力 plugins/<plugin>/internal/<pkg>/testdata/<name>/ を、一時ディレクトリの

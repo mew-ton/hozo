@@ -20,18 +20,13 @@ func TestRequirements(t *testing.T) { flowstest.RunRequirements(t, requirements{
 ```toml
 name     = "go-design"
 command  = ["go", "run", "github.com/mew-ton/hozo/plugins/go-design"]
-protocol = "0.21"
+protocol = "0.22"
 
 [[transpiler]]
 name     = "go-design"
 language = "go"
 requires = ["go"]
-
-[check]
-enabled = true
 ```
-
-`[check]` は、`emit` が `errors` で返す誤りを、検査の段（`hozoc check`）でも返すためのもの（`docs/plugin-protocol.md`「check」）。
 
 - 読む語彙は、標準の `business`（op の `@business.flow`）、`usecase`（op の `@usecase.of`）、`prd`（`@prd.ref`）。`actor` の語彙（担い手の種類）は、読まない（印のまま）。語彙は提供しない。
 - 継ぎ目は宣言しない。基底の出力（配線、`Ops`、`New`）は、変えない。

@@ -1,6 +1,6 @@
 name     = "go-sqlite"
 command  = ["go", "run", "github.com/mew-ton/hozo/plugins/go-sqlite"]
-protocol = "0.21"
+protocol = "0.22"
 
 # 提供するトランスパイラは一つ。Go の基底 go に相乗りする（docs/plugin-go-sqlite.md「マニフェスト」）。
 # 読む語彙は db（標準の語彙。docs/vocab.md「同梱する語彙」）で、語彙は提供しない
@@ -10,6 +10,3 @@ language = "go"
 requires = ["go"]
 # @db.transaction は継ぎ目: 基底が、付いた op を二層で出し、このトランスパイラが、その中身（DbSeams）を出す（同「トランザクション」）
 seams    = ["db.transaction"]
-
-[check]
-enabled = true                  # emit が errors で返す誤りを、検査の段（hozoc check）でも返す（docs/plugin-protocol.md「check」）

@@ -38,14 +38,10 @@ type CheckCase struct {
 type CollectOutputsCases interface {
 	// OK は、正常に終わるケース。
 	OK() CollectOutputsCase
-	// CheckFailed は、例外 hozoc.CheckFailed を投げるケース。
-	CheckFailed() CollectOutputsCase
 	// OutputConflict は、例外 hozoc.OutputConflict を投げるケース。
 	OutputConflict() CollectOutputsCase
 	// UnknownNamespace は、例外 hozoc.UnknownNamespace を投げるケース。
 	UnknownNamespace() CollectOutputsCase
-	// Crashed は、例外 proc.Crashed を投げるケース。
-	Crashed() CollectOutputsCase
 	// MalformedOutput は、例外 proc.MalformedOutput を投げるケース。
 	MalformedOutput() CollectOutputsCase
 }
@@ -62,8 +58,6 @@ type CollectOutputsCase struct {
 type MatchTestsCases interface {
 	// OK は、正常に終わるケース。
 	OK() MatchTestsCase
-	// CheckFailed は、例外 hozoc.CheckFailed を投げるケース。
-	CheckFailed() MatchTestsCase
 	// ConfigInvalid は、例外 hozoc.ConfigInvalid を投げるケース。
 	ConfigInvalid() MatchTestsCase
 	// OutputConflict は、例外 hozoc.OutputConflict を投げるケース。
@@ -206,17 +200,6 @@ func RunLeaves(t *testing.T, leaves hozoc.Leaves, c LeafCases) {
 				k.Then(t, got, err)
 			}
 		})
-		t.Run("CheckFailed", func(t *testing.T) {
-			k := cases.CheckFailed()
-			got, err := leaves.CollectOutputs(context.Background(), k.In, k.Checked)
-			var want hozoc.CheckFailed
-			if !errors.As(err, &want) {
-				t.Fatalf("want exception hozoc.CheckFailed, got %v", err)
-			}
-			if k.Then != nil {
-				k.Then(t, got, err)
-			}
-		})
 		t.Run("OutputConflict", func(t *testing.T) {
 			k := cases.OutputConflict()
 			got, err := leaves.CollectOutputs(context.Background(), k.In, k.Checked)
@@ -234,17 +217,6 @@ func RunLeaves(t *testing.T, leaves hozoc.Leaves, c LeafCases) {
 			var want hozoc.UnknownNamespace
 			if !errors.As(err, &want) {
 				t.Fatalf("want exception hozoc.UnknownNamespace, got %v", err)
-			}
-			if k.Then != nil {
-				k.Then(t, got, err)
-			}
-		})
-		t.Run("Crashed", func(t *testing.T) {
-			k := cases.Crashed()
-			got, err := leaves.CollectOutputs(context.Background(), k.In, k.Checked)
-			var want proc.Crashed
-			if !errors.As(err, &want) {
-				t.Fatalf("want exception proc.Crashed, got %v", err)
 			}
 			if k.Then != nil {
 				k.Then(t, got, err)
@@ -269,17 +241,6 @@ func RunLeaves(t *testing.T, leaves hozoc.Leaves, c LeafCases) {
 			got, err := leaves.MatchTests(context.Background(), k.In, k.Checked)
 			if err != nil {
 				t.Fatalf("want no error, got %v", err)
-			}
-			if k.Then != nil {
-				k.Then(t, got, err)
-			}
-		})
-		t.Run("CheckFailed", func(t *testing.T) {
-			k := cases.CheckFailed()
-			got, err := leaves.MatchTests(context.Background(), k.In, k.Checked)
-			var want hozoc.CheckFailed
-			if !errors.As(err, &want) {
-				t.Fatalf("want exception hozoc.CheckFailed, got %v", err)
 			}
 			if k.Then != nil {
 				k.Then(t, got, err)

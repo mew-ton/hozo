@@ -7,13 +7,13 @@ import (
 	"errors"
 	"flag"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"reflect"
 	"sort"
 	"strings"
 	"testing"
 
+	"github.com/mew-ton/hozo/internal/fakeplugin"
 	"github.com/mew-ton/hozo/internal/gen/hozoc"
 	"github.com/mew-ton/hozo/internal/gen/hozoc/cli"
 	"github.com/mew-ton/hozo/internal/gen/hozoc/inner"
@@ -931,7 +931,8 @@ func TestWriteOutputsSteps(t *testing.T) {
 	}
 	paths := []hozoc.Path{"gen/browser/out.txt", "gen/http/out.txt", "gen/page/out.txt", "gen/server/out.txt"}
 
-	// collectOutputs: トランスパイラのファイル（パスの辞書順）と、check の warning にトランスパイラの warning を足したもの
+	// collectOutputs: トランスパイラのファイル（パスの辞書順）と、check の warning（トランスパイラの warning を含む: check が、
+	// プラグインに頼んで、もう受け取っている。四つの出力の基底が返す、同じ warning は、一度だけ。docs/plugin-protocol.md「emit」）
 	plan, err := ops.CollectOutputs(ctx, hozoc.EmitInput{}, checked)
 	if err != nil {
 		t.Fatal(err)
@@ -944,8 +945,14 @@ func TestWriteOutputsSteps(t *testing.T) {
 	if !reflect.DeepEqual(planned, paths) || plan.Files[3].Content != "new server" || plan.DryRun != nil {
 		t.Fatalf("plan.Files = %+v, DryRun = %v", plan.Files, plan.DryRun)
 	}
-	if len(plan.Warnings) != len(checked.Warnings)+4 || plan.Warnings[0].Code != "PLUGIN" {
-		t.Fatalf("plan.Warnings = %+v（check の %d 個と、四つの出力の基底の warning）", plan.Warnings, len(checked.Warnings))
+	plugins := 0
+	for _, w := range plan.Warnings {
+		if w.Code == "PLUGIN" {
+			plugins++
+		}
+	}
+	if !reflect.DeepEqual(plan.Warnings, checked.Warnings) || plugins != 1 || plan.Warnings[0].Code != "PLUGIN" {
+		t.Fatalf("plan.Warnings = %+v（want check の %d 個と同じで、基底の warning が、一つ）", plan.Warnings, len(checked.Warnings))
 	}
 
 	// outputChanges: 書くファイルは、予定のすべて（内容が同じでも）。消すファイルは、前回書いて、今回は書かないもの
@@ -1141,42 +1148,14 @@ func containsStr(list []string, s string) bool {
 	return false
 }
 
-// requestsFile は fakePlugin が受け取った要求を一行ずつ足していくファイル（マニフェストのディレクトリの下）。
+// requestsFile は fakePlugin が、受け取った頼みごとを一行ずつ足していくファイル（マニフェストのディレクトリの下）。
 const requestsFile = "requests.jsonl"
 
-// fakeScript は fakePlugin の中身（sh）。要求を requestsFile に足し、応答のひな形 response.json の @DIR@ を要求の
-// view.config.dir（Dir(U, N)）に、@NS@ を view.viewer に置き換えて返す。終了コードは exit ファイルの中身。
-// direction が coverage の要求には、coverage.json をそのまま返す（終了コード 0。tests_test.go）。先頭に fakeHeader を置いて使う。
-// fakeHeader は、シェルで動く、テストのプラグインの先頭: 自分のディレクトリ（マニフェストのディレクトリ）を d に入れる。hozoc は、
-// プラグインに、環境変数を足さない（docs/plugin-protocol.md「起動」）ので、置き場は、起動されたパス（$0）から求める。
-const fakeHeader = "#!/bin/sh\nd=$(dirname \"$0\")\n"
-
-// writeScript は、実行できるシェルスクリプトを置く（マニフェストの command は `["./plugin.sh"]`）。
-func writeScript(t *testing.T, path, body string) {
-	t.Helper()
-	write(t, path, fakeHeader+body)
-	if err := os.Chmod(path, 0o755); err != nil {
-		t.Fatal(err)
-	}
-}
-
-const fakeScript = `req=$(cat)
-printf '%s\n' "$req" >>"$d/requests.jsonl"
-case "$req" in
-*'"direction":"coverage"'*)
-  cat "$d/coverage.json"
-  exit 0
-  ;;
-esac
-ns=$(printf '%s' "$req" | sed -n 's/^.*"view":{"version":"[^"]*","viewer":"\([^"]*\)".*$/\1/p')
-dir=$(printf '%s' "$req" | sed -n 's/^.*"view":{"version":"[^"]*","viewer":"[^"]*","config":{"index":[0-9]*,"language":"[^"]*","base":"[^"]*","out":"[^"]*","dir":"\([^"]*\)".*$/\1/p')
-sed -e "s|@DIR@|$dir|g" -e "s|@NS@|$ns|g" "$d/response.json"
-exit "$(cat "$d/exit")"
-`
-
-// fakePlugin はシェルで動く小さなプラグインを plugins/<name> に置く。提供するトランスパイラは、プラグインと同じ名前の基底一つ
-// （言語は lang）。stdout は応答の JSON（@DIR@ と @NS@ は、要求の Dir(U, N) と名前空間に置き換わる）、exit は終了コード。
-// extra はマニフェストに足す行。受け取った要求は、マニフェストのディレクトリの requestsFile に一行ずつ足す（requests で読む）。
+// fakePlugin は、にせもののプラグイン（internal/fakeplugin）を plugins/<name> に置く。提供するトランスパイラは、プラグインと同じ
+// 名前の基底一つ（言語は lang）。stdout は、トランスパイラ一つの、出力一つへの答えの JSON（@DIR@ と @NS@ は、その出力の
+// Dir(U, N) と名前空間に置き換わる。にせものは、要求の出力とトランスパイラの組ごとに、これを並べて、応答にする:
+// docs/plugin-protocol.md「emit」）、exit は終了コード。extra はマニフェストに足す行。受け取った頼みごとは、出力とトランスパイラの
+// 組ごとに一行、マニフェストのディレクトリの requestsFile に足す（requests で読む）。起動の回数は、launches で読む。
 func fakePlugin(t *testing.T, dir, name, lang, extra, stdout string, exit int) {
 	t.Helper()
 	fakeTranspiler(t, dir, name, lang, extra, "", stdout, exit)
@@ -1190,19 +1169,37 @@ func fakeRider(t *testing.T, dir, name, lang, requires, stdout string, exit int)
 
 func fakeTranspiler(t *testing.T, dir, name, lang, extra, transpilerExtra, stdout string, exit int) {
 	t.Helper()
-	if _, err := exec.LookPath("sh"); err != nil {
-		t.Skip("sh がない")
-	}
 	pluginDir := filepath.Join(dir, "plugins", name)
-	writeScript(t, filepath.Join(pluginDir, "plugin.sh"), fakeScript)
+	fakeplugin.Install(t, pluginDir, "")
 	write(t, filepath.Join(pluginDir, "response.json"), stdout)
 	write(t, filepath.Join(pluginDir, "exit"), string(rune('0'+exit)))
-	manifest := "name = \"" + name + "\"\ncommand = [\"./plugin.sh\"]\nprotocol = \"0.21\"\n" + extra +
+	manifest := "name = \"" + name + "\"\ncommand = " + fakeplugin.CommandTOML + "\nprotocol = \"0.22\"\n" + extra +
 		"\n[[transpiler]]\nname = \"" + name + "\"\nlanguage = \"" + lang + "\"\n" + transpilerExtra
 	write(t, filepath.Join(pluginDir, "hozo-plugin.toml"), manifest)
 }
 
-// request は fakePlugin が受け取った emit の要求のうち、テストが見る部分。
+// readFile は、ファイルの中身（なければ ""）。
+func readFile(t *testing.T, path string) string {
+	t.Helper()
+	data, err := os.ReadFile(path)
+	if err != nil && !os.IsNotExist(err) {
+		t.Fatal(err)
+	}
+	return string(data)
+}
+
+// launches は、プラグイン name が、これまでに起動された回数（記録は、消さない）。
+func launches(t *testing.T, dir, name string) int {
+	t.Helper()
+	data, err := os.ReadFile(filepath.Join(dir, "plugins", name, "launches"))
+	if err != nil && !os.IsNotExist(err) {
+		t.Fatal(err)
+	}
+	return strings.Count(string(data), "\n")
+}
+
+// request は fakePlugin が受け取った emit の頼みごと（出力とトランスパイラの組ごとに一つ。にせものが、要求の outputs と transpilers を
+// ほどいて、記録する）のうち、テストが見る部分。view は、その出力の view（docs/ir.md「まとめた形」の OutputView）。
 type request struct {
 	Protocol   string `json:"protocol"`
 	Direction  string `json:"direction"`
@@ -1387,7 +1384,7 @@ func TestEmitUnits(t *testing.T) {
 			}
 			r := reqs[0]
 			cfg := r.View.Config
-			if r.Protocol != "0.21" || r.Direction != "emit" || r.Transpiler != c.name || r.View.Viewer != c.viewer || cfg.Dir != c.dir || cfg.Out != c.out ||
+			if r.Protocol != "0.22" || r.Direction != "emit" || r.Transpiler != c.name || r.View.Viewer != c.viewer || cfg.Dir != c.dir || cfg.Out != c.out ||
 				cfg.Index != c.index || cfg.Language != "go" || cfg.Base != c.base || strings.Join(cfg.Transpilers, ",") != c.transpilers ||
 				userFiles(r.View.Files) != c.files || !containsStr(r.View.Files, "hozo:vocab/http.hozo") {
 				t.Errorf("%s: 要求 = %+v", c.name, r)
@@ -1402,26 +1399,33 @@ func TestEmitUnits(t *testing.T) {
 		}
 	})
 
-	t.Run("起動の順は、単位の設定の順、transpilers に書いた順", func(t *testing.T) {
-		// rider と api は、同じ出力について一回ずつ。書いた順（rider が先）は、応答のファイルを変えない
+	t.Run("起動は、プラグインごとに一回。順は、最初に現れた順", func(t *testing.T) {
+		// docs/plugin-protocol.md「起動」: 一度の emit（check と、書き出し）で、プラグインは、一回ずつ。api は、二つの単位の出力を、
+		// admin は、二つの出力を受け持つが、起動は一回。順は、単位の設定の順、transpilers に書いた順に見て、最初に現れた順
+		// （単位 1 の transpilers は、rider が先）
 		write(t, filepath.Join(dir, "plugins", "order.txt"), "")
 		for _, name := range []string{"api", "rider", "admin"} {
-			script := "printf '%s\\n' " + name + " >>\"$d/../order.txt\"\n" + fakeScript
-			writeScript(t, filepath.Join(dir, "plugins", name, "plugin.sh"), script)
+			fakeplugin.Install(t, filepath.Join(dir, "plugins", name), "printf '%s\\n' "+name+" >>\"$d/../order.txt\"")
 		}
 		emitAll(t, dir)
 		order, err := os.ReadFile(filepath.Join(dir, "plugins", "order.txt"))
-		if err != nil || string(order) != "rider\napi\napi\nadmin\nadmin\n" {
+		if err != nil || string(order) != "rider\napi\nadmin\n" {
 			t.Errorf("起動の順 = %q (%v)", order, err)
 		}
 	})
 }
 
 // TestEmitUnitsTargets は docs/cli.md「emit」の 1: 引数は名前空間で、その名前空間と子孫を出力するすべての単位の分を
-// 書き出す。対象を絞っても、書き出す出力の内容は、すべてを対象にしたときと同じ。対象でない出力のトランスパイラは起動しない。
+// 書き出す。対象を絞っても、書き出す出力の内容は、すべてを対象にしたときと同じ。プラグインには、対象を絞っても、すべての
+// 出力を頼む（check が、すべての出力の診断を要る）: 絞るのは、書き出すファイルだけ。
 func TestEmitUnitsTargets(t *testing.T) {
 	dir := unitsProject(t)
 	all := emitAll(t, dir)
+	// すべてを対象にしたときの、頼みごとの数（出力とトランスパイラの組ごとに一つ）
+	asked := map[string]int{}
+	for _, name := range []string{"api", "rider", "admin"} {
+		asked[name] = len(requests(t, dir, name))
+	}
 	clear := func() {
 		if err := os.RemoveAll(filepath.Join(dir, "gen")); err != nil {
 			t.Fatal(err)
@@ -1451,11 +1455,17 @@ func TestEmitUnitsTargets(t *testing.T) {
 			}
 		}
 	}
-	// shop.admin: 単位 3 の出力だけ。ほかの出力のトランスパイラは起動しない（型の置き場の単位 4 も）
+	// shop.admin: 書き出すのは、単位 3 の出力だけ。プラグインへの頼みごとは、すべてを対象にしたときと同じ（起動は、一回ずつ）
 	clear()
+	before := map[string]int{}
+	for _, name := range []string{"api", "rider", "admin"} {
+		before[name] = launches(t, dir, name)
+	}
 	same(emitAll(t, dir, "shop.admin"), "admin/")
-	if n, m, k := len(requests(t, dir, "api")), len(requests(t, dir, "rider")), len(requests(t, dir, "admin")); n != 0 || m != 0 || k != 1 {
-		t.Errorf("起動の回数: api = %d, rider = %d, admin = %d（want 0, 0, 1）", n, m, k)
+	for _, name := range []string{"api", "rider", "admin"} {
+		if n, started := len(requests(t, dir, name)), launches(t, dir, name)-before[name]; n != asked[name] || started != 1 {
+			t.Errorf("%s: 頼みごとが %d 個（want %d。すべてを対象にしたときと同じ）、起動が %d 回（want 1）", name, n, asked[name], started)
+		}
 	}
 	// shop: shop とその子孫を出力するすべての単位の分（四つとも）
 	clear()
@@ -1556,24 +1566,19 @@ func TestEmitIn(t *testing.T) {
 
 // TestRunEmit は cli.hozo の op runEmit（hozoc.Leaves のメソッド。docs/cli.md「手で書くもの」）: plugin を起動し、req を JSON に
 // して送り、応答を hozoc.EmitResponse に読んで返す。内部の op なので、内側のパッケージの Ops から呼ぶ。作業ディレクトリは
-// plugin.root、マニフェストのディレクトリは plugin.dir。hozoc.View は中身のない model なので、要求の view は空のオブジェクト。
-// 異常終了は proc.Crashed、形の違う応答は proc.MalformedOutput（どちらも internal/gen/proc の型）。
+// plugin.root、マニフェストのディレクトリは plugin.dir。hozoc.Spec と hozoc.OutputView は中身のない model なので、要求の spec と、
+// 出力の view は空のオブジェクト。異常終了は proc.Crashed、形の違う応答は proc.MalformedOutput（どちらも internal/gen/proc の型）。
 func TestRunEmit(t *testing.T) {
-	if _, err := exec.LookPath("sh"); err != nil {
-		t.Skip("sh がない")
-	}
 	root := t.TempDir()
 	dir := filepath.Join(root, "plugins", "echo")
-	// 受け取った要求と、作業ディレクトリを記録して、決まった応答を返す
-	writeScript(t, filepath.Join(dir, "plugin.sh"), `cat >"$d/request.json"
-pwd >"$d/cwd"
-cat "$d/response.json"
-exit "$(cat "$d/exit")"
-`)
-	write(t, filepath.Join(dir, "response.json"), `{"files":[{"path":"gen/a/x.go","content":"package a\n"}],"warnings":[{"at":"a.f","message":"w"}],"errors":[{"code":"X-1","at":"a.g","message":"e"}]}`)
+	// 受け取った要求（raw.jsonl）と、作業ディレクトリを記録して、頼まれたトランスパイラごとに、決まった答えを返す
+	fakeplugin.Install(t, dir, `pwd >"$d/cwd"`)
+	write(t, filepath.Join(dir, "response.json"), `{"files":[{"path":"gen/a/@T@.go","content":"package a\n"}],"warnings":[{"at":"a.f","message":"w"}],"errors":[{"code":"X-1","at":"a.g","message":"e"}]}`)
 	write(t, filepath.Join(dir, "exit"), "0")
-	plugin := hozoc.Plugin{Name: "echo", Command: []string{"./plugin.sh"}, Dir: hozoc.Path(dir), Root: hozoc.Path(root)}
-	req := hozoc.EmitRequest{Protocol: "0.21", Direction: "emit", Transpiler: "echo"}
+	plugin := hozoc.Plugin{Name: "echo", Command: fakeplugin.CommandArgs, Dir: hozoc.Path(dir), Root: hozoc.Path(root)}
+	// 出力が二つ: 一つ目は、トランスパイラを二つ、二つ目は、一つ
+	req := hozoc.EmitRequest{Protocol: "0.22", Direction: "emit", Outputs: []hozoc.EmitOutput{
+		{Transpilers: []string{"echo", "echo2"}}, {Transpilers: []string{"echo"}}}}
 	ctx := context.Background()
 	a := &App{Stderr: &bytes.Buffer{}}
 	ops := innerOps(a)
@@ -1582,19 +1587,25 @@ exit "$(cat "$d/exit")"
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := hozoc.EmitResponse{
-		Files:    []hozoc.OutputFile{{Path: "gen/a/x.go", Content: "package a\n"}},
-		Warnings: []hozoc.PluginWarning{{At: "a.f", Message: "w"}},
-		Errors:   []hozoc.PluginError{{Code: "X-1", At: "a.g", Message: "e"}},
+	result := func(name string) hozoc.TranspilerResult {
+		return hozoc.TranspilerResult{
+			Files:    []hozoc.OutputFile{{Path: hozoc.Path("gen/a/" + name + ".go"), Content: "package a\n"}},
+			Warnings: []hozoc.PluginWarning{{At: "a.f", Message: "w"}},
+			Errors:   []hozoc.PluginError{{Code: "X-1", At: "a.g", Message: "e"}},
+		}
 	}
+	want := hozoc.EmitResponse{Outputs: []hozoc.OutputResult{
+		{Results: []hozoc.TranspilerResult{result("echo"), result("echo2")}},
+		{Results: []hozoc.TranspilerResult{result("echo")}},
+	}}
 	if !reflect.DeepEqual(resp, want) {
 		t.Errorf("応答 = %+v, want %+v", resp, want)
 	}
-	sent, err := os.ReadFile(filepath.Join(dir, "request.json"))
+	sent, err := os.ReadFile(filepath.Join(dir, "raw.jsonl"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := strings.TrimSpace(string(sent)); got != `{"protocol":"0.21","direction":"emit","transpiler":"echo","view":{}}` {
+	if got := strings.TrimSpace(string(sent)); got != `{"protocol":"0.22","direction":"emit","spec":{},"outputs":[{"transpilers":["echo","echo2"],"view":{}},{"transpilers":["echo"],"view":{}}]}` {
 		t.Errorf("送った要求 = %s", got)
 	}
 	absRoot, _ := filepath.EvalSymlinks(root)
@@ -1629,15 +1640,13 @@ exit "$(cat "$d/exit")"
 		}
 	}
 	// 中断された ctx では、起動しない
-	if err := os.Remove(filepath.Join(dir, "request.json")); err != nil {
-		t.Fatal(err)
-	}
+	before := strings.Count(readFile(t, filepath.Join(dir, "launches")), "\n")
 	cancelled, cancel := context.WithCancel(ctx)
 	cancel()
 	if _, err = ops.RunEmit(cancelled, plugin, req); !errors.Is(err, context.Canceled) {
 		t.Errorf("中断された ctx: err = %v", err)
 	}
-	if _, err := os.Stat(filepath.Join(dir, "request.json")); !os.IsNotExist(err) {
+	if after := strings.Count(readFile(t, filepath.Join(dir, "launches")), "\n"); after != before {
 		t.Error("中断された ctx で、プラグインを起動した")
 	}
 }
@@ -1734,5 +1743,54 @@ func TestStateUnits(t *testing.T) {
 	}
 	if empty, err := b.Outputs().IsEmpty(ctx); err != nil || !empty {
 		t.Errorf("設定なしの outputs.IsEmpty = %v, %v", empty, err)
+	}
+}
+
+// TestEmitAsksEachPluginOnce は docs/plugin-protocol.md「起動」: 一度の実行で、プラグインごとに、多くて一回、起動する。hozoc emit は、
+// 検査（check）と、書き出し（collectOutputs）で、同じ答えを使い、同じプラグインに、二度、頼まない。プラグインが受け持つ出力は、
+// 一つの要求に並ぶ。
+func TestEmitAsksEachPluginOnce(t *testing.T) {
+	dir := unitsProject(t)
+	for _, c := range []struct {
+		args []string
+	}{{[]string{"check"}}, {[]string{"emit"}}, {[]string{"emit", "--dry-run"}}} {
+		before := map[string]int{}
+		for _, name := range []string{"api", "rider", "admin"} {
+			before[name] = launches(t, dir, name)
+			requests(t, dir, name)
+		}
+		if code, stdout, stderr := run(t, dir, nil, c.args...); code != 0 {
+			t.Fatalf("%v: code=%d stdout=%q stderr=%q", c.args, code, stdout, stderr)
+		}
+		for name, outputs := range map[string]int{"api": 2, "rider": 1, "admin": 2} {
+			if started := launches(t, dir, name) - before[name]; started != 1 {
+				t.Errorf("%v: %s の起動が %d 回（want 1）", c.args, name, started)
+			}
+			if asked := len(requests(t, dir, name)); asked != outputs {
+				t.Errorf("%v: %s への頼みごとが %d 個（want %d: 受け持つ出力ごとに一つ）", c.args, name, asked, outputs)
+			}
+		}
+	}
+	// 一つの要求に、仕様は一度: 要求の、いちばん上の項目は、protocol、direction、spec、outputs
+	raw := strings.Split(strings.TrimSpace(readFile(t, filepath.Join(dir, "plugins", "api", "raw.jsonl"))), "\n")
+	var req map[string]json.RawMessage
+	if err := json.Unmarshal([]byte(raw[len(raw)-1]), &req); err != nil {
+		t.Fatal(err)
+	}
+	var outputs []map[string]json.RawMessage
+	if err := json.Unmarshal(req["outputs"], &outputs); err != nil || len(outputs) != 2 || len(req) != 4 || req["spec"] == nil {
+		t.Fatalf("api への要求の項目 = %v, outputs = %d 個 (%v)", len(req), len(outputs), err)
+	}
+	var spec map[string]json.RawMessage
+	_ = json.Unmarshal(req["spec"], &spec)
+	if spec["program"] == nil || spec["namespaces"] == nil || string(spec["version"]) != `"0.22"` {
+		t.Errorf("spec の項目が足りない: %v", len(spec))
+	}
+	for i, o := range outputs {
+		var view map[string]json.RawMessage
+		_ = json.Unmarshal(o["view"], &view)
+		if view["program"] != nil || view["namespaces"] != nil || view["viewer"] == nil || view["config"] == nil || view["ops"] == nil {
+			t.Errorf("outputs[%d].view が、出力ごとの部分だけでない", i)
+		}
 	}
 }

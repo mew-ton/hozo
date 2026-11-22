@@ -426,7 +426,7 @@ func dependencyFiles(t *testing.T, root string, views []*ir.View) map[string]str
 			if !listed(v, dep.transpiler) {
 				continue
 			}
-			req, err := json.Marshal(request(v, dep.transpiler))
+			req, err := json.Marshal(request(v, dep.transpiler).Batch())
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -439,8 +439,8 @@ func dependencyFiles(t *testing.T, root string, views []*ir.View) map[string]str
 			if err := cmd.Run(); err != nil {
 				t.Fatalf("%s（%s）: %v\n%s", dep.transpiler, v.Viewer, err, stderr.String())
 			}
-			var resp plugin.EmitResponse
-			if err := json.Unmarshal(stdout.Bytes(), &resp); err != nil {
+			resp, err := plugin.SingleResult(stdout.Bytes())
+			if err != nil {
 				t.Fatalf("%s（%s）の応答を読めない: %v", dep.transpiler, v.Viewer, err)
 			}
 			for _, d := range resp.Errors {

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -16,7 +17,6 @@ import (
 // fake は各方向を関数で差し替えられる Handler。nil の方向は ErrUnsupported。
 type fake struct {
 	emit   func(*EmitRequest) (*EmitResponse, error)
-	check  func(*CheckRequest) (*CheckResponse, error)
 	imp    func(*ImportRequest) (*ImportResponse, error)
 	cov    func(*CoverageRequest) (*CoverageResponse, error)
 	called string
@@ -28,14 +28,6 @@ func (f *fake) Emit(r *EmitRequest) (*EmitResponse, error) {
 		return nil, ErrUnsupported
 	}
 	return f.emit(r)
-}
-
-func (f *fake) Check(r *CheckRequest) (*CheckResponse, error) {
-	f.called = "check"
-	if f.check == nil {
-		return nil, ErrUnsupported
-	}
-	return f.check(r)
 }
 
 func (f *fake) Import(r *ImportRequest) (*ImportResponse, error) {
@@ -67,9 +59,21 @@ type refusal struct {
 	} `json:"error"`
 }
 
-func viewJSON(viewer string) string {
-	return fmt.Sprintf(`{"version":%q,"viewer":%q,"config":{"index":1,"language":"go","base":"go","out":"gen","dir":"gen","transpilers":["go","cli"],"options":{},"seams":{}},"files":[],"namespaces":{},"program":{"version":%q,"namespaces":[],"binds":[]},"ops":{}}`,
-		ir.Version, viewer, ir.Version)
+// specJSON は、要求の spec（docs/ir.md「まとめた形」の Spec）。program は、名前空間を持たない。
+func specJSON() string {
+	return fmt.Sprintf(`{"version":%q,"namespaces":{},"program":{"version":%q,"namespaces":[],"binds":[]}}`, ir.Version, ir.Version)
+}
+
+// outputJSON は、要求の outputs の要素一つ: 見る側が viewer の出力で、頼むトランスパイラが transpilers。
+func outputJSON(viewer string, transpilers ...string) string {
+	names, _ := json.Marshal(transpilers)
+	return fmt.Sprintf(`{"transpilers":%s,"view":{"viewer":%q,"config":{"index":1,"language":"go","base":"go","out":"gen","dir":"gen","transpilers":["go","cli"],"options":{},"seams":{}},"files":[],"synthesized":[],"entries":[],"ops":{}}}`,
+		names, viewer)
+}
+
+// emitJSON は、direction "emit" の要求（docs/plugin-protocol.md「emit」）: 仕様を一度と、出力の並び。
+func emitJSON(outputs ...string) string {
+	return fmt.Sprintf(`{"protocol":%q,"direction":"emit","spec":%s,"outputs":[%s]}`, ir.Version, specJSON(), strings.Join(outputs, ","))
 }
 
 func TestEmit(t *testing.T) {
@@ -77,29 +81,126 @@ func TestEmit(t *testing.T) {
 		if r.Protocol != ir.Version || r.Direction != "emit" || r.Transpiler != "go-cli" {
 			t.Errorf("request header = %q %q %q", r.Protocol, r.Direction, r.Transpiler)
 		}
-		if r.View == nil || r.View.Viewer != "cli" {
+		if r.View == nil || r.View.Viewer != "cli" || r.View.Version != ir.Version || r.View.Program == nil {
 			t.Errorf("view not decoded: %+v", r.View)
 		}
 		return &EmitResponse{Files: []File{{Path: "cli/cli.go", Content: "package cli\n"}}}, nil
 	}}
-	code, out, errOut := run(t, h, fmt.Sprintf(`{"protocol":%q,"direction":"emit","transpiler":"go-cli","view":%s}`, ir.Version, viewJSON("cli")))
+	code, out, errOut := run(t, h, emitJSON(outputJSON("cli", "go-cli")))
 	if code != 0 || errOut != "" {
 		t.Fatalf("code = %d, stderr = %q", code, errOut)
 	}
-	var got map[string]json.RawMessage
-	decode(t, out, &got)
-	if string(got["files"]) != `[{"path":"cli/cli.go","content":"package cli\n"}]` {
-		t.Errorf("files = %s", got["files"])
+	// 応答は、出力ごと、トランスパイラごとの答えの並び。warnings は空でも []、errors は省く。select は、ない
+	// （版 0.4 でなくした。docs/plugin-protocol.md「選択をなくしたこと」）
+	want := `{"outputs":[{"results":[{"files":[{"path":"cli/cli.go","content":"package cli\n"}],"warnings":[]}]}]}` + "\n"
+	if out != want {
+		t.Errorf("stdout = %s\nwant %s", out, want)
 	}
-	if string(got["warnings"]) != `[]` {
-		t.Errorf("warnings must be [] when empty, got %s", got["warnings"])
+	got, err := SingleResult([]byte(out))
+	if err != nil || len(got.Files) != 1 || got.Files[0].Path != "cli/cli.go" {
+		t.Errorf("SingleResult = %+v, %v", got, err)
 	}
-	if _, ok := got["errors"]; ok {
-		t.Errorf("errors must be omitted when empty, got %s", got["errors"])
+}
+
+// TestRunEmitBatch は docs/plugin-protocol.md「emit」の「SDK が、並びを回す」: 要求の outputs の順、その中は transpilers の順に、
+// Handler.Emit を呼び、答えを、同じ並びで応答に置く。Emit に渡る View は、spec と、その出力の view を合わせたもの
+// （docs/ir.md「まとめた形」）: program は、spec のものに、その出力の synthesized を、viewer の名前空間の末尾に足したもの。
+// 出力のない要求には、空の outputs を返す。transpilers が空の出力には、空の results。
+func TestRunEmitBatch(t *testing.T) {
+	spec := fmt.Sprintf(`{"version":%q,"namespaces":{"a":[],"b":[]},"program":{"version":%q,"namespaces":[`+
+		`{"name":"a","decls":[{"kind":"model","name":"a.M","span":{"file":"a.hozo","start":{"line":1,"col":1},"end":{"line":1,"col":2}},"decorators":[],"fields":[]}]},`+
+		`{"name":"b","decls":[]}],"binds":[]}}`, ir.Version, ir.Version)
+	view := func(viewer, synthesized string) string {
+		return fmt.Sprintf(`{"viewer":%q,"config":{"index":1,"language":"go","base":"go","out":"gen","dir":"gen/%s","transpilers":["go","cli"],"options":{},"seams":{}},"files":["a.hozo"],"synthesized":[%s],"entries":[],"ops":{}}`,
+			viewer, viewer, synthesized)
 	}
-	// 応答に select はない（版 0.4 でなくした。docs/plugin-protocol.md「選択をなくしたこと」）
-	if _, ok := got["select"]; ok {
-		t.Errorf("select must not be written, got %s", got["select"])
+	synth := `{"kind":"model","name":"a.f$in","span":{"file":"a.hozo","start":{"line":2,"col":1},"end":{"line":2,"col":2}},"decorators":[],"synthesizedFrom":"a.f","fields":[]}`
+	req := fmt.Sprintf(`{"protocol":%q,"direction":"emit","spec":%s,"outputs":[`+
+		`{"transpilers":["go","cli"],"view":%s},{"transpilers":[],"view":%s},{"transpilers":["cli"],"view":%s}]}`,
+		ir.Version, spec, view("a", synth), view("b", ""), view("b", ""))
+	var calls []string
+	var programs []*ir.Program
+	h := &fake{emit: func(r *EmitRequest) (*EmitResponse, error) {
+		decls := 0
+		if ns := r.View.Program.Namespace("a"); ns != nil {
+			decls = len(ns.Decls)
+		}
+		calls = append(calls, fmt.Sprintf("%s@%s dir=%s a.decls=%d", r.Transpiler, r.View.Viewer, r.View.Config.Dir, decls))
+		programs = append(programs, r.View.Program)
+		if r.View.Version != ir.Version || len(r.View.Namespaces) != 2 || len(r.View.Files) != 1 {
+			t.Errorf("View が、spec と view を合わせたものでない: %+v", r.View)
+		}
+		if r.Transpiler == "cli" && r.View.Viewer == "a" {
+			return &EmitResponse{Errors: []Diagnostic{{Code: "X-1", At: "a.M", Message: "e"}}}, nil
+		}
+		return &EmitResponse{Files: []File{{Path: "gen/" + r.View.Viewer + "/" + r.Transpiler + ".go", Content: "x"}}}, nil
+	}}
+	code, out, errOut := run(t, h, req)
+	if code != 0 || errOut != "" {
+		t.Fatalf("code = %d, stderr = %q", code, errOut)
+	}
+	wantCalls := []string{"go@a dir=gen/a a.decls=2", "cli@a dir=gen/a a.decls=2", "cli@b dir=gen/b a.decls=1"}
+	if !reflect.DeepEqual(calls, wantCalls) {
+		t.Errorf("Emit の呼び出し = %q\nwant %q", calls, wantCalls)
+	}
+	// 合成した model を足すのは、その出力の View だけ: 仕様（spec の program）は、変えない
+	if len(programs) == 3 && len(programs[2].Namespace("a").Decls) != 1 {
+		t.Error("ほかの出力の synthesized が、spec の program に残った")
+	}
+	want := `{"outputs":[` +
+		`{"results":[{"files":[{"path":"gen/a/go.go","content":"x"}],"warnings":[]},{"files":[],"warnings":[],"errors":[{"code":"X-1","at":"a.M","message":"e"}]}]},` +
+		`{"results":[]},` +
+		`{"results":[{"files":[{"path":"gen/b/cli.go","content":"x"}],"warnings":[]}]}]}` + "\n"
+	if out != want {
+		t.Errorf("stdout = %s\nwant %s", out, want)
+	}
+	// 出力のない要求
+	if code, out, _ := run(t, h, emitJSON()); code != 0 || out != `{"outputs":[]}`+"\n" {
+		t.Errorf("出力のない要求: code = %d, stdout = %s", code, out)
+	}
+	// spec のない要求、view のない出力は、誤り（終了コード 1）
+	for name, input := range map[string]string{
+		"spec がない": fmt.Sprintf(`{"protocol":%q,"direction":"emit","outputs":[%s]}`, ir.Version, outputJSON("a", "go")),
+		"view がない": fmt.Sprintf(`{"protocol":%q,"direction":"emit","spec":%s,"outputs":[{"transpilers":["go"]}]}`, ir.Version, specJSON()),
+	} {
+		if code, out, errOut := run(t, h, input); code != 1 || out != "" || errOut == "" {
+			t.Errorf("%s: code = %d, stdout = %q, stderr = %q", name, code, out, errOut)
+		}
+	}
+}
+
+// TestRunIgnoresUnknownFields は docs/plugin-protocol.md「要求と応答」: プラグインは、要求の、知らない項目を、どの階層でも、
+// 無視する（docs/decisions.md「決めたこと」421）。知らない項目を足した要求への応答は、足さない要求への応答と、同じ。
+func TestRunIgnoresUnknownFields(t *testing.T) {
+	decl := func(extra string) string {
+		return `{"kind":"model","name":"a.M","span":{"file":"a.hozo","start":{"line":1,"col":1` + extra + `},"end":{"line":1,"col":2}},"decorators":[],"fields":[` +
+			`{"name":"id","type":{"kind":"core","name":"string"` + extra + `},"optional":false,"decorators":[],"span":{"file":"a.hozo","start":{"line":1,"col":1},"end":{"line":1,"col":2}}` + extra + `}]` + extra + `}`
+	}
+	request := func(extra string) string {
+		config := `{"index":1,"language":"go","base":"go","out":"gen","dir":"gen/a","transpilers":["go"],"options":{"go":{"module":"example.com/app"}},"seams":{}` + extra + `}`
+		return fmt.Sprintf(`{"protocol":%q,"direction":"emit"%s,"spec":{"version":%q,"namespaces":{"a":[%s]},"program":{"version":%q,"namespaces":[{"name":"a","decls":[%s]%s}],"binds":[]%s}%s},`+
+			`"outputs":[{"transpilers":["go"],"view":{"viewer":"a","config":%s,"files":["a.hozo"],"synthesized":[],"entries":[],"ops":{}%s}%s}]}`,
+			ir.Version, extra, ir.Version, config, ir.Version, decl(extra), extra, extra, extra, config, extra, extra)
+	}
+	h := &fake{emit: func(r *EmitRequest) (*EmitResponse, error) {
+		m, _ := r.View.Program.Lookup("a.M").(*ir.Model)
+		if m == nil || len(m.Fields) != 1 || m.Fields[0].Name != "id" || r.View.Config.Dir != "gen/a" || len(r.View.Namespaces["a"]) != 1 {
+			return nil, fmt.Errorf("View を読めていない: %+v", r.View)
+		}
+		return &EmitResponse{Files: []File{{Path: "gen/a/" + m.Fields[0].Name + ".go", Content: r.View.Config.Options["go"]["module"].(string)}}}, nil
+	}}
+	code, plain, errOut := run(t, h, request(""))
+	if code != 0 || errOut != "" {
+		t.Fatalf("知らない項目のない要求: code = %d, stderr = %q", code, errOut)
+	}
+	// 文字列、数、null、配列、オブジェクトの、知らない項目を、すべての階層に足す
+	extra := `,"futureString":"x","futureNumber":1,"futureNull":null,"futureList":[{"deep":true}],"futureObject":{"kind":"unknownKind","name":7}`
+	if !strings.Contains(request(extra), `"futureObject"`) || strings.Count(request(extra), `"futureString"`) < 10 {
+		t.Fatal("知らない項目が、要求に入っていない")
+	}
+	code, out, errOut := run(t, h, request(extra))
+	if code != 0 || errOut != "" || out != plain {
+		t.Errorf("知らない項目のある要求: code = %d, stderr = %q\nstdout = %s\nwant %s", code, errOut, out, plain)
 	}
 }
 
@@ -213,87 +314,13 @@ func TestEmitErrorsAndWarnings(t *testing.T) {
 			Errors:   []Diagnostic{{Code: "CLI-1", At: "hozoc.check", Message: "e"}},
 		}, nil
 	}}
-	code, out, _ := run(t, h, fmt.Sprintf(`{"protocol":%q,"direction":"emit","view":%s}`, ir.Version, viewJSON("hozoc")))
+	code, out, _ := run(t, h, emitJSON(outputJSON("hozoc", "go-cli")))
 	if code != 0 {
 		t.Fatalf("code = %d", code)
 	}
-	want := `{"files":[],"warnings":[{"at":"hozoc.emit","message":"w"}],"errors":[{"code":"CLI-1","at":"hozoc.check","message":"e"}]}` + "\n"
+	want := `{"outputs":[{"results":[{"files":[],"warnings":[{"at":"hozoc.emit","message":"w"}],"errors":[{"code":"CLI-1","at":"hozoc.check","message":"e"}]}]}]}` + "\n"
 	if out != want {
 		t.Errorf("stdout = %s\nwant %s", out, want)
-	}
-}
-
-func TestCheck(t *testing.T) {
-	h := &fake{check: func(r *CheckRequest) (*CheckResponse, error) {
-		if r.View == nil || r.View.Viewer != "browser" {
-			t.Errorf("view not decoded: %+v", r.View)
-		}
-		return &CheckResponse{Diagnostics: []Diagnostic{{Severity: "error", Code: "PAGE-1", Message: "m", At: "browser.openOrders"}}}, nil
-	}}
-	code, out, _ := run(t, h, fmt.Sprintf(`{"protocol":%q,"direction":"check","view":%s}`, ir.Version, viewJSON("browser")))
-	if code != 0 {
-		t.Fatalf("code = %d", code)
-	}
-	want := `{"diagnostics":[{"severity":"error","code":"PAGE-1","at":"browser.openOrders","message":"m"}]}` + "\n"
-	if out != want {
-		t.Errorf("stdout = %s\nwant %s", out, want)
-	}
-}
-
-// TestCheckByEmit は、direction "check" を、emit と同じ検査で答える道（docs/plugin-protocol.md「check」）: 単位の transpilers の
-// うち、そのプラグインのものごとに、同じ View で Emit を呼び、errors を、severity が "error" の diagnostics にする。
-// warnings と files は、返さない。単位にない自分のトランスパイラと、ほかのプラグインのトランスパイラは、呼ばない。
-func TestCheckByEmit(t *testing.T) {
-	var calls []string
-	h := &fake{emit: func(r *EmitRequest) (*EmitResponse, error) {
-		calls = append(calls, r.Transpiler)
-		if r.Direction != "emit" || r.Protocol != ir.Version || r.View == nil || r.View.Viewer != "hozoc" {
-			t.Errorf("emit の要求 = %+v", r)
-		}
-		return &EmitResponse{
-			Files:    []File{{Path: "gen/x.go", Content: "package x"}},
-			Warnings: []Warning{{Message: "w"}},
-			Errors:   []Diagnostic{{Code: "X-1", At: "hozoc." + r.Transpiler, Message: "e"}},
-		}, nil
-	}}
-	h.check = func(r *CheckRequest) (*CheckResponse, error) {
-		// このプラグインのトランスパイラは cli、go、lost（lost は、単位に書かれていない）。順は、単位の transpilers の順（go、cli）
-		return CheckByEmit(h, []string{"cli", "go", "lost"}, r)
-	}
-	code, out, _ := run(t, h, fmt.Sprintf(`{"protocol":%q,"direction":"check","view":%s}`, ir.Version, viewJSON("hozoc")))
-	if code != 0 {
-		t.Fatalf("code = %d", code)
-	}
-	want := `{"diagnostics":[{"severity":"error","code":"X-1","at":"hozoc.go","message":"e"},{"severity":"error","code":"X-1","at":"hozoc.cli","message":"e"}]}` + "\n"
-	if out != want {
-		t.Errorf("stdout = %s\nwant %s", out, want)
-	}
-	if got := strings.Join(calls, ","); got != "go,cli" {
-		t.Errorf("Emit を呼んだトランスパイラ = %s（期待は go,cli）", got)
-	}
-
-	// errors のない応答は、空の diagnostics
-	h.emit = func(*EmitRequest) (*EmitResponse, error) {
-		return &EmitResponse{Warnings: []Warning{{Message: "w"}}}, nil
-	}
-	if code, out, _ := run(t, h, fmt.Sprintf(`{"protocol":%q,"direction":"check","view":%s}`, ir.Version, viewJSON("hozoc"))); code != 0 || out != "{\"diagnostics\":[]}\n" {
-		t.Errorf("code = %d, stdout = %s", code, out)
-	}
-	// Emit の誤りは、そのまま返す。View のない要求は、誤り
-	h.emit = func(*EmitRequest) (*EmitResponse, error) { return nil, errors.New("boom") }
-	if _, err := CheckByEmit(h, []string{"go"}, &CheckRequest{View: &ir.View{Config: ir.NamespaceConfig{Transpilers: []string{"go"}}}}); err == nil || err.Error() != "boom" {
-		t.Errorf("err = %v（期待は boom）", err)
-	}
-	if _, err := CheckByEmit(h, []string{"go"}, &CheckRequest{}); err == nil {
-		t.Error("View のない要求で、誤りにならない")
-	}
-}
-
-func TestCheckEmptyDiagnostics(t *testing.T) {
-	h := &fake{check: func(r *CheckRequest) (*CheckResponse, error) { return &CheckResponse{}, nil }}
-	code, out, _ := run(t, h, fmt.Sprintf(`{"protocol":%q,"direction":"check","view":%s}`, ir.Version, viewJSON("browser")))
-	if code != 0 || out != "{\"diagnostics\":[]}\n" {
-		t.Errorf("code = %d, stdout = %s", code, out)
 	}
 }
 
@@ -359,10 +386,9 @@ func TestRequestHead(t *testing.T) {
 	for _, c := range table.Cases {
 		t.Run(c.Name, func(t *testing.T) {
 			h := &fake{
-				emit:  func(*EmitRequest) (*EmitResponse, error) { return &EmitResponse{}, nil },
-				check: func(*CheckRequest) (*CheckResponse, error) { return &CheckResponse{}, nil },
-				imp:   func(*ImportRequest) (*ImportResponse, error) { return &ImportResponse{}, nil },
-				cov:   func(*CoverageRequest) (*CoverageResponse, error) { return &CoverageResponse{}, nil },
+				emit: func(*EmitRequest) (*EmitResponse, error) { return &EmitResponse{}, nil },
+				imp:  func(*ImportRequest) (*ImportResponse, error) { return &ImportResponse{}, nil },
+				cov:  func(*CoverageRequest) (*CoverageResponse, error) { return &CoverageResponse{}, nil },
 			}
 			code, out, errOut := run(t, h, c.Request)
 			if code != c.Exit {
@@ -466,10 +492,14 @@ func TestTestMapFile(t *testing.T) {
 }
 
 func TestUnsupportedDirection(t *testing.T) {
-	for _, dir := range []string{"emit", "check", "import", "coverage"} {
+	for _, dir := range []string{"emit", "import", "coverage"} {
 		t.Run(dir, func(t *testing.T) {
 			h := &fake{} // すべて ErrUnsupported
-			code, out, _ := run(t, h, fmt.Sprintf(`{"protocol":%q,"direction":%q}`, ir.Version, dir))
+			input := fmt.Sprintf(`{"protocol":%q,"direction":%q}`, ir.Version, dir)
+			if dir == "emit" { // emit は、頼まれたトランスパイラごとに Handler を呼ぶ
+				input = emitJSON(outputJSON("a", "go"))
+			}
+			code, out, _ := run(t, h, input)
 			if code != 2 {
 				t.Fatalf("code = %d, want 2", code)
 			}
@@ -490,7 +520,7 @@ func TestWrappedErrUnsupported(t *testing.T) {
 	h := &fake{emit: func(r *EmitRequest) (*EmitResponse, error) {
 		return nil, fmt.Errorf("transpiler %q: %w", r.Transpiler, ErrUnsupported)
 	}}
-	code, out, _ := run(t, h, fmt.Sprintf(`{"protocol":%q,"direction":"emit","transpiler":"nope"}`, ir.Version))
+	code, out, _ := run(t, h, emitJSON(outputJSON("a", "nope")))
 	var r refusal
 	decode(t, out, &r)
 	if code != 2 || r.Error.Code != "unsupported" || !strings.Contains(r.Error.Message, `"nope"`) {
@@ -512,21 +542,21 @@ func TestUnknownDirection(t *testing.T) {
 }
 
 func TestHandlerError(t *testing.T) {
-	h := &fake{check: func(*CheckRequest) (*CheckResponse, error) { return nil, errors.New("boom") }}
-	code, out, errOut := run(t, h, fmt.Sprintf(`{"protocol":%q,"direction":"check"}`, ir.Version))
+	h := &fake{emit: func(*EmitRequest) (*EmitResponse, error) { return nil, errors.New("boom") }}
+	code, out, errOut := run(t, h, emitJSON(outputJSON("a", "go")))
 	if code != 1 {
 		t.Fatalf("code = %d, want 1", code)
 	}
 	if out != "" {
 		t.Errorf("stdout must be empty, got %s", out)
 	}
-	if !strings.Contains(errOut, "boom") || !strings.Contains(errOut, "check") {
+	if !strings.Contains(errOut, "boom") || !strings.Contains(errOut, "emit") {
 		t.Errorf("stderr = %q", errOut)
 	}
 }
 
 func TestMalformedRequest(t *testing.T) {
-	for name, input := range map[string]string{"not json": "{", "empty": "", "wrong type": fmt.Sprintf(`{"protocol":%q,"direction":"emit","view":5}`, ir.Version)} {
+	for name, input := range map[string]string{"not json": "{", "empty": "", "wrong type": fmt.Sprintf(`{"protocol":%q,"direction":"emit","spec":5}`, ir.Version)} {
 		t.Run(name, func(t *testing.T) {
 			h := &fake{emit: func(*EmitRequest) (*EmitResponse, error) { return &EmitResponse{}, nil }}
 			code, out, errOut := run(t, h, input)
@@ -544,7 +574,7 @@ func (failWriter) Write([]byte) (int, error) { return 0, errors.New("closed") }
 func TestWriteFailure(t *testing.T) {
 	h := &fake{emit: func(*EmitRequest) (*EmitResponse, error) { return &EmitResponse{}, nil }}
 	var e bytes.Buffer
-	code := Run(h, strings.NewReader(fmt.Sprintf(`{"protocol":%q,"direction":"emit"}`, ir.Version)), failWriter{}, &e)
+	code := Run(h, strings.NewReader(emitJSON(outputJSON("a", "go"))), failWriter{}, &e)
 	if code != 1 || !strings.Contains(e.String(), "closed") {
 		t.Errorf("code = %d, stderr = %q", code, e.String())
 	}
@@ -554,7 +584,7 @@ func TestNoHTMLEscape(t *testing.T) {
 	h := &fake{emit: func(*EmitRequest) (*EmitResponse, error) {
 		return &EmitResponse{Files: []File{{Path: "a.go", Content: "a < b && c > d"}}}, nil
 	}}
-	_, out, _ := run(t, h, fmt.Sprintf(`{"protocol":%q,"direction":"emit"}`, ir.Version))
+	_, out, _ := run(t, h, emitJSON(outputJSON("a", "go")))
 	if !strings.Contains(out, `"a < b && c > d"`) {
 		t.Errorf("content must not be HTML-escaped: %s", out)
 	}

@@ -99,7 +99,7 @@ func (s *server) contentChanged(content string) {
 }
 
 // needsPluginChecks は、直近の解析で、プラグインの check を走らせる意味があるか（docs/lsp.md「プラグインの診断」の
-// 「走らせないとき」）: hozo.toml があり、hozoc 自身の診断に error がなく、使うプラグインに、[check] enabled のものがある。
+// 「走らせないとき」）: hozo.toml があり、hozoc 自身の診断に error がなく、起動する相手（受け持つ出力のある、使うプラグイン）がある。
 func (s *server) needsPluginChecks() bool {
 	p := s.proj
 	if !s.checks.allowed || p == nil || p.NoConfig {
@@ -108,14 +108,7 @@ func (s *server) needsPluginChecks() bool {
 	if errs, _ := diag.Count(p.Diags); errs > 0 {
 		return false
 	}
-	for i := range p.Units {
-		for _, t := range p.Units[i].Transpilers {
-			if t.Plugin != nil && t.Plugin.Manifest.Check.Enabled && len(t.Plugin.Mismatch) == 0 {
-				return true
-			}
-		}
-	}
-	return false
+	return p.NeedsPlugins()
 }
 
 // requestPluginChecks は、今の中身について、プラグインの check を求める（docs/lsp.md「プラグインの診断」の「きっかけ」）。

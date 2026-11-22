@@ -15,7 +15,7 @@ import (
 const exampleManifest = `
 name     = "react-router"
 command  = ["node", "dist/main.js"]
-protocol = "0.21"
+protocol = "0.22"
 
 vocabulary = ["vocab/page.hozo"]
 
@@ -25,9 +25,6 @@ language    = "ts"
 requires    = ["ts", "ts-valid"]
 unsupported = []
 seams       = ["rate.limited"]
-
-[check]
-enabled = true
 
 [import]
 formats = []
@@ -40,7 +37,7 @@ enabled = true
 const goCLIManifest = `
 name     = "go-cli"
 command  = ["go", "run", "github.com/mew-ton/hozo/plugins/go-cli"]
-protocol = "0.21"
+protocol = "0.22"
 
 [[transpiler]]
 name     = "go-cli"
@@ -48,7 +45,7 @@ language = "go"
 `
 
 // base は name = "x" の最小のマニフェスト（protocol は hozoc のもの）。後ろにテーブルを足して使う。
-const base = "name = \"x\"\ncommand = \"x\"\nprotocol = \"0.21\"\n"
+const base = "name = \"x\"\ncommand = \"x\"\nprotocol = \"0.22\"\n"
 
 func writeManifest(t *testing.T, dir, content string) string {
 	t.Helper()
@@ -78,10 +75,9 @@ func TestLoadManifestExample(t *testing.T) {
 		t.Fatalf("diags = %+v", diags)
 	}
 	want := &Manifest{
-		Name: "react-router", Command: []string{"node", "dist/main.js"}, Protocol: "0.21",
+		Name: "react-router", Command: []string{"node", "dist/main.js"}, Protocol: "0.22",
 		Vocabulary:  []string{"vocab/page.hozo"},
 		Transpilers: []Transpiler{{Name: "react-router", Language: "ts", Requires: []string{"ts", "ts-valid"}, Unsupported: []string{}, Seams: []string{"rate.limited"}}},
-		Check:       Check{Enabled: true},
 		Import:      Import{Formats: []string{}},
 		Coverage:    Coverage{Enabled: true},
 	}
@@ -109,7 +105,7 @@ func TestLoadManifestGoCLI(t *testing.T) {
 		t.Errorf("transpilers = %+v", m.Transpilers)
 	}
 	// 省いた [coverage] は enabled = false
-	if m.Check.Enabled || m.Coverage.Enabled || len(m.Vocabulary) != 0 || m.Vocabulary == nil || m.HasImport() {
+	if m.Coverage.Enabled || len(m.Vocabulary) != 0 || m.Vocabulary == nil || m.HasImport() {
 		t.Errorf("%+v", m)
 	}
 }
@@ -126,7 +122,7 @@ func TestLoadManifestRepoGoCLI(t *testing.T) {
 }
 
 func TestLoadManifestStringCommand(t *testing.T) {
-	m, diags := LoadManifest(writeManifest(t, t.TempDir(), "name = \"x\"\ncommand = \"hozoc-plugin-x\"\nprotocol = \"0.21\"\n"))
+	m, diags := LoadManifest(writeManifest(t, t.TempDir(), "name = \"x\"\ncommand = \"hozoc-plugin-x\"\nprotocol = \"0.22\"\n"))
 	if len(diags) != 0 || !reflect.DeepEqual(m.Command, []string{"hozoc-plugin-x"}) || m.HasEmit() {
 		t.Errorf("m=%+v diags=%+v", m, diags)
 	}
@@ -160,11 +156,13 @@ func TestLoadManifestDiagnostics(t *testing.T) {
 		{"unknown key", base + "foo = 1\n", []string{"MAN-4"}, true},
 		{"unknown transpiler key", base + tr + "foo = 1\n", []string{"MAN-4"}, true},
 		{"unknown table", base + "[extra]\na = 1\n", []string{"MAN-4"}, true},
-		{"no command", "name = \"x\"\nprotocol = \"0.21\"\n", []string{"MAN-4"}, true},
-		{"empty string command", "name = \"x\"\ncommand = \"\"\nprotocol = \"0.21\"\n", []string{"MAN-4"}, true},
-		{"empty array command", "name = \"x\"\ncommand = []\nprotocol = \"0.21\"\n", []string{"MAN-4"}, true},
-		{"command wrong type", "name = \"x\"\ncommand = 1\nprotocol = \"0.21\"\n", []string{"MAN-4"}, true},
-		{"no name", "command = \"x\"\nprotocol = \"0.21\"\n", []string{"MAN-4"}, true},
+		{"no command", "name = \"x\"\nprotocol = \"0.22\"\n", []string{"MAN-4"}, true},
+		{"empty string command", "name = \"x\"\ncommand = \"\"\nprotocol = \"0.22\"\n", []string{"MAN-4"}, true},
+		{"empty array command", "name = \"x\"\ncommand = []\nprotocol = \"0.22\"\n", []string{"MAN-4"}, true},
+		{"command wrong type", "name = \"x\"\ncommand = 1\nprotocol = \"0.22\"\n", []string{"MAN-4"}, true},
+		{"no name", "command = \"x\"\nprotocol = \"0.22\"\n", []string{"MAN-4"}, true},
+		// 版 0.22 でなくした [check]（docs/plugin-protocol.md「マニフェスト」）は、知らないキー
+		{"removed check table", base + "\n[check]\nenabled = true\n", []string{"MAN-4"}, true},
 		{"unsupported wrong type", base + tr + "unsupported = \"a\"\n", []string{"MAN-4"}, true},
 		// 言語を持つのはトランスパイラ。トップレベルの language と [emit]（設計書 §4.6 の decorate / entry / stop を含む）は知らないキー
 		{"top-level language is unknown", base + "language = \"go\"\n", []string{"MAN-4"}, true},
@@ -265,7 +263,7 @@ func TestDiscoverOrder(t *testing.T) {
 
 	// where は、どこのマニフェストかをトランスパイラの名前に書いたマニフェスト
 	manifest := func(name, where string) string {
-		return "name = \"" + name + "\"\ncommand = \"p\"\nprotocol = \"0.21\"\n[[transpiler]]\nname = \"" + where + "\"\nlanguage = \"go\"\n"
+		return "name = \"" + name + "\"\ncommand = \"p\"\nprotocol = \"0.22\"\n[[transpiler]]\nname = \"" + where + "\"\nlanguage = \"go\"\n"
 	}
 	plugins, diags := Discover(cfg, env)
 	if len(plugins) != 0 || len(diags) != 0 {
@@ -338,7 +336,7 @@ func TestDiscoverNameMismatch(t *testing.T) {
 	env := SearchEnv{}
 	cfg := config.Default(root)
 	cfg.Hozo.PluginDirs = []string{"plugins"}
-	p := writeManifest(t, filepath.Join(root, "plugins", "p"), "name = \"q\"\ncommand = \"q\"\nprotocol = \"0.21\"\n")
+	p := writeManifest(t, filepath.Join(root, "plugins", "p"), "name = \"q\"\ncommand = \"q\"\nprotocol = \"0.22\"\n")
 	plugins, diags := Discover(cfg, env)
 	if len(plugins) != 0 || !reflect.DeepEqual(codes(diags), []string{"MAN-3"}) || diags[0].File != p {
 		t.Errorf("plugins=%v diags=%+v", names(plugins), diags)
@@ -354,7 +352,7 @@ func TestDiscoverBadManifest(t *testing.T) {
 	cfg := config.Default(root)
 	cfg.Hozo.PluginDirs = []string{"plugins"}
 	writeManifest(t, filepath.Join(root, "plugins", "p"), "name = \n")
-	writeManifest(t, filepath.Join(home, ".hozo", "plugins", "p"), "name = \"p\"\ncommand = \"p\"\nprotocol = \"0.21\"\n")
+	writeManifest(t, filepath.Join(home, ".hozo", "plugins", "p"), "name = \"p\"\ncommand = \"p\"\nprotocol = \"0.22\"\n")
 	plugins, diags := Discover(cfg, env)
 	if len(plugins) != 0 || !reflect.DeepEqual(codes(diags), []string{"MAN-4"}) {
 		t.Errorf("plugins=%v diags=%+v", names(plugins), diags)

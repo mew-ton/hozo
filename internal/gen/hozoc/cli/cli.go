@@ -110,7 +110,7 @@ func Main(ctx context.Context, ops hozoc.Ops, p Presenter, args []string, env fu
 
 // cliUsage は全体の使い方。
 func cliUsage(prog string) string {
-	return "usage: " + prog + " <command> [flags]\n\ncommands:\n  check   仕様を検査する。ファイルは書き出さない\n  emit    仕様を検査し、単位ごとにトランスパイラを呼んで、生成したファイルを書き出す\n  tests   仕様を検査し、求めるテストが走ったかを、カバレッジと突き合わせて確かめる。テストは走らせない\n  lsp     言語サーバーとして標準入出力で動く（docs/lsp.md）。クライアントが exit を送るまで戻らない\n"
+	return "usage: " + prog + " <command> [flags]\n\ncommands:\n  check   仕様を検査する。使うプラグインに、展開を頼み、その診断も集める。ファイルは書き出さない\n  emit    仕様を検査し、プラグインから受け取ったファイルを書き出す\n  tests   仕様を検査し、求めるテストが走ったかを、カバレッジと突き合わせて確かめる。テストは走らせない\n  lsp     言語サーバーとして標準入出力で動く（docs/lsp.md）。クライアントが exit を送るまで戻らない\n"
 }
 
 // runCheck はサブコマンド check（op hozoc.check）。
@@ -157,7 +157,7 @@ func failCheck(p Presenter, prog string, input any, err error, stderr io.Writer)
 
 // usageCheck は check の使い方に出す説明: コマンドの名前と一行の説明と、入力のフィールドの順に、フィールドの名前と一行の説明。
 func usageCheck() cliHelp {
-	return cliHelp{command: "check", summary: "仕様を検査する。ファイルは書き出さない", fields: [][2]string{
+	return cliHelp{command: "check", summary: "仕様を検査する。使うプラグインに、展開を頼み、その診断も集める。ファイルは書き出さない", fields: [][2]string{
 		{"config", "設定ファイルの場所"},
 		{"format", "表示の形式"},
 		{"pluginPath", "プラグインを探すディレクトリ（OS のパス区切りで複数）"},
@@ -212,7 +212,7 @@ func failEmit(p Presenter, prog string, input any, err error, stderr io.Writer) 
 
 // usageEmit は emit の使い方に出す説明: コマンドの名前と一行の説明と、入力のフィールドの順に、フィールドの名前と一行の説明。
 func usageEmit() cliHelp {
-	return cliHelp{command: "emit", summary: "仕様を検査し、単位ごとにトランスパイラを呼んで、生成したファイルを書き出す", fields: [][2]string{
+	return cliHelp{command: "emit", summary: "仕様を検査し、プラグインから受け取ったファイルを書き出す", fields: [][2]string{
 		{"config", "設定ファイルの場所"},
 		{"format", "表示の形式"},
 		{"namespaces", "生成する名前空間（一つもなければすべて）。その名前空間と子孫を出力する単位の分を書き出す"},

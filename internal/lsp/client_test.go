@@ -319,7 +319,7 @@ func standInPlugins(t *testing.T) string {
 // 起動しない。docs/lsp.md「診断」）。プラグインの探索は、テストのサーバー（startServer）と同じ場所を見る。
 func loadCorpus(t *testing.T, root string) *project.Project {
 	t.Helper()
-	return project.LoadWith(project.Options{Root: root, PluginPath: repoPlugins(t), NoPluginChecks: true})
+	return project.LoadWith(project.Options{Root: root, PluginPath: repoPlugins(t), NoPlugins: true})
 }
 
 // warnFile は corpusWithWarning が足すファイル。設計書のコーパスには診断がない（error も warning もない。

@@ -8,7 +8,49 @@ import (
 	sdk "github.com/mew-ton/hozo/plugin"
 )
 
-// docs/plugin-protocol.md「応答の形」: 必須の項目と型を確かめ、知らない項目は無視する。
+// wrapResult は、トランスパイラ一つの答え result を、出力が一つ、頼んだトランスパイラが一つの、emit の応答にする。
+func wrapResult(result string) string { return `{"outputs":[{"results":[` + result + `]}]}` }
+
+// docs/plugin-protocol.md「応答の形」: emit の応答は、出力ごと（outputs）、トランスパイラごと（results）の答えの並び。
+func TestEmitBatchShape(t *testing.T) {
+	for _, in := range []string{
+		`{"outputs":[]}`,
+		`{"outputs":[{"results":[]}]}`,
+		`{"outputs":[{"results":[{"files":[],"warnings":[]},{"files":[],"warnings":[]}]},{"results":[{"files":[],"warnings":[]}]}]}`,
+		// 知らない項目は、どの階層でも無視する
+		`{"outputs":[{"results":[],"future":1}],"future":{"x":1}}`,
+	} {
+		if err := checkShape([]byte(in), &sdk.EmitBatchResponse{}); err != nil {
+			t.Errorf("%s: %v", in, err)
+		}
+	}
+	for in, want := range map[string]string{
+		`{}`:                               "outputs がない",
+		`{"unknown":1}`:                    "outputs がない",
+		`{"outputs":null}`:                 "outputs がない",
+		`{"Outputs":[]}`:                   "outputs がない", // 名前は大文字と小文字を区別する
+		`{"files":[],"warnings":[]}`:       "outputs がない", // 版 0.21 までの、答え一つの形
+		`{"diagnostics":[]}`:               "outputs がない", // なくした direction check の応答
+		`{"outputs":{}}`:                   "outputs が配列でない",
+		`{"outputs":[[]]}`:                 "outputs[0] がオブジェクトでない",
+		`{"outputs":[{}]}`:                 "outputs[0].results がない",
+		`{"outputs":[{"results":null}]}`:   "outputs[0].results がない",
+		`{"outputs":[{"results":{}}]}`:     "outputs[0].results が配列でない",
+		`{"outputs":[{"results":["x"]}]}`:  "outputs[0].results[0] がオブジェクトでない",
+		`{"outputs":[{"results":[null]}]}`: "outputs[0].results[0] がオブジェクトでない",
+		`{"outputs":[{"results":[{"files":[],"warnings":[]}]},{"results":[{"files":[]}]}]}`: "outputs[1].results[0].warnings がない",
+		`[]`:   "応答がオブジェクトでない",
+		`"x"`:  "応答がオブジェクトでない",
+		`null`: "応答がオブジェクトでない",
+	} {
+		err := checkShape([]byte(in), &sdk.EmitBatchResponse{})
+		if err == nil || !strings.Contains(err.Error(), want) {
+			t.Errorf("%s: err = %v, want %q", in, err, want)
+		}
+	}
+}
+
+// docs/plugin-protocol.md「応答の形」: トランスパイラ一つの答え（results の要素）の、必須の項目と型を確かめ、知らない項目は無視する。
 func TestEmitShape(t *testing.T) {
 	ok := []string{
 		`{"files":[],"warnings":[]}`,
@@ -28,7 +70,7 @@ func TestEmitShape(t *testing.T) {
 		`{"files":[],"warnings":[],"errors":[{"severity":"fatal","code":"X-1","message":"m"}]}`,
 	}
 	for _, in := range ok {
-		if err := checkShape([]byte(in), &sdk.EmitResponse{}); err != nil {
+		if err := checkShape([]byte(wrapResult(in)), &sdk.EmitBatchResponse{}); err != nil {
 			t.Errorf("%s: %v", in, err)
 		}
 	}
@@ -40,9 +82,9 @@ func TestEmitShape(t *testing.T) {
 		`{"files":null,"warnings":[]}`:     "files がない",
 		`{"files":[],"warnings":null}`:     "warnings がない",
 		`{"Files":[],"warnings":[]}`:       "files がない", // 名前は大文字と小文字を区別する
-		`[]`:                               "応答がオブジェクトでない",
-		`"x"`:                              "応答がオブジェクトでない",
-		`null`:                             "応答がオブジェクトでない",
+		`[]`:                               "results[0] がオブジェクトでない",
+		`"x"`:                              "results[0] がオブジェクトでない",
+		`null`:                             "results[0] がオブジェクトでない",
 		`{"files":{},"warnings":[]}`:       "files が配列でない",
 		`{"files":"a.go","warnings":[]}`:   "files が配列でない",
 		`{"files":["a.go"],"warnings":[]}`: "files[0] がオブジェクトでない",
@@ -59,41 +101,15 @@ func TestEmitShape(t *testing.T) {
 		`{"files":[],"warnings":[],"errors":[{"code":"X-1"}]}`:   "errors[0] に message がない",
 	}
 	for in, want := range ng {
-		err := checkShape([]byte(in), &sdk.EmitResponse{})
-		if err == nil || !strings.Contains(err.Error(), want) {
+		err := checkShape([]byte(wrapResult(in)), &sdk.EmitBatchResponse{})
+		if err == nil || !strings.Contains(err.Error(), "outputs[0].results[0]") || !strings.Contains(err.Error(), want) {
 			t.Errorf("%s: err = %v, want %q", in, err, want)
 		}
 	}
 }
 
-func TestCheckResponseShape(t *testing.T) {
-	ok := []string{
-		`{"diagnostics":[]}`,
-		`{"diagnostics":[{"severity":"error","code":"PAGE-1","message":"m","at":"browser.openOrders"},{"severity":"warning","code":"PAGE-2","message":"m"}],"extra":true}`,
-	}
-	for _, in := range ok {
-		if err := checkShape([]byte(in), &sdk.CheckResponse{}); err != nil {
-			t.Errorf("%s: %v", in, err)
-		}
-	}
-	ng := map[string]string{
-		`{}`:                         "diagnostics がない",
-		`{"diagnostics":null}`:       "diagnostics がない",
-		`{"files":[],"warnings":[]}`: "diagnostics がない",
-		`{"diagnostics":{}}`:         "diagnostics が配列でない",
-		`{"diagnostics":[{"code":"P-1","message":"m"}]}`:                             "diagnostics[0] に severity がない",
-		`{"diagnostics":[{"severity":"fatal","code":"P-1","message":"m"}]}`:          `"error" でも "warning" でもない`,
-		`{"diagnostics":[{"severity":"error","message":"m"}]}`:                       "diagnostics[0] に code がない",
-		`{"diagnostics":[{"severity":"error","code":"P-1"}]}`:                        "diagnostics[0] に message がない",
-		`{"diagnostics":[{"severity":"error","code":"P-1","message":"m","at":[1]}]}`: "diagnostics[0] の at が文字列でない",
-	}
-	for in, want := range ng {
-		err := checkShape([]byte(in), &sdk.CheckResponse{})
-		if err == nil || !strings.Contains(err.Error(), want) {
-			t.Errorf("%s: err = %v, want %q", in, err, want)
-		}
-	}
-	// ほかの型（import の応答、テストの型）は確かめない
+// ほかの型（import の応答、テストの型）は確かめない。
+func TestOtherShapesUnchecked(t *testing.T) {
 	if err := checkShape([]byte(`{"unknown":1}`), &sdk.ImportResponse{}); err != nil {
 		t.Errorf("ImportResponse: %v", err)
 	}
@@ -145,28 +161,26 @@ func TestRunResponseShape(t *testing.T) {
 	run := func(req map[string]any, resp any) error {
 		return Runner{Root: root}.Run(echoManifest(), root, req, resp)
 	}
-	var emit sdk.EmitResponse
+	result := func(fields map[string]any) map[string]any {
+		return map[string]any{"mode": "echo", "outputs": []any{map[string]any{"results": []any{fields}}}}
+	}
+	var emit sdk.EmitBatchResponse
 	err := run(map[string]any{"mode": "echo", "unknown": 1}, &emit)
 	var mo *MalformedOutputError
-	if !errors.Is(err, ErrMalformedOutput) || !errors.As(err, &mo) || mo.ExitCode != 0 || !strings.Contains(err.Error(), "files がない") {
+	if !errors.Is(err, ErrMalformedOutput) || !errors.As(err, &mo) || mo.ExitCode != 0 || !strings.Contains(err.Error(), "outputs がない") {
 		t.Errorf("emit, 必須の項目がない: err = %v", err)
 	}
-	if err := run(map[string]any{"mode": "echo", "files": []any{}, "warnings": "none"}, &emit); !errors.Is(err, ErrMalformedOutput) {
+	if err := run(result(map[string]any{"files": []any{}, "warnings": "none"}), &emit); !errors.Is(err, ErrMalformedOutput) {
 		t.Errorf("emit, 型が違う: err = %v", err)
 	}
-	emit = sdk.EmitResponse{}
-	err = run(map[string]any{"mode": "echo", "future": 1, "warnings": []any{},
+	emit = sdk.EmitBatchResponse{}
+	err = run(result(map[string]any{"future": 1, "warnings": []any{},
 		"files":  []any{map[string]any{"path": "gen/a.txt", "content": "hi", "mode": "0644"}},
-		"select": map[string]any{"roots": []any{"a.f"}}}, &emit)
-	if err != nil || len(emit.Files) != 1 || emit.Files[0].Path != "gen/a.txt" || emit.Files[0].Content != "hi" {
-		t.Errorf("emit, 知らない項目: err = %v resp = %+v", err, emit)
+		"select": map[string]any{"roots": []any{"a.f"}}}), &emit)
+	if err != nil || len(emit.Outputs) != 1 || len(emit.Outputs[0].Results) != 1 {
+		t.Fatalf("emit, 知らない項目: err = %v resp = %+v", err, emit)
 	}
-
-	var check sdk.CheckResponse
-	if err := run(map[string]any{"mode": "echo"}, &check); !errors.Is(err, ErrMalformedOutput) || !strings.Contains(err.Error(), "diagnostics がない") {
-		t.Errorf("check, 必須の項目がない: err = %v", err)
-	}
-	if err := run(map[string]any{"mode": "echo", "diagnostics": []any{}}, &check); err != nil {
-		t.Errorf("check: err = %v", err)
+	if files := emit.Outputs[0].Results[0].Files; len(files) != 1 || files[0].Path != "gen/a.txt" || files[0].Content != "hi" {
+		t.Errorf("emit, 知らない項目: resp = %+v", emit)
 	}
 }

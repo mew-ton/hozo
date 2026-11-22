@@ -1,6 +1,6 @@
 name     = "go"
 command  = ["go", "run", "github.com/mew-ton/hozo/plugins/go"]
-protocol = "0.21"
+protocol = "0.22"
 
 [[transpiler]]
 name     = "go"
@@ -8,6 +8,3 @@ language = "go"
 
 [coverage]
 enabled = true
-
-[check]
-enabled = true                  # emit が errors で返す誤りを、検査の段（hozoc check）でも返す（docs/plugin-protocol.md「check」）

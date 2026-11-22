@@ -20,12 +20,15 @@ import (
 	"github.com/mew-ton/hozo/ir"
 )
 
-// Handler はプラグインが実装する四つの方向（direction）。
+// Handler はプラグインが実装する三つの方向（direction）。
 // 実装しない方向と、Emit で知らないトランスパイラ（EmitRequest.Transpiler）は ErrUnsupported を返す。Main はそれを
 // docs/plugin-protocol.md「起動」の code "unsupported"（終了コード 2）にする。
+//
+// Emit は、トランスパイラ一つが、出力一つに答える関数。direction "emit" の要求は、プラグインが受け持つ出力と、出力ごとに頼む
+// トランスパイラを並べている（同「emit」）が、その並びを回すのは [Run] で、Emit は、一回の呼び出しで、一つの答えを返す。
+// 答えは、渡された View だけから作る（同「起動」: 答えは、出力ごとに独立）。
 type Handler interface {
 	Emit(req *EmitRequest) (*EmitResponse, error)
-	Check(req *CheckRequest) (*CheckResponse, error)
 	Import(req *ImportRequest) (*ImportResponse, error)
 	Coverage(req *CoverageRequest) (*CoverageResponse, error)
 }
@@ -34,8 +37,9 @@ type Handler interface {
 // errors.Is で比べるので、包んで返してもよい。
 var ErrUnsupported = errors.New("plugin: direction not supported")
 
-// EmitRequest は direction "emit" の要求（docs/plugin-protocol.md「emit」）。
-// Transpiler は起動されたトランスパイラの名前（マニフェストの [[transpiler]] の name）。複数のトランスパイラを
+// EmitRequest は、[Handler] の Emit の、一回の呼び出し: 頼まれたトランスパイラ一つと、出力一つ。やり取りの JSON の形
+// （[EmitBatch]）そのものではなく、[Run] が、要求の spec と、出力の view を合わせて作る（docs/plugin-protocol.md「emit」）。
+// Transpiler は頼まれたトランスパイラの名前（マニフェストの [[transpiler]] の name）。複数のトランスパイラを
 // 提供するプラグインは、この名前で処理を分ける。View.Viewer が対象の名前空間で、View.Config がその単位の設定。
 type EmitRequest struct {
 	Protocol   string   `json:"protocol"`
@@ -44,12 +48,80 @@ type EmitRequest struct {
 	View       *ir.View `json:"view"`
 }
 
-// EmitResponse は "emit" の応答。Errors が一つでもあれば hozoc は Files を書き出さない。
+// EmitResponse は、トランスパイラ一つの、出力一つへの答え（"emit" の応答の results の要素）。Errors が一つでもあれば
+// hozoc は Files を書き出さない。
 // 何を出すかを hozoc に伝える項目（版 0.3 までの select）はない（docs/plugin-protocol.md「選択をなくしたこと」）。
 type EmitResponse struct {
 	Files    []File       `json:"files"`
 	Warnings []Warning    `json:"warnings"`
 	Errors   []Diagnostic `json:"errors,omitempty"`
+}
+
+// EmitBatch は direction "emit" の要求の、JSON の形（docs/plugin-protocol.md「emit」）: 仕様を一度と、プラグインが受け持つ
+// 出力の並び。プラグインの書き手は、触らない（[Run] が読む）。hozoc が、要求を作るのに使う。
+type EmitBatch struct {
+	Protocol  string       `json:"protocol"`
+	Direction string       `json:"direction"`
+	Spec      *ir.Spec     `json:"spec"`
+	Outputs   []EmitOutput `json:"outputs"`
+}
+
+// NewEmitBatch は、View の並び views と、View ごとに頼むトランスパイラの名前 transpilers（views と同じ長さ）から、
+// direction "emit" の要求を作る（docs/plugin-protocol.md「emit」）。仕様（spec）は、最初の View のもの: views は、同じ仕様の
+// View（出力に依らない部分が、同じ）でなければならない。views が空なら、spec は nil。
+func NewEmitBatch(views []*ir.View, transpilers [][]string) *EmitBatch {
+	req := &EmitBatch{Protocol: ir.Version, Direction: "emit", Outputs: []EmitOutput{}}
+	for i, v := range views {
+		spec, out := v.Split()
+		if i == 0 {
+			req.Spec = spec
+		}
+		names := []string{}
+		if i < len(transpilers) {
+			names = append(names, transpilers[i]...)
+		}
+		req.Outputs = append(req.Outputs, EmitOutput{Transpilers: names, View: out})
+	}
+	return req
+}
+
+// Batch は、この一回の呼び出し（トランスパイラ一つ、出力一つ）だけを頼む、direction "emit" の要求。プラグインの実行ファイルを、
+// テストで、標準入出力から動かすときに使う（応答は [SingleResult] で読む）。
+func (r *EmitRequest) Batch() *EmitBatch {
+	b := NewEmitBatch([]*ir.View{r.View}, [][]string{{r.Transpiler}})
+	if r.Protocol != "" {
+		b.Protocol = r.Protocol
+	}
+	return b
+}
+
+// SingleResult は、direction "emit" の応答 data（JSON）の、ただ一つの答え（outputs が一つで、その results が一つ）を返す。
+// そういう形でなければ、誤り。[EmitRequest.Batch] の要求への応答を読む。
+func SingleResult(data []byte) (*EmitResponse, error) {
+	var resp EmitBatchResponse
+	if err := json.Unmarshal(data, &resp); err != nil {
+		return nil, err
+	}
+	if len(resp.Outputs) != 1 || len(resp.Outputs[0].Results) != 1 {
+		return nil, fmt.Errorf("emit response does not hold exactly one result (outputs: %d)", len(resp.Outputs))
+	}
+	return &resp.Outputs[0].Results[0], nil
+}
+
+// EmitOutput は、要求の outputs の要素: 出力一つと、その出力で頼むトランスパイラの名前（単位の transpilers に書いた順）。
+type EmitOutput struct {
+	Transpilers []string       `json:"transpilers"`
+	View        *ir.OutputView `json:"view"`
+}
+
+// EmitBatchResponse は direction "emit" の応答の、JSON の形: 要求の outputs と、同じ数、同じ順。
+type EmitBatchResponse struct {
+	Outputs []OutputResult `json:"outputs"`
+}
+
+// OutputResult は、応答の outputs の要素: その出力の transpilers と、同じ数、同じ順の、答え。
+type OutputResult struct {
+	Results []EmitResponse `json:"results"`
 }
 
 // Version は、このリポジトリのプラグインの版。生成したファイルのヘッダに書く（docs/plugin-go.md「ファイル」）。
@@ -136,52 +208,6 @@ func OpsWith(view *ir.View, decorator string) []string {
 	return out
 }
 
-// CheckRequest は direction "check" の要求（docs/plugin-protocol.md「check」）。
-type CheckRequest struct {
-	Protocol  string   `json:"protocol"`
-	Direction string   `json:"direction"`
-	View      *ir.View `json:"view"`
-}
-
-// CheckResponse は "check" の応答。
-type CheckResponse struct {
-	Diagnostics []Diagnostic `json:"diagnostics"`
-}
-
-// CheckByEmit は、direction "check" を、emit と同じ検査で答える（docs/plugin-protocol.md「check」の「emit が errors で返す誤りは、
-// check でも返す」）。Handler の Check が、これを呼ぶ: transpilers は、そのプラグインが提供するトランスパイラの名前。
-//
-// req.View.Config.Transpilers（その単位の transpilers。書かれた順）のうち、transpilers にあるものごとに、同じ View で h.Emit を呼び、
-// 応答の Errors を、Severity が "error" の Diagnostics にして、その順に並べる。Files と Warnings は、捨てる（warning は、emit の
-// ときにだけ出る）。h.Emit が誤りを返せば、その誤りを返す。
-func CheckByEmit(h Handler, transpilers []string, req *CheckRequest) (*CheckResponse, error) {
-	if req == nil || req.View == nil {
-		return nil, errors.New("check: request has no view")
-	}
-	provided := map[string]bool{}
-	for _, name := range transpilers {
-		provided[name] = true
-	}
-	out := &CheckResponse{Diagnostics: []Diagnostic{}}
-	for _, name := range req.View.Config.Transpilers {
-		if !provided[name] {
-			continue
-		}
-		resp, err := h.Emit(&EmitRequest{Protocol: req.Protocol, Direction: "emit", Transpiler: name, View: req.View})
-		if err != nil {
-			return nil, err
-		}
-		if resp == nil {
-			continue
-		}
-		for _, d := range resp.Errors {
-			d.Severity = "error"
-			out.Diagnostics = append(out.Diagnostics, d)
-		}
-	}
-	return out, nil
-}
-
 // ImportRequest は direction "import" の要求（docs/plugin-protocol.md「import」）。
 // Format はマニフェストの [import].formats の一つ。
 type ImportRequest struct {
@@ -237,8 +263,8 @@ type Warning struct {
 	Message string `json:"message"`
 }
 
-// Diagnostic は "check" の diagnostics と "emit" の errors の要素。
-// Severity は "error" か "warning"（emit の errors では常に error なので省く）。
+// Diagnostic は "emit" の errors の要素。
+// Severity は、hozoc が読まない（errors は、常に error。省く）。
 // Code はプラグインが決める規則の ID（PAGE-1、CLI-1 など）。At は FQN か "file:line:col"。
 type Diagnostic struct {
 	Severity string `json:"severity,omitempty"`
@@ -289,38 +315,15 @@ func Run(h Handler, in io.Reader, out, errOut io.Writer) int {
 	var resp any
 	switch head.Direction {
 	case "emit":
-		var req EmitRequest
+		// 知らない項目は、どの階層でも、読まずに無視する（encoding/json と ir の読み方が、そうなっている。
+		// docs/plugin-protocol.md「要求と応答」）
+		var req EmitBatch
 		if err := json.Unmarshal(raw, &req); err != nil {
 			return fail(errOut, fmt.Errorf("decode emit request: %w", err))
 		}
-		r, err := h.Emit(&req)
+		r, err := emitBatch(h, &req)
 		if err != nil {
 			return handlerError(out, errOut, head.Direction, err)
-		}
-		if r == nil {
-			r = &EmitResponse{}
-		}
-		if r.Files == nil {
-			r.Files = []File{}
-		}
-		if r.Warnings == nil {
-			r.Warnings = []Warning{}
-		}
-		resp = r
-	case "check":
-		var req CheckRequest
-		if err := json.Unmarshal(raw, &req); err != nil {
-			return fail(errOut, fmt.Errorf("decode check request: %w", err))
-		}
-		r, err := h.Check(&req)
-		if err != nil {
-			return handlerError(out, errOut, head.Direction, err)
-		}
-		if r == nil {
-			r = &CheckResponse{}
-		}
-		if r.Diagnostics == nil {
-			r.Diagnostics = []Diagnostic{}
 		}
 		resp = r
 	case "import":
@@ -368,6 +371,42 @@ func Run(h Handler, in io.Reader, out, errOut io.Writer) int {
 		return fail(errOut, fmt.Errorf("write response: %w", err))
 	}
 	return 0
+}
+
+// emitBatch は、direction "emit" の要求 req の、outputs の順、その中は transpilers の順に、h.Emit を呼び、答えを、同じ並びで
+// 返す（docs/plugin-protocol.md「emit」の「SDK が、並びを回す」）。h.Emit に渡す View は、req.Spec と、その出力の view を
+// 合わせたもの（docs/ir.md「まとめた形」）。h.Emit が誤りを返せば、そこでやめて、その誤りを返す。
+func emitBatch(h Handler, req *EmitBatch) (*EmitBatchResponse, error) {
+	if req.Spec == nil {
+		return nil, errors.New("request has no spec")
+	}
+	resp := &EmitBatchResponse{Outputs: make([]OutputResult, 0, len(req.Outputs))}
+	for i, o := range req.Outputs {
+		if o.View == nil {
+			return nil, fmt.Errorf("outputs[%d] has no view", i)
+		}
+		view := req.Spec.View(o.View)
+		result := OutputResult{Results: make([]EmitResponse, 0, len(o.Transpilers))}
+		for _, name := range o.Transpilers {
+			r, err := h.Emit(&EmitRequest{Protocol: req.Protocol, Direction: req.Direction, Transpiler: name, View: view})
+			if err != nil {
+				return nil, err
+			}
+			if r == nil {
+				r = &EmitResponse{}
+			}
+			one := *r
+			if one.Files == nil {
+				one.Files = []File{}
+			}
+			if one.Warnings == nil {
+				one.Warnings = []Warning{}
+			}
+			result.Results = append(result.Results, one)
+		}
+		resp.Outputs = append(resp.Outputs, result)
+	}
+	return resp, nil
 }
 
 // handlerError は Handler の誤りを終了コードにする。ErrUnsupported なら 2、それ以外は 1。

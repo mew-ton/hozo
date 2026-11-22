@@ -26,6 +26,7 @@ internal/config/       hozo.toml
 internal/vocab/        埋め込んだ標準の語彙
 internal/plugin/       プラグインの探索と起動
 internal/testmap/      テストの対応表の形の確かめと、実行された行との突き合わせ
+internal/fakeplugin/   テストのための、にせもののプラグイン（cmd/fakeplugin が中身。SDK を通さずに、決まった応答を返す。docs/testing.md「環境からの独立」）
 internal/project/      一度の解析のすべて
 internal/app/          hozoc の葉の op と状態の単位の実装と表示
 internal/lsp/          言語サーバー（jsonrpc/ は JSON-RPC、protocol/ は LSP の型のうち使うもの）
@@ -63,6 +64,8 @@ Go のパッケージごとの、このモジュールの中で import してい
 | `internal/project` | `internal/check`、`internal/config`、`internal/diag`、`internal/plugin`、`internal/sema`、`internal/source`、`internal/syntax`、`internal/syntax/ast`、`internal/vocab`、`ir`、`plugin` |
 | `internal/plugin` | `internal/config`、`internal/diag`、`ir`、`plugin` |
 | `internal/testmap` | `plugin` |
+| `internal/fakeplugin` | — |
+| `internal/fakeplugin/cmd/fakeplugin` | — |
 | `internal/check` | `internal/config`、`internal/diag`、`internal/source`、`ir` |
 | `internal/sema` | `internal/diag`、`internal/source`、`internal/syntax/ast`、`ir` |
 | `internal/syntax` | `internal/diag`、`internal/source`、`internal/syntax/ast`、`internal/syntax/token` |
@@ -124,6 +127,8 @@ Go のパッケージごとの、このモジュールの中で import してい
 func (p *Program) Lookup(fqn string) Decl          // 宣言を引く。なければ nil
 func (p *Program) Namespace(fqn string) *Namespace
 func (v *View) Signature(op string) *ViewedSignature
+func (v *View) Split() (*Spec, *OutputView)       // View を、出力に依らない部分と、出力ごとの部分に分ける（docs/ir.md「まとめた形」）。synthesized は、viewer の decls の末尾の、合成した model
+func (s *Spec) View(o *OutputView) *View           // 二つを合わせた View（同「まとめた形」の「合わせ方」）。s.Program は、変えない
 func (v *View) InUnit(fqn string) bool             // viewer の名前空間の宣言で、単位の対象か（span.file が View.files にある。docs/config.md「in」）
 func (o *Op) DirectReads() []ReadRef               // 葉の op が直に読むもの: Reads の後ろに Carried.Reads（重複は最初の出現に寄せる）。検査を通った仕様では、
                                                    // 葉の Reads は空（STATE-5）なので、Carried.Reads と同じ（docs/check.md「デコレータが運ぶ reads と effects」）
@@ -147,19 +152,24 @@ TS の SDK は、ない（`docs/decisions.md`「決めたこと」415 で、外�
 
 ```go
 type Handler interface {
-    Emit(req *EmitRequest) (*EmitResponse, error)
-    Check(req *CheckRequest) (*CheckResponse, error)
+    Emit(req *EmitRequest) (*EmitResponse, error)   // トランスパイラ一つが、出力一つに答える。要求の outputs と transpilers の並びは、Run が回す
     Import(req *ImportRequest) (*ImportResponse, error)
     Coverage(req *CoverageRequest) (*CoverageResponse, error)
 }
-type EmitRequest struct { Protocol string; Direction string; Transpiler string; View *ir.View }   // Transpiler は起動されたトランスパイラの名前
-type EmitResponse struct { Files []File; Warnings []Warning; Errors []Diagnostic }
+type EmitRequest struct { Protocol string; Direction string; Transpiler string; View *ir.View }   // Emit の一回の呼び出し: 頼まれたトランスパイラの名前と、出力一つの View（Run が、要求の spec と、出力の view を合わせて作る）
+type EmitResponse struct { Files []File; Warnings []Warning; Errors []Diagnostic }                // トランスパイラ一つの答え（応答の results の要素）
+// やり取りの JSON の形（docs/plugin-protocol.md「emit」）。プラグインの書き手は、触らない（Run が読み書きする）。hozoc が、要求を作るのに使う
+type EmitBatch struct { Protocol string; Direction string; Spec *ir.Spec; Outputs []EmitOutput }
+func NewEmitBatch(views []*ir.View, transpilers [][]string) *EmitBatch   // 同じ仕様の View の並びと、View ごとに頼むトランスパイラの名前から、要求を作る（spec は、最初の View のもの）
+type EmitOutput struct { Transpilers []string; View *ir.OutputView }
+type EmitBatchResponse struct { Outputs []OutputResult }
+type OutputResult struct { Results []EmitResponse }
 func OpsWith(view *ir.View, decorator string) []string             // view.viewer の op のうち、単位の対象（View.InUnit）で、そのデコレータ（FQN。via も見る）が付いたものの FQN。相乗りが自分の対象を探す道具
 func Options(req *EmitRequest, into any) ([]string, error)         // req.View.Config.Options[req.Transpiler] を into（構造体へのポインタ。フィールドは json タグで結ぶ）に読む。
                                                                    // 書かれていなければ into はそのまま。戻り値は、into にないキー（辞書順）。型の違う値は error。
                                                                    // 知らないキーと error を診断にするのは呼ぶ側（docs/config.md「オプション」）
 const Version = "0.0.0-dev"                                         // このリポジトリのプラグインの版。生成したファイルのヘッダに書く（docs/plugin-go.md「ファイル」）
-// CheckRequest / CheckResponse / ImportRequest / ImportResponse / File / Warning / Diagnostic も同じ形
+// ImportRequest / ImportResponse / File / Warning / Diagnostic も同じ形
 type CoverageRequest struct { Protocol string; Direction string; Coverage File; Files []string; Outputs []ir.NamespaceConfig }   // docs/plugin-protocol.md「coverage」
 type CoverageResponse struct { Recognized bool; Files []CoveredFile }
 type CoveredFile struct { Path string; Lines [][2]int }             // 実行された所の、行の範囲（始まり、終わり）
@@ -172,17 +182,16 @@ func TestMapTranspiler(path string) (string, bool)                  // path の�
 func TestMapFile(dir, transpiler string, tests []TestEntry) File     // dir の下の、対応表のファイル。テスト一つを一行に書く（docs/plugin-go.md「テストの対応表」の並びと字下げ）
 
 // Main は標準入力の要求を読み、protocol を確かめ、h を呼び、標準出力に応答を書く。終了コードを返す
-// （docs/plugin-protocol.md「要求と応答」「起動」。文字列でない protocol も「合わない」で code "protocol"。TS の run も同じ）。
+// （docs/plugin-protocol.md「要求と応答」「起動」。文字列でない protocol も「合わない」で code "protocol"）。
+// direction "emit" は、要求の outputs の順、その中は transpilers の順に、h.Emit を呼び、答えを、同じ並びで応答に置く。
+// 要求の、知らない項目は、どの階層でも、読まずに無視する（同「要求と応答」）。
 func Main(h Handler) int
 func Run(h Handler, in io.Reader, out, errOut io.Writer) int   // Main の中身。テスト用
 // 実装しない方向と、Emit で知らない Transpiler は ErrUnsupported を返す。Main は docs/plugin-protocol.md「起動」の code "unsupported" で終わる
 var ErrUnsupported error
-// direction "check" を、emit と同じ検査で答える（docs/plugin-protocol.md「check」）。Handler の Check が呼ぶ。transpilers は、そのプラグインの
-// トランスパイラの名前。req.View.Config.Transpilers のうち、transpilers にあるものごとに h.Emit を呼び、Errors を、severity が "error" の Diagnostics にする
-func CheckByEmit(h Handler, transpilers []string, req *CheckRequest) (*CheckResponse, error)
 ```
 
-`Select`、`Wrap`、`EmitResponse.Select` はなくした（`docs/plugin-protocol.md`「選択をなくしたこと」）。
+`Select`、`Wrap`、`EmitResponse.Select` はなくした（`docs/plugin-protocol.md`「選択をなくしたこと」）。`Handler` の `Check`、`CheckRequest`、`CheckResponse`、`CheckByEmit` も、なくした（同「検査のための頼みごとを、なくしたこと」）。
 
 ### `plugin/golang`（公開）
 
@@ -548,7 +557,7 @@ type Plugin struct { Name, Dir string; Manifest *Manifest; Mismatch []diag.Diagn
 type SearchEnv struct { PluginPath, Home string }                                       // 探索が見るプロジェクトの外の場所（HOZO_PLUGIN_PATH の値、ホーム）。呼ぶ側が渡す。零値なら plugin_dirs だけ
 func Discover(cfg *config.Config, env SearchEnv) ([]*Plugin, []diag.Diagnostic)         // 入っているプラグインのすべて（docs/plugin-protocol.md「探索」の順）。MAN-3 / MAN-4。プロセスの環境は読まない
 type Runner struct { Root string; Stderr io.Writer; Env []string }
-func (r Runner) Run(m *Manifest, dir string, req any, resp any) error                   // 起動して JSON をやり取り（docs/plugin-protocol.md「起動」）。resp が *sdk.EmitResponse か *sdk.CheckResponse か *sdk.CoverageResponse なら応答の形も確かめる（同「応答の形」）
+func (r Runner) Run(m *Manifest, dir string, req any, resp any) error                   // 起動して JSON をやり取り（docs/plugin-protocol.md「起動」）。resp が *sdk.EmitBatchResponse か *sdk.CoverageResponse なら応答の形も確かめる（同「応答の形」）
 var ErrCrashed, ErrMalformedOutput error                                                // errors.Is で判定。*PluginError は exit 2 の code を持ち、MAN-2 / MAN-5 の診断にする
 ```
 
@@ -564,8 +573,10 @@ type Project struct {
     Sema    *sema.Result
     Plugins []*plugin.Plugin         // 入っているプラグイン（internal/plugin.Discover）
     Units   []Unit                   // 解決した単位（Config.Units と同じ順）
-    Diags   []diag.Diagnostic        // 解析・解決・検査・設定・プラグインの check のすべて。並べ替え済み
+    Diags   []diag.Diagnostic        // 解析・解決・検査・設定と、プラグインの診断（emit の errors と warnings）のすべて。並べ替え済み
+    Answers []Answer                 // プラグインから受け取った答え（docs/cli.md「check」の 4）。単位の設定の順、名前空間の IR の順、transpilers に書いた順。起動しなかったら、空
 }
+type Answer struct { Unit int; Namespace string; Transpiler Transpiler; Response *sdk.EmitResponse }   // トランスパイラ一つの、出力一つ（Units の添字と、名前空間）への答え
 type Unit struct { *config.Unit; Language, Base string; Transpilers []Transpiler; Seams map[string]string; Files []string }   // 言語、基底の名前（CFG-20 なら空）、解決できたトランスパイラ、単位の継ぎ目（デコレータの FQN → 宣言したトランスパイラ。CFG-23 なら、設定の順で最初のもの）、in に合ったファイル（語彙のファイルを含む）
 type Transpiler struct { Name string; Plugin *plugin.Plugin; Decl *plugin.Transpiler }
 type Options struct {
@@ -573,21 +584,22 @@ type Options struct {
     Overlay map[string][]byte        // ディスクの代わりに使う内容（言語サーバーの開いている文書）
     Stderr io.Writer; Env []string   // プラグインの標準エラーの流し先と、プラグインに渡す環境変数の元
     PluginPath, Home string          // プラグインの探索が見るプロジェクトの外の場所（internal/plugin.SearchEnv）。空なら探さない
-    NoPluginChecks bool              // プラグインの check（docs/cli.md「check」の 4）を、起動しない。仕様を読み直すだけの呼び出しと、言語サーバーの解析（docs/lsp.md「プラグインの診断」）
-    Context context.Context          // プラグインの check を、やめさせる口（言語サーバーの、裏の check）。nil なら、やめさせない。プラグインの起動と起動の間で見て、やめたら、Project.RunErr が、その誤り
+    NoPlugins bool                   // プラグインを、起動しない（docs/cli.md「check」の 4 を、しない）。仕様を読み直すだけの呼び出しと、言語サーバーの解析（docs/lsp.md「プラグインの診断」）
+    Context context.Context          // プラグインの起動を、やめさせる口（言語サーバーの、裏の check）。nil なら、やめさせない。プラグインの起動と起動の間で見て、やめたら、Project.RunErr が、その誤り
 }
 func LoadWith(opts Options) *Project                                            // 解析の本体。NoConfig なら CFG-* の診断を除く
-func Load(root string, configPath string, overlay map[string][]byte) *Project   // LoadWith の短い形。プラグインは plugin_dirs だけから探す
+func Load(root string, configPath string, overlay map[string][]byte) *Project   // LoadWith の短い形。プラグインは plugin_dirs だけから探し、起動しない
 func (p *Project) Errors() int
 func (p *Project) Views() []map[string]*ir.View                                 // 単位ごとの、出力する名前空間 → View（internal/check.Views）
 func (p *Project) Covered(unit int) []string                                    // 単位の対象の名前空間（Program の順。in で出力しなくなったものも含む）
 func (p *Project) ManifestPath(pl *plugin.Plugin) string                        // 診断の File に使う形のマニフェストのパス
 func (p *Project) Locate(at string) (*source.Span, string)                      // プラグインの at（FQN か "file:line:col"）を診断の位置に
-func (p *Project) PluginDiagnostic(plugin string, d sdk.Diagnostic) diag.Diagnostic   // プラグインの診断（check の diagnostics、emit の errors）を診断に
+func (p *Project) Answer(unit int, namespace, transpiler string) *sdk.EmitResponse    // 単位 unit（Units の添字）の、名前空間 namespace の出力への、トランスパイラ transpiler の答え。なければ nil
+func (p *Project) PluginDiagnostic(plugin string, d sdk.Diagnostic) diag.Diagnostic   // プラグインの診断（emit の errors）を診断に
 func (p *Project) PluginWarning(transpiler string, w sdk.Warning) diag.Diagnostic     // トランスパイラの warning を PLUGIN の診断に
 ```
 
-`hozoc` の `check` / `emit`（`internal/app`）と言語サーバー（`internal/lsp`）は `LoadWith` を呼ぶ。`Project` は `Root`、`Sources`、`RunErr`（プラグインの `check` が `proc.Crashed` / `proc.MalformedOutput` で終わったときの誤り）も持つ。`Covered` 以下の五つは、`internal/app` が `emit` の手順（`docs/cli.md`「emit」）で使うためのもの。
+`hozoc` の `check` / `emit`（`internal/app`）と言語サーバー（`internal/lsp`）は `LoadWith` を呼ぶ。`Project` は `Root`、`Sources`、`RunErr`（プラグインが `proc.Crashed` / `proc.MalformedOutput` で終わったときの誤り）も持つ。`Covered` 以下の六つは、`internal/app` が `emit` の手順（`docs/cli.md`「emit」）で使うためのもの。
 
 ### `internal/testmap`
 

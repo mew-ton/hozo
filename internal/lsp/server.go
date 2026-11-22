@@ -571,19 +571,19 @@ func (s *server) reanalyze() {
 	s.publishAll()
 }
 
-// loadOptions は、project.LoadWith の設定。ctx が nil なら、解析（プラグインの check を、起動しない）。nil でなければ、裏の check
-// （プラグインの check を起動し、ctx で、やめさせられる）。
+// loadOptions は、project.LoadWith の設定。ctx が nil なら、解析（プラグインを、起動しない）。nil でなければ、裏の check
+// （プラグインを起動し、ctx で、やめさせられる）。
 func (s *server) loadOptions(overlay map[string][]byte, ctx context.Context) project.Options {
 	return project.Options{
-		Root:           s.root,
-		ConfigPath:     s.opts.ConfigPath,
-		Overlay:        overlay,
-		Stderr:         s.logW, // 標準エラーには書かない（docs/lsp.md「通信」）
-		Env:            s.opts.Env,
-		PluginPath:     s.opts.PluginPath,
-		Home:           s.opts.Home,
-		NoPluginChecks: ctx == nil,
-		Context:        ctx,
+		Root:       s.root,
+		ConfigPath: s.opts.ConfigPath,
+		Overlay:    overlay,
+		Stderr:     s.logW, // 標準エラーには書かない（docs/lsp.md「通信」）
+		Env:        s.opts.Env,
+		PluginPath: s.opts.PluginPath,
+		Home:       s.opts.Home,
+		NoPlugins:  ctx == nil,
+		Context:    ctx,
 	}
 }
 

@@ -3,7 +3,6 @@ package lsp
 import (
 	"encoding/json"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -11,12 +10,13 @@ import (
 	"time"
 
 	"github.com/mew-ton/hozo/internal/diag"
+	"github.com/mew-ton/hozo/internal/fakeplugin"
 	"github.com/mew-ton/hozo/internal/lsp/protocol"
 	"github.com/mew-ton/hozo/internal/project"
 	"github.com/mew-ton/hozo/ir"
 )
 
-// docs/lsp.md「プラグインの診断」のテスト。プラグインは、sh で動く、にせもの（pluginProject）。
+// docs/lsp.md「プラグインの診断」のテスト。プラグインは、にせもの（internal/fakeplugin。pluginProject）。
 
 // pluginSpec は、hozoc 自身の診断が、warning 一つ（REL-2: 効果を持たない op の prevents effects）だけの仕様。error が
 // ないので、プラグインの check は、走る。
@@ -28,11 +28,11 @@ const pluginSpecEdited = "// 編集した\n" + pluginSpec
 // pluginSpecBroken は、hozoc 自身の診断に、error（RES-1）がある仕様。プラグインの check は、走らない。
 const pluginSpecBroken = "namespace a {\n  fn f(): Missing;\n}\n"
 
-// pluginProject は、にせもののプラグイン chk（[check] enabled）を、単位に並べた、小さなプロジェクト。
+// pluginProject は、にせもののプラグイン chk を、単位に並べた、小さなプロジェクト。
 //
-// プラグインは、呼ばれるたびに、自分のディレクトリの calls に一行足し、何度目の呼び出しかを数える。gate があれば、open が
-// できるまで、待つ。crash があれば、終了コード 3 で終わる。そうでなければ、診断 CHK-1（位置は a.f。メッセージは
-// "run <何度目>"）を返す。
+// プラグインは、起動されるたびに、自分のディレクトリの launches に一行足し、何度目の起動かを数える。gate があれば、open が
+// できるまで、待つ。crash があれば、終了コード 3 で終わる。そうでなければ、頼まれた emit に、error の CHK-1（位置は a.f。
+// メッセージは "run <何度目>"）と、warning を一つ、答える（ファイルも返すが、言語サーバーは、書かない）。
 type pluginProject struct {
 	t    *testing.T
 	root string
@@ -42,25 +42,17 @@ type pluginProject struct {
 
 func newPluginProject(t *testing.T, text string) *pluginProject {
 	t.Helper()
-	if _, err := exec.LookPath("sh"); err != nil {
-		t.Skip("sh がない")
-	}
 	root := t.TempDir()
 	if resolved, err := filepath.EvalSymlinks(root); err == nil {
 		root = resolved
 	}
 	p := &pluginProject{t: t, root: root, dir: filepath.Join(root, "plugins", "chk"), uri: fileURI(filepath.Join(root, "a.hozo"))}
-	script := filepath.Join(p.dir, "run.sh")
-	writeFile(t, script, `cat >/dev/null
-d=$(dirname "$0")
-echo x >> "$d/calls"
-n=$(wc -l < "$d/calls" | tr -d ' ')
-while [ -f "$d/gate" ] && [ ! -f "$d/open" ]; do sleep 0.01; done
-if [ -f "$d/crash" ]; then exit 3; fi
-printf '{"diagnostics":[{"severity":"error","code":"CHK-1","at":"a.f","message":"run %s"}]}' "$n"
-`)
+	fakeplugin.Install(t, p.dir, "")
+	// トランスパイラ一つの答え: error の CHK-1（何度目の起動かを、メッセージに入れる）と、warning を一つ
+	writeFile(t, filepath.Join(p.dir, "response.json"),
+		`{"files":[{"path":"@DIR@/x.txt","content":"x"}],"warnings":[{"at":"a.f","message":"note"}],"errors":[{"code":"CHK-1","at":"a.f","message":"run @RUN@"}]}`)
 	writeFile(t, filepath.Join(p.dir, "hozo-plugin.toml"),
-		"name = \"chk\"\ncommand = [\"sh\", "+strconv.Quote(script)+"]\nprotocol = \""+ir.Version+"\"\n\n[check]\nenabled = true\n\n[[transpiler]]\nname = \"chk\"\nlanguage = \"go\"\n")
+		"name = \"chk\"\ncommand = "+fakeplugin.CommandTOML+"\nprotocol = \""+ir.Version+"\"\n\n[[transpiler]]\nname = \"chk\"\nlanguage = \"go\"\n")
 	writeFile(t, filepath.Join(root, "hozo.toml"), "[hozo]\nplugin_dirs = [\"plugins\"]\n\n[[emit]]\nnamespace = \"a\"\ntranspilers = [\"chk\"]\nout = \"gen/a\"\n")
 	writeFile(t, filepath.Join(root, "a.hozo"), text)
 	return p
@@ -68,7 +60,7 @@ printf '{"diagnostics":[{"severity":"error","code":"CHK-1","at":"a.f","message":
 
 // calls は、プラグインが、これまでに起動した回数。
 func (p *pluginProject) calls() int {
-	data, err := os.ReadFile(filepath.Join(p.dir, "calls"))
+	data, err := os.ReadFile(filepath.Join(p.dir, "launches"))
 	if err != nil {
 		return 0
 	}
@@ -246,7 +238,7 @@ func TestPluginDiagnosticsOnSave(t *testing.T) {
 }
 
 // TestNoPluginCheckDiagnostics は、解析（initialized と、打鍵の didChange）では、プラグインの check を、起動しないこと
-// （docs/lsp.md「プラグインの診断」: 起動は、打鍵ごとの解析には、遅い）。[check] enabled のプラグインが、診断を返す設定でも、
+// （docs/lsp.md「プラグインの診断」: 起動は、打鍵ごとの解析には、遅い）。プラグインが、診断を返す設定でも、
 // その診断は出ず、プラグインは、呼ばれない。hozoc 自身の診断は、今までどおり出る。
 func TestNoPluginCheckDiagnostics(t *testing.T) {
 	p := newPluginProject(t, pluginSpec)

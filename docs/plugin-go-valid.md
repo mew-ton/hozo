@@ -11,18 +11,13 @@
 ```toml
 name     = "go-valid"
 command  = ["go", "run", "github.com/mew-ton/hozo/plugins/go-valid"]
-protocol = "0.21"
+protocol = "0.22"
 
 [[transpiler]]
 name     = "go-valid"
 language = "go"
 requires = ["go"]
-
-[check]
-enabled = true
 ```
-
-`[check]` は、`emit` が `errors` で返す誤りを、検査の段（`hozoc check`）でも返すためのもの（`docs/plugin-protocol.md`「check」）。
 
 - 読む語彙は、標準の `valid`（`min` / `max` / `length` / `pattern` / `format`）。語彙は提供しない。
 - オプションはない。`[emit.options.go-valid]` にキーがあれば GOVALID-7。
@@ -147,7 +142,7 @@ func CheckFormat(name, v string) bool                   // "email" / "uri" / "uu
 
 ## 診断
 
-`emit` の応答の `errors` で返し、同じものを、検査の段（direction `check`）でも返す（`docs/plugin-protocol.md`「check」）。
+`emit` の応答の `errors` で返す。検査だけの実行（`hozoc check`）も、同じ応答の診断を使う（`docs/plugin-protocol.md`「起動」「emit」）。
 
 | ID | 重さ | 意味 |
 |---|---|---|

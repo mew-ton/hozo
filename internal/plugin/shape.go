@@ -14,25 +14,23 @@ import (
 // 形が違えば proc.MalformedOutput（同「起動」の表）。確かめるのは次のことだけ:
 //
 //   - 応答は JSON のオブジェクト一つ。
-//   - 必須の項目がある（null は「ない」と同じ）: emit の files と warnings、check の diagnostics、coverage の recognized と
-//     files（要素の path と lines）、
-//     要素では files の path と content、warnings の message、errors / diagnostics の code と message、
-//     check の diagnostics の severity。
-//   - 書かれた項目の型が合う（配列、オブジェクト、文字列）。check の severity は "error" か "warning"。
-//   - 省ける項目（errors、at、emit の errors の severity）は、なくても null でもよい。
+//   - 必須の項目がある（null は「ない」と同じ）: emit の outputs、その要素の results、その要素（トランスパイラ一つの答え）の
+//     files と warnings、coverage の recognized と files（要素の path と lines）、
+//     要素では files の path と content、warnings の message、errors の code と message。
+//   - 書かれた項目の型が合う（配列、オブジェクト、文字列）。
+//   - 省ける項目（errors、at、errors の severity）は、なくても null でもよい。
 //   - 知らない項目は、どの階層でも無視する（版 0.3 までの select を書いたままの応答も、読まれないだけで通る）。
 //
-// path が Dir(U, N) の下か（PLG-1）、重複（PLG-2）は、形が合った後に呼ぶ側が確かめる。
+// emit の応答の数が、要求と合うか（outputs と、その results）、path が Dir(U, N) の下か（PLG-1）、重複（PLG-2）は、形が
+// 合った後に呼ぶ側が確かめる。
 
 // checkShape は終了コード 0 の標準出力 data が、resp の型の応答の形をしているかを確かめる。
-// resp が *sdk.EmitResponse なら emit、*sdk.CheckResponse なら check、*sdk.CoverageResponse なら coverage の応答。ほかの型は確かめない
+// resp が *sdk.EmitBatchResponse なら emit、*sdk.CoverageResponse なら coverage の応答。ほかの型は確かめない
 // （import の応答の形は docs/plugin-protocol.md「import」が段階 6 で決める）。
 func checkShape(data []byte, resp any) error {
 	switch resp.(type) {
-	case *sdk.EmitResponse:
+	case *sdk.EmitBatchResponse:
 		return emitShape(data)
-	case *sdk.CheckResponse:
-		return checkResponseShape(data)
 	case *sdk.CoverageResponse:
 		return coverageShape(data)
 	}
@@ -87,48 +85,36 @@ func isLineRange(raw json.RawMessage) bool {
 	return err1 == nil && err2 == nil && start >= 1 && start <= end
 }
 
-// emitShape は emit の応答（docs/plugin-protocol.md「emit」）の形。
+// emitShape は emit の応答（docs/plugin-protocol.md「emit」）の形: outputs の要素ごとに results、その要素が、トランスパイラ
+// 一つの答え。
 func emitShape(data []byte) error {
 	top, err := shapeObject(data, "")
 	if err != nil {
 		return err
 	}
+	return eachElement(top, "outputs", true, func(output map[string]json.RawMessage, where string) error {
+		return eachElementAt(output, "results", where+".results", true, resultShape)
+	})
+}
+
+// resultShape は、トランスパイラ一つの答え（emit の応答の results の要素）の形。
+func resultShape(top map[string]json.RawMessage, at string) error {
+	in := func(key string) string { return at + "." + key }
 	// files: 必須。要素は { path, content }
-	if err := eachElement(top, "files", true, func(el map[string]json.RawMessage, where string) error {
+	if err := eachElementAt(top, "files", in("files"), true, func(el map[string]json.RawMessage, where string) error {
 		return firstErr(requireString(el, "path", where), requireString(el, "content", where))
 	}); err != nil {
 		return err
 	}
 	// warnings: 必須。要素は { at?, message }
-	if err := eachElement(top, "warnings", true, func(el map[string]json.RawMessage, where string) error {
+	if err := eachElementAt(top, "warnings", in("warnings"), true, func(el map[string]json.RawMessage, where string) error {
 		return firstErr(optionalString(el, "at", where), requireString(el, "message", where))
 	}); err != nil {
 		return err
 	}
 	// errors: 省ける。要素は { code, at?, message }。severity は見ない（常に error）
-	return eachElement(top, "errors", false, func(el map[string]json.RawMessage, where string) error {
+	return eachElementAt(top, "errors", in("errors"), false, func(el map[string]json.RawMessage, where string) error {
 		return firstErr(requireString(el, "code", where), optionalString(el, "at", where), requireString(el, "message", where))
-	})
-}
-
-// checkResponseShape は check の応答（docs/plugin-protocol.md「check」）の形。
-func checkResponseShape(data []byte) error {
-	top, err := shapeObject(data, "")
-	if err != nil {
-		return err
-	}
-	// diagnostics: 必須。要素は { severity, code, message, at? }
-	return eachElement(top, "diagnostics", true, func(el map[string]json.RawMessage, where string) error {
-		if err := firstErr(requireString(el, "severity", where), requireString(el, "code", where),
-			requireString(el, "message", where), optionalString(el, "at", where)); err != nil {
-			return err
-		}
-		var sev string
-		_ = json.Unmarshal(el["severity"], &sev)
-		if sev != "error" && sev != "warning" {
-			return fmt.Errorf("%s の severity %q は \"error\" でも \"warning\" でもない", where, sev)
-		}
-		return nil
 	})
 }
 

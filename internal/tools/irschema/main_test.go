@@ -257,12 +257,18 @@ func TestNegative(t *testing.T) {
 		{"emit response", "EmitResponse", `{"files":[{"path":"a/b.go","content":"x"}],"warnings":[{"at":"a.b","message":"m"}]}`, true},
 		{"emit response with errors", "EmitResponse", `{"files":[],"warnings":[],"errors":[{"code":"CLI-1","at":"a.b","message":"m"}]}`, true},
 		{"emit response missing warnings", "EmitResponse", `{"files":[]}`, false},
-		{"check response", "CheckResponse", `{"diagnostics":[{"severity":"warning","code":"PAGE-1","message":"m","at":"a.b"}]}`, true},
-		{"check response no severity", "CheckResponse", `{"diagnostics":[{"code":"PAGE-1","message":"m","at":"a.b"}]}`, false},
-		{"check response bad severity", "CheckResponse", `{"diagnostics":[{"severity":"info","code":"PAGE-1","message":"m","at":"a.b"}]}`, false},
-		{"import request", "ImportRequest", `{"protocol":"0.21","direction":"import","format":"openapi","files":[{"path":"openapi.yaml","content":""}]}`, true},
-		{"import request wrong direction", "ImportRequest", `{"protocol":"0.21","direction":"emit","format":"openapi","files":[]}`, false},
-		{"check request wrong protocol", "CheckRequest", `{"protocol":"0.2","direction":"check","view":{}}`, false},
+		// emit の要求と応答は、出力ごと、トランスパイラごとの並び（docs/plugin-protocol.md「emit」）
+		{"emit batch response", "EmitBatchResponse", `{"outputs":[{"results":[{"files":[],"warnings":[]},{"files":[],"warnings":[],"errors":[{"code":"X-1","at":"a.b","message":"m"}]}]},{"results":[]}]}`, true},
+		{"emit batch response empty", "EmitBatchResponse", `{"outputs":[]}`, true},
+		{"emit batch response old shape", "EmitBatchResponse", `{"files":[],"warnings":[]}`, false},
+		{"emit batch response no results", "EmitBatchResponse", `{"outputs":[{}]}`, false},
+		{"emit batch response bad result", "EmitBatchResponse", `{"outputs":[{"results":[{"files":[]}]}]}`, false},
+		{"emit output no view", "EmitOutput", `{"transpilers":["go"]}`, false},
+		{"emit batch wrong protocol", "EmitBatch", `{"protocol":"0.2","direction":"emit","spec":{"version":"0.22","namespaces":{},"program":{"version":"0.22","namespaces":[],"binds":[]}},"outputs":[]}`, false},
+		{"emit batch", "EmitBatch", `{"protocol":"0.22","direction":"emit","spec":{"version":"0.22","namespaces":{},"program":{"version":"0.22","namespaces":[],"binds":[]}},"outputs":[]}`, true},
+		{"emit batch wrong direction", "EmitBatch", `{"protocol":"0.22","direction":"check","spec":{"version":"0.22","namespaces":{},"program":{"version":"0.22","namespaces":[],"binds":[]}},"outputs":[]}`, false},
+		{"import request", "ImportRequest", `{"protocol":"0.22","direction":"import","format":"openapi","files":[{"path":"openapi.yaml","content":""}]}`, true},
+		{"import request wrong direction", "ImportRequest", `{"protocol":"0.22","direction":"emit","format":"openapi","files":[]}`, false},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {

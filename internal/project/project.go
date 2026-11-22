@@ -38,16 +38,42 @@ type Project struct {
 	Sources []string
 	// Sema は解決・正規化の結果。Program は検査の計算（Signature、Call.Bound）も済んでいる。
 	Sema *sema.Result
-	// Diags は解析・解決・検査・設定・プラグインの check のすべて。並べ替え済み（docs/diagnostics.md「順序」）。
+	// Diags は解析・解決・検査・設定と、プラグインの診断（emit の errors と warnings）のすべて。並べ替え済み
+	// （docs/diagnostics.md「順序」）。
 	Diags []diag.Diagnostic
 	// Plugins は入っているプラグイン（docs/plugin-protocol.md「探索」。探した順）。設定なしなら空。
 	Plugins []*hostplugin.Plugin
 	// Units は解決した単位（Config.Units と同じ順）: 言語、基底、解決できたトランスパイラ、単位の継ぎ目、in に合ったファイル。
 	Units []Unit
-	// RunErr はプラグインの check が proc.Crashed / proc.MalformedOutput（internal/plugin の ErrCrashed /
+	// Answers は、プラグインから受け取った答え（docs/cli.md「check」の 4、docs/plugin-protocol.md「起動」）: トランスパイラ一つの、
+	// 出力一つへの答え。単位の設定の順、名前空間の IR の順、transpilers に書いた順。プラグインを起動しなかったとき
+	// （Options.NoPlugins、1〜3 に error がある、設定なし）は、空。途中で止まったとき（RunErr）は、そこまでの分。
+	Answers []Answer
+	// RunErr はプラグインが proc.Crashed / proc.MalformedOutput（internal/plugin の ErrCrashed /
 	// ErrMalformedOutput）で終わったときのその誤り。最初の一つで止め、以降のプラグインは呼ばない。なければ nil。
 	// Options.Context で、やめさせたときは、Context の誤り。
 	RunErr error
+}
+
+// Answer は、トランスパイラ一つの、出力一つへの答え（docs/plugin-protocol.md「emit」の応答の results の要素）。
+type Answer struct {
+	// Unit は単位（Project.Units の添字）、Namespace は、その単位が出力する名前空間。
+	Unit      int
+	Namespace string
+	// Transpiler は、答えたトランスパイラ。
+	Transpiler Transpiler
+	// Response は、その答え（files、warnings、errors）。
+	Response *sdk.EmitResponse
+}
+
+// Answer は、単位 unit（Units の添字）の、名前空間 namespace の出力への、トランスパイラ transpiler の答え。なければ nil。
+func (p *Project) Answer(unit int, namespace, transpiler string) *sdk.EmitResponse {
+	for i := range p.Answers {
+		if a := &p.Answers[i]; a.Unit == unit && a.Namespace == namespace && a.Transpiler.Name == transpiler {
+			return a.Response
+		}
+	}
+	return nil
 }
 
 // Unit は解決した単位（docs/config.md「単位」）。設定の単位に、マニフェストと読んだファイルから決まるものを足したもの。
@@ -94,10 +120,10 @@ type Options struct {
 	// Home はホームディレクトリ（同 3 の <ホーム>/.hozo/plugins）。空なら探さない。
 	// このパッケージは PluginPath も Home もプロセスの環境から読まない。hozoc と言語サーバーが渡す（internal/app）。
 	Home string
-	// NoPluginChecks は、プラグインの check（docs/cli.md「check」の 4）を、起動しない。仕様を読むだけの呼び出し（出力を集める前の
-	// 読み直し。プラグインの誤りは、emit の応答の errors で返る）と、言語サーバー（docs/lsp.md「診断」）が、真にする。
-	NoPluginChecks bool
-	// Context は、プラグインの check を、やめさせる口（言語サーバーの、裏の check。docs/lsp.md「プラグインの診断」）。nil なら、
+	// NoPlugins は、プラグインを、起動しない（docs/cli.md「check」の 4 を、しない）。仕様を読むだけの呼び出し（状態の単位が、
+	// 設定とソースを読み直すとき）と、言語サーバーの解析（docs/lsp.md「診断」）が、真にする。
+	NoPlugins bool
+	// Context は、プラグインの起動を、やめさせる口（言語サーバーの、裏の check。docs/lsp.md「プラグインの診断」）。nil なら、
 	// やめさせない。見るのは、プラグインの起動と起動の間（起動したプラグインは、止めない）。やめたら、そこで止めて、
 	// RunErr が、Context の誤り（診断には、しない）。
 	Context context.Context
@@ -106,9 +132,10 @@ type Options struct {
 // Load は root から hozo.toml を探して（configPath があればそれを読んで）プロジェクトを解析する
 // （docs/packages.md「internal/project」）。hozo.toml がなければ既定の設定で解析し、CFG-* の診断を除く。
 // overlay の内容はディスクの内容より優先し、ディスクにないファイルも足せる。
-// プラグインを探すのは [hozo].plugin_dirs だけ（HOZO_PLUGIN_PATH とホームは LoadWith の Options で渡す）。
+// プラグインを探すのは [hozo].plugin_dirs だけ（HOZO_PLUGIN_PATH とホームは LoadWith の Options で渡す）。プラグインは、起動しない
+// （docs/cli.md「check」の 1〜3 だけ。4 を含めるのは LoadWith）。
 func Load(root, configPath string, overlay map[string][]byte) *Project {
-	return LoadWith(Options{Root: root, ConfigPath: configPath, Overlay: overlay})
+	return LoadWith(Options{Root: root, ConfigPath: configPath, Overlay: overlay, NoPlugins: true})
 }
 
 // LoadWith は Load の本体。
@@ -181,10 +208,10 @@ func LoadWith(opts Options) *Project {
 		diags = append(diags, checker.CheckHomes(p.Sema.Program, p.Config, p.checkUnits())...)
 	}
 
-	// 4. プラグインの check（docs/cli.md「check」の 4）。1〜3 に error があれば、起動しない: View は、検査を通っていない仕様のもので、
-	// トランスパイラの検査は、それを前提にしていない（docs/plugin-protocol.md「check」）
-	if errs, _ := diag.Count(diags); errs == 0 && !opts.NoPluginChecks {
-		pds, err := p.runPluginChecks(opts)
+	// 4. プラグインに頼む（docs/cli.md「check」の 4）。1〜3 に error があれば、起動しない: View は、検査を通っていない仕様のもので、
+	// トランスパイラは、それを前提にしていない（docs/plugin-protocol.md「起動」）
+	if errs, _ := diag.Count(diags); errs == 0 && !opts.NoPlugins {
+		pds, err := p.runPlugins(opts)
 		diags = append(diags, pds...)
 		p.RunErr = err
 	}
@@ -562,62 +589,154 @@ func (p *Project) covered(unit int) []string {
 // （View を持つとは限らない）。
 func (p *Project) Covered(unit int) []string { return p.covered(unit) }
 
-// runPluginChecks は、使うプラグインのうち [check] enabled のものに direction "check" を送り、返った診断を足す
-// （docs/cli.md「check」の 4、docs/plugin-protocol.md「起動」「check」）。プラグインと、出力（単位と、その単位が出力する
-// 名前空間の組）の組ごとに一回で、相手の出力は、そのプラグインのトランスパイラを書いた単位のもの。渡す view は、その出力のもの
-// （emit が、同じ出力に渡すものと同じ）。順序は、単位の設定の順、名前空間の IR の順、transpilers に書いた順。
-// 重さ、code、位置、メッセージが、すべて同じ診断は、最初の一つだけを残す（同じ名前空間を、二つの単位が出力しているとき）。
-// protocol の合わないプラグイン（MAN-2）は起動しない。
-// code "protocol" / "unsupported" の応答は MAN-2 / MAN-5 の診断。proc.Crashed / proc.MalformedOutput なら
-// そこで止めて、その誤りを返す。
-func (p *Project) runPluginChecks(opts Options) ([]diag.Diagnostic, error) {
-	var diags []diag.Diagnostic
+// pluginJob は、プラグイン一つへの、一度の頼みごと: 受け持つ出力と、出力ごとに頼むトランスパイラ。
+type pluginJob struct {
+	plugin  *hostplugin.Plugin
+	outputs []jobOutput
+}
+
+type jobOutput struct {
+	unit        int
+	ns          string
+	view        *ir.View
+	transpilers []Transpiler
+}
+
+// pluginJobs は、起動するプラグインと、それぞれが受け持つ出力（docs/plugin-protocol.md「起動」）。プラグインの並びは、最初に
+// 現れた順（単位の設定の順、名前空間の IR の順、transpilers に書いた順）。出力の並びは、単位の設定の順、名前空間の IR の順で、
+// 頼むトランスパイラは、その単位の transpilers のうち、そのプラグインのもの（書いた順）。protocol の合わないプラグイン（MAN-2）は、
+// 入れない。受け持つ出力のないプラグインも、入らない。
+func (p *Project) pluginJobs() []*pluginJob {
+	var jobs []*pluginJob
+	byPlugin := map[*hostplugin.Plugin]*pluginJob{}
 	var views []map[string]*ir.View
-	runner := hostplugin.Runner{Root: p.Root, Stderr: opts.Stderr, Env: opts.Env}
-	seen := map[string]bool{}
 	for i := range p.Units {
 		for _, ns := range p.covered(i) {
-			called := map[*hostplugin.Plugin]bool{} // 一つの出力に、同じプラグインの二つのトランスパイラを書いていても、一回
+			if views == nil {
+				views = p.Views()
+			}
+			view := views[i][ns]
+			if view == nil {
+				continue
+			}
+			at := map[*pluginJob]int{} // この出力の、job.outputs の中の位置
 			for _, t := range p.Units[i].Transpilers {
 				pl := t.Plugin
-				if !pl.Manifest.Check.Enabled || len(pl.Mismatch) > 0 || called[pl] {
+				if len(pl.Mismatch) > 0 {
 					continue
 				}
-				if views == nil {
-					views = p.Views()
+				job := byPlugin[pl]
+				if job == nil {
+					job = &pluginJob{plugin: pl}
+					byPlugin[pl] = job
+					jobs = append(jobs, job)
 				}
-				view := views[i][ns]
-				if view == nil {
-					continue
+				k, seen := at[job]
+				if !seen {
+					k = len(job.outputs)
+					at[job] = k
+					job.outputs = append(job.outputs, jobOutput{unit: i, ns: ns, view: view})
 				}
-				if opts.Context != nil {
-					if err := opts.Context.Err(); err != nil {
-						return diags, err
-					}
-				}
-				called[pl] = true
-				req := sdk.CheckRequest{Protocol: hostplugin.Protocol, Direction: "check", View: view}
-				var resp sdk.CheckResponse
-				if err := runner.Run(pl.Manifest, pl.Dir, &req, &resp); err != nil {
-					var pe *hostplugin.PluginError
-					if errors.As(err, &pe) {
-						d := pe.Diagnostic(pl.ManifestPath())
-						if key := pluginDiagKey(d); !seen[key] {
-							seen[key] = true
-							diags = append(diags, d)
-						}
-						continue
-					}
-					return diags, err
-				}
-				for _, d := range resp.Diagnostics {
-					pd := p.PluginDiagnostic(pl.Name, d)
-					if key := pluginDiagKey(pd); !seen[key] {
-						seen[key] = true
-						diags = append(diags, pd)
-					}
-				}
+				job.outputs[k].transpilers = append(job.outputs[k].transpilers, t)
 			}
+		}
+	}
+	return jobs
+}
+
+// NeedsPlugins は、起動する相手（docs/plugin-protocol.md「起動」: 受け持つ出力のある、使うプラグイン）が、一つでもあるか。
+func (p *Project) NeedsPlugins() bool { return len(p.pluginJobs()) > 0 }
+
+// runPlugins は、使うプラグインごとに一回、direction "emit" を送り、返った答えを p.Answers に置いて、その診断を返す
+// （docs/cli.md「check」の 4、docs/plugin-protocol.md「起動」「emit」）。一つの要求に、仕様を一度と、そのプラグインが受け持つ
+// 出力を並べる。errors は error の診断、warnings は PLUGIN の warning。重さ、code、位置、メッセージが、すべて同じ診断は、最初の
+// 一つだけを残す（同じ名前空間を、二つの単位が出力しているとき）。
+// code "protocol" / "unsupported" の応答は MAN-2 / MAN-5 の診断（そのプラグインの答えは、ない）。proc.Crashed /
+// proc.MalformedOutput なら、そこで止めて、その誤りを返す。応答の outputs と results の数が、要求と合わないのも、
+// proc.MalformedOutput。
+func (p *Project) runPlugins(opts Options) ([]diag.Diagnostic, error) {
+	var diags []diag.Diagnostic
+	runner := hostplugin.Runner{Root: p.Root, Stderr: opts.Stderr, Env: opts.Env}
+	seen := map[string]bool{}
+	add := func(d diag.Diagnostic) {
+		if key := pluginDiagKey(d); !seen[key] {
+			seen[key] = true
+			diags = append(diags, d)
+		}
+	}
+	type slot struct {
+		answer Answer
+		order  [3]int // 単位、名前空間の IR の順、transpilers の中の位置
+	}
+	var slots []slot
+	nsOrder := map[string]int{}
+	for i := range p.Sema.Program.Namespaces {
+		nsOrder[p.Sema.Program.Namespaces[i].Name] = i
+	}
+	for _, job := range p.pluginJobs() {
+		if opts.Context != nil {
+			if err := opts.Context.Err(); err != nil {
+				return diags, err
+			}
+		}
+		views := make([]*ir.View, len(job.outputs))
+		names := make([][]string, len(job.outputs))
+		for i, o := range job.outputs {
+			views[i] = o.view
+			for _, t := range o.transpilers {
+				names[i] = append(names[i], t.Name)
+			}
+		}
+		req := sdk.NewEmitBatch(views, names)
+		var resp sdk.EmitBatchResponse
+		if err := runner.Run(job.plugin.Manifest, job.plugin.Dir, &req, &resp); err != nil {
+			var pe *hostplugin.PluginError
+			if errors.As(err, &pe) {
+				add(pe.Diagnostic(job.plugin.ManifestPath()))
+				continue
+			}
+			return diags, err
+		}
+		if len(resp.Outputs) != len(job.outputs) {
+			return diags, &hostplugin.MalformedOutputError{Plugin: job.plugin.Name,
+				Reason: fmt.Sprintf("応答の outputs が %d 個（要求の outputs は %d 個）", len(resp.Outputs), len(job.outputs))}
+		}
+		for i, o := range job.outputs {
+			results := resp.Outputs[i].Results
+			if len(results) != len(o.transpilers) {
+				return diags, &hostplugin.MalformedOutputError{Plugin: job.plugin.Name,
+					Reason: fmt.Sprintf("応答の outputs[%d].results が %d 個（要求の、その出力の transpilers は %d 個）", i, len(results), len(o.transpilers))}
+			}
+			for j, t := range o.transpilers {
+				r := results[j]
+				pos := 0
+				for k, name := range p.Units[o.unit].Transpilers {
+					if name.Name == t.Name {
+						pos = k
+					}
+				}
+				slots = append(slots, slot{Answer{Unit: o.unit, Namespace: o.ns, Transpiler: t, Response: &r}, [3]int{o.unit, nsOrder[o.ns], pos}})
+			}
+		}
+	}
+	// 答えと診断の並びは、プラグインの起動の順ではなく、単位の設定の順、名前空間の IR の順、transpilers に書いた順
+	sort.SliceStable(slots, func(a, b int) bool {
+		x, y := slots[a].order, slots[b].order
+		for k := range x {
+			if x[k] != y[k] {
+				return x[k] < y[k]
+			}
+		}
+		return false
+	})
+	for _, s := range slots {
+		p.Answers = append(p.Answers, s.answer)
+		for _, e := range s.answer.Response.Errors {
+			e.Severity = "error"
+			add(p.PluginDiagnostic(s.answer.Transpiler.Name, e))
+		}
+		for _, w := range s.answer.Response.Warnings {
+			add(p.PluginWarning(s.answer.Transpiler.Name, w))
 		}
 	}
 	return diags, nil
@@ -632,8 +751,7 @@ func pluginDiagKey(d diag.Diagnostic) string {
 	return fmt.Sprintf("%d\x00%s\x00%s\x00%s", d.Severity, d.Code, pos, d.Message)
 }
 
-// PluginDiagnostic はプラグインが返した診断（docs/plugin-protocol.md「check」の diagnostics、「emit」の errors）を
-// 診断にする。severity が "warning" なら warning、それ以外は error。at は FQN（その宣言の位置）か "file:line:col"（Locate）。
+// PluginDiagnostic はプラグインが返した診断（docs/plugin-protocol.md「emit」の errors）を診断にする。severity が "warning" なら warning、それ以外は error。at は FQN（その宣言の位置）か "file:line:col"（Locate）。
 func (p *Project) PluginDiagnostic(plugin string, d sdk.Diagnostic) diag.Diagnostic {
 	sev := diag.Error
 	if d.Severity == "warning" {

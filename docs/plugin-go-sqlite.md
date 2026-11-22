@@ -18,19 +18,14 @@
 ```toml
 name     = "go-sqlite"
 command  = ["go", "run", "github.com/mew-ton/hozo/plugins/go-sqlite"]
-protocol = "0.21"
+protocol = "0.22"
 
 [[transpiler]]
 name     = "go-sqlite"
 language = "go"
 requires = ["go"]
 seams    = ["db.transaction"]
-
-[check]
-enabled = true
 ```
-
-`[check]` は、`emit` が `errors` で返す誤りを、検査の段（`hozoc check`）でも返すためのもの（`docs/plugin-protocol.md`「check」）。
 
 - 読む語彙は、状態の `@db.table`、フィールドの、しまい方（`@db.text` / `@db.int` / `@db.float` / `@db.bool` / `@db.datetime` / `@db.date` / `@db.time` / `@db.json`）と `@db.key` / `@db.unique` / `@db.ref`、`read` の `@db.find` / `@db.list` / `@db.where` / `@db.latest`、効果の `@db.insert` / `@db.update` / `@db.delete`、op の `@db.transaction`。語彙は提供しない。
 - **`@db.transaction` は継ぎ目**（`seams`。`docs/config.md`「継ぎ目」）: このトランスパイラを並べた単位では、基底が、`@db.transaction` の付いた op を二層で出し、継ぎ目の口（`Seams` のメソッド）を出す。中身は、このトランスパイラが出す（「トランザクション」）。並べていない単位では、`@db.transaction` は印で、何も起きない（同「継ぎ目」の「読む者がなければ、何も出ない」）。
@@ -510,7 +505,7 @@ func dbConflict(err, conflict error) error {
 
 ## 診断
 
-`emit` の応答の `errors` で返し、同じものを、検査の段（direction `check`）でも返す（`docs/plugin-protocol.md`「check」）。
+`emit` の応答の `errors` で返す。検査だけの実行（`hozoc check`）も、同じ応答の診断を使う（`docs/plugin-protocol.md`「起動」「emit」）。
 
 | ID | 重さ | 意味 |
 |---|---|---|

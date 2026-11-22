@@ -13,18 +13,13 @@
 ```toml
 name     = "go-http"
 command  = ["go", "run", "github.com/mew-ton/hozo/plugins/go-http"]
-protocol = "0.21"
+protocol = "0.22"
 
 [[transpiler]]
 name     = "go-http"
 language = "go"
 requires = ["go", "go-valid"]
-
-[check]
-enabled = true
 ```
-
-`[check]` は、`emit` が `errors` で返す誤りを、検査の段（`hozoc check`）でも返すためのもの（`docs/plugin-protocol.md`「check」）。
 
 - 読む語彙は、標準の `http`: op の `@http.get(path)` / `@http.post(path)`、フィールドの `@http.header` / `@http.query` / `@http.body`（項目の形）と `@http.headerObj` / `@http.queryObj` / `@http.bodyObj`（全体の形）、`@http.required` と `@http.default(value)`（項目がないときの扱い）、例外の `@http.status(code)`。`@http.retry` は読まない（印）。語彙は提供しない。
 - `go-valid` への依存は、オプションによらない（`docs/config.md`「基底と相乗り」）。`validate = false` でも、単位の `transpilers` に `go-valid` が要る。
@@ -531,7 +526,7 @@ func RunHTTP(t *testing.T, leaves server.Leaves, c HTTPCases) {
 
 ## 診断
 
-`emit` の応答の `errors` で返し、同じものを、検査の段（direction `check`）でも返す（`docs/plugin-protocol.md`「check」）: `hozoc check` で出て、`hozoc emit` は、どのファイルも書く前に、止まる。位置は、表に書いた宣言の FQN。
+`emit` の応答の `errors` で返す。検査だけの実行（`hozoc check`）も、同じ応答の診断を使う（`docs/plugin-protocol.md`「起動」「emit」）: `hozoc check` で出て、`hozoc emit` は、どのファイルも書く前に、止まる。位置は、表に書いた宣言の FQN。
 
 | ID | 重さ | 意味 |
 |---|---|---|

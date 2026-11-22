@@ -21,7 +21,7 @@ TypeScript 風の記法で書く。`?` は省略可（JSON での扱いは「JSO
 
 ```ts
 interface Program {
-  version: "0.21";                 // この文書の版。Program か View の構造が変わったら上げる（「版」）
+  version: "0.22";                 // この文書の版。Program か View の構造が変わったら上げる（「版」）
   namespaces: Namespace[];        // グローバルは name "" の Namespace として先頭に置く
   binds: Bind[];
 }
@@ -519,7 +519,7 @@ interface Bind {
 
 ```ts
 interface View {
-  version: "0.21";
+  version: "0.22";
   viewer: string;                 // 見る側の名前空間の FQN
   config: NamespaceConfig;        // この View の単位での viewer の設定
   files: string[];                // この View の単位の in に合ったユーザーのファイルと、読み込んだすべての語彙のファイル
@@ -601,6 +601,31 @@ interface ViewedSignature extends Signature {   // Signature は Sig(O, viewer)
 - `viewer` が同じなら、`config`・`files`・`entries` 以外は単位によらず同じ。
 - `entries` は、単位ごとに違いうる: 単位の対象の op と、通す出力が、単位で決まる（`docs/check.md`「入口ごとの、求めるケース」の「入口」「流れ」）。`Entry`・`EntrySource`・`EntryStep` のフィールドは、どれも、省かない（値がなければ、`""` か `[]`）。
 
+### まとめた形
+
+プラグインへの要求（`docs/plugin-protocol.md`「emit」）は、一つの要求に、いくつもの出力を並べる（`docs/decisions.md`「決めたこと」411）ので、`View` を、そのまま並べず、**出力に依らない部分**（`Spec`）と、**出力ごとの部分**（`OutputView`）に分けて送る。`View` は、この二つを合わせたもので、中身は、変わらない: トランスパイラが受け取るのは、今までどおり `View`（SDK が、合わせる）。
+
+```ts
+interface Spec {                  // 出力に依らない部分。要求に、一度だけ
+  version: "0.22";                // View.version
+  namespaces: Record<string, NamespaceConfig[]>;   // View.namespaces
+  program: Program;               // 全体そのまま。合成した model（ViewedSignature.params）は、含まない
+}
+
+interface OutputView {            // 出力（単位と名前空間の組）ごとの部分
+  viewer: string;                 // View.viewer
+  config: NamespaceConfig;        // View.config
+  files: string[];                // View.files
+  synthesized: Decl[];            // ops の params が合成した model（親を先に）。なければ []
+  entries: Entry[];               // View.entries
+  ops: Record<string, ViewedSignature>;   // View.ops
+}
+```
+
+- **合わせ方**: `View` の `version` と `namespaces` は、`Spec` のもの。`viewer`、`config`、`files`、`entries`、`ops` は、`OutputView` のもの。`View.program` は、`Spec.program` の、`viewer` の `Namespace.decls` の末尾に、`synthesized` を、その順に足したもの（ほかの名前空間と、ほかの項目は、`Spec.program` のまま）。
+- 分け方の理由: `program`（仕様の全体）と `namespaces` は、どの出力でも同じで、要求の大きさの、ほとんどを占める。`ops` と `synthesized` は、見る側（`viewer`）で決まり、`config`、`files`、`entries` は、単位でも変わる。
+- `Spec` と `OutputView` のフィールドは、どれも、省かない（値がなければ `[]` か `{}`）。JSON での並びは、上の順で、`ops` のキーは FQN の辞書順。
+
 ## JSON
 
 - フィールド名はこの文書の通り（lowerCamelCase）。`kind` が判別子。Go の `ir` パッケージの JSON タグはここから写す。
@@ -611,10 +636,11 @@ interface ViewedSignature extends Signature {   // Signature は Sig(O, viewer)
 
 ## 版
 
-`Program.version` と `View.version` は同じ値で、どちらかの構造か、プラグインとのやり取りの形（`docs/plugin-protocol.md`「要求と応答」）が変わったら上げる。IR が決めている名前のうち、プラグインが、その値で出力を分けるもの（核の型の名前、標準の分類のケースの名前）が変わったときも、上げる。今の版は `"0.21"`。構造もやり取りの形も同じで、値の意味だけが変わる決定では、上げない: 配線の op の `Op.carried` が空でないことがあり、その `Signature` が運ばれたものを含むこと（`docs/decisions.md`「決めたこと」149）は、0.6 の中にある。
+`Program.version` と `View.version` は同じ値で、どちらかの構造か、プラグインとのやり取りの形（`docs/plugin-protocol.md`「要求と応答」）が変わったら上げる。IR が決めている名前のうち、プラグインが、その値で出力を分けるもの（核の型の名前、標準の分類のケースの名前）が変わったときも、上げる。今の版は `"0.22"`。構造もやり取りの形も同じで、値の意味だけが変わる決定では、上げない: 配線の op の `Op.carried` が空でないことがあり、その `Signature` が運ばれたものを含むこと（`docs/decisions.md`「決めたこと」149）は、0.6 の中にある。
 
 | 版 | 変わったこと |
 |---|---|
+| 0.22 | やり取りの形: プラグインの起動を、プラグインごとに一回にまとめた。`emit` の要求は、`spec`（`Spec`）と `outputs`（頼むトランスパイラの名前の並びと、`OutputView`）、応答は、出力ごと、トランスパイラごとの答えの並び（「まとめた形」、`docs/plugin-protocol.md`「emit」）。検査のための頼みごと direction `check` と、マニフェストの `[check]` をなくした（同「検査のための頼みごとを、なくしたこと」）。`coverage` の要求に `outputs`（出力の設定の並び）。起動のときに足していた環境変数 `HOZO_PROJECT_ROOT` と `HOZO_PLUGIN_DIR` をなくした（同「起動」）。`Program` の構造と、`View` の中身は、0.21 と同じ（`docs/decisions.md`「決めたこと」411、416、421、425） |
 | 0.21 | `View.entries`（`Entry`、`EntrySource`、`EntryStep`）を足した: 入口ごとの、求めるケースを、本体が求めて、プラグインに渡す（`docs/check.md`「入口ごとの、求めるケース」、`docs/decisions.md`「決めたこと」409） |
 | 0.20 | 配線の文（`Statement`）に `try`（`Catch`）と `throw` を足した。`Match.subject` に `caught`。アームの本体の `throw` に `caught`（`throw e`）。`Classify.subject` に `exception`、`Classify.cases[]` に `exceptions` と `rest`（例外の分類）（`docs/check.md`「例外を受ける」「例外の分類」。`docs/decisions.md`「決めたこと」419、422）。`View` とやり取りの形は 0.19 のまま |
 | 0.19 | `Decorator.external` をなくし、`Decorator.outerThrows`（節 `outer throws`）と、`Decorator.entry`、`Decorator.hint`（核の印 `@entry`、`@hint`）を足した（`docs/grammar.md`「decorator の宣言」。`docs/decisions.md`「決めたこと」407、408、420） |

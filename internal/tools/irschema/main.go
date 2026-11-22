@@ -156,18 +156,14 @@ var overrides = map[string]any{
 	"Op.returns": nullable(ref("Type")),
 	"Op.body":    nullable(ref("Wiring")),
 	// docs/plugin-protocol.md「要求と応答」: protocol は docs/ir.md の version と同じ値。
-	"EmitRequest.protocol":      map[string]any{"const": ir.Version},
-	"EmitRequest.direction":     map[string]any{"const": "emit"},
-	"CheckRequest.protocol":     map[string]any{"const": ir.Version},
-	"CheckRequest.direction":    map[string]any{"const": "check"},
+	"EmitBatch.protocol":        map[string]any{"const": ir.Version},
+	"EmitBatch.direction":       map[string]any{"const": "emit"},
 	"ImportRequest.protocol":    map[string]any{"const": ir.Version},
 	"ImportRequest.direction":   map[string]any{"const": "import"},
 	"CoverageRequest.protocol":  map[string]any{"const": ir.Version},
 	"CoverageRequest.direction": map[string]any{"const": "coverage"},
-	// docs/plugin-protocol.md「check」: severity は "error" か "warning"。emit の errors では省く。
+	// docs/plugin-protocol.md「応答の形」: emit の errors の severity は、省ける（hozoc は読まない。常に error）。
 	"Diagnostic.severity": map[string]any{"type": "string", "enum": []string{"error", "warning"}},
-	// check の診断は severity を必ず持つ。
-	"CheckResponse.diagnostics": arrayOf(ref("CheckDiagnostic")),
 }
 
 // descriptions は $defs の説明。docs の見出しを指す。
@@ -264,10 +260,13 @@ var descriptions = map[string]string{
 	"EntryStepVerb":        "差し替えに言うことの種類（docs/ir.md「その名前空間から見た IR」の EntryStep.verb）。",
 	"EntryTargetKind":      "差し替える相手の種類（docs/ir.md「その名前空間から見た IR」の EntryStep.kind）。",
 	"ViewedSignature":      "viewer から見た op の関数の型（docs/ir.md「その名前空間から見た IR」）。",
-	"EmitRequest":          "direction \"emit\" の要求（docs/plugin-protocol.md「emit」）。transpiler は起動するトランスパイラの名前。",
-	"EmitResponse":         "\"emit\" の応答（docs/plugin-protocol.md「emit」）。errors が一つでもあれば書き出さない。",
-	"CheckRequest":         "direction \"check\" の要求（docs/plugin-protocol.md「check」）。",
-	"CheckResponse":        "\"check\" の応答（docs/plugin-protocol.md「check」）。",
+	"Spec":                 "View の、出力に依らない部分（docs/ir.md「まとめた形」の Spec）。emit の要求に、一度だけ入る。",
+	"OutputView":           "View の、出力（単位と名前空間の組）ごとの部分（docs/ir.md「まとめた形」の OutputView）。",
+	"EmitBatch":            "direction \"emit\" の要求（docs/plugin-protocol.md「emit」）。spec は仕様（一度だけ）、outputs はプラグインが受け持つ出力。",
+	"EmitOutput":           "emit の要求の outputs の要素（docs/plugin-protocol.md「emit」）。transpilers は、その出力で頼むトランスパイラの名前。",
+	"EmitBatchResponse":    "\"emit\" の応答（docs/plugin-protocol.md「emit」）。outputs は、要求の outputs と、同じ数、同じ順。",
+	"OutputResult":         "emit の応答の outputs の要素（docs/plugin-protocol.md「emit」）。results は、その出力の transpilers と、同じ数、同じ順。",
+	"EmitResponse":         "トランスパイラ一つの、出力一つへの答え（docs/plugin-protocol.md「emit」の応答の results の要素）。errors が一つでもあれば書き出さない。",
 	"ImportRequest":        "direction \"import\" の要求（docs/plugin-protocol.md「import」）。",
 	"ImportResponse":       "\"import\" の応答（docs/plugin-protocol.md「import」）。",
 	"CoverageRequest":      "direction \"coverage\" の要求（docs/plugin-protocol.md「coverage」）。coverage はカバレッジのファイル、files は実行された行を知りたいファイル、outputs は files を出した出力の設定。",
@@ -275,18 +274,16 @@ var descriptions = map[string]string{
 	"CoveredFile":          "カバレッジが測っていたファイル一つの、実行された所の行の範囲（docs/plugin-protocol.md「coverage」）。lines の要素は、始まりの行と終わりの行。",
 	"TestMap":              "テストの対応表（docs/plugin-protocol.md「テストの対応表」）。emit の応答の files に足すファイル hozo-tests.<トランスパイラの名前>.json の中身。",
 	"TestEntry":            "対応表のテスト一つ（docs/plugin-protocol.md「テストの対応表」）。lines は、始まりの行と終わりの行。",
-	"File":                 "書き出す（取り込む）ファイル（docs/plugin-protocol.md「emit」）。path はルートからの相対パス（emit の応答では、その起動の view.config.dir の下。そうでなければ PLG-1）、content は UTF-8 の文字列。",
+	"File":                 "書き出す（取り込む）ファイル（docs/plugin-protocol.md「emit」）。path はルートからの相対パス（emit の応答では、その出力の view.config.dir の下。そうでなければ PLG-1）、content は UTF-8 の文字列。",
 	"Warning":              "warning の診断（docs/plugin-protocol.md「emit」）。at は FQN か \"file:line:col\"。",
 	"Diagnostic":           "emit の errors の要素（docs/plugin-protocol.md「emit」）。severity は省ける（常に error）。",
-	"CheckDiagnostic":      "check の diagnostics の要素（docs/plugin-protocol.md「check」）。severity を必ず持つ。",
 	"PluginError":          "終了コード 2 のときの標準出力（docs/plugin-protocol.md「起動」）。",
 }
 
 // roots は $defs に置く起点。到達できる型をすべて写す。
 var roots = []reflect.Type{
 	typeOf[ir.Program](), typeOf[ir.View](),
-	typeOf[plugin.EmitRequest](), typeOf[plugin.EmitResponse](),
-	typeOf[plugin.CheckRequest](), typeOf[plugin.CheckResponse](),
+	typeOf[plugin.EmitBatch](), typeOf[plugin.EmitBatchResponse](),
 	typeOf[plugin.ImportRequest](), typeOf[plugin.ImportResponse](),
 	typeOf[plugin.CoverageRequest](), typeOf[plugin.CoverageResponse](),
 	typeOf[plugin.TestMap](),
@@ -336,12 +333,6 @@ func (g *gen) build() error {
 		}
 	}
 	// 手で足す定義。
-	cd, err := g.structDef(typeOf[plugin.Diagnostic](), "CheckDiagnostic")
-	if err != nil {
-		return err
-	}
-	cd["required"] = append([]string{"severity"}, cd["required"].([]string)...)
-	g.defs["CheckDiagnostic"] = cd
 	g.defs["PluginError"] = describe("PluginError", object(map[string]any{
 		"error": object(map[string]any{
 			"code":    map[string]any{"type": "string", "enum": []string{"protocol", "unsupported"}},

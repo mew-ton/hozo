@@ -18,11 +18,11 @@ import (
 // 効果の結果の判定に使うためのもの。値は、作業ディレクトリから探した設定で、ディスクから読む。呼ぶたびに読み直す。
 // outputs の単位は、read outputChanges（配線 writeOutputs が呼ぶ）も持つ。
 
-// load は、作業ディレクトリから hozo.toml を探して解析する（Check と同じ解析。入力の config は取らない）。プラグインの check は、
-// 起動しない（状態の単位が、仕様と設定を読み直すだけの呼び出し。プラグインの誤りを報告するのは、Check と、emit の応答）。
-// error の診断は、check と同じ例外で返す。
-func (a *App) load() (*project.Project, error) {
-	p := project.LoadWith(project.Options{Root: a.Dir, Stderr: a.Stderr, Env: a.Env, PluginPath: a.pluginPath, Home: a.Home, NoPluginChecks: true})
+// load は、作業ディレクトリから hozo.toml を探して解析する（Check と同じ解析。入力の config は取らない）。plugins が偽なら、
+// プラグインは、起動しない（状態の単位が、仕様と設定を読み直すだけの呼び出し）。真なら、Check と同じに、プラグインに頼み、
+// 答えを受け取る（生成し直して比べるとき。[App.collect] が、その答えを使う）。error の診断は、check と同じ例外で返す。
+func (a *App) load(plugins bool) (*project.Project, error) {
+	p := project.LoadWith(project.Options{Root: a.Dir, Stderr: a.Stderr, Env: a.Env, PluginPath: a.pluginPath, Home: a.Home, NoPlugins: !plugins})
 	if p.RunErr != nil {
 		return nil, asProc(p.RunErr)
 	}
@@ -45,7 +45,7 @@ func (s sourcesState) Get(ctx context.Context) ([]hozoc.SourceFile, error) {
 		return nil, err
 	}
 	a := s.a
-	p := project.LoadWith(project.Options{Root: a.Dir, Stderr: a.Stderr, Env: a.Env, PluginPath: a.pluginPath, Home: a.Home, NoPluginChecks: true})
+	p := project.LoadWith(project.Options{Root: a.Dir, Stderr: a.Stderr, Env: a.Env, PluginPath: a.pluginPath, Home: a.Home, NoPlugins: true})
 	if p.RunErr != nil {
 		return nil, asProc(p.RunErr)
 	}
@@ -114,7 +114,7 @@ func (s outputsState) Get(ctx context.Context) ([]hozoc.OutputFile, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
-	p, err := s.a.load()
+	p, err := s.a.load(false)
 	if err != nil {
 		return nil, err
 	}

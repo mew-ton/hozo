@@ -11,6 +11,7 @@ import (
 
 	"github.com/mew-ton/hozo/internal/diag"
 	"github.com/mew-ton/hozo/internal/project"
+	"github.com/mew-ton/hozo/ir"
 )
 
 // pluginViewsFile は、プラグインの単体テストの入力（View の列）のファイルの名前。
@@ -57,9 +58,9 @@ func TestPluginViewFixtures(t *testing.T) {
 			rel = dir // サンプルの中のプラグインの入力は、tests/ からの相対パスのまま
 		}
 		t.Run(filepath.ToSlash(rel), func(t *testing.T) {
-			// プラグインの check は、起動しない: ここで要るのは View だけで、入力には、プラグインが診断を返すための仕様もある
+			// プラグインは、起動しない: ここで要るのは View だけで、入力には、プラグインが診断を返すための仕様もある
 			// （その診断が、hozoc check で出ることは、TestPluginDiagnosticsAtCheck）
-			p := project.LoadWith(project.Options{Root: dir, PluginPath: repoPlugins(t) + samplePluginPath(t, dir), NoPluginChecks: true})
+			p := project.LoadWith(project.Options{Root: dir, PluginPath: repoPlugins(t) + samplePluginPath(t, dir), NoPlugins: true})
 			if n, _ := diag.Count(p.Diags); n > 0 {
 				var b strings.Builder
 				for _, d := range p.Diags {
@@ -83,6 +84,7 @@ func TestPluginViewFixtures(t *testing.T) {
 					if err != nil {
 						t.Fatal(err)
 					}
+					splitRoundTrip(t, views[ns], data)
 					if n > 0 {
 						buf.WriteString(",")
 					}
@@ -119,4 +121,44 @@ func samplePluginPath(t *testing.T, dir string) string {
 	}
 	t.Fatalf("%s の上に、プラグインのマニフェスト（hozo-plugin.toml）がない", dir)
 	return ""
+}
+
+// splitRoundTrip は、View v を、やり取りの形（docs/ir.md「まとめた形」: 出力に依らない Spec と、出力ごとの OutputView）に分け、
+// JSON にして読み直し、合わせたものが、もとの View と、同じ JSON（want）になることを確かめる: プラグインが受け取る View は、
+// 分けて送っても、中身が変わらない。Spec の Program は、合成した model を含まない。
+func splitRoundTrip(t *testing.T, v *ir.View, want []byte) {
+	t.Helper()
+	spec, out := v.Split()
+	specJSON, err := json.Marshal(spec)
+	if err != nil {
+		t.Fatal(err)
+	}
+	outJSON, err := json.Marshal(out)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if bytes.Contains(specJSON, []byte(`$`+`"`)) && bytes.Contains(specJSON, []byte(`"name":"`+v.Viewer+`.`)) {
+		for i := range spec.Program.Namespaces {
+			for _, d := range spec.Program.Namespaces[i].Decls {
+				if m, ok := d.(*ir.Model); ok && m.SynthesizedFrom != "" && strings.Contains(m.Name, "$") {
+					t.Errorf("%s: Spec の Program に、合成した model %s が残っている", v.Viewer, m.Name)
+				}
+			}
+		}
+	}
+	var spec2 ir.Spec
+	var out2 ir.OutputView
+	if err := json.Unmarshal(specJSON, &spec2); err != nil {
+		t.Fatalf("%s: Spec を読み直せない: %v", v.Viewer, err)
+	}
+	if err := json.Unmarshal(outJSON, &out2); err != nil {
+		t.Fatalf("%s: OutputView を読み直せない: %v", v.Viewer, err)
+	}
+	got, err := json.Marshal(spec2.View(&out2))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(got, want) {
+		t.Errorf("%s: 分けて、合わせた View が、もとの View と違う（%d バイト、もとは %d バイト）", v.Viewer, len(got), len(want))
+	}
 }

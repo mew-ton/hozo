@@ -30,7 +30,8 @@ const entryDecorator = "t.entry"
 // loadViewCorpus はコーパスを internal/project で解析し、web から見た View を返す。error があれば失敗。
 func loadViewCorpus(t *testing.T) (*project.Project, *ir.View) {
 	t.Helper()
-	p := project.LoadWith(project.Options{Root: viewCorpus, Stderr: io.Discard, PluginPath: repoPlugins(t)})
+	// プラグイン（コーパスの view-dump）は、起動しない: ここで見るのは、hozoc が作る View
+	p := project.LoadWith(project.Options{Root: viewCorpus, Stderr: io.Discard, PluginPath: repoPlugins(t), NoPlugins: true})
 	if p.Errors() > 0 {
 		var b strings.Builder
 		for _, d := range p.Diags {
@@ -1122,11 +1123,15 @@ func TestViewDeliveredToPlugin(t *testing.T) {
 	// 書き出されるのは、トランスパイラが返した view.json と、出力先ごとの記録だけ。api と page の単位も、同じ基底で出力を持つ
 	t.Run("plugin-protocol.md emit/応答", func(t *testing.T) {
 		m, dir := viewDumpBuilt(t, root)
-		req := sdk.EmitRequest{Protocol: hostplugin.Protocol, Direction: "emit", Transpiler: "view-dump", View: want}
-		var resp sdk.EmitResponse
-		if err := (hostplugin.Runner{Root: root, Stderr: io.Discard}).Run(m, dir, &req, &resp); err != nil {
+		req := (&sdk.EmitRequest{Transpiler: "view-dump", View: want}).Batch()
+		var batch sdk.EmitBatchResponse
+		if err := (hostplugin.Runner{Root: root, Stderr: io.Discard}).Run(m, dir, req, &batch); err != nil {
 			t.Fatal(err)
 		}
+		if len(batch.Outputs) != 1 || len(batch.Outputs[0].Results) != 1 {
+			t.Fatalf("view-dump の応答 = %+v", batch)
+		}
+		resp := batch.Outputs[0].Results[0]
 		if len(resp.Files) != 1 || resp.Files[0].Path != "gen/web/view.json" || len(resp.Warnings) != 0 || len(resp.Errors) != 0 {
 			t.Errorf("view-dump の応答 = %+v", resp)
 		}
@@ -1139,15 +1144,15 @@ func TestViewDeliveredToPlugin(t *testing.T) {
 		expect(t, "hozoc emit が書いたファイル", written, []string{"gen/api/view.json", "gen/page/view.json", "gen/web/view.json"})
 	})
 
-	// docs/plugin-protocol.md「要求と応答」: protocol が合わなければ code "protocol"（MAN-2）、direction か、要求の transpiler を
+	// docs/plugin-protocol.md「要求と応答」: protocol が合わなければ code "protocol"（MAN-2）、direction か、頼まれたトランスパイラを
 	// 実装していなければ code "unsupported"（MAN-5）で、どちらも終了コード 2。同じプラグインを internal/plugin.Runner で直接起動して確かめる。
 	// マニフェストの `go run` を通すと `go run` が終了コード 2 を 1 に変えてしまう（proc.Crashed になる）ので、
 	// ここではプラグインを go build した実行ファイルで起動する（internal/plugin の echo-plugin のテストと同じ）。
 	t.Run("plugin-protocol.md 要求と応答/protocol", func(t *testing.T) {
 		m, dir := viewDumpBuilt(t, root)
-		req := sdk.EmitRequest{Protocol: "9.9", Direction: "emit", View: want}
-		var resp sdk.EmitResponse
-		err := hostplugin.Runner{Root: root, Stderr: io.Discard}.Run(m, dir, &req, &resp)
+		req := (&sdk.EmitRequest{Protocol: "9.9", Transpiler: "view-dump", View: want}).Batch()
+		var resp sdk.EmitBatchResponse
+		err := hostplugin.Runner{Root: root, Stderr: io.Discard}.Run(m, dir, req, &resp)
 		var pe *hostplugin.PluginError
 		if !errors.As(err, &pe) || pe.Code != hostplugin.CodeProtocol {
 			t.Fatalf("protocol 9.9 の要求に対する誤り = %v, want *PluginError{Code: %q}", err, hostplugin.CodeProtocol)
@@ -1167,9 +1172,9 @@ func TestViewDeliveredToPlugin(t *testing.T) {
 	})
 	t.Run("plugin-protocol.md 要求と応答/知らない transpiler", func(t *testing.T) {
 		m, dir := viewDumpBuilt(t, root)
-		req := sdk.EmitRequest{Protocol: hostplugin.Protocol, Direction: "emit", Transpiler: "view-nope", View: want}
-		var resp sdk.EmitResponse
-		err := hostplugin.Runner{Root: root, Stderr: io.Discard}.Run(m, dir, &req, &resp)
+		req := (&sdk.EmitRequest{Transpiler: "view-nope", View: want}).Batch()
+		var resp sdk.EmitBatchResponse
+		err := hostplugin.Runner{Root: root, Stderr: io.Discard}.Run(m, dir, req, &resp)
 		var pe *hostplugin.PluginError
 		if !errors.As(err, &pe) || pe.Code != hostplugin.CodeUnsupported || !strings.Contains(pe.Message, "view-nope") {
 			t.Fatalf("知らない transpiler の要求に対する誤り = %v, want *PluginError{Code: %q}", err, hostplugin.CodeUnsupported)
@@ -1741,4 +1746,24 @@ func jsonKeysInOrder(t *testing.T, data []byte, key string) []string {
 	}
 	t.Fatalf("JSON に %s がない", key)
 	return nil
+}
+
+// TestViewSplitRoundTrip は docs/ir.md「まとめた形」: View を、出力に依らない部分（Spec）と、出力ごとの部分（OutputView）に分けて
+// 送っても、合わせれば、もとの View と同じ。コーパスの web は、bind で埋まる位置から合成した model を持つ（Spec の Program には
+// 入らず、OutputView の synthesized に入る）。
+func TestViewSplitRoundTrip(t *testing.T) {
+	p, web := loadViewCorpus(t)
+	_, out := web.Split()
+	if len(out.Synthesized) == 0 {
+		t.Fatal("web の View に、合成した model がない（コーパスが、この確かめの役に立っていない）")
+	}
+	for _, views := range p.Views() {
+		for _, v := range views {
+			data, err := json.Marshal(v)
+			if err != nil {
+				t.Fatal(err)
+			}
+			splitRoundTrip(t, v, data)
+		}
+	}
 }
