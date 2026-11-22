@@ -1,3 +1,0 @@
-GOHTTP-8	app.second	経路 GET /items が二つある: op app.first と op app.second
-GOHTTP-8	app.third	経路 GET /items が二つある: op app.first と op app.third
-GOHTTP-8	app.again	経路 POST /twice が二つある: op app.twice と op app.again

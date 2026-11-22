@@ -102,6 +102,78 @@ func TestPluginViewFixtures(t *testing.T) {
 	}
 }
 
+// pluginSpecsFile は、語彙の読み解きの単体テストの入力（仕様）のファイルの名前。
+const pluginSpecsFile = "spec.json"
+
+// specFixtureRoots は、語彙の読み解きの単体テストの入力の置き場（tests/ からの相対パス）。それぞれの直下のディレクトリが、入力一つ。
+var specFixtureRoots = []string{filepath.Join("..", "plugin", "httpvocab", "testdata")}
+
+// TestPluginSpecFixtures は、語彙の読み解きの単体テストの入力が、その元の仕様から作ったものと同じであることを確かめる
+// （docs/testing.md「単体テスト」の `plugin/httpvocab`）。
+//
+// 語彙の決まりは、単位に依らない（docs/plugin-protocol.md「語彙のプラグイン」）ので、入力は、`.hozo` だけ（hozo.toml を置かない）。
+// ここで、`.hozo` を一時ディレクトリに写して、設定なしで internal/project に解析させ、hozoc が、語彙のプラグインに渡すのと同じ仕様（同「read」の spec: Project.Spec）を、
+// `testdata/<名前>/spec.json` に、一行で置く。更新は `go test ./tests -run TestPluginSpecFixtures -update`。
+// 仕様は hozoc の検査を通ること（error があれば、このテストが落ちる。語彙のプラグインが返す診断の条件は、検査を通る仕様で書く）。
+func TestPluginSpecFixtures(t *testing.T) {
+	n := 0
+	for _, root := range specFixtureRoots {
+		entries, err := os.ReadDir(root)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, e := range entries {
+			if !e.IsDir() {
+				continue
+			}
+			n++
+			dir := filepath.Join(root, e.Name())
+			t.Run(filepath.ToSlash(filepath.Join(filepath.Base(filepath.Dir(root)), e.Name())), func(t *testing.T) {
+				// リポジトリの hozo.toml を拾わないように、.hozo を、リポジトリの外に写して、設定なしで読む
+				root := t.TempDir()
+				sources, err := filepath.Glob(filepath.Join(dir, "*.hozo"))
+				if err != nil || len(sources) == 0 {
+					t.Fatalf("%s に .hozo がない（%v）", dir, err)
+				}
+				for _, src := range sources {
+					data, err := os.ReadFile(src)
+					if err != nil {
+						t.Fatal(err)
+					}
+					if err := os.WriteFile(filepath.Join(root, filepath.Base(src)), data, 0o644); err != nil {
+						t.Fatal(err)
+					}
+				}
+				p := project.LoadWith(project.Options{Root: root, NoPlugins: true})
+				if !p.NoConfig {
+					t.Fatalf("%s を、設定なしで読めなかった（語彙の読み解きの入力は、単位に依らない）", dir)
+				}
+				if n, _ := diag.Count(p.Diags); n > 0 {
+					var b strings.Builder
+					for _, d := range p.Diags {
+						if d.Severity == diag.Error {
+							b.WriteString("\n  " + d.Code + ": " + d.Message)
+						}
+					}
+					t.Fatalf("仕様が検査を通らない:%s", b.String())
+				}
+				spec := p.Spec()
+				if len(spec.Namespaces) != 0 {
+					t.Errorf("単位のない仕様の spec.namespaces が、空でない: %v", spec.Namespaces)
+				}
+				data, err := json.Marshal(spec)
+				if err != nil {
+					t.Fatal(err)
+				}
+				compareGolden(t, filepath.Join(dir, pluginSpecsFile), append(data, '\n'))
+			})
+		}
+	}
+	if n == 0 {
+		t.Fatal("語彙の読み解きの単体テストの入力が、一つもない")
+	}
+}
+
 // samplePluginPath は、単体テストの入力 dir が、サンプルの中のプラグインのものなら、そのプラグインを置いたディレクトリ
 // （サンプルの plugin_dirs のディレクトリ）を、HOZO_PLUGIN_PATH の続きの形（パス区切りと絶対パス）で返す。そうでなければ ""。
 // プラグインのディレクトリは、dir から親へ向かって最初に見つかる、マニフェストを持つディレクトリ。

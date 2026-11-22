@@ -29,6 +29,7 @@ type Manifest struct {
 	Protocol    string
 	Vocabulary  []string     // マニフェストからの相対パス。省略時は []
 	Transpilers []Transpiler // [[transpiler]]。書いた順。一つもなければ emit を持たない
+	Read        Read         // [read]。Namespaces が空でなければ、語彙のプラグイン
 	Import      Import
 	Coverage    Coverage
 }
@@ -41,10 +42,31 @@ type Transpiler struct {
 	Requires    []string // 出力の形を前提にするトランスパイラの名前。空なら基底、空でなければ相乗り（docs/config.md「基底と相乗り」）
 	Unsupported []string // 意味を保てない記法（デコレータの FQN）。使われていれば CFG-6
 	Seams       []string // 継ぎ目を要るデコレータの FQN（docs/config.md「継ぎ目」）
+	// RequiresVocabulary は、語彙のプラグインを要る語彙の名前空間（docs/plugin-protocol.md「語彙のプラグイン」）。なければ CFG-25
+	RequiresVocabulary []string
 }
 
 // IsBase は、このトランスパイラが基底か（requires が空。docs/config.md「基底と相乗り」）。
 func (t *Transpiler) IsBase() bool { return len(t.Requires) == 0 }
+
+// Read は [read] テーブル（docs/plugin-protocol.md「語彙のプラグイン」）。Namespaces は、読み解く語彙の名前空間の FQN。
+// テーブルがなければ、空（語彙のプラグインではない）。
+type Read struct {
+	Namespaces []string
+}
+
+// HasRead は、語彙のプラグインか（[read] を持つ）。
+func (m *Manifest) HasRead() bool { return len(m.Read.Namespaces) > 0 }
+
+// Reads は、このプラグインが、語彙の名前空間 namespace を読み解くか。
+func (m *Manifest) Reads(namespace string) bool {
+	for _, n := range m.Read.Namespaces {
+		if n == namespace {
+			return true
+		}
+	}
+	return false
+}
 
 // Coverage は [coverage] テーブル。Enabled なら hozoc tests で direction "coverage" を呼ぶ
 // （docs/plugin-protocol.md「coverage」）。
@@ -86,7 +108,11 @@ type rawManifest struct {
 		Requires    []string `toml:"requires"`
 		Unsupported []string `toml:"unsupported"`
 		Seams       []string `toml:"seams"`
+		Vocabulary  []string `toml:"requires_vocabulary"`
 	} `toml:"transpiler"`
+	Read *struct {
+		Namespaces []string `toml:"namespaces"`
+	} `toml:"read"`
 	Import struct {
 		Formats []string `toml:"formats"`
 	} `toml:"import"`
@@ -98,7 +124,8 @@ type rawManifest struct {
 // LoadManifest は path のマニフェストを読む。診断は MAN-6（なくした書き方 command がある）と、
 // MAN-4（TOML の誤り、知らないキー、wasm がない・空・文字列でない・相対パスでない・ディレクトリの外に出る、値の型違い、
 // [[transpiler]] に name か language がない、language が空、requires に自分の名前か同じ名前が二度ある、
-// seams に空の文字列か同じ FQN が二度ある、同じ名前の [[transpiler]] が二つ）と
+// seams に空の文字列か同じ FQN が二度ある、requires_vocabulary に空の文字列か同じ名前が二度ある、同じ名前の [[transpiler]] が二つ、
+// [read] の namespaces がない・空・空の文字列がある・同じ名前が二度ある）と
 // MAN-2（protocol が Protocol と違う）。MAN-4 か MAN-6 なら Manifest は nil。MAN-2 だけなら Manifest も返す。
 // 設計書 §4.6 の [emit]（decorate / entry / stop）とトップレベルの language は持たないので、書いてあれば知らないキー（MAN-4）。
 func LoadManifest(path string) (*Manifest, []diag.Diagnostic) {
@@ -210,11 +237,41 @@ func LoadManifest(path string) (*Manifest, []diag.Diagnostic) {
 			}
 			declared[fqn] = true
 		}
+		needed := map[string]bool{}
+		for _, ns := range t.Vocabulary {
+			switch {
+			case ns == "":
+				errorf("MAN-4", "マニフェストの [[transpiler]] %s の requires_vocabulary に空の文字列がある", t.Name)
+				bad = true
+			case needed[ns]:
+				errorf("MAN-4", "マニフェストの [[transpiler]] %s の requires_vocabulary に %s が二度ある", t.Name, ns)
+				bad = true
+			}
+			needed[ns] = true
+		}
 		if bad {
 			continue
 		}
 		m.Transpilers = append(m.Transpilers, Transpiler{Name: t.Name, Language: *t.Language,
-			Requires: orEmpty(t.Requires), Unsupported: orEmpty(t.Unsupported), Seams: orEmpty(t.Seams)})
+			Requires: orEmpty(t.Requires), Unsupported: orEmpty(t.Unsupported), Seams: orEmpty(t.Seams),
+			RequiresVocabulary: orEmpty(t.Vocabulary)})
+	}
+	if raw.Read != nil {
+		// [read]: namespaces は、一つ以上、要る（docs/plugin-protocol.md「マニフェスト」）
+		if len(raw.Read.Namespaces) == 0 {
+			errorf("MAN-4", "マニフェストの [read] に namespaces がない（読み解く語彙の名前空間を、一つ以上、書く）")
+		}
+		read := map[string]bool{}
+		for _, ns := range raw.Read.Namespaces {
+			switch {
+			case ns == "":
+				errorf("MAN-4", "マニフェストの [read] の namespaces に空の文字列がある")
+			case read[ns]:
+				errorf("MAN-4", "マニフェストの [read] の namespaces に %s が二度ある", ns)
+			}
+			read[ns] = true
+		}
+		m.Read.Namespaces = raw.Read.Namespaces
 	}
 	m.Import.Formats = orEmpty(raw.Import.Formats)
 	m.Coverage.Enabled = raw.Coverage.Enabled

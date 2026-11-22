@@ -345,7 +345,7 @@ hozoc は自分自身の境界（コマンド、ファイル、プラグイン�
 | 6 | （入れない。同 428: 基底と相乗りの約束は、今までどおり、ライブラリ） | — |
 | 7 | 解釈するデコレータの名指しと、warning | 420 |
 
-- **入った段**は、1、2、3、4。段 4 の持ち主は、`docs/plugin-protocol.md`「マニフェスト `hozo-plugin.toml`」（`wasm`）、「起動」（プラグインに渡すものと、渡さないもの。途中で止めること。機械の言葉に直したものを、覚えること）、「信頼の前提」。段 2 の、本体の計算の持ち主は、`docs/check.md`「入口ごとの、求めるケース」。段 3 の、やり取りの形の持ち主は、`docs/plugin-protocol.md`「起動」「emit」と、`docs/ir.md`「まとめた形」（プラグインごとに、一度の起動。検査のための頼みごとを、なくしたこと。版 0.22）、`docs/config.md`「プロジェクト全体のオプション」と `docs/plugin-go.md`「パッケージと import パス」（プラグインは、ファイルも、環境変数も、読まない。Go のモジュールの名前は、設定に）、`docs/cli.md`「build」（`hozoc build` と `hozoc build --no-emit`）。
+- **入った段**は、1、2、3、4 と、5 のうち、`http` の語彙の分（`valid` と `db` は、まだ）。段 5 の持ち主は、`docs/plugin-protocol.md`「語彙のプラグイン」「read」（語彙のプラグインの種類。マニフェストの `[read]` と `requires_vocabulary`。版 0.23）と、`docs/plugin-http.md`（`http` の語彙の、言語に依らない決まり。診断 HTTP-*。`go-http` から移した ID の対応は `docs/plugin-go-http.md`「診断」の「欠番」）。段 4 の持ち主は、`docs/plugin-protocol.md`「マニフェスト `hozo-plugin.toml`」（`wasm`）、「起動」（プラグインに渡すものと、渡さないもの。途中で止めること。機械の言葉に直したものを、覚えること）、「信頼の前提」。段 2 の、本体の計算の持ち主は、`docs/check.md`「入口ごとの、求めるケース」。段 3 の、やり取りの形の持ち主は、`docs/plugin-protocol.md`「起動」「emit」と、`docs/ir.md`「まとめた形」（プラグインごとに、一度の起動。検査のための頼みごとを、なくしたこと。版 0.22）、`docs/config.md`「プロジェクト全体のオプション」と `docs/plugin-go.md`「パッケージと import パス」（プラグインは、ファイルも、環境変数も、読まない。Go のモジュールの名前は、設定に）、`docs/cli.md`「build」（`hozoc build` と `hozoc build --no-emit`）。
 
 段 7 が済んだ版が、1.0（「版」）。
 
@@ -479,7 +479,7 @@ R2 の成果物:
 | 設定: `[emit.options]`、プロジェクト全体の `[options]`（CFG-24）、基底と相乗り（CFG-19〜CFG-21）、型の置き場（CFG-22）、継ぎ目（CFG-23）、語彙の名前空間の単位 | `docs/config.md` |
 | プロトコル: 版 0.4（`requires`、`seams`、`View.config` の `index` / `base` / `options` / `seams`、`select` の廃止） | `docs/plugin-protocol.md`、`docs/ir.md`「その名前空間から見た IR」 |
 | 公開の SDK: `plugin`（`Options`）、`plugin/golang`（形の規則）、`plugin/govalid` | `docs/packages.md` |
-| プラグイン `plugins/go`、`plugins/go-valid`、`plugins/go-sqlite`、`plugins/go-http`、`plugins/go-cli`（作り直し） | `docs/plugin-go.md`、`docs/plugin-go-valid.md`、`docs/plugin-go-sqlite.md`、`docs/plugin-go-http.md`、`docs/plugin-go-cli.md` |
+| プラグイン `plugins/go`、`plugins/go-valid`、`plugins/go-sqlite`、`plugins/go-http`、`plugins/go-cli`（作り直し） | `docs/plugin-go.md`、`docs/plugin-go-valid.md`、`docs/plugin-go-sqlite.md`、`docs/plugin-go-http.md`、`docs/plugin-http.md`、`docs/plugin-go-cli.md` |
 | `emit` の手順（本体は出力を作らない）、`cli.hozo` と `hozo.toml`、`internal/app` | `docs/cli.md` |
 | 語彙: `http.BadRequest` | `docs/vocab.md`「同梱する語彙」 |
 | テスト: サンプルのサブテスト、コーパスのゴールデンの作り直し、`select` のコーパスと `pick` の削除 | `docs/testing.md`、`tests/samples/README.md` |
@@ -624,7 +624,7 @@ Go にした理由は「プラグインの書き方」に依る。設計書の�
 | 語彙の宣言の読み込み元 | なし | `docs/vocab.md` |
 | プラグインの探索、マニフェストの追加項目（トランスパイラの一覧を含む）、語彙に固有の検査 | §4.6 に形だけ | `docs/plugin-protocol.md` |
 | 言語ごとの出力の担い手と形 | §4.3 に方針 | 担い手は、言語ごとの基底のトランスパイラ（`docs/config.md`「基底と相乗り」）。本体は言語を知らない。Go の形は `docs/plugin-go.md`。TS は段階 5 |
-| 語彙ごとの出力（検証、HTTP、DB） | §4.2、§4.3 に方針 | `docs/plugin-go-valid.md`、`docs/plugin-go-http.md`（通信の形を含む）、`docs/plugin-go-sqlite.md` |
+| 語彙ごとの出力（検証、HTTP、DB） | §4.2、§4.3 に方針 | `docs/plugin-go-valid.md`、`docs/plugin-go-http.md`、`docs/plugin-http.md`（HTTP の通信の形）、`docs/plugin-go-sqlite.md` |
 | `cli` の語彙の意味 | `examples/hozoc.hozo` | `docs/plugin-go-cli.md` |
 | 診断の形と終了コード | `examples/hozoc.hozo` に一部 | `docs/diagnostics.md` |
 | hozoc の振る舞いと `cli.hozo` | `examples/hozoc.hozo` | `docs/cli.md` |
@@ -666,6 +666,7 @@ Go にした理由は「プラグインの書き方」に依る。設計書の�
 | STATE-9 | 配線が、矢印の前にケースを並べた行の遷移を持つ効果を、そのケースにあると分かっていない行で呼んだこと。前のケースを、行の引数の型で言うようにした（`docs/decisions.md` の 369）ときに、型の検査（TYPE-4、MATCH-4）にまとまった | `docs/check.md`「状態と効果」 |
 | THROWS-1 | `throws` の節を書いた配線の op が、呼び出し先の例外と、アームの `throw` の例外を、その節に書いていないこと（§7.2、§16 の「配線の `throws` は、すべて書かせる」。379 で、節を書いた op だけの規則になっていた）。節を、その関数が足すものにした（`docs/decisions.md`「決めたこと」381）ときになくなった | `docs/check.md`「throws」 |
 | EFF-2 | 配線の op に書いた `effects` が、本体の呼び出しから決まる効果と、付いたデコレータが運ぶ効果を合わせたものと、食い違うこと（§7.2）。同じく 381 でなくなった: 書いた効果は、計算した効果に、足す | `docs/check.md`「状態と効果」 |
+| GOHTTP-1〜GOHTTP-8、GOHTTP-12〜GOHTTP-15、GOHTTP-17〜GOHTTP-19 | `go-http` が返していた、`http` の語彙の使い方の検査のうち、言語に依らないもの。語彙のプラグイン `http` に移した（`docs/decisions.md` の 410）ときになくなった。行き先（HTTP-1〜HTTP-15）の対応は、持ち主の文書 | `docs/plugin-go-http.md`「診断」の「欠番」 |
 | READS-2 | 配線の op に書いた `reads` が、計算した読む状態と、食い違うこと（S15）。同じく 381 でなくなった: 書いた状態は、計算した読む状態に、足す | `docs/check.md`「状態と効果」 |
 | GOSQL-14、GOSQL-18、GOSQL-19、GOSQL-21、GOSQL-23 | `db` の語彙の、op の中身を言うデコレータ（`@db.reads`、`@db.effects`）、`@db.nullable`、デコレータの引数の表についての規則。`db` の語彙を、`read` と効果の宣言から中身を作る形にした（`docs/decisions.md` の 134〜137）ときになくなった | `docs/plugin-go-sqlite.md`「診断」 |
 

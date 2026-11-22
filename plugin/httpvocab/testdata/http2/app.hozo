@@ -1,0 +1,31 @@
+// HTTP-2: 位置は op。
+namespace app {
+  model A { @http.query a: string?; }
+  model B { @http.query b: string?; }
+  scalar Id extends string;
+  union Either { Left: A; Right: B; }
+  model Attrs { [name: string]: string; }
+
+  // 引数が二つ
+  @http.get("/two")
+  export fn two(a: A, b: B): string;
+  // 引数が、フィールドを持つ model でない: 核の型、scalar、省略可能な model、model の配列、union、インデックスの model
+  @http.get("/core")
+  export fn core(id: string): string;
+  @http.get("/scalar")
+  export fn byId(id: Id): string;
+  @http.get("/optional")
+  export fn optional(in: A?): string;
+  @http.get("/list")
+  export fn many(in: A[]): string;
+  @http.get("/either")
+  export fn either(in: Either): string;
+  @http.get("/index")
+  export fn byIndex(in: Attrs): string;
+
+  // 0 個か、model 一つなら、当たらない
+  @http.get("/none")
+  export fn nothing(): string;
+  @http.get("/one")
+  export fn one(in: A): string;
+}

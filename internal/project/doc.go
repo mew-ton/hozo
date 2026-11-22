@@ -9,8 +9,9 @@
 //     sources はルートからの glob で、各単位の out の下と plugin_dirs の下は常に除く（docs/config.md「形」）。
 //     読んだファイルに各単位の in を照らす（docs/config.md「in」。CFG-18）。
 //  3. 解決・正規化（internal/sema）と検査（internal/check）。CFG-6 はマニフェストが要るのでここで出す。
-//  4. 1〜3 に error がなければ、使うプラグインごとに一回、direction "emit" を送り（一つの要求に、そのプラグインが受け持つ
-//     出力を並べる）、返った答えを残して（Project.Answers）、その診断（errors と warnings）を足す。
+//  4. 1〜3 に error がなければ、プラグインに頼む。はじめに、仕様が使っている語彙のプラグイン（Project.Readers）ごとに一回、
+//     direction "read" を送り、その診断を足す。それに error がなければ、使うプラグインごとに一回、direction "emit" を送り
+//     （一つの要求に、そのプラグインが受け持つ出力を並べる）、返った答えを残して（Project.Answers）、その診断（errors と warnings）を足す。
 //
 // 診断はすべて集めて docs/diagnostics.md「順序」に並べ替える。ファイルのパスはルートからの相対パス
 // （docs/ir.md「Program」の Span.file と同じ形）で、hozo.toml やマニフェストの位置のない診断の File も同じ形にする。

@@ -589,3 +589,58 @@ func TestNoHTMLEscape(t *testing.T) {
 		t.Errorf("content must not be HTML-escaped: %s", out)
 	}
 }
+
+// readFake は、read だけを実装する語彙のプラグイン。
+type readFake struct {
+	got  *ReadRequest
+	resp *ReadResponse
+	err  error
+}
+
+func (f *readFake) Read(r *ReadRequest) (*ReadResponse, error) {
+	f.got = r
+	return f.resp, f.err
+}
+
+// TestRunRead は direction "read"（docs/plugin-protocol.md「read」）: Reader を満たす Handler に、要求の spec を渡し、答えを、
+// errors と warnings（空でも []）で返す。Reader を満たさない Handler と、read だけの Handler へのほかの direction は、code "unsupported"。
+func TestRunRead(t *testing.T) {
+	input := fmt.Sprintf(`{"protocol":%q,"direction":"read","spec":%s,"later":1}`, ir.Version, specJSON())
+	// 診断を返す
+	f := &readFake{resp: &ReadResponse{Errors: []Diagnostic{{Code: "VOC-1", At: "a.f", Message: "bad"}}}}
+	code, out, errOut := run(t, ReadOnly(f), input)
+	if code != 0 {
+		t.Fatalf("code = %d, stderr = %s", code, errOut)
+	}
+	if f.got == nil || f.got.Spec == nil || f.got.Spec.Program == nil || f.got.Direction != "read" || f.got.Protocol != ir.Version {
+		t.Fatalf("Read が受け取った要求 = %+v", f.got)
+	}
+	if want := `{"errors":[{"code":"VOC-1","at":"a.f","message":"bad"}],"warnings":[]}` + "\n"; out != want {
+		t.Errorf("応答 = %s, want %s", out, want)
+	}
+	// 何も返さない（nil）: 空の並びは [] で出る
+	if code, out, _ := run(t, ReadOnly(&readFake{}), input); code != 0 || out != `{"errors":[],"warnings":[]}`+"\n" {
+		t.Errorf("nil の答え: code = %d, 応答 = %s", code, out)
+	}
+	// spec のない要求は、誤り（応答を書かない）
+	if code, out, errOut := run(t, ReadOnly(&readFake{}), fmt.Sprintf(`{"protocol":%q,"direction":"read"}`, ir.Version)); code != 1 || out != "" || !strings.Contains(errOut, "spec") {
+		t.Errorf("spec のない要求: code = %d, 応答 = %q, stderr = %q", code, out, errOut)
+	}
+	// Reader を満たさない Handler は、read を実装していない
+	var r refusal
+	code, out, _ = run(t, &fake{}, input)
+	decode(t, out, &r)
+	if code != 2 || r.Error.Code != "unsupported" || !strings.Contains(r.Error.Message, "read") {
+		t.Errorf("Reader でない Handler: code = %d, refusal = %+v", code, r.Error)
+	}
+	// read だけの Handler は、emit を実装していない
+	code, out, _ = run(t, ReadOnly(&readFake{}), emitJSON(outputJSON("a", "go")))
+	decode(t, out, &r)
+	if code != 2 || r.Error.Code != "unsupported" {
+		t.Errorf("read だけの Handler への emit: code = %d, refusal = %+v", code, r.Error)
+	}
+	// Read が返した誤りは、終了コード 1
+	if code, _, errOut := run(t, ReadOnly(&readFake{err: errors.New("boom")}), input); code != 1 || !strings.Contains(errOut, "boom") {
+		t.Errorf("Read の誤り: code = %d, stderr = %q", code, errOut)
+	}
+}

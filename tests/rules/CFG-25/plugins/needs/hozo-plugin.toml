@@ -1,0 +1,16 @@
+# CFG-25 の fixture: go-v は、語彙 voc の語彙のプラグインを要る（reader が読み解く）。go-w は、語彙 absent のものを要る（誰も読み解かない）
+name     = "needs"
+wasm     = "plugin.wasm"
+protocol = "0.23"
+
+[[transpiler]]
+name     = "go-v"
+language = "go"
+requires = ["go"]
+requires_vocabulary = ["voc"]
+
+[[transpiler]]
+name     = "go-w"
+language = "go"
+requires = ["go"]
+requires_vocabulary = ["voc", "absent"]

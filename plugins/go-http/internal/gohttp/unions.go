@@ -7,17 +7,16 @@ import (
 
 	"github.com/mew-ton/hozo/ir"
 	"github.com/mew-ton/hozo/plugin/golang"
+	"github.com/mew-ton/hozo/plugin/httpvocab"
 )
 
-// このファイルは、通信に出る union（docs/plugin-go-http.md「通信の形」の「union」）: 出せる union かの検査（GOHTTP-5）と、
-// 二つの http.go に出す、表 httpUnions と、読み書きの補助。
+// このファイルは、通信に出る union（docs/plugin-http.md「通信の形」の「union」）の、Go の読み書き: 二つの http.go に出す、表 httpUnions と、
+// 読み書きの補助。どの union が、通信に出せるか（HTTP-5）と、アームの決め手を求めるのは、plugin/httpvocab。
 
-// wireUnion は、経路の op の、本文、結果、例外の引数の型の中に現れた union（arms）一つ。
+// wireUnion は、経路の op の、本文、結果、例外の引数の型の中に現れた、通信に出せる union（arms）一つ。
 type wireUnion struct {
 	decl *ir.Union
 	arms []wireArm
-	// problem は、通信に出せない理由（出せるなら ""）。
-	problem string
 }
 
 // wireArm は、通信に出る union のアーム一つ。
@@ -27,110 +26,26 @@ type wireArm struct {
 	// その構造体。それ以外は、包む型 <Union><アーム名>（docs/plugin-go.md「union」）。
 	goName  string
 	wrapped bool
-	// keys は、決め手: そのアームの model の、省略可能でないフィールドのうち、ほかのどのアームの、どのフィールドとも、名前が違うもの。
+	// keys は、決め手（httpvocab.Arm.Keys）。
 	keys []string
 }
 
-// checkJSON は GOHTTP-5: 型 t（what: 本文、結果、例外の引数の、どの型か）の中の union が、どれも、通信に出せること。
-// 出せる union は、最初に現れた順に、g.unions に集める。
-func (g *generator) checkJSON(op *ir.Op, t ir.Type, what string) {
-	for _, u := range g.unionsIn(t, map[string]bool{}) {
-		if u.problem != "" {
-			g.errorf(codeHTTPJSON, op.Name, "経路の op %s の%s %s が、通信に出せない union %s を中に持つ: %s（通信に出せるのは、アームが、どれも、フィールドを持つ model で、アームごとに、そのアームだけが持つ、省略可能でないフィールドがある union）",
-				op.Name, what, golang.TypeDisplay(t), u.decl.Name, u.problem)
+// wireUnions は、httpvocab が読み解いた、通信に出せる union（最初に現れた順）に、Go の型の名前を足して、g.unions に置く。
+func (g *generator) wireUnions(unions []*httpvocab.Union) {
+	for _, u := range unions {
+		ns := g.declNS[u.Decl.Name]
+		w := &wireUnion{decl: u.Decl}
+		for _, a := range u.Arms {
+			arm := wireArm{name: a.Name, keys: a.Keys}
+			if g.declNS[a.Model.Name] == ns {
+				arm.goName = golang.TypeName(a.Model.Name, ns)
+			} else {
+				arm.goName, arm.wrapped = golang.TypeName(u.Decl.Name, ns)+golang.Capitalize(a.Name), true
+			}
+			w.arms = append(w.arms, arm)
 		}
+		g.unions = append(g.unions, w)
 	}
-}
-
-// unionsIn は、型 t の中の union（arms）を、辿った順に返す（アームの型の中の union も）。初めて見た union は、調べて、覚える。
-func (g *generator) unionsIn(t ir.Type, visited map[string]bool) []*wireUnion {
-	switch x := t.(type) {
-	case ir.OptionalType:
-		return g.unionsIn(x.Of, visited)
-	case ir.ArrayType:
-		return g.unionsIn(x.Of, visited)
-	case ir.CaseType:
-		return g.unionsIn(x.Of, visited)
-	case ir.RefType:
-		if visited[x.Target] {
-			return nil
-		}
-		visited[x.Target] = true
-		switch d := g.p.Lookup(x.Target).(type) {
-		case *ir.Union:
-			if d.Variant != ir.UnionArms {
-				return nil
-			}
-			out := []*wireUnion{g.wireUnion(d)}
-			for _, a := range d.Arms {
-				out = append(out, g.unionsIn(a.Type, visited)...)
-			}
-			return out
-		case *ir.Model:
-			var out []*wireUnion
-			for _, f := range d.Fields {
-				out = append(out, g.unionsIn(f.Type, visited)...)
-			}
-			if d.Index != nil {
-				out = append(out, g.unionsIn(d.Index.Value, visited)...)
-			}
-			return out
-		}
-	}
-	return nil
-}
-
-// wireUnion は、union u を、通信に出せるか調べた結果（一度だけ調べる）。出せる union は、g.unions に足す。
-func (g *generator) wireUnion(u *ir.Union) *wireUnion {
-	if w, ok := g.unionOf[u.Name]; ok {
-		return w
-	}
-	if g.unionOf == nil {
-		g.unionOf = map[string]*wireUnion{}
-	}
-	w := &wireUnion{decl: u}
-	g.unionOf[u.Name] = w
-	ns := g.declNS[u.Name]
-	models := make([]*ir.Model, len(u.Arms))
-	for i, a := range u.Arms {
-		if r, ok := a.Type.(ir.RefType); ok {
-			if m, isModel := g.p.Lookup(r.Target).(*ir.Model); isModel && m.Index == nil {
-				models[i] = m
-			}
-		}
-		if models[i] == nil {
-			w.problem = fmt.Sprintf("アーム %s の型 %s が、フィールドを持つ model でない", a.Name, golang.TypeDisplay(a.Type))
-			return w
-		}
-	}
-	for i, a := range u.Arms {
-		arm := wireArm{name: a.Name}
-		if g.declNS[models[i].Name] == ns {
-			arm.goName = golang.TypeName(models[i].Name, ns)
-		} else {
-			arm.goName, arm.wrapped = golang.TypeName(u.Name, ns)+golang.Capitalize(a.Name), true
-		}
-		others := map[string]bool{}
-		for j := range models {
-			if j != i {
-				for _, f := range models[j].Fields {
-					others[f.Name] = true
-				}
-			}
-		}
-		for _, f := range models[i].Fields {
-			if _, optional := f.Type.(ir.OptionalType); !optional && !others[f.Name] {
-				arm.keys = append(arm.keys, f.Name)
-			}
-		}
-		if len(arm.keys) == 0 {
-			w.problem = fmt.Sprintf("アーム %s（%s）に、そのアームだけが持つ、省略可能でないフィールドがない", a.Name, models[i].Name)
-			return w
-		}
-		w.arms = append(w.arms, arm)
-	}
-	g.unions = append(g.unions, w)
-	return w
 }
 
 // unionTable は、表 httpUnions（docs/plugin-go-http.md「補助」の「union の読み書き」）。qualifier は、名前空間のパッケージの修飾

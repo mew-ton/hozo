@@ -1,0 +1,9 @@
+# go-w は、語彙 absent の語彙のプラグインも要るが、入っていない → CFG-25（voc のものは、入っている）
+# ERROR: CFG-25
+[hozo]
+plugin_dirs = ["plugins"]
+
+[[emit]]
+namespace   = "a"
+transpilers = ["go", "go-w"]
+out         = "gen/a"

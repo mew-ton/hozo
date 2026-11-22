@@ -39,6 +39,7 @@ plugins/go/            Go の基底のプラグイン（main。中身は interna
 plugins/go-valid/      go-valid プラグイン（main。中身は internal/govalid/）
 plugins/go-sqlite/     go-sqlite プラグイン（main。中身は internal/gosqlite/）
 plugins/go-http/       go-http プラグイン（main。中身は internal/gohttp/）
+plugins/http/          語彙のプラグイン http（main。中身は、公開のライブラリ plugin/httpvocab）
 plugins/go-cli/        go-cli プラグイン（main。中身は internal/gocli/）と、その語彙 cli.hozo
 plugins/go-design/     go-design プラグイン（main。中身は internal/godesign/）
 schema/                IR の JSON スキーマ（go generate の置き場のパッケージ schema）
@@ -90,6 +91,7 @@ Go のパッケージごとの、このモジュールの中で import してい
 | `plugin` | `ir` |
 | `plugin/golang` | `ir`、`plugin` |
 | `plugin/govalid` | `ir`、`runtime` |
+| `plugin/httpvocab` | `ir`、`plugin`、`plugin/govalid` |
 | `runtime` | — |
 | `vocab` | — |
 | `plugins/go` | `plugin`、`plugins/go/internal/gobase` |
@@ -99,7 +101,8 @@ Go のパッケージごとの、このモジュールの中で import してい
 | `plugins/go-sqlite` | `plugin`、`plugins/go-sqlite/internal/gosqlite` |
 | `plugins/go-sqlite/internal/gosqlite` | `ir`、`plugin`、`plugin/golang` |
 | `plugins/go-http` | `plugin`、`plugins/go-http/internal/gohttp` |
-| `plugins/go-http/internal/gohttp` | `ir`、`plugin`、`plugin/golang`、`plugin/govalid` |
+| `plugins/go-http/internal/gohttp` | `ir`、`plugin`、`plugin/golang`、`plugin/govalid`、`plugin/httpvocab` |
+| `plugins/http` | `plugin`、`plugin/httpvocab` |
 | `plugins/go-cli` | `plugin`、`plugins/go-cli/internal/gocli` |
 | `plugins/go-cli/internal/gocli` | `ir`、`plugin`、`plugin/golang`、`plugin/govalid` |
 | `plugins/go-design` | `plugin`、`plugins/go-design/internal/godesign` |
@@ -110,9 +113,9 @@ Go のパッケージごとの、このモジュールの中で import してい
 | `tests` | — |
 
 - `internal/` は `cmd/hozoc` と `internal/` の中からだけ使う。例外は、リポジトリをまたぐテストのパッケージ `tests` だけ（テストのファイルから `internal/app`、`internal/project` などを import する。`tests` にテストでないファイルはない）。
-- プラグインが使えるのは `ir`、`plugin`、`plugin/golang`、`plugin/govalid`、`runtime`（と、自分のディレクトリの下のパッケージ）。テスト用のプラグインも同じ。別のプラグインのパッケージは import しない: 相乗りが基底やほかの相乗りの形を知るのは、公開の SDK（`plugin/golang`、`plugin/govalid`）を通してだけ（`docs/plugin-protocol.md`「相乗りが基底の形を知る方法」）。
-- 公開のパッケージ（`ir`、`plugin`、`plugin/golang`、`plugin/govalid`、`runtime`、`vocab`）は `internal/` に依存しない。
-- **hozoc 本体（`cmd/hozoc` と `internal/` のパッケージ。生成物 `internal/gen/` を除く）は、特定の言語の出力のコードを持たない。** `plugin/golang`、`plugin/govalid`、`plugins/` を import しない（言語を知るのはプラグインだけ。`docs/plugin-protocol.md`「この文書が決めること」）。`runtime` を import するのは、生成物だけ。
+- プラグインが使えるのは `ir`、`plugin`、`plugin/golang`、`plugin/govalid`、`plugin/httpvocab`、`runtime`（と、自分のディレクトリの下のパッケージ）。テスト用のプラグインも同じ。別のプラグインのパッケージは import しない: 相乗りが基底やほかの相乗りの形を知るのは、公開の SDK（`plugin/golang`、`plugin/govalid`）を通してだけ（`docs/plugin-protocol.md`「相乗りが基底の形を知る方法」）。
+- 公開のパッケージ（`ir`、`plugin`、`plugin/golang`、`plugin/govalid`、`plugin/httpvocab`、`runtime`、`vocab`）は `internal/` に依存しない。
+- **hozoc 本体（`cmd/hozoc` と `internal/` のパッケージ。生成物 `internal/gen/` を除く）は、特定の言語の出力のコードを持たない。** `plugin/golang`、`plugin/govalid`、`plugins/` を import しない（言語を知るのはプラグインだけ。`docs/plugin-protocol.md`「この文書が決めること」）。語彙ごとの決まりも、持たない: `plugin/httpvocab` を import しない（語彙の決まりを知るのは、語彙のプラグインと、その語彙を出すトランスパイラだけ。同「語彙のプラグイン」）。`runtime` を import するのは、生成物だけ。
 - 解析（`internal/project`）は、プラグインの `emit` を起動しない。応答のファイルを集めて書き出すのは `internal/app`。言語サーバーは `internal/project` までで、プラグインの起動（`emit`）を行わない。
 - `internal/sema` は設定（`internal/config`）に依存しない。設定に関わる検査は `internal/config`、`internal/check`、`internal/project` が行う（「`internal/config`」）。
 - `internal/tools/selfgen` はこのモジュールのどのパッケージも import しない（生成物が壊れていても動くため。「自己生成の手順」）。
@@ -172,6 +175,11 @@ func Options(req *EmitRequest, into any) ([]string, error)         // req.View.C
                                                                    // 知らないキーと error を診断にするのは呼ぶ側（docs/config.md「オプション」）
 const Version = "0.0.0-dev"                                         // このリポジトリのプラグインの版。生成したファイルのヘッダに書く（docs/plugin-go.md「ファイル」）
 // ImportRequest / ImportResponse / File / Warning / Diagnostic も同じ形
+// 語彙のプラグイン（docs/plugin-protocol.md「語彙のプラグイン」「read」）。Handler が、Reader も満たしていれば、Run が、direction "read" で呼ぶ
+type Reader interface { Read(req *ReadRequest) (*ReadResponse, error) }
+type ReadRequest struct { Protocol string; Direction string; Spec *ir.Spec }   // direction "read" の要求。hozoc が、要求を作るのにも使う
+type ReadResponse struct { Errors []Diagnostic; Warnings []Warning }
+func ReadOnly(r Reader) Handler                                    // read だけを実装するプラグインの Handler（emit、import、coverage は ErrUnsupported）
 type CoverageRequest struct { Protocol string; Direction string; Coverage File; Files []string; Outputs []ir.NamespaceConfig }   // docs/plugin-protocol.md「coverage」
 type CoverageResponse struct { Recognized bool; Files []CoveredFile }
 type CoveredFile struct { Path string; Lines [][2]int }             // 実行された所の、行の範囲（始まり、終わり）
@@ -385,6 +393,33 @@ func (p *CoverProfile) Lines(name string) (lines [][2]int, measured bool)   // <
 - `PublicTestNames` は、テストのパッケージの、基底の公開の名前（`docs/plugin-go.md`「単体テストの口」: `LeafCases`、`RunLeaves`、葉ごとの `<Op>Cases` と `<Op>Case`、分類ごとの `<C>Examples` と `Run<C>`。同「テストのにせもの」: にせものの型、`Fakes`、`NewOps`）の、ただ一つの写し。基底は、この一覧の中で名前が当たれば GO-2 を返す。テストのパッケージにファイルを足す相乗り（`go-http` の GOHTTP-20）は、自分の名前が、この一覧の名前と当たるかを確かめる。空かどうかは、基底が、テストのパッケージを作るかどうか。
 - `TestKitOf` は、テストのにせものと、テストの中の組み立て（`docs/plugin-go.md`「テストのにせもの」）の、ただ一つの写し。基底は、ここから `fakes.go` を作り、組み立てを使う相乗り（`go-http` の `RunHTTP`）は、同じ値から、`Fakes` のフィールドの名前と、`NewOps` の引数を求める。別の単位の出力の形は、`HomeOf` と同じに、その単位の `in` を省いたものとして求める。
 
+### `plugin/httpvocab`（公開）
+
+`docs/plugin-http.md`「対象」「通信の形」の「union」「診断」の写し: 標準の語彙 `http` の、言語に依らない読み解き。語彙のプラグイン `http`（`plugins/http`）と、`http` の語彙をある言語に出すトランスパイラ（`go-http`）が共有する（`docs/decisions.md`「決めたこと」428）。読むのは `ir.Program` だけで、単位にも、言語にも、依らない。
+
+```go
+const Namespace = "http"                               // この語彙の名前空間
+const Get, Post, Header, Query, Body, HeaderObj, QueryObj, BodyObj, Required, Default, Status   // 読むデコレータの FQN
+func Check(p *ir.Program) []plugin.Diagnostic          // すべての名前空間の経路を読み解いた診断（HTTP-*）。名前空間の IR の順、その中は op の宣言順
+type Reader struct { … }                               // 仕様一つを読み解く。入力の model と union は、一度だけ調べ、診断も、一度だけ
+func NewReader(p *ir.Program) *Reader
+func (r *Reader) Routes(namespace string, target func(op *ir.Op) bool) []Route   // その名前空間の op のうち、target が真のもの（nil なら、すべて）の経路。診断を集める。HTTP-8 は、この呼び出しが見た経路の中で比べる
+func (r *Reader) Errors() []plugin.Diagnostic          // ここまでに読み解いたものの診断（HTTP-*）
+func (r *Reader) Unions() []*Union                     // ここまでに読み解いた経路の、通信に出せる union（最初に現れた順）
+type Route struct { Op *ir.Op; Method, Path string; Model *ir.Model; Inputs []Input }   // 経路一つ。Model は入力の model（なければ nil）
+func (r *Route) HasBody() bool
+type Input struct { Field *ir.Field; Decorator string; Place Place; Whole bool; Name string; Required bool; Default ir.Literal }   // フィールド一つの読み方（デコレータが言ったことだけ）
+func (in *Input) Location() string                     // 通信の上の場所（header.<名前>、body など）
+type Place int                                         // InHeader / InQuery / InBody。Word() は header / query / body
+type Union struct { Decl *ir.Union; Arms []Arm }       // 通信に出せる union
+type Arm struct { Name string; Model *ir.Model; Keys []string }   // Keys は、決め手
+func Statuses(p *ir.Program, routes []Route) []ExceptionStatus    // 経路の op が投げうる例外のうち、@http.status を持つもの（最初に現れた順）
+type ExceptionStatus struct { Exception *ir.Exception; Code int64 }
+```
+
+- トランスパイラは、`Routes` を、自分の出力の op だけに絞って呼ぶ（`target`）。`Errors` が空でなければ、語彙のプラグインの検査を通っていない仕様で、トランスパイラは、診断にせず、異常終了する（`docs/plugin-go-http.md`「診断」）。
+- `@http.default` の値を、制約で確かめるのは `plugin/govalid` の `CheckLiteral`（HTTP-15）。制約の読み方を、語彙 `valid` の側のライブラリに移すかは、`valid` の語彙のプラグインを作るときに決める（`docs/open.md`「語彙とプラグイン」）。
+
 ### `plugin/govalid`（公開）
 
 `docs/plugin-go-valid.md`「Validate を持つ型」の規則の写し。`go-valid` と、`Validate` を呼ぶ相乗り（`go-http`、`go-cli`）が共有する。
@@ -401,7 +436,7 @@ func CheckLiteral(p *ir.Program, field *ir.Field, lit ir.Literal) []Mismatch   /
 ```
 
 - `Unlisted` は、別の名前空間の型の `Validate` を呼べるかを見る、ただ一つの写し（`docs/plugin-go-valid.md`「出力」）: `Validate` は型の定義のパッケージにしか書けないので、呼ぶコードは、その型の置き場（`docs/config.md`「型の置き場」）の単位が `go-valid` を並べているときにだけコンパイルできる。`go-valid` の GOVALID-3、`go-http` の GOHTTP-11、`go-cli` の CLI-9 が、これで確かめる。置き場は `View.namespaces` と `View.config` だけから求まる。
-- `CheckLiteral` は、値一つを制約で確かめる、ただ一つの写し。境界のデコレータが補う値（`@http.default`、`@cli.default`）を、相乗りが、生成するときに確かめる（`go-http` の GOHTTP-19、`go-cli` の CLI-14。`docs/plugin-go-http.md`「補う値と制約」、`docs/plugin-go-cli.md`「補う値と制約」）。確かめる制約は、`valid` の標準の制約（`Standard`）のうち、フィールドの型の scalar（と、その元の scalar）に付いたものと、フィールドに付いたもの。意味は、`go-valid` が出す `Validate` と同じ（`docs/plugin-go-valid.md`「制約」の表。`format` は `runtime.CheckFormat` を、そのまま呼ぶ）で、返す順も、`Validate` が確かめる順（元の scalar から自分の scalar へ、その後にフィールド。それぞれ、書かれた順）。省略可能なフィールドは、中の型で見る。リテラルがフィールドの型に渡せることは、呼ぶ側が先に確かめる（GOHTTP-18、CLI-13）。確かめられないものは、合わないとは言わない: リテラルの型に当たらない制約と、解釈できない正規表現（`go-valid` の GOVALID-1）、利用者が `valid` に足した制約（同 GOVALID-5）。
+- `CheckLiteral` は、値一つを制約で確かめる、ただ一つの写し。境界のデコレータが補う値（`@http.default`、`@cli.default`）を、語彙のプラグインと相乗りが確かめる（`http` の HTTP-15、`go-cli` の CLI-14。`docs/plugin-http.md`「補う値と制約」、`docs/plugin-go-cli.md`「補う値と制約」）。確かめる制約は、`valid` の標準の制約（`Standard`）のうち、フィールドの型の scalar（と、その元の scalar）に付いたものと、フィールドに付いたもの。意味は、`go-valid` が出す `Validate` と同じ（`docs/plugin-go-valid.md`「制約」の表。`format` は `runtime.CheckFormat` を、そのまま呼ぶ）で、返す順も、`Validate` が確かめる順（元の scalar から自分の scalar へ、その後にフィールド。それぞれ、書かれた順）。省略可能なフィールドは、中の型で見る。リテラルがフィールドの型に渡せることは、呼ぶ側が先に確かめる（HTTP-14、CLI-13）。確かめられないものは、合わないとは言わない: リテラルの型に当たらない制約と、解釈できない正規表現（`go-valid` の GOVALID-1）、利用者が `valid` に足した制約（同 GOVALID-5）。
 
 ### `runtime`（公開）
 
@@ -552,8 +587,8 @@ func Under(a, dir string) bool                              // 相対パス a �
 ホスト側。`docs/plugin-protocol.md`。
 
 ```go
-type Manifest struct{ ...; Transpilers []Transpiler; Coverage Coverage }   // Coverage.Enabled は [coverage] enabled
-type Transpiler struct { Name, Language string; Requires, Unsupported, Seams []string }  // [[transpiler]] 一つ。Requires が空なら基底。Seams は継ぎ目を要るデコレータの FQN
+type Manifest struct{ ...; Transpilers []Transpiler; Read Read; Coverage Coverage }   // Coverage.Enabled は [coverage] enabled。Read.Namespaces は [read] の namespaces（空でなければ、語彙のプラグイン: HasRead）
+type Transpiler struct { Name, Language string; Requires, Unsupported, Seams, RequiresVocabulary []string }  // [[transpiler]] 一つ。Requires が空なら基底。Seams は継ぎ目を要るデコレータの FQN。RequiresVocabulary は、語彙のプラグインを要る語彙の名前空間
 func LoadManifest(path string) (*Manifest, []diag.Diagnostic)                           // MAN-2 / MAN-4
 type Plugin struct { Name, Dir string; Manifest *Manifest; Mismatch []diag.Diagnostic } // 入っているプラグイン一つ。Dir は絶対パス。Mismatch は MAN-2（使うときにだけ報告する）
 type SearchEnv struct { PluginPath, Home string }                                       // 探索が見るプロジェクトの外の場所（HOZO_PLUGIN_PATH の値、ホーム）。呼ぶ側が渡す。零値なら plugin_dirs だけ
@@ -578,6 +613,7 @@ type Project struct {
     Plugins []*plugin.Plugin         // 入っているプラグイン（internal/plugin.Discover）
     Units   []Unit                   // 解決した単位（Config.Units と同じ順）
     Diags   []diag.Diagnostic        // 解析・解決・検査・設定と、プラグインの診断（emit の errors と warnings）のすべて。並べ替え済み
+    Readers []*plugin.Plugin         // 頼む語彙のプラグイン（docs/plugin-protocol.md「語彙のプラグイン」: 仕様が、その語彙を使っている。名前の辞書順）。protocol の合わないものも含む
     Answers []Answer                 // プラグインから受け取った答え（docs/cli.md「検査」の 4）。単位の設定の順、名前空間の IR の順、transpilers に書いた順。起動しなかったら、空
 }
 type Answer struct { Unit int; Namespace string; Transpiler Transpiler; Response *sdk.EmitResponse }   // トランスパイラ一つの、出力一つ（Units の添字と、名前空間）への答え
@@ -595,6 +631,7 @@ func LoadWith(opts Options) *Project                                            
 func Load(root string, configPath string, overlay map[string][]byte) *Project   // LoadWith の短い形。プラグインは plugin_dirs だけから探し、起動しない
 func (p *Project) Errors() int
 func (p *Project) Views() []map[string]*ir.View                                 // 単位ごとの、出力する名前空間 → View（internal/check.Views）
+func (p *Project) Spec() *ir.Spec                                               // 仕様の、出力に依らない部分（docs/ir.md「まとめた形」の Spec）。read の要求に入れる。単位がなければ、namespaces は空
 func (p *Project) Covered(unit int) []string                                    // 単位の対象の名前空間（Program の順。in で出力しなくなったものも含む）
 func (p *Project) ManifestPath(pl *plugin.Plugin) string                        // 診断の File に使う形のマニフェストのパス
 func (p *Project) Locate(at string) (*source.Span, string)                      // プラグインの at（FQN か "file:line:col"）を診断の位置に
@@ -635,6 +672,7 @@ Go のプラグインは、どれも同じ形: `main` パッケージが `plugin
 | `plugins/go-valid` | `docs/plugin-go-valid.md` | `internal/govalid`: `validate.go`。GOVALID-* |
 | `plugins/go-sqlite` | `docs/plugin-go-sqlite.md` | `internal/gosqlite`: `db.go`。GOSQL-* |
 | `plugins/go-http` | `docs/plugin-go-http.md` | `internal/gohttp`: 入口のパッケージの `http.go` と、テストのパッケージの `http.go`。GOHTTP-* |
+| `plugins/http` | `docs/plugin-http.md` | 語彙のプラグイン: `main` が `plugin.Main(plugin.ReadOnly(…))` を呼び、`plugin/httpvocab` の `Check` の診断を返す。HTTP-* |
 | `plugins/go-cli` | `docs/plugin-go-cli.md` | `internal/gocli`: `cli/cli.go`。CLI-* |
 | `plugins/go-design` | `docs/plugin-go-design.md` | `internal/godesign`: テストのパッケージの `design.go`。GODESIGN-* |
 

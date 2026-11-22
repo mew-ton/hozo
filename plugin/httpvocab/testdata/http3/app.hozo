@@ -1,0 +1,30 @@
+// HTTP-3: 位置は model。
+namespace app {
+  model Paging { page: int?; }
+
+  model In {
+    // どれも持たない
+    bare: string;
+    @db.key marked: string;
+    // 二つ以上持つ（項目の形どうし、全体の形どうし、項目の形と全体の形）
+    @http.query @http.body both: string;
+    @http.header("X-All") @http.query @http.body all: string?;
+    @http.headerObj @http.queryObj twice: Paging;
+    @http.query @http.queryObj mixed: Paging;
+    // ちょうど一つなら、当たらない
+    @http.query ok: string?;
+  }
+
+  @http.post("/in")
+  export fn take(in: In);
+
+  // 同じ model を二つの経路が使っても、診断は一度
+  @http.post("/again")
+  export fn again(in: In);
+
+  // 経路の op の入力でない model は、見ない。全体の形で受け取る model のフィールドも、場所のデコレータは要らない（Paging）
+  model Other { free: string; }
+  model Fine { @http.queryObj paging: Paging; }
+  @http.get("/fine")
+  export fn fine(in: Fine);
+}

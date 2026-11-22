@@ -186,12 +186,12 @@ effect fn deleteSession(token: type.Token): effects sessions.delete;
   - `@http.required`（`@http.required @http.body lines: OrderLine[]`）: op を呼ぶ前の失敗（`http.BadRequest`）。
   - `@http.default(<リテラル>)`（`@http.query @http.default(1) page: int`）: フィールドを、その値にする。`value` の型は、リテラルの型のすべて（`docs/grammar.md`「リテラル」の `Literal`）。
   - どちらもないフィールドは、零値のまま（省略可能なフィールドは、値がない）。
-- **型の宣言に書く既定値（`page: int = 1`）は、言語にない**（`docs/decisions.md`「設計書から離れた決定」S24）。共有の型の既定値は、その型を使うすべての名前空間（ブラウザも、サーバーも）が入れることになる。誰が入れるかは振る舞いなので、境界のデコレータと、それを読むプラグインが言う: HTTP の要求なら、読むサーバーが入れる（`docs/plugin-go-http.md`「通信の形」の「要求」）。
-- 項目がないときの扱いは、フィールドの型（省略可能かどうか）からは決めない。型は、食い違いを確かめるのにだけ使う: 二つのデコレータは、項目の形を持たないフィールド（全体の形のフィールドと、その model の中のフィールドを含む）にも、省略可能なフィールド（`T?`）にも付けられず、一つのフィールドに両方は付けられず、`default` のリテラルは、フィールドの型に渡せなければならない（確かめるのは、語彙を読むトランスパイラ）。
+- **型の宣言に書く既定値（`page: int = 1`）は、言語にない**（`docs/decisions.md`「設計書から離れた決定」S24）。共有の型の既定値は、その型を使うすべての名前空間（ブラウザも、サーバーも）が入れることになる。誰が入れるかは振る舞いなので、境界のデコレータと、それを読むプラグインが言う: HTTP の要求なら、読むサーバーが入れる（`docs/plugin-http.md`「通信の形」の「要求」）。
+- 項目がないときの扱いは、フィールドの型（省略可能かどうか）からは決めない。型は、食い違いを確かめるのにだけ使う: 二つのデコレータは、項目の形を持たないフィールド（全体の形のフィールドと、その model の中のフィールドを含む）にも、省略可能なフィールド（`T?`）にも付けられず、一つのフィールドに両方は付けられず、`default` のリテラルは、フィールドの型に渡せなければならない（確かめるのは、語彙のプラグイン `http`: `docs/plugin-http.md`「対象」）。
 - `default` は予約語だが、デコレータの名前には書ける（`docs/grammar.md`「識別子」の `DecoratorName`）。
 - 出典（§4.2）から変えたところ: `header` の `name` を省けるようにし、`query` と `body` に、同じ `name` を足した。「`@http.body` が一つなら、本文がその値。二つ以上なら、フィールドの名前をキーにしたオブジェクト」という、数で形が変わる読み方は、やめた: 本文そのものを一つの model で受け取るなら `@http.bodyObj`、キー一つなら `@http.body`。
-- 通信の上の形と、書いたものの整合の検査は、語彙を読むトランスパイラが決める（`docs/plugin-go-http.md`「対象」「通信の形」「診断」）。
-- **`vocab/http.hozo` のファイルは、この部分を、そのまま含む**（同じテストが確かめる）。読むのは `go-http`（`docs/plugin-go-http.md`「対象」）。
+- 通信の上の形と、書いたものの整合の検査は、語彙のプラグイン `http` が持つ（`docs/plugin-http.md`「対象」「通信の形」「診断」）。
+- **`vocab/http.hozo` のファイルは、この部分を、そのまま含む**（同じテストが確かめる）。決まりを確かめるのは、語彙のプラグイン `http`（`docs/plugin-http.md`）。Go に出すのは `go-http`（`docs/plugin-go-http.md`）。
 
 ### 設計の図の語彙
 
@@ -313,6 +313,7 @@ namespace flows {
 | `valid` の標準の制約 | `go-valid`（`docs/plugin-go-valid.md`） |
 | `cli`（go-cli の語彙） | `plugins/go-cli/`（`docs/plugin-go-cli.md`） |
 | `fs` / `proc` | 語彙を実装するプラグインはない。`@proc.stdio` の付いた op は、基底が、人が実装する葉として出す（`docs/plugin-go.md`「op の置き場」。hozoc 自身では `runEmit`。`docs/cli.md`「手で書くもの」）。`@fs.files` は読むトランスパイラがなく、印のまま（`docs/plugin-go.md`「デコレータ」）。`proc` の例外の型は、`proc` の単位の基底が出す |
+| `http`（言語に依らない決まり: 経路、通信の上の形、使い方の検査） | 語彙のプラグイン `http`（`docs/plugin-http.md`） |
 | `http`（サーバー） | `go-http`（`docs/plugin-go-http.md`） |
 | `db` | `go-sqlite`（`docs/plugin-go-sqlite.md`） |
 | `http`（クライアント）/ `localStorage` / `page` | 段階 5 のプラグイン |

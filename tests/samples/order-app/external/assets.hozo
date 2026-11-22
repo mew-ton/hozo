@@ -4,9 +4,9 @@
 namespace assets {
   /** 期限付きの URL の依頼 */
   model LinkRequest {
-    asset: type.AssetId;
+    @http.body asset: type.AssetId;
     /** URL が使える長さ */
-    lifetime: duration;
+    @http.body lifetime: duration;
   }
 
   /** そのファイルを、期限の間だけ取れる URL を作る */

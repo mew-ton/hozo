@@ -264,11 +264,11 @@ func TestNegative(t *testing.T) {
 		{"emit batch response no results", "EmitBatchResponse", `{"outputs":[{}]}`, false},
 		{"emit batch response bad result", "EmitBatchResponse", `{"outputs":[{"results":[{"files":[]}]}]}`, false},
 		{"emit output no view", "EmitOutput", `{"transpilers":["go"]}`, false},
-		{"emit batch wrong protocol", "EmitBatch", `{"protocol":"0.2","direction":"emit","spec":{"version":"0.22","namespaces":{},"program":{"version":"0.22","namespaces":[],"binds":[]}},"outputs":[]}`, false},
-		{"emit batch", "EmitBatch", `{"protocol":"0.22","direction":"emit","spec":{"version":"0.22","namespaces":{},"program":{"version":"0.22","namespaces":[],"binds":[]}},"outputs":[]}`, true},
-		{"emit batch wrong direction", "EmitBatch", `{"protocol":"0.22","direction":"check","spec":{"version":"0.22","namespaces":{},"program":{"version":"0.22","namespaces":[],"binds":[]}},"outputs":[]}`, false},
-		{"import request", "ImportRequest", `{"protocol":"0.22","direction":"import","format":"openapi","files":[{"path":"openapi.yaml","content":""}]}`, true},
-		{"import request wrong direction", "ImportRequest", `{"protocol":"0.22","direction":"emit","format":"openapi","files":[]}`, false},
+		{"emit batch wrong protocol", "EmitBatch", `{"protocol":"0.2","direction":"emit","spec":{"version":"0.23","namespaces":{},"program":{"version":"0.23","namespaces":[],"binds":[]}},"outputs":[]}`, false},
+		{"emit batch", "EmitBatch", `{"protocol":"0.23","direction":"emit","spec":{"version":"0.23","namespaces":{},"program":{"version":"0.23","namespaces":[],"binds":[]}},"outputs":[]}`, true},
+		{"emit batch wrong direction", "EmitBatch", `{"protocol":"0.23","direction":"check","spec":{"version":"0.23","namespaces":{},"program":{"version":"0.23","namespaces":[],"binds":[]}},"outputs":[]}`, false},
+		{"import request", "ImportRequest", `{"protocol":"0.23","direction":"import","format":"openapi","files":[{"path":"openapi.yaml","content":""}]}`, true},
+		{"import request wrong direction", "ImportRequest", `{"protocol":"0.23","direction":"emit","format":"openapi","files":[]}`, false},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {

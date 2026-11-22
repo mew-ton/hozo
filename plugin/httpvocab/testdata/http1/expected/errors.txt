@@ -1,0 +1,2 @@
+HTTP-1	app.hidden	op app.hidden に @http.get が付いているが、export がない（経路の op は、名前空間の外からの呼び出しが届く入口。経路を黙って飛ばすことはしない）
+HTTP-1	app.also	op app.also に @http.post が付いているが、export がない（経路の op は、名前空間の外からの呼び出しが届く入口。経路を黙って飛ばすことはしない）

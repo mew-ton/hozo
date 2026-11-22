@@ -1,0 +1,9 @@
+HTTP-15	app.In	model app.In のフィールド page の @http.default の値 0 が、型の scalar app.Page の制約 @valid.min(1) に合わない（補う値は、制約に合う値にする）
+HTTP-15	app.In	model app.In のフィールド size の @http.default の値 101 が、型の scalar app.SmallPage の制約 @valid.max(100) に合わない（補う値は、制約に合う値にする）
+HTTP-15	app.In	model app.In のフィールド offset の @http.default の値 -1 が、型の scalar app.Page の制約 @valid.min(1) に合わない（補う値は、制約に合う値にする）
+HTTP-15	app.In	model app.In のフィールド mail の @http.default の値 "nobody" が、型の scalar app.Email の制約 @valid.format("email") に合わない（補う値は、制約に合う値にする）
+HTTP-15	app.In	model app.In のフィールド ratio の @http.default の値 0 が、フィールドの制約 @valid.min(0.5) に合わない（補う値は、制約に合う値にする）
+HTTP-15	app.In	model app.In のフィールド code の @http.default の値 "abcd" が、フィールドの制約 @valid.length(min: 2, max: 3) に合わない（補う値は、制約に合う値にする）
+HTTP-15	app.In	model app.In のフィールド name の @http.default の値 "ABC" が、フィールドの制約 @valid.pattern("^[a-z]+$") に合わない（補う値は、制約に合う値にする）
+HTTP-15	app.In	model app.In のフィールド both の @http.default の値 0 が、型の scalar app.Page の制約 @valid.min(1) に合わない（補う値は、制約に合う値にする）
+HTTP-15	app.In	model app.In のフィールド both の @http.default の値 0 が、フィールドの制約 @valid.min(3) に合わない（補う値は、制約に合う値にする）

@@ -2,7 +2,7 @@
 # 読むのは View.config.seams だけで、このプラグインは起動しない（wasm のファイルは、置いていない）。
 name     = "seamers"
 wasm     = "plugin.wasm"
-protocol = "0.22"
+protocol = "0.23"
 
 [[transpiler]]
 name     = "go-rate"

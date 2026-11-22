@@ -1,0 +1,12 @@
+// HTTP-1: 位置は op。
+namespace app {
+  @http.get("/hidden")
+  fn hidden(): string;
+
+  @http.post("/also")
+  fn also();
+
+  // export があれば、当たらない
+  @http.get("/open")
+  export fn open(): string;
+}

@@ -1,0 +1,12 @@
+HTTP-14	app.In	model app.In のフィールド page の @http.default のリテラル "one"（string）は、型 int に渡せない
+HTTP-14	app.In	model app.In のフィールド q の @http.default のリテラル 1（int）は、型 string に渡せない
+HTTP-14	app.In	model app.In のフィールド size の @http.default のリテラル 1.5（float）は、型 int に渡せない
+HTTP-14	app.In	model app.In のフィールド exact の @http.default のリテラル 1（int）は、型 boolean に渡せない
+HTTP-14	app.In	model app.In のフィールド trace の @http.default のリテラル true（boolean）は、型 string に渡せない
+HTTP-14	app.In	model app.In のフィールド limit の @http.default のリテラル "x"（string）は、型 app.Page に渡せない
+HTTP-14	app.In	model app.In のフィールド owner の @http.default のリテラル 30s（duration）は、型 app.Token に渡せない
+HTTP-14	app.In	model app.In のフィールド item の @http.default のリテラル "x"（string）は、型 app.Item に渡せない
+HTTP-14	app.In	model app.In のフィールド tags の @http.default のリテラル 1（int）は、型 int[] に渡せない
+HTTP-14	app.In	model app.In のフィールド attrs の @http.default のリテラル "x"（string）は、型 app.Attrs に渡せない
+HTTP-14	app.In	model app.In のフィールド at の @http.default のリテラル "2024-01-02T03:04:05Z"（string）は、型 datetime に渡せない
+HTTP-14	app.In	model app.In のフィールド wait の @http.default のリテラル 5（int）は、型 duration に渡せない

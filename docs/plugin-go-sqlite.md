@@ -18,7 +18,7 @@
 ```toml
 name     = "go-sqlite"
 wasm     = "plugin.wasm"
-protocol = "0.22"
+protocol = "0.23"
 
 [[transpiler]]
 name     = "go-sqlite"

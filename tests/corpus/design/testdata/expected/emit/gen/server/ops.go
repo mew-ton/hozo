@@ -10,6 +10,21 @@ import (
 
 // Ops は、この名前空間の外から呼べる op: 仕様で export を付けた op。宣言順。New が返す。
 type Ops interface {
+	// Login は op server.login。
+	//
+	// Throws: server.InvalidCredentials, server.NotVerified, server.Suspended, server.AlreadyLoggedIn, server.ClientError
+	// Effects: server.createSession
+	Login(ctx context.Context, in LoginInput) (LoginOk, error)
+
+	// RequestPasswordReset はパスワードの再設定メールを送る。
+	//
+	// 引数:
+	//   - in: 再設定の依頼
+	//
+	// Throws: server.RateLimited
+	// Effects: server.sendResetMail
+	RequestPasswordReset(ctx context.Context, in PasswordResetInput) error
+
 	// Logout は op server.logout。
 	//
 	// Effects: server.deleteSession

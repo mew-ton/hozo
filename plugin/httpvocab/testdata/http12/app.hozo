@@ -1,0 +1,15 @@
+// HTTP-12: 位置は model。
+namespace app {
+  scalar Token extends string;
+  model In {
+    @http.header("Authorization") @http.required token: Token?;
+    @http.query @http.default(1) page: int?;
+    @http.body @http.required lines: string[]?;
+    // 省略可能でなければ、当たらない。どちらも付けていない省略可能なフィールドも、当たらない
+    @http.query @http.required q: string;
+    @http.query @http.default(10) size: int;
+    @http.query tag: string?;
+  }
+  @http.post("/in")
+  export fn take(in: In);
+}

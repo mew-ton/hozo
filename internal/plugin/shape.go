@@ -15,7 +15,7 @@ import (
 //
 //   - 応答は JSON のオブジェクト一つ。
 //   - 必須の項目がある（null は「ない」と同じ）: emit の outputs、その要素の results、その要素（トランスパイラ一つの答え）の
-//     files と warnings、coverage の recognized と files（要素の path と lines）、
+//     files と warnings、read の errors と warnings、coverage の recognized と files（要素の path と lines）、
 //     要素では files の path と content、warnings の message、errors の code と message。
 //   - 書かれた項目の型が合う（配列、オブジェクト、文字列）。
 //   - 省ける項目（errors、at、errors の severity）は、なくても null でもよい。
@@ -25,7 +25,7 @@ import (
 // 合った後に呼ぶ側が確かめる。
 
 // checkShape は終了コード 0 の標準出力 data が、resp の型の応答の形をしているかを確かめる。
-// resp が *sdk.EmitBatchResponse なら emit、*sdk.CoverageResponse なら coverage の応答。ほかの型は確かめない
+// resp が *sdk.EmitBatchResponse なら emit、*sdk.CoverageResponse なら coverage、*sdk.ReadResponse なら read の応答。ほかの型は確かめない
 // （import の応答の形は docs/plugin-protocol.md「import」が段階 6 で決める）。
 func checkShape(data []byte, resp any) error {
 	switch resp.(type) {
@@ -33,8 +33,28 @@ func checkShape(data []byte, resp any) error {
 		return emitShape(data)
 	case *sdk.CoverageResponse:
 		return coverageShape(data)
+	case *sdk.ReadResponse:
+		return readShape(data)
 	}
 	return nil
+}
+
+// readShape は read の応答（docs/plugin-protocol.md「read」）の形: errors と warnings は、どちらも必須。要素は、emit のものと同じ。
+func readShape(data []byte) error {
+	top, err := shapeObject(data, "")
+	if err != nil {
+		return err
+	}
+	// errors: 必須。要素は { code, at?, message }。severity は見ない（常に error）
+	if err := eachElement(top, "errors", true, func(el map[string]json.RawMessage, where string) error {
+		return firstErr(requireString(el, "code", where), optionalString(el, "at", where), requireString(el, "message", where))
+	}); err != nil {
+		return err
+	}
+	// warnings: 必須。要素は { at?, message }
+	return eachElement(top, "warnings", true, func(el map[string]json.RawMessage, where string) error {
+		return firstErr(optionalString(el, "at", where), requireString(el, "message", where))
+	})
 }
 
 // coverageShape は coverage の応答（docs/plugin-protocol.md「coverage」）の形。

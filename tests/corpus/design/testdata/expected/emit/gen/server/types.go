@@ -131,6 +131,9 @@ const EffectSendResetMail = inner.EffectSendResetMail
 // RateLimited: 同じアドレスに短時間で送りすぎた
 type RateLimited = inner.RateLimited
 
+// PasswordResetInput は再設定の依頼。http の語彙の入口は、入力の model を、一つ、受け取る（docs/plugin-http.md。README.md の表の 11）
+type PasswordResetInput = inner.PasswordResetInput
+
 // EffectDeleteSession はログインセッションを削除する
 const EffectDeleteSession = inner.EffectDeleteSession
 

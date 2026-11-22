@@ -21,7 +21,7 @@ TypeScript 風の記法で書く。`?` は省略可（JSON での扱いは「JSO
 
 ```ts
 interface Program {
-  version: "0.22";                 // この文書の版。Program か View の構造が変わったら上げる（「版」）
+  version: "0.23";                 // この文書の版。Program か View の構造が変わったら上げる（「版」）
   namespaces: Namespace[];        // グローバルは name "" の Namespace として先頭に置く
   binds: Bind[];
 }
@@ -519,7 +519,7 @@ interface Bind {
 
 ```ts
 interface View {
-  version: "0.22";
+  version: "0.23";
   viewer: string;                 // 見る側の名前空間の FQN
   config: NamespaceConfig;        // この View の単位での viewer の設定
   files: string[];                // この View の単位の in に合ったユーザーのファイルと、読み込んだすべての語彙のファイル
@@ -607,7 +607,7 @@ interface ViewedSignature extends Signature {   // Signature は Sig(O, viewer)
 
 ```ts
 interface Spec {                  // 出力に依らない部分。要求に、一度だけ
-  version: "0.22";                // View.version
+  version: "0.23";                // View.version
   namespaces: Record<string, NamespaceConfig[]>;   // View.namespaces
   program: Program;               // 全体そのまま。合成した model（ViewedSignature.params）は、含まない
 }
@@ -636,10 +636,11 @@ interface OutputView {            // 出力（単位と名前空間の組）ご�
 
 ## 版
 
-`Program.version` と `View.version` は同じ値で、どちらかの構造か、プラグインとのやり取りの形（`docs/plugin-protocol.md`「要求と応答」）が変わったら上げる。IR が決めている名前のうち、プラグインが、その値で出力を分けるもの（核の型の名前、標準の分類のケースの名前）が変わったときも、上げる。今の版は `"0.22"`。構造もやり取りの形も同じで、値の意味だけが変わる決定では、上げない: 配線の op の `Op.carried` が空でないことがあり、その `Signature` が運ばれたものを含むこと（`docs/decisions.md`「決めたこと」149）は、0.6 の中にある。
+`Program.version` と `View.version` は同じ値で、どちらかの構造か、プラグインとのやり取りの形（`docs/plugin-protocol.md`「要求と応答」）が変わったら上げる。IR が決めている名前のうち、プラグインが、その値で出力を分けるもの（核の型の名前、標準の分類のケースの名前）が変わったときも、上げる。今の版は `"0.23"`。構造もやり取りの形も同じで、値の意味だけが変わる決定では、上げない: 配線の op の `Op.carried` が空でないことがあり、その `Signature` が運ばれたものを含むこと（`docs/decisions.md`「決めたこと」149）は、0.6 の中にある。
 
 | 版 | 変わったこと |
 |---|---|
+| 0.23 | やり取りの形: 語彙のプラグインへの頼みごと direction `read` を足した（`spec` を受け取り、`errors` と `warnings` を返す。`docs/plugin-protocol.md`「語彙のプラグイン」「read」、`docs/decisions.md`「決めたこと」410、416）。マニフェストの `[read]` と、`[[transpiler]]` の `requires_vocabulary`。`go-http` の診断のうち、言語に依らないものを、語彙のプラグイン `http` の HTTP-* に移した（`docs/plugin-go-http.md`「診断」の「欠番」）。IR の構造は、変えていない |
 | 0.22 | やり取りの形: プラグインの起動を、プラグインごとに一回にまとめた。`emit` の要求は、`spec`（`Spec`）と `outputs`（頼むトランスパイラの名前の並びと、`OutputView`）、応答は、出力ごと、トランスパイラごとの答えの並び（「まとめた形」、`docs/plugin-protocol.md`「emit」）。検査のための頼みごと direction `check` と、マニフェストの `[check]` をなくした（同「検査のための頼みごとを、なくしたこと」）。`coverage` の要求に `outputs`（出力の設定の並び）。起動のときに足していた環境変数 `HOZO_PROJECT_ROOT` と `HOZO_PLUGIN_DIR` をなくした（同「起動」）。`Program` の構造と、`View` の中身は、0.21 と同じ（`docs/decisions.md`「決めたこと」411、416、421、425） |
 | 0.21 | `View.entries`（`Entry`、`EntrySource`、`EntryStep`）を足した: 入口ごとの、求めるケースを、本体が求めて、プラグインに渡す（`docs/check.md`「入口ごとの、求めるケース」、`docs/decisions.md`「決めたこと」409） |
 | 0.20 | 配線の文（`Statement`）に `try`（`Catch`）と `throw` を足した。`Match.subject` に `caught`。アームの本体の `throw` に `caught`（`throw e`）。`Classify.subject` に `exception`、`Classify.cases[]` に `exceptions` と `rest`（例外の分類）（`docs/check.md`「例外を受ける」「例外の分類」。`docs/decisions.md`「決めたこと」419、422）。`View` とやり取りの形は 0.19 のまま |

@@ -251,6 +251,12 @@ func (RateLimited) HozoException() string { return "server.RateLimited" }
 
 var _ runtime.Exception = RateLimited{}
 
+// PasswordResetInput は再設定の依頼。http の語彙の入口は、入力の model を、一つ、受け取る（docs/plugin-http.md。README.md の表の 11）
+type PasswordResetInput struct {
+	// 再設定するアカウントのメールアドレス
+	Email Email `json:"email"`
+}
+
 // EffectDeleteSession はログインセッションを削除する
 const EffectDeleteSession runtime.Effect = "server.deleteSession"
 

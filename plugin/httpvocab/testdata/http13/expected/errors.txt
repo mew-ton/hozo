@@ -1,0 +1,2 @@
+HTTP-13	app.In	model app.In のフィールド page に、@http.required と @http.default の両方が付いている（項目がなければ誤りにするか、値を入れるかの、どちらか）
+HTTP-13	app.In	model app.In のフィールド trace に、@http.required と @http.default の両方が付いている（項目がなければ誤りにするか、値を入れるかの、どちらか）

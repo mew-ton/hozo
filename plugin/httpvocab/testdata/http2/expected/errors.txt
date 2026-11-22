@@ -1,0 +1,7 @@
+HTTP-2	app.two	経路の op app.two の引数が 2 個ある（引数は、0 個か、入力の model 一つ）
+HTTP-2	app.core	経路の op app.core の引数 id の型 string が、フィールドを持つ model でない（引数は、0 個か、入力の model 一つ。インデックスの model は、入力の model にできない）
+HTTP-2	app.byId	経路の op app.byId の引数 id の型 app.Id が、フィールドを持つ model でない（引数は、0 個か、入力の model 一つ。インデックスの model は、入力の model にできない）
+HTTP-2	app.optional	経路の op app.optional の引数 in の型 app.A? が、フィールドを持つ model でない（引数は、0 個か、入力の model 一つ。インデックスの model は、入力の model にできない）
+HTTP-2	app.many	経路の op app.many の引数 in の型 app.A[] が、フィールドを持つ model でない（引数は、0 個か、入力の model 一つ。インデックスの model は、入力の model にできない）
+HTTP-2	app.either	経路の op app.either の引数 in の型 app.Either が、フィールドを持つ model でない（引数は、0 個か、入力の model 一つ。インデックスの model は、入力の model にできない）
+HTTP-2	app.byIndex	経路の op app.byIndex の引数 in の型 app.Attrs が、フィールドを持つ model でない（引数は、0 個か、入力の model 一つ。インデックスの model は、入力の model にできない）

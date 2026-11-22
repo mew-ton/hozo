@@ -1,7 +1,8 @@
 # 設計書 §5〜§11 の例のコーパス（docs/testing.md「コーパス」）。
 # 設計書 §4.5 では browser は TS だが、TS の基底はまだないので、今は両方とも Go の基底 go で出力する（README.md）。
 # go は、リポジトリの plugins/ のプラグイン。テストが HOZO_PLUGIN_PATH として渡す（docs/testing.md「コーパス」）。
-# 設計書のプラグイン（http のサーバー、ルーター、db）は並べないので、語彙のデコレータは印のまま（docs/plugin-go.md「デコレータ」）。
+# 設計書のプラグイン（http のサーバー、ルーター、db）は並べないので、語彙のデコレータは、出力では、印のまま（docs/plugin-go.md「デコレータ」）。
+# http の語彙の検査は、語彙のプラグイン http が、単位に依らず、行う（docs/plugin-http.md）。
 
 [hozo]
 sources = ["**/*.hozo"]

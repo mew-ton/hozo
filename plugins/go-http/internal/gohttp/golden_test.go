@@ -454,46 +454,33 @@ func TestUnitTargets(t *testing.T) {
 // diagnosticFixtures は、診断を返す入力（testdata/<名前>/）。期待する診断は testdata/<名前>/expected/errors.txt
 // （一行に、コード、位置、メッセージをタブで区切って。View の順、その中は返した順）。
 var diagnosticFixtures = []struct{ name, code string }{
-	{"gohttp1", codeHTTPExport},      // @http.get / @http.post の付いた op に export がない
-	{"gohttp2", codeHTTPParams},      // 経路の op の引数が、0 個でも model 一つでもない
-	{"gohttp3", codeHTTPPlace},       // 入力の model のフィールドが、場所の六つのデコレータのどれも持たない、または二つ以上持つ
-	{"gohttp4", codeHTTPFieldType},   // ヘッダかクエリから読むフィールド（全体の形なら、その model のフィールド）の型が受け付けられない
-	{"gohttp5", codeHTTPJSON},        // 本文、結果、@http.status を持つ例外の引数の型に、JSON にできない型がある
-	{"gohttp6", codeHTTPGetBody},     // @http.get の op の入力が、本文のデコレータのフィールドを持つ
-	{"gohttp7", codeHTTPPath},        // パスが / で始まらない、または { か } を含む
-	{"gohttp8", codeHTTPDuplicate},   // 同じメソッドとパスの経路が二つある
 	{"gohttp9", codeHTTPOption},      // [emit.options.go-http] に、知らないキーか、型の違う値がある
 	{"gohttp10", codeHTTPName},       // NewHandler が、N の定義のパッケージの名前と当たる
 	{"gohttp11", codeHTTPValidate},   // validate = true で、Validate を持つ入力の model の置き場の単位が、go-valid を並べていない
-	{"gohttp12", codeHTTPWholeType},  // 全体の形を付けたフィールドの型が、model でない
-	{"gohttp13", codeHTTPWholeMix},   // 一つの場所に、全体の形が二つ以上ある、または、全体の形と項目の形の両方がある
-	{"gohttp14", codeHTTPNoItem},     // @http.required か @http.default の付いたフィールドが、項目の形を持たない
-	{"gohttp15", codeHTTPOptional},   // @http.required か @http.default の付いたフィールドの型が、省略可能
 	{"gohttp16", codeHTTPResult},     // 経路の op の結果の型が、省略可能な配列か、省略可能な record
-	{"gohttp17", codeHTTPBoth},       // 一つのフィールドに、@http.required と @http.default の両方がある
-	{"gohttp18", codeHTTPDefault},    // @http.default のリテラルが、フィールドの型に渡せない
-	{"gohttp19", codeHTTPConstraint}, // @http.default の値が、フィールドの制約（@valid.*）に合わない
 	{"gohttp20", codeHTTPTestName},   // テストのパッケージに足す公開の名前が、基底の公開の名前か、自分のほかの名前と当たる
 	{"gohttp21", codeHTTPTestDir},    // テストのパッケージのディレクトリが、同じ単位が出力する子の名前空間の出力先と重なる
 }
 
-// TestDiagnosticCodes は、「診断」の表の ID（GOHTTP-1〜GOHTTP-21。欠番はない）のどれもが、入力を一つ持つこと。
+// TestDiagnosticCodes は、「診断」の表の ID（GOHTTP-9〜GOHTTP-11、GOHTTP-16、GOHTTP-20、GOHTTP-21）のどれもが、入力を一つ持つこと。
+// ほかの番号は欠番（語彙のプラグイン http の HTTP-* に移した。docs/plugin-go-http.md「診断」の「欠番」。その入力は plugin/httpvocab）。
 func TestDiagnosticCodes(t *testing.T) {
 	seen := map[string]bool{}
 	for _, fx := range diagnosticFixtures {
 		seen[fx.code] = true
 	}
-	for n := 1; n <= 21; n++ {
+	live := []int{9, 10, 11, 16, 20, 21}
+	for _, n := range live {
 		if code := "GOHTTP-" + strconv.Itoa(n); !seen[code] {
 			t.Errorf("%s の入力がない", code)
 		}
 	}
-	if len(seen) != 21 {
-		t.Errorf("診断の入力のコードが %d 種類（21 のはず）", len(seen))
+	if len(seen) != len(live) {
+		t.Errorf("診断の入力のコードが %d 種類（%d のはず: 欠番の入力が、残っている）", len(seen), len(live))
 	}
 }
 
-// TestDiagnostics は docs/plugin-go-http.md「診断」の GOHTTP-1〜GOHTTP-21: 診断のコード・位置・メッセージがゴールデンと同じで、
+// TestDiagnostics は docs/plugin-go-http.md「診断」の表の GOHTTP-*: 診断のコード・位置・メッセージがゴールデンと同じで、
 // 診断を返した出力がファイルも warning も返さないこと（emitViews が確かめる）。
 func TestDiagnostics(t *testing.T) {
 	for _, fx := range diagnosticFixtures {
@@ -517,27 +504,10 @@ func TestDiagnostics(t *testing.T) {
 // TestDiagnosticPositions は、診断の位置（docs/plugin-go-http.md「診断」の表）: 表に書いた宣言の FQN。GOHTTP-9 は位置なし。
 func TestDiagnosticPositions(t *testing.T) {
 	for name, want := range map[string][]string{
-		"gohttp1": {"app.hidden", "app.also"},
-		"gohttp2": {"app.two", "app.core", "app.byId", "app.optional", "app.many", "app.either", "app.byIndex"},
-		"gohttp3": {"app.In"},
-		// 全体の形で受け取る model のフィールドの型は、その model の位置
-		"gohttp4":  {"app.HeaderIn", "app.QueryIn", "app.Meta", "app.Paging"},
-		"gohttp5":  {"app.putShape", "app.putAlbum", "app.putDrawing", "app.getDrawing", "app.getShapes", "app.getSame", "app.getEmpty", "app.getSub", "app.getIndexed", "app.clash", "app.refused"},
-		"gohttp6":  {"app.fetch", "app.both", "app.whole"},
-		"gohttp7":  {"app.relative", "app.empty", "app.absolute", "app.byId", "app.brace"},
-		"gohttp8":  {"app.second", "app.third", "app.again"},
 		"gohttp9":  {""},
 		"gohttp10": {"app.NewHandler", "typed.NewHandler", "wrapped.New"},
 		"gohttp11": {"app.a", "app.b"},
-		"gohttp12": {"app.In", "app.More"},
-		"gohttp13": {"app.Twice", "app.Mixed"},
-		// 全体の形のフィールドは入力の model、その中のフィールドは、全体の形で受け取る model の位置
-		"gohttp14": {"app.In", "app.Paging"},
-		"gohttp15": {"app.In"},
 		"gohttp16": {"app.items", "app.byName", "app.names"},
-		"gohttp17": {"app.In"},
-		"gohttp18": {"app.In"},
-		"gohttp19": {"app.In"},
 		// 当たった自分の名前を生んだ経路の op。決まった名前（RunHTTP、HTTPCases）が当たったなら、相手の名前を生んだ宣言（分類、葉の op）
 		"gohttp20": {"app.foo", "typed.HTTP", "leafy.HTTP", "multi.both"},
 		// 最初の経路の op
@@ -633,9 +603,34 @@ func TestNoModule(t *testing.T) {
 	if len(files) != 0 || len(diags) != 0 || len(warnings) != 0 {
 		t.Errorf("files=%v 診断=%+v warnings=%+v, want どれも空（GO-8 は基底が返す）", sortedPaths(files), diags, warnings)
 	}
-	_, diags, _ = emitViews(t, "", noModule(loadViews(t, "gohttp1")))
-	if len(diags) == 0 || diags[0].Code != codeHTTPExport {
-		t.Errorf("診断 = %+v, want GOHTTP-1", diags)
+	_, diags, _ = emitViews(t, "", noModule(loadViews(t, "gohttp16")))
+	if len(diags) == 0 || diags[0].Code != codeHTTPResult {
+		t.Errorf("診断 = %+v, want GOHTTP-16", diags)
+	}
+}
+
+// TestUncheckedSpec は「診断」: http の語彙の使い方の誤り（HTTP-*。docs/plugin-http.md「診断」）は、語彙のプラグインが、先に断る。
+// その検査を通っていない仕様（ここでは、経路の op から export を外した View: HTTP-1）を受け取ったら、go-http は、同じ診断を
+// 重ねて返さず、error で終わる（hozoc からは proc.Crashed）。
+func TestUncheckedSpec(t *testing.T) {
+	var view *ir.View
+	for _, v := range loadViews(t, "routes") {
+		if v.Viewer == "bare" {
+			view = v
+		}
+	}
+	broken := false
+	for _, d := range view.Program.Namespace("bare").Decls {
+		if op, ok := d.(*ir.Op); ok && len(op.Decorators) > 0 && op.Exported {
+			op.Exported, broken = false, true
+		}
+	}
+	if !broken {
+		t.Fatal("入力 routes の名前空間 bare に、経路の op がない")
+	}
+	resp, err := Handler{}.Emit(request(view, TranspilerName))
+	if err == nil || !strings.Contains(err.Error(), "HTTP-1") {
+		t.Fatalf("resp = %+v, err = %v, want HTTP-1 を名指しした error", resp, err)
 	}
 }
 

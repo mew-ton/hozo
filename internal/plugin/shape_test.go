@@ -183,3 +183,34 @@ func TestRunResponseShape(t *testing.T) {
 		t.Errorf("emit, 知らない項目: resp = %+v", emit)
 	}
 }
+
+// docs/plugin-protocol.md「応答の形」の、read の応答: errors と warnings は、どちらも必須（空でも []）。要素は、emit のものと同じ。
+func TestReadShape(t *testing.T) {
+	ok := []string{
+		`{"errors":[],"warnings":[]}`,
+		`{"errors":[{"code":"HTTP-1","at":"a.f","message":"m","severity":"warning"},{"code":"HTTP-2","message":"m","at":null}],"warnings":[{"message":"w"},{"at":"a.f","message":"w"}],"files":[1],"extra":true}`,
+	}
+	for _, in := range ok {
+		if err := checkShape([]byte(in), &sdk.ReadResponse{}); err != nil {
+			t.Errorf("%s: %v", in, err)
+		}
+	}
+	ng := map[string]string{
+		`[]`:                            "応答がオブジェクトでない",
+		`{"warnings":[]}`:               "errors がない",
+		`{"errors":null,"warnings":[]}`: "errors がない",
+		`{"errors":[]}`:                 "warnings がない",
+		`{"errors":{},"warnings":[]}`:   "errors が配列でない",
+		`{"errors":[1],"warnings":[]}`:  "errors[0] がオブジェクトでない",
+		`{"errors":[{"message":"m"}],"warnings":[]}`:                   "errors[0] に code がない",
+		`{"errors":[{"code":"X"}],"warnings":[]}`:                      "errors[0] に message がない",
+		`{"errors":[{"code":"X","message":"m","at":1}],"warnings":[]}`: "errors[0] の at が文字列でない",
+		`{"errors":[],"warnings":[{"at":"a.f"}]}`:                      "warnings[0] に message がない",
+	}
+	for in, want := range ng {
+		err := checkShape([]byte(in), &sdk.ReadResponse{})
+		if err == nil || !strings.Contains(err.Error(), want) {
+			t.Errorf("%s: err = %v, want %q", in, err, want)
+		}
+	}
+}

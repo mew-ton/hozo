@@ -77,12 +77,12 @@ func (o *ops) PlaceOrder(ctx context.Context, in OrderInput) (Order, error) {
 // RequestPasswordReset はパスワードの再設定メールを送る。
 //
 // 引数:
-//   - email: 再設定するアカウントのメールアドレス
+//   - in: 再設定の依頼
 //
 // Throws: server.RateLimited
 // Effects: server.sendResetMail
-func (o *ops) RequestPasswordReset(ctx context.Context, email Email) error {
-	reset, err := o.NewPasswordReset(ctx, email)
+func (o *ops) RequestPasswordReset(ctx context.Context, in PasswordResetInput) error {
+	reset, err := o.NewPasswordReset(ctx, in.Email)
 	if err != nil {
 		return err
 	}

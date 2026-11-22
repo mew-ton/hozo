@@ -61,11 +61,11 @@ type Ops interface {
 	// RequestPasswordReset はパスワードの再設定メールを送る。
 	//
 	// 引数:
-	//   - email: 再設定するアカウントのメールアドレス
+	//   - in: 再設定の依頼
 	//
 	// Throws: server.RateLimited
 	// Effects: server.sendResetMail
-	RequestPasswordReset(ctx context.Context, email Email) error
+	RequestPasswordReset(ctx context.Context, in PasswordResetInput) error
 
 	// Logout は op server.logout。
 	//

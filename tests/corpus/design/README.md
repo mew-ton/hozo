@@ -28,7 +28,7 @@
 | 8 | §11.1 `@redirectToLogin` `@cache(key: "me", staleTime: 5m)` `fn fetchMe()`、`@redirectToLogin` `@cache(key: ["orders", query], staleTime: 30s)` `fn fetchOrders(query)` | デコレータを外し、配線と `throws http.NetworkError, http.ServerError` だけを残した | 7 と同じ行、および「スコープ外」2 行目（`cache`）。§11.2 の `openOrders` / `openProfile` が呼ぶので op 自体は残す |
 | 9 | §8.1 `decorator fn requiresAuth(): throws Unauthorized prevents effects;` は、§11.1 の `fetchMe` に付く `@redirectToLogin` が `server.Unauthorized` を吸収することから、`server.getMe` に付いていると読める | 追加した `getMe` / `getOrders` には `@requiresAuth` を付けない。`requiresAuth` は宣言だけ残す | 8 で `@redirectToLogin` を外したため、付ければ `fetchMe` / `fetchOrders` が `server.Unauthorized` を宣言も吸収もせず THROWS-1（`docs/check.md`「throws」）。`fetchMe` の `throws` を増やせば `openOrders` / `openProfile`（「fallback が吸収するので throws は書かない」）にも波及する |
 | 10 | §6.5 `namespace valid { decorator checkDigit for scalar, field; }` | `server.hozo` の先頭に置いた | `server.EmployeeCode` が使う。`valid` は語彙の名前空間なので専用のファイルにせず、使う側のファイルに置いた（§3.2「語彙プラグインの名前空間にも、ユーザーが宣言を足せる」、`docs/vocab.md`「読み込み」） |
-| 11 | §3.4 `fn requestPasswordReset(email: Email): effects sendResetMail throws RateLimited prevents effects;`（名前空間の記述なし） | `server` に置いた | `@see login` が `server.login` を指すため |
+| 11 | §3.4 `fn requestPasswordReset(email: Email): effects sendResetMail throws RateLimited prevents effects;`（名前空間の記述なし） | `server` に置き、`export` を付け、引数を、入力の model `PasswordResetInput`（フィールド `email` に `@http.body`）にした。`login` にも `export` を付けた | `@see login` が `server.login` を指すため。`export` と、入力の model は、`http` の語彙の決まり（`docs/plugin-http.md` の HTTP-1、HTTP-2、HTTP-3）: 語彙のプラグインは、単位に依らず、経路の op を検査する（`docs/decisions.md`「決めたこと」410、429） |
 | 12 | §10.2 の文の断片 `const plan = match item by WarrantyAvailable { WarrantyAvailable => askWarrantyPlan(item); default => none; };` | 追加した `op chooseWarrantyPlan` の本体に、`Available => askWarrantyPlan(item); Unavailable => none;` と書いて置いた | 文は op の本体にしか書けない（`docs/grammar.md`「配線」）。`default` のアームは書けず、アームは、分類のケースを名前で受ける（表の 23） |
 | 13 | §9 `effect removeToken on token.put;   // none を入れる` | `effect fn removeToken(): effects token.delete;` | 空にするのは `delete`（`docs/decisions.md`「設計書から離れた決定」S2、`docs/check.md`「状態の形」の表: `nullable` の `delete` は `Some` → `None`）。`put` は列数を変えない組み込みの効果なので、空にする意味にならない |
 | 14 | §7.3 `fn placeOrder(in: OrderInput): Order effects createOrder \| notifyUser throws NotificationFailed keeps createOrder prevents notifyUser;`（葉の op） | 効果を一つずつ呼ぶ配線 `saveOrder`（`effects createOrder`）と `sendOrderNotice`（`effects notifyUser`、`throws NotificationFailed prevents effects`）を足し、`placeOrder` はその二つを順に呼ぶ配線（`throws NotificationFailed`。`effects` も `prevents` / `keeps` も書かない） | `prevents` / `keeps` の目的語は `effects` だけで、効果を名前で書き分ける形はない（`docs/decisions.md`「設計書から離れた決定」S9）。例外ごとの効果の状態は、配線の行の順から計算される（`docs/check.md`「計算」手順 0）。葉の op が `effects` を書けないことは、表の 20 |
@@ -73,7 +73,7 @@
 | `gen/browser/` | 同じく `inner/` と入口。述語で決まる分類（`WarrantyKind`、`WarrantyAvailable`）の `classify.go`、`server` の op の口 `ServerOps`、`server` の入口のパッケージの型の import |
 | `gen/http/`、`gen/page/` | 語彙の型（`http` の例外、`page.Route` など）だけ。op を持たないので、`inner/` はない。`http.BadRequest` は、二つの引数（`message`、`violations`）が、そのまま二つのフィールド |
 
-相乗りを並べていないので、語彙のデコレータ（`@http.get`、`@page.route`、`@db.table` など）と、利用者が `valid` に足した制約（§6.5）は印のままで、出力に現れない（`docs/plugin-go.md`「デコレータ」）。
+相乗りを並べていないので、語彙のデコレータ（`@http.get`、`@page.route`、`@db.table` など）と、利用者が `valid` に足した制約（§6.5）は印のままで、出力に現れない（`docs/plugin-go.md`「デコレータ」）。`http` の語彙の検査は、相乗りを並べていなくても、掛かる（語彙のプラグイン `http`。`docs/plugin-http.md`）。
 
 ## 設計書の例が規則に触れるところ
 

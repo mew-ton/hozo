@@ -1,0 +1,30 @@
+// HTTP-15: 位置は model。サーバーが、制約を確かめる設定かどうかに、よらない。
+namespace app {
+  @valid.min(1)
+  scalar Page extends int;
+  @valid.max(100)
+  scalar SmallPage extends Page;
+  @valid.format("email")
+  scalar Email extends string;
+
+  model In {
+    // 型の scalar に付いた制約（元の scalar のものも）
+    @http.query @http.default(0) page: Page;
+    @http.query @http.default(101) size: SmallPage;
+    @http.query @http.default(-1) offset: SmallPage;
+    @http.header("X-Mail") @http.default("nobody") mail: Email;
+    // フィールドに付いた制約
+    @valid.min(0.5) @http.query @http.default(0) ratio: float;
+    @valid.length(min: 2, max: 3) @http.query @http.default("abcd") code: string;
+    @valid.pattern("^[a-z]+$") @http.body @http.default("ABC") name: string;
+    // 両方に合わない
+    @valid.min(3) @http.body @http.default(0) both: Page;
+    // 合う値は、当たらない。制約のないフィールドも、@http.default のないフィールドも、当たらない
+    @http.query @http.default(1) first: Page;
+    @valid.length(max: 3) @http.query @http.default("abc") short: string;
+    @http.query @http.default(-5) free: int;
+    @http.query last: Page;
+  }
+  @http.post("/in")
+  export fn take(in: In);
+}

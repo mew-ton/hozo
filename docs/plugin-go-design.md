@@ -20,7 +20,7 @@ func TestRequirements(t *testing.T) { flowstest.RunRequirements(t, requirements{
 ```toml
 name     = "go-design"
 wasm     = "plugin.wasm"
-protocol = "0.22"
+protocol = "0.23"
 
 [[transpiler]]
 name     = "go-design"

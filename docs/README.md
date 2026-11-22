@@ -26,7 +26,8 @@ Hozo の言語と、その実装（このリポジトリ）の設計。言語の
 | [`plugin-go.md`](plugin-go.md) | Go の基底のトランスパイラ `go`: 語彙によらずに決まる Go の出力のすべて（置き場、名前、型、op の形、実装を受け取る口、配線の本体、継ぎ目） | `plugins/go`、`plugin/golang`、`runtime` |
 | [`plugin-go-valid.md`](plugin-go-valid.md) | `valid` の制約を確かめる関数を出す相乗り `go-valid` | `plugins/go-valid`、`plugin/govalid`、`runtime` |
 | [`plugin-go-sqlite.md`](plugin-go-sqlite.md) | `db` の状態を SQLite の表と読み書きにする相乗り `go-sqlite` | `plugins/go-sqlite` |
-| [`plugin-go-http.md`](plugin-go-http.md) | `http` の op を `net/http` のハンドラにする相乗り `go-http` と、HTTP の通信の上の形 | `plugins/go-http` |
+| [`plugin-http.md`](plugin-http.md) | 語彙のプラグイン `http`: `http` の語彙の、言語に依らない決まり（経路、HTTP の通信の上の形、使い方の検査 HTTP-*） | `plugins/http`、`plugin/httpvocab` |
+| [`plugin-go-http.md`](plugin-go-http.md) | `http` の op を `net/http` のハンドラにする相乗り `go-http` | `plugins/go-http` |
 | [`plugin-go-cli.md`](plugin-go-cli.md) | `cli` の語彙を Go の CLI にする相乗り `go-cli` | `plugins/go-cli` |
 | [`plugin-go-design.md`](plugin-go-design.md) | 設計の図の語彙（`business.flow`、`usecase.of`、`prd.ref`）から、フローの E2E テストの口と、要求ごとの、テストの入れ物の口を出す相乗り `go-design` | `plugins/go-design` |
 | [`diagnostics.md`](diagnostics.md) | 診断の形、表示、終了コード | `internal/diag` |
@@ -71,7 +72,7 @@ Hozo の言語と、その実装（このリポジトリ）の設計。言語の
 | 定義のパッケージ、入口のパッケージ、内側のフォルダ | `plugin-go.md`「内側のフォルダと入口」 |
 | op の置き場、形で決まる問い合わせ、問い合わせ、命令 | `plugin-go.md`「op の置き場」「状態の単位」 |
 | テストのパッケージ、単体テストの口（人か AI が中身を書く関数の、結果ごとのケースを受け取る口）、効果の入口の確かめ | `plugin-go.md`「単体テストの口」「効果の入口の確かめ」。言語によらない決まりは `ide-chain.md`「テストの規約」「ステートマシン図」 |
-| 通信の形（HTTP の要求と応答の JSON） | `plugin-go-http.md`「通信の形」 |
+| 通信の形（HTTP の要求と応答の JSON） | `plugin-http.md`「通信の形」 |
 | インテグレーションテストの口（入口のデコレータを持つ op の、結果ごとのケースを受け取る口。HTTP の入口のもの） | `plugin-go-http.md`「インテグレーションテストの口」。言語によらない決まりは `ide-chain.md`「テストの規約」の「インテグレーションテスト」 |
 | E2E テストの口（フローの op の、ケースを受け取る口）、要求の、テストの入れ物の口、要求の分類、指している設計 | `plugin-go-design.md`「E2E テストの口」「要求の、テストの入れ物の口」。言語によらない決まりは `ide-chain.md`「テストの規約」の「E2E テスト」「要求のテスト」 |
 |書き出しの対象（一度の `hozoc build` が書き出す出力） | `cli.md`「書き出し」 |
@@ -91,7 +92,7 @@ Hozo の言語と、その実装（このリポジトリ）の設計。言語の
 | 出力を推論しない（プラグインの原則: op のデコレータは包むだけで、出すコードは型に依らない。op 以外は、宣言の全体から作る） | `requirements.md`「出力を推論しない」 |
 | op の中身に立ち入らない（基底の原則: op の中身に何が要るかを判定せず、言語の作法で関数に付くものを、どの関数にも同じ形で与える） | `requirements.md`「op の中身に立ち入らない」 |
 | 表の状態、表の model、しまい方 | `plugin-go-sqlite.md`「出力」「表」「しまい方」（語彙は `vocab.md`「`db` の表と、しまい方」） |
-| 項目の形、全体の形（要求のどこから読むか） | `plugin-go-http.md`「対象」（語彙は `vocab.md`「`http` の語彙」） |
+| 項目の形、全体の形（要求のどこから読むか） | `plugin-http.md`「対象」（語彙は `vocab.md`「`http` の語彙」） |
 | 形の語、状態の型 | `types.md`「形の書き方」 |
 | 継承した model、元の model、継承している | `types.md`「継承した model」 |
 | インデックスの model（本体にインデックス `[名前: K]: V;` を書いた model。キーが決まっていない構造） | `types.md`「インデックスの model」 |

@@ -1,0 +1,8 @@
+# go-v は、語彙 voc の語彙のプラグインを要り、reader が、それを読み解く
+[hozo]
+plugin_dirs = ["plugins"]
+
+[[emit]]
+namespace   = "a"
+transpilers = ["go", "go-v"]
+out         = "gen/a"

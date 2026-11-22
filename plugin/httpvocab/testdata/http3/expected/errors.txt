@@ -1,0 +1,6 @@
+HTTP-3	app.In	入力の model app.In のフィールド bare が、要求のどこから読むかを言うデコレータ（@http.header / @http.query / @http.body / @http.headerObj / @http.queryObj / @http.bodyObj）のどれも持たない（ちょうど一つ要る）
+HTTP-3	app.In	入力の model app.In のフィールド marked が、要求のどこから読むかを言うデコレータ（@http.header / @http.query / @http.body / @http.headerObj / @http.queryObj / @http.bodyObj）のどれも持たない（ちょうど一つ要る）
+HTTP-3	app.In	入力の model app.In のフィールド both が、@http.query と @http.body を持つ（要求のどこから読むかを言うデコレータは、ちょうど一つ要る）
+HTTP-3	app.In	入力の model app.In のフィールド all が、@http.header と @http.query と @http.body を持つ（要求のどこから読むかを言うデコレータは、ちょうど一つ要る）
+HTTP-3	app.In	入力の model app.In のフィールド twice が、@http.headerObj と @http.queryObj を持つ（要求のどこから読むかを言うデコレータは、ちょうど一つ要る）
+HTTP-3	app.In	入力の model app.In のフィールド mixed が、@http.query と @http.queryObj を持つ（要求のどこから読むかを言うデコレータは、ちょうど一つ要る）

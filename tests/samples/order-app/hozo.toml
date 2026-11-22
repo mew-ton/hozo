@@ -1,6 +1,6 @@
 # サンプル order-app（README.md）: 仕様だけのサンプル。出力の単位（[[emit]]）は、一つも置かない。
-# 単位がないので、hozoc は何も出力せず、プラグインも探さない。検査（hozoc build --no-emit）は、すべての名前空間に同じに掛かる
-# （docs/config.md「形」「単位の対象」）。
+# 単位がないので、hozoc は何も出力せず、トランスパイラも起動しない。検査（hozoc build --no-emit）は、すべての名前空間に同じに掛かる
+# （docs/config.md「形」「単位の対象」）。語彙のプラグイン（docs/plugin-protocol.md「語彙のプラグイン」）は、入っていれば、単位がなくても、頼まれる。
 
 [hozo]
 sources = ["**/*.hozo"]

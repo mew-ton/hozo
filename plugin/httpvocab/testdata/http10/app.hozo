@@ -1,0 +1,35 @@
+// HTTP-10: 位置は model。
+namespace app {
+  model Item { name: string; }
+
+  // 一つの場所に、全体の形が二つ
+  model Twice {
+    @http.bodyObj first: Item;
+    @http.bodyObj second: Item;
+  }
+  @http.post("/twice")
+  export fn twice(in: Twice);
+
+  // 同じ場所の、全体の形と項目の形（三つの場所で）
+  model Mixed {
+    @http.headerObj meta: Item;
+    @http.header("X-Trace") trace: string?;
+    @http.queryObj paging: Item;
+    @http.query page: string?;
+    @http.body note: string?;
+    @http.bodyObj item: Item;
+    @http.body("memo") memo: string?;
+  }
+  @http.post("/mixed")
+  export fn mixed(in: Mixed);
+
+  // 別の場所なら、一緒に書ける。項目の形は、一つの場所にいくつあってもよい
+  model Fine {
+    @http.headerObj meta: Item;
+    @http.queryObj paging: Item;
+    @http.body a: string?;
+    @http.body b: string?;
+  }
+  @http.post("/fine")
+  export fn fine(in: Fine);
+}

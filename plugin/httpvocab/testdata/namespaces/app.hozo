@@ -1,0 +1,18 @@
+// 「対象」: 経路は、名前空間ごと。別の名前空間の、同じメソッドとパスは、比べない（HTTP-8 にならない）。
+namespace a {
+  model Item { name: string; }
+  model PutIn { @http.required @http.body name: string; }
+
+  @http.get("/items")
+  export fn items(): Item[];
+
+  @http.post("/items")
+  export fn put(in: PutIn);
+}
+
+namespace b {
+  model Item { name: string; }
+
+  @http.get("/items")
+  export fn items(): Item[];
+}

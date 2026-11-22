@@ -1,0 +1,31 @@
+// HTTP-9: 位置は model。
+namespace app {
+  scalar Name extends string;
+  model Item { name: string; }
+  union Shape { Dot: Item; Label: string; }
+  model ItemsByName { [name: string]: Item; }
+
+  model In {
+    // 省略可能な model、配列、インデックスの model、核の型、scalar、union には、付けられない
+    @http.headerObj meta: Item?;
+    @http.queryObj paging: Item[];
+    @http.bodyObj attrs: ItemsByName;
+  }
+  @http.post("/in")
+  export fn take(in: In);
+
+  model More {
+    @http.headerObj text: string;
+    @http.queryObj name: Name;
+    @http.bodyObj shape: Shape;
+  }
+  @http.post("/more")
+  export fn more(in: More);
+
+  // model なら、当たらない
+  model Fine {
+    @http.bodyObj item: Item;
+  }
+  @http.post("/fine")
+  export fn fine(in: Fine);
+}

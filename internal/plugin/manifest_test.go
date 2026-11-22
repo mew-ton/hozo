@@ -16,7 +16,7 @@ import (
 const exampleManifest = `
 name     = "react-router"
 wasm     = "dist/plugin.wasm"
-protocol = "0.22"
+protocol = "0.23"
 
 vocabulary = ["vocab/page.hozo"]
 
@@ -26,6 +26,10 @@ language    = "ts"
 requires    = ["ts", "ts-valid"]
 unsupported = []
 seams       = ["rate.limited"]
+requires_vocabulary = ["http"]
+
+[read]
+namespaces = ["page"]
 
 [import]
 formats = []
@@ -38,7 +42,7 @@ enabled = true
 const goCLIManifest = `
 name     = "go-cli"
 wasm     = "plugin.wasm"
-protocol = "0.22"
+protocol = "0.23"
 
 [[transpiler]]
 name     = "go-cli"
@@ -46,7 +50,7 @@ language = "go"
 `
 
 // base は name = "x" の最小のマニフェスト（protocol は hozoc のもの）。後ろにテーブルを足して使う。
-const base = "name = \"x\"\nwasm = \"x.wasm\"\nprotocol = \"0.22\"\n"
+const base = "name = \"x\"\nwasm = \"x.wasm\"\nprotocol = \"0.23\"\n"
 
 func writeManifest(t *testing.T, dir, content string) string {
 	t.Helper()
@@ -76,9 +80,10 @@ func TestLoadManifestExample(t *testing.T) {
 		t.Fatalf("diags = %+v", diags)
 	}
 	want := &Manifest{
-		Name: "react-router", Wasm: "dist/plugin.wasm", Protocol: "0.22",
+		Name: "react-router", Wasm: "dist/plugin.wasm", Protocol: "0.23",
 		Vocabulary:  []string{"vocab/page.hozo"},
-		Transpilers: []Transpiler{{Name: "react-router", Language: "ts", Requires: []string{"ts", "ts-valid"}, Unsupported: []string{}, Seams: []string{"rate.limited"}}},
+		Transpilers: []Transpiler{{Name: "react-router", Language: "ts", Requires: []string{"ts", "ts-valid"}, Unsupported: []string{}, Seams: []string{"rate.limited"}, RequiresVocabulary: []string{"http"}}},
+		Read:        Read{Namespaces: []string{"page"}},
 		Import:      Import{Formats: []string{}},
 		Coverage:    Coverage{Enabled: true},
 	}
@@ -101,12 +106,12 @@ func TestLoadManifestGoCLI(t *testing.T) {
 	if m.Name != "go-cli" || m.Wasm != "plugin.wasm" {
 		t.Errorf("%+v", m)
 	}
-	// requires を書かなければ基底（docs/config.md「基底と相乗り」）。省いた requires / unsupported / seams は []
-	if !reflect.DeepEqual(m.Transpilers, []Transpiler{{Name: "go-cli", Language: "go", Requires: []string{}, Unsupported: []string{}, Seams: []string{}}}) || !m.Transpilers[0].IsBase() {
+	// requires を書かなければ基底（docs/config.md「基底と相乗り」）。省いた requires / unsupported / seams / requires_vocabulary は []
+	if !reflect.DeepEqual(m.Transpilers, []Transpiler{{Name: "go-cli", Language: "go", Requires: []string{}, Unsupported: []string{}, Seams: []string{}, RequiresVocabulary: []string{}}}) || !m.Transpilers[0].IsBase() {
 		t.Errorf("transpilers = %+v", m.Transpilers)
 	}
 	// 省いた [coverage] は enabled = false
-	if m.Coverage.Enabled || len(m.Vocabulary) != 0 || m.Vocabulary == nil || m.HasImport() {
+	if m.Coverage.Enabled || len(m.Vocabulary) != 0 || m.Vocabulary == nil || m.HasImport() || m.HasRead() {
 		t.Errorf("%+v", m)
 	}
 }
@@ -124,7 +129,7 @@ func TestLoadManifestRepoGoCLI(t *testing.T) {
 
 // docs/plugin-protocol.md「マニフェスト」の wasm: マニフェストのディレクトリからの相対パス。整えて持つ。
 func TestLoadManifestWasm(t *testing.T) {
-	m, diags := LoadManifest(writeManifest(t, t.TempDir(), "name = \"x\"\nwasm = \"./bin/../bin/x.wasm\"\nprotocol = \"0.22\"\n"))
+	m, diags := LoadManifest(writeManifest(t, t.TempDir(), "name = \"x\"\nwasm = \"./bin/../bin/x.wasm\"\nprotocol = \"0.23\"\n"))
 	if len(diags) != 0 || m.Wasm != "bin/x.wasm" || m.HasEmit() {
 		t.Errorf("m=%+v diags=%+v", m, diags)
 	}
@@ -137,9 +142,9 @@ func TestLoadManifestWasm(t *testing.T) {
 // docs/plugin-protocol.md「診断」の MAN-6: なくした書き方 command があれば、wasm に書き直すことを示す。wasm も書いてあっても、同じ。
 func TestLoadManifestCommandIsGone(t *testing.T) {
 	for _, body := range []string{
-		"name = \"x\"\ncommand = [\"go\", \"run\", \"example.com/x\"]\nprotocol = \"0.22\"\n",
-		"name = \"x\"\ncommand = \"hozoc-plugin-x\"\nprotocol = \"0.22\"\n",
-		"name = \"x\"\ncommand = \"hozoc-plugin-x\"\nwasm = \"plugin.wasm\"\nprotocol = \"0.22\"\n",
+		"name = \"x\"\ncommand = [\"go\", \"run\", \"example.com/x\"]\nprotocol = \"0.23\"\n",
+		"name = \"x\"\ncommand = \"hozoc-plugin-x\"\nprotocol = \"0.23\"\n",
+		"name = \"x\"\ncommand = \"hozoc-plugin-x\"\nwasm = \"plugin.wasm\"\nprotocol = \"0.23\"\n",
 	} {
 		m, diags := LoadManifest(writeManifest(t, t.TempDir(), body))
 		var man6 []diag.Diagnostic
@@ -162,8 +167,8 @@ func TestLoadManifestTranspilers(t *testing.T) {
 	if len(diags) != 0 {
 		t.Fatalf("diags = %+v", diags)
 	}
-	want := []Transpiler{{Name: "a", Language: "go", Requires: []string{}, Unsupported: []string{"http.retry"}, Seams: []string{}},
-		{Name: "b", Language: "ts", Requires: []string{}, Unsupported: []string{}, Seams: []string{}}}
+	want := []Transpiler{{Name: "a", Language: "go", Requires: []string{}, Unsupported: []string{"http.retry"}, Seams: []string{}, RequiresVocabulary: []string{}},
+		{Name: "b", Language: "ts", Requires: []string{}, Unsupported: []string{}, Seams: []string{}, RequiresVocabulary: []string{}}}
 	if !reflect.DeepEqual(m.Transpilers, want) {
 		t.Errorf("transpilers = %+v", m.Transpilers)
 	}
@@ -182,16 +187,16 @@ func TestLoadManifestDiagnostics(t *testing.T) {
 		{"unknown key", base + "foo = 1\n", []string{"MAN-4"}, true},
 		{"unknown transpiler key", base + tr + "foo = 1\n", []string{"MAN-4"}, true},
 		{"unknown table", base + "[extra]\na = 1\n", []string{"MAN-4"}, true},
-		{"no wasm", "name = \"x\"\nprotocol = \"0.22\"\n", []string{"MAN-4"}, true},
-		{"empty wasm", "name = \"x\"\nwasm = \"\"\nprotocol = \"0.22\"\n", []string{"MAN-4"}, true},
-		{"wasm is an array", "name = \"x\"\nwasm = [\"x.wasm\"]\nprotocol = \"0.22\"\n", []string{"MAN-4"}, true},
-		{"wasm wrong type", "name = \"x\"\nwasm = 1\nprotocol = \"0.22\"\n", []string{"MAN-4"}, true},
-		{"absolute wasm", "name = \"x\"\nwasm = \"/usr/lib/x.wasm\"\nprotocol = \"0.22\"\n", []string{"MAN-4"}, true},
-		{"wasm outside the directory", "name = \"x\"\nwasm = \"../x.wasm\"\nprotocol = \"0.22\"\n", []string{"MAN-4"}, true},
-		{"wasm outside the directory, hidden", "name = \"x\"\nwasm = \"bin/../../x.wasm\"\nprotocol = \"0.22\"\n", []string{"MAN-4"}, true},
-		{"wasm is the directory", "name = \"x\"\nwasm = \".\"\nprotocol = \"0.22\"\n", []string{"MAN-4"}, true},
-		{"command (MAN-6) and no wasm", "name = \"x\"\ncommand = \"x\"\nprotocol = \"0.22\"\n", []string{"MAN-4", "MAN-6"}, true},
-		{"no name", "wasm = \"x.wasm\"\nprotocol = \"0.22\"\n", []string{"MAN-4"}, true},
+		{"no wasm", "name = \"x\"\nprotocol = \"0.23\"\n", []string{"MAN-4"}, true},
+		{"empty wasm", "name = \"x\"\nwasm = \"\"\nprotocol = \"0.23\"\n", []string{"MAN-4"}, true},
+		{"wasm is an array", "name = \"x\"\nwasm = [\"x.wasm\"]\nprotocol = \"0.23\"\n", []string{"MAN-4"}, true},
+		{"wasm wrong type", "name = \"x\"\nwasm = 1\nprotocol = \"0.23\"\n", []string{"MAN-4"}, true},
+		{"absolute wasm", "name = \"x\"\nwasm = \"/usr/lib/x.wasm\"\nprotocol = \"0.23\"\n", []string{"MAN-4"}, true},
+		{"wasm outside the directory", "name = \"x\"\nwasm = \"../x.wasm\"\nprotocol = \"0.23\"\n", []string{"MAN-4"}, true},
+		{"wasm outside the directory, hidden", "name = \"x\"\nwasm = \"bin/../../x.wasm\"\nprotocol = \"0.23\"\n", []string{"MAN-4"}, true},
+		{"wasm is the directory", "name = \"x\"\nwasm = \".\"\nprotocol = \"0.23\"\n", []string{"MAN-4"}, true},
+		{"command (MAN-6) and no wasm", "name = \"x\"\ncommand = \"x\"\nprotocol = \"0.23\"\n", []string{"MAN-4", "MAN-6"}, true},
+		{"no name", "wasm = \"x.wasm\"\nprotocol = \"0.23\"\n", []string{"MAN-4"}, true},
 		// 版 0.22 でなくした [check]（docs/plugin-protocol.md「マニフェスト」）は、知らないキー
 		{"removed check table", base + "\n[check]\nenabled = true\n", []string{"MAN-4"}, true},
 		{"unsupported wrong type", base + tr + "unsupported = \"a\"\n", []string{"MAN-4"}, true},
@@ -211,6 +216,20 @@ func TestLoadManifestDiagnostics(t *testing.T) {
 		{"requires twice", base + tr + "requires = [\"go\", \"go\"]\n", []string{"MAN-4"}, true},
 		{"requires wrong type", base + tr + "requires = \"go\"\n", []string{"MAN-4"}, true},
 		{"requires element wrong type", base + tr + "requires = [1]\n", []string{"MAN-4"}, true},
+		// requires_vocabulary（docs/plugin-protocol.md「マニフェスト」）: 空の文字列、同じ名前が二度、文字列の配列でない
+		{"requires_vocabulary", base + tr + "requires_vocabulary = [\"http\", \"db\"]\n", nil, false},
+		{"requires_vocabulary empty string", base + tr + "requires_vocabulary = [\"\"]\n", []string{"MAN-4"}, true},
+		{"requires_vocabulary twice", base + tr + "requires_vocabulary = [\"http\", \"http\"]\n", []string{"MAN-4"}, true},
+		{"requires_vocabulary wrong type", base + tr + "requires_vocabulary = \"http\"\n", []string{"MAN-4"}, true},
+		// [read]（語彙のプラグイン）: namespaces は、一つ以上。空の文字列、同じ名前が二度、文字列の配列でない
+		{"read", base + "[read]\nnamespaces = [\"http\"]\n", nil, false},
+		{"read and transpiler", base + tr + "[read]\nnamespaces = [\"http\", \"db\"]\n", nil, false},
+		{"read without namespaces", base + "[read]\n", []string{"MAN-4"}, true},
+		{"read with no namespace", base + "[read]\nnamespaces = []\n", []string{"MAN-4"}, true},
+		{"read empty string", base + "[read]\nnamespaces = [\"\"]\n", []string{"MAN-4"}, true},
+		{"read twice", base + "[read]\nnamespaces = [\"http\", \"http\"]\n", []string{"MAN-4"}, true},
+		{"read wrong type", base + "[read]\nnamespaces = \"http\"\n", []string{"MAN-4"}, true},
+		{"read unknown key", base + "[read]\nnamespaces = [\"http\"]\ndecorators = []\n", []string{"MAN-4"}, true},
 		// seams: 空の文字列、同じ FQN が二度、文字列の配列でない。基底も書ける
 		{"seams", base + tr + "seams = [\"rate.limited\", \"trace.span\"]\n", nil, false},
 		{"seams empty string", base + tr + "seams = [\"\"]\n", []string{"MAN-4"}, true},
@@ -278,7 +297,7 @@ func TestDiscoverOrder(t *testing.T) {
 
 	// where は、どこのマニフェストかをトランスパイラの名前に書いたマニフェスト
 	manifest := func(name, where string) string {
-		return "name = \"" + name + "\"\nwasm = \"p.wasm\"\nprotocol = \"0.22\"\n[[transpiler]]\nname = \"" + where + "\"\nlanguage = \"go\"\n"
+		return "name = \"" + name + "\"\nwasm = \"p.wasm\"\nprotocol = \"0.23\"\n[[transpiler]]\nname = \"" + where + "\"\nlanguage = \"go\"\n"
 	}
 	plugins, diags := Discover(cfg, env)
 	if len(plugins) != 0 || len(diags) != 0 {
@@ -351,7 +370,7 @@ func TestDiscoverNameMismatch(t *testing.T) {
 	env := SearchEnv{}
 	cfg := config.Default(root)
 	cfg.Hozo.PluginDirs = []string{"plugins"}
-	p := writeManifest(t, filepath.Join(root, "plugins", "p"), "name = \"q\"\nwasm = \"q.wasm\"\nprotocol = \"0.22\"\n")
+	p := writeManifest(t, filepath.Join(root, "plugins", "p"), "name = \"q\"\nwasm = \"q.wasm\"\nprotocol = \"0.23\"\n")
 	plugins, diags := Discover(cfg, env)
 	if len(plugins) != 0 || !reflect.DeepEqual(codes(diags), []string{"MAN-3"}) || diags[0].File != p {
 		t.Errorf("plugins=%v diags=%+v", names(plugins), diags)
@@ -367,7 +386,7 @@ func TestDiscoverBadManifest(t *testing.T) {
 	cfg := config.Default(root)
 	cfg.Hozo.PluginDirs = []string{"plugins"}
 	writeManifest(t, filepath.Join(root, "plugins", "p"), "name = \n")
-	writeManifest(t, filepath.Join(home, ".hozo", "plugins", "p"), "name = \"p\"\nwasm = \"p.wasm\"\nprotocol = \"0.22\"\n")
+	writeManifest(t, filepath.Join(home, ".hozo", "plugins", "p"), "name = \"p\"\nwasm = \"p.wasm\"\nprotocol = \"0.23\"\n")
 	plugins, diags := Discover(cfg, env)
 	if len(plugins) != 0 || !reflect.DeepEqual(codes(diags), []string{"MAN-4"}) {
 		t.Errorf("plugins=%v diags=%+v", names(plugins), diags)
@@ -377,5 +396,29 @@ func TestDiscoverBadManifest(t *testing.T) {
 	plugins, diags = Discover(cfg, env)
 	if len(plugins) != 1 || len(diags) != 0 || !reflect.DeepEqual(codes(plugins[0].Mismatch), []string{"MAN-2"}) {
 		t.Errorf("plugins=%v diags=%+v", names(plugins), diags)
+	}
+}
+
+// 語彙のプラグインのマニフェスト（docs/plugin-protocol.md「語彙のプラグイン」）: [read] の namespaces と、トランスパイラの
+// requires_vocabulary。リポジトリの http と go-http のマニフェストが、その組になっている。
+func TestLoadManifestRead(t *testing.T) {
+	m, diags := LoadManifest(writeManifest(t, t.TempDir(), base+"[read]\nnamespaces = [\"http\", \"db\"]\n"))
+	if len(diags) != 0 {
+		t.Fatalf("diags = %+v", diags)
+	}
+	if !m.HasRead() || !m.Reads("http") || !m.Reads("db") || m.Reads("valid") || m.HasEmit() {
+		t.Errorf("Read = %+v, HasEmit = %v", m.Read, m.HasEmit())
+	}
+	plain, _ := LoadManifest(writeManifest(t, t.TempDir(), base))
+	if plain.HasRead() || plain.Reads("http") {
+		t.Errorf("[read] のないマニフェストが、語彙のプラグインになった: %+v", plain.Read)
+	}
+	reader, diags := LoadManifest(filepath.Join("..", "..", "plugins", "http", ManifestFileName))
+	if len(diags) != 0 || !reader.Reads("http") || reader.HasEmit() {
+		t.Fatalf("plugins/http のマニフェスト = %+v（%+v）", reader, diags)
+	}
+	gohttp, diags := LoadManifest(filepath.Join("..", "..", "plugins", "go-http", ManifestFileName))
+	if len(diags) != 0 || gohttp.Transpiler("go-http") == nil || !reflect.DeepEqual(gohttp.Transpiler("go-http").RequiresVocabulary, []string{"http"}) {
+		t.Fatalf("plugins/go-http のマニフェスト = %+v（%+v）", gohttp, diags)
 	}
 }

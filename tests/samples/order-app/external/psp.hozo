@@ -17,11 +17,11 @@ namespace psp {
 
   /** 支払いの画面を開く依頼 */
   model SessionRequest {
-    orderId: type.OrderId;
+    @http.body orderId: type.OrderId;
     /** 客が同意する額。枠の確保なら、請求の上限 */
-    amount: type.Yen;
+    @http.body amount: type.Yen;
     /** 同意の後に、客を戻す先 */
-    returnTo: type.Url;
+    @http.body returnTo: type.Url;
   }
 
   /** 支払いの画面 */
@@ -33,13 +33,13 @@ namespace psp {
 
   /** 額を伴う依頼（請求の確定、返金） */
   model AmountRequest {
-    session: SessionId;
-    amount: type.Yen;
+    @http.body session: SessionId;
+    @http.body amount: type.Yen;
   }
 
   /** 額を伴わない依頼（枠を手放す） */
   model SessionRef {
-    session: SessionId;
+    @http.body session: SessionId;
   }
 
   /** 通知 */

@@ -1,0 +1,22 @@
+// HTTP-8: 位置は後ろの op。
+namespace app {
+  @http.get("/items")
+  export fn first(): string;
+  @http.get("/items")
+  export fn second(): string;
+  @http.get("/items")
+  export fn third(): string;
+
+  // メソッドが違えば、当たらない。パスが違っても、当たらない
+  @http.post("/items")
+  export fn create();
+  @http.get("/items/")
+  export fn slash(): string;
+
+  // 一つの op の二つの経路どうしでも当たる
+  @http.post("/twice")
+  export fn twice();
+  @http.post("/twice")
+  @http.get("/twice")
+  export fn again();
+}

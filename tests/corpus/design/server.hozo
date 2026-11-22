@@ -198,7 +198,7 @@ namespace server {
   // 上の行の例外のとき、下の行の効果が起きていないこと（prevents effects）は、検査器が本体から確かめる（REL-4）
   @http.post("/login")
   @validated
-  fn login(in: LoginInput): LoginOk
+  export fn login(in: LoginInput): LoginOk
     effects createSession
     throws InvalidCredentials, NotVerified, Suspended, AlreadyLoggedIn prevents effects
   {
@@ -300,19 +300,25 @@ namespace server {
   fn newPasswordReset(email: Email): PasswordReset
     throws RateLimited;
 
+  /** 再設定の依頼。http の語彙の入口は、入力の model を、一つ、受け取る（docs/plugin-http.md。README.md の表の 11） */
+  model PasswordResetInput {
+    /** 再設定するアカウントのメールアドレス */
+    @http.body email: Email;
+  }
+
   /**
    * パスワードの再設定メールを送る。
    *
-   * @param email 再設定するアカウントのメールアドレス
+   * @param in 再設定の依頼
    * @throws RateLimited 同じアドレスに短時間で送りすぎた
    * @see login
    */
   @http.post("/password-reset")
-  fn requestPasswordReset(email: Email):
+  export fn requestPasswordReset(in: PasswordResetInput):
     effects sendResetMail
     throws RateLimited prevents effects
   {
-    val reset = newPasswordReset(email);
+    val reset = newPasswordReset(in.email);
     sendResetMail(reset);
   }
 

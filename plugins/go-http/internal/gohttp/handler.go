@@ -6,8 +6,9 @@
 //
 // 経路ごと、フィールドごとに出すコードは、デコレータの引数だけから作り、どの型でも同じ補助の呼び出しにする
 // （docs/requirements.md「出力を推論しない」）: 値で変わる振る舞いは、http.go の補助（helpers.go）が、実行時に決める。
-// 型を見るのは、書いたものの整合の検査（emit.go、inputs.go）だけで、食い違いは、診断（GOHTTP-*）で返す。どの型が `Validate` を
-// 持つか（GOHTTP-11）と、補う値が制約に合うか（GOHTTP-19）は、plugin/govalid で求める。
+// 型を見るのは、書いたものの整合の検査（emit.go）だけで、食い違いは、診断（GOHTTP-*）で返す。http の語彙の使い方の検査（HTTP-*）は、
+// 語彙のプラグイン http が持ち、ここは、同じライブラリ plugin/httpvocab で、経路と入力の読み方を求める。どの型が `Validate` を
+// 持つか（GOHTTP-11）は、plugin/govalid で求める。
 package gohttp
 
 import (

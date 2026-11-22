@@ -1,8 +1,0 @@
-[options.go]
-module = "example.com/app"
-
-# plugins/go-http の単体テストの入力（docs/testing.md「単体テスト」）: GOHTTP-14（@http.required か @http.default の付いたフィールドが、項目の形を持たない）。
-[[emit]]
-namespace   = "app"
-transpilers = ["go", "go-valid", "go-http"]
-out         = "gen/app"

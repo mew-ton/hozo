@@ -1,0 +1,69 @@
+// HTTP-5: 位置は op。通信に出せない union（docs/plugin-http.md「通信の形」の「union」の二つの条件）。
+namespace app {
+  model Card { n: int; }
+  // アームの型が、model でない
+  union Shape { Dot: Card; Label: string; }
+  model Drawing { title: string; shape: Shape; }
+  model Album { drawings: Drawing[]; }
+  model ShapesByName { [name: string]: Shape[]; }
+  model CardsByName { [name: string]: Card[]; }
+
+  // 決め手のないアームがある: 同じ構造のアーム、フィールドのないアーム、ほかのアームと名前の重なるフィールドしかないアーム、
+  // 省略可能なフィールドしか、違いのないアーム、インデックスの model のアーム
+  model Wide { n: int; note: string?; }
+  union Same { A: Card; B: { n: int; }; }
+  union Empty { Full: Card; None: {}; }
+  union Sub { Small: Card; Large: Wide; }
+  union Indexed { One: Card; Many: CardsByName; }
+  // 通信に出せる union は、当たらない
+  union Fine { Card: Card; Text: { text: string; }; }
+
+  // 本文の項目: union そのもの、union を中に持つ model
+  model ShapeIn { @http.body shape: Shape; }
+  @http.post("/shape")
+  export fn putShape(in: ShapeIn);
+  model AlbumIn { @http.query id: string?; @http.body album: Album?; @http.body("names") byName: ShapesByName; }
+  @http.post("/album")
+  export fn putAlbum(in: AlbumIn);
+
+  // 本文の全体
+  model DrawingIn { @http.bodyObj drawing: Drawing; }
+  @http.post("/drawing")
+  export fn putDrawing(in: DrawingIn);
+
+  // 結果
+  @http.get("/drawing")
+  export fn getDrawing(): Drawing?;
+  @http.get("/shapes")
+  export fn getShapes(): Shape[];
+  @http.get("/same")
+  export fn getSame(): Same;
+  @http.get("/empty")
+  export fn getEmpty(): Empty[];
+  @http.get("/sub")
+  export fn getSub(): Sub?;
+  @http.get("/indexed")
+  export fn getIndexed(): Indexed;
+  @http.get("/fine")
+  export fn getFine(): Fine;
+
+  // @http.status を持つ例外の引数の型: 引数ごとに見る（通信に出せない union を中に持つ引数だけが当たる）
+  @http.status(409)
+  exception Clash(value: Drawing);
+  @http.get("/clash")
+  export fn clash(): string
+    throws Clash;
+  @http.status(422)
+  exception Refused(card: Card, shapes: Shape[]?, reason: string, album: Album, fine: Fine);
+  @http.get("/refused")
+  export fn refused(): string
+    throws Refused;
+
+  // ステータスを持たない例外の引数は、通信に現れないので、当たらない。union を持たない型も、当たらない
+  exception Quiet(value: Drawing);
+  @http.status(404)
+  exception Missing(card: Card, cards: CardsByName?);
+  @http.get("/quiet")
+  export fn quiet(): Card
+    throws Quiet, Missing;
+}

@@ -1,3 +1,0 @@
-GOHTTP-15	app.In	model app.In のフィールド token に @http.required が付いているが、型 app.Token? が省略可能（型は「なくてよい」と言っている。なければ誤りにするか、値を入れるなら、省略可能にしない）
-GOHTTP-15	app.In	model app.In のフィールド page に @http.default が付いているが、型 int? が省略可能（型は「なくてよい」と言っている。なければ誤りにするか、値を入れるなら、省略可能にしない）
-GOHTTP-15	app.In	model app.In のフィールド lines に @http.required が付いているが、型 string[]? が省略可能（型は「なくてよい」と言っている。なければ誤りにするか、値を入れるなら、省略可能にしない）

@@ -671,3 +671,64 @@ func TestPluginChecksGranted(t *testing.T) {
 		t.Errorf("裏の check を始めた %d 回、起動 %d 回（期待は、どちらも 2）", n, p.calls())
 	}
 }
+
+// TestVocabularyPluginChecks は、語彙のプラグインの診断（docs/plugin-protocol.md「語彙のプラグイン」）が、トランスパイラの診断と同じ道で
+// 出ること（docs/lsp.md「プラグインの診断」）: クライアントが許したときだけ、裏の check で。出力の単位は、要らない（この
+// プロジェクトの設定は、単位を一つも持たない）。出た診断は、hozoc build --no-emit（project.LoadWith）と同じ。
+func TestVocabularyPluginChecks(t *testing.T) {
+	const spec = "namespace voc {\n  /** 印 */\n  decorator fn mark();\n}\nnamespace a {\n  /** f */\n  @voc.mark\n  export fn f();\n}\n"
+	setup := func(t *testing.T) (root, dir, uri string) {
+		root = t.TempDir()
+		if resolved, err := filepath.EvalSymlinks(root); err == nil {
+			root = resolved
+		}
+		dir = filepath.Join(root, "plugins", "reader")
+		fakeplugin.Install(t, dir)
+		writeFile(t, filepath.Join(dir, "response.json"), `{"errors":[{"code":"VOC-1","at":"a.f","message":"bad use"}],"warnings":[]}`)
+		writeFile(t, filepath.Join(dir, "hozo-plugin.toml"),
+			"name = \"reader\"\nwasm = "+fakeplugin.WasmTOML+"\nprotocol = \""+ir.Version+"\"\n\n[read]\nnamespaces = [\"voc\"]\n")
+		writeFile(t, filepath.Join(root, "hozo.toml"), "[hozo]\nplugin_dirs = [\"plugins\"]\n")
+		writeFile(t, filepath.Join(root, "a.hozo"), spec)
+		return root, dir, fileURI(filepath.Join(root, "a.hozo"))
+	}
+	launched := func(dir string) int {
+		data, _ := os.ReadFile(filepath.Join(dir, "launches"))
+		return strings.Count(string(data), "x")
+	}
+	open := func(c *testClient, uri string) {
+		c.notify(protocol.MethodDidOpen, protocol.DidOpenTextDocumentParams{TextDocument: protocol.TextDocumentItem{URI: uri, LanguageID: "hozo", Version: 1, Text: spec}})
+	}
+
+	t.Run("許されていれば、出る", func(t *testing.T) {
+		root, dir, uri := setup(t)
+		c := startServer(t, Options{})
+		_, byURI := c.initializeWith(root, protocol.ClientCapabilities{}, `{"pluginChecks": true}`)
+		if hasCode(byURI[uri], "VOC-1") || launched(dir) != 0 {
+			t.Fatalf("initialized で、語彙のプラグインの診断が出た: %v（起動 %d 回）", codes(byURI[uri]), launched(dir))
+		}
+		open(c, uri)
+		var ds []protocol.Diagnostic
+		for !hasCode(ds, "VOC-1") {
+			ds = c.waitDiagnostics(uri)
+		}
+		if launched(dir) != 1 {
+			t.Errorf("語彙のプラグインの起動 = %d 回（期待は 1 回）", launched(dir))
+		}
+		want := project.LoadWith(project.Options{Root: root})
+		if want.RunErr != nil || want.Errors() != 1 || len(want.Diags) != len(ds) {
+			t.Errorf("言語サーバーの診断 = %v、hozoc build --no-emit の診断 = %d 件（RunErr = %v）", codes(ds), len(want.Diags), want.RunErr)
+		}
+		c.shutdown()
+	})
+
+	t.Run("許されていなければ、起動しない", func(t *testing.T) {
+		root, dir, uri := setup(t)
+		c := startServer(t, Options{})
+		c.initialize(root, protocol.ClientCapabilities{})
+		open(c, uri)
+		if ds := c.syncDiagnostics()[uri]; hasCode(ds, "VOC-1") || launched(dir) != 0 {
+			t.Errorf("診断 = %v、起動 %d 回（期待は、語彙のプラグインの診断なし、起動 0 回）", codes(ds), launched(dir))
+		}
+		c.shutdown()
+	})
+}

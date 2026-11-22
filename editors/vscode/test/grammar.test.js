@@ -734,9 +734,9 @@ test('コメントとドキュメンテーションコメント', () => {
   assertScope(s, 'throws RefundPending keeps effects   //', 'keeps', 'keyword.control.hozo');
   assertScope(s, '/** メールアドレス */', '/**', 'comment.block.documentation.hozo');
   assertScope(s, '/** メールアドレス */', ' メールアドレス ', 'comment.block.documentation.hozo');
-  assertScope(s, '* @param email', '@param', 'storage.type.class.jsdoc');
-  assertScope(s, '* @param email', 'email', 'variable.other.jsdoc');
-  assertScope(s, '* @param email', '@param', 'comment.block.documentation.hozo');
+  assertScope(s, '* @param in', '@param', 'storage.type.class.jsdoc');
+  assertScope(s, '* @param in', 'in', 'variable.other.jsdoc');
+  assertScope(s, '* @param in', '@param', 'comment.block.documentation.hozo');
   assertScope(s, '* @throws RateLimited', '@throws', 'storage.type.class.jsdoc');
   assertScope(s, '* @throws RateLimited', 'RateLimited', 'variable.other.jsdoc');
   assertScope(s, '* @see login', '@see', 'storage.type.class.jsdoc');

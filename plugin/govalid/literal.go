@@ -30,7 +30,7 @@ type Mismatch struct {
 // フィールドに付いたもの。返す順は、go-valid の Validate が確かめる順（docs/plugin-go-valid.md「scalar」「model」）:
 // 元の scalar から自分の scalar へ、その後にフィールド。それぞれ、書かれた順。省略可能なフィールドは、中の型で見る。
 //
-// リテラルがフィールドの型に渡せることは、呼ぶ側が先に確かめる（go-http の GOHTTP-18）。ここで確かめられないものは、合わないとは
+// リテラルがフィールドの型に渡せることは、呼ぶ側が先に確かめる（http の HTTP-14）。ここで確かめられないものは、合わないとは
 // 言わない: リテラルの型に当たらない制約と、解釈できない正規表現（go-valid が GOVALID-1 にする）、利用者が valid に足した制約
 // （同 GOVALID-5）。p が nil なら、フィールドに付いた制約だけを確かめる。
 func CheckLiteral(p *ir.Program, field *ir.Field, lit ir.Literal) []Mismatch {

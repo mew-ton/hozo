@@ -1,6 +1,7 @@
 package project
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -14,6 +15,7 @@ import (
 	"github.com/mew-ton/hozo/internal/fakeplugin"
 	hostplugin "github.com/mew-ton/hozo/internal/plugin"
 	"github.com/mew-ton/hozo/internal/source"
+	"github.com/mew-ton/hozo/ir"
 )
 
 const corpusDir = "../../tests/corpus/design"
@@ -332,7 +334,7 @@ func fakePlugin(t *testing.T, dir, name, lang, extra, result string, exit int, t
 	fakeplugin.Install(t, pluginDir)
 	write(t, filepath.Join(pluginDir, "response.json"), result)
 	write(t, filepath.Join(pluginDir, "exit"), string(rune('0'+exit)))
-	manifest := "name = \"" + name + "\"\nwasm = " + fakeplugin.WasmTOML + "\nprotocol = \"0.22\"\n" + extra
+	manifest := "name = \"" + name + "\"\nwasm = " + fakeplugin.WasmTOML + "\nprotocol = \"0.23\"\n" + extra
 	for _, tr := range transpilers {
 		manifest += "\n[[transpiler]]\nname = \"" + tr + "\"\nlanguage = \"" + lang + "\"\n"
 	}
@@ -515,7 +517,7 @@ func TestPluginAnswersPerOutput(t *testing.T) {
 	dir := t.TempDir()
 	write(t, filepath.Join(dir, "a.hozo"), "namespace a {\n  fn f();\n}\nnamespace b {\n  fn g();\n}\n")
 	fakePlugin(t, dir, "chk", "go", "", `{"files":[{"path":"@DIR@/@T@.txt","content":"@NS@"}],"warnings":[]}`, 0)
-	m := "name = \"chk\"\nwasm = " + fakeplugin.WasmTOML + "\nprotocol = \"0.22\"\n" +
+	m := "name = \"chk\"\nwasm = " + fakeplugin.WasmTOML + "\nprotocol = \"0.23\"\n" +
 		"\n[[transpiler]]\nname = \"chk\"\nlanguage = \"go\"\n\n[[transpiler]]\nname = \"chk2\"\nlanguage = \"go\"\nrequires = [\"chk\"]\n"
 	write(t, filepath.Join(dir, "plugins", "chk", "hozo-plugin.toml"), m)
 
@@ -615,7 +617,7 @@ func (c *cancelAfterFirst) Err() error {
 // （name と language のほかの行: requires、seams など）を、トランスパイラの名前 → 行で。
 func manifest(t *testing.T, dir, name string, transpilers ...[2]string) {
 	t.Helper()
-	m := "name = \"" + name + "\"\nwasm = \"plugin.wasm\"\nprotocol = \"0.22\"\n"
+	m := "name = \"" + name + "\"\nwasm = \"plugin.wasm\"\nprotocol = \"0.23\"\n"
 	for _, tr := range transpilers {
 		lang := "go"
 		if strings.HasPrefix(tr[0], "ts") {
@@ -850,7 +852,7 @@ func TestDiscoveryEnvironmentComesFromCaller(t *testing.T) {
 	envDir, home := t.TempDir(), t.TempDir()
 	// env-t と home-t は、基底 t に相乗りする（一つの単位は、基底をちょうど一つ持つ）
 	manifest := func(name, transpiler string) string {
-		return "name = \"" + name + "\"\nwasm = \"plugin.wasm\"\nprotocol = \"0.22\"\n\n[[transpiler]]\nname = \"" + transpiler + "\"\nlanguage = \"go\"\nrequires = [\"t\"]\n"
+		return "name = \"" + name + "\"\nwasm = \"plugin.wasm\"\nprotocol = \"0.23\"\n\n[[transpiler]]\nname = \"" + transpiler + "\"\nlanguage = \"go\"\nrequires = [\"t\"]\n"
 	}
 	write(t, filepath.Join(envDir, "from-env", "hozo-plugin.toml"), manifest("from-env", "env-t"))
 	write(t, filepath.Join(envDir, "t", "hozo-plugin.toml"), "name = \n") // plugin_dirs の t が先なので読まない
@@ -899,13 +901,13 @@ func TestManifestDiagnosticsOfInstalledPlugins(t *testing.T) {
 	// 読めないマニフェストと name の違うマニフェストは、使っていなくても報告する
 	write(t, filepath.Join(dir, "hozo.toml"), pluginDirs+unit("a", "gen/a"))
 	write(t, filepath.Join(dir, "plugins", "broken", "hozo-plugin.toml"), "name = \n")
-	write(t, filepath.Join(dir, "plugins", "renamed", "hozo-plugin.toml"), "name = \"other\"\nwasm = \"plugin.wasm\"\nprotocol = \"0.22\"\n")
+	write(t, filepath.Join(dir, "plugins", "renamed", "hozo-plugin.toml"), "name = \"other\"\nwasm = \"plugin.wasm\"\nprotocol = \"0.23\"\n")
 	p = Load(dir, "", nil)
 	if got := strings.Join(codes(p.Diags), ","); got != "MAN-4,MAN-3" {
 		t.Fatalf("codes = %v, want [MAN-4 MAN-3]\n%s", got, text(p))
 	}
 	// なくした書き方 command のマニフェスト（MAN-6）も、使っていなくても報告する。メッセージは、新しい書き方（wasm）を示す
-	write(t, filepath.Join(dir, "plugins", "legacy", "hozo-plugin.toml"), "name = \"legacy\"\ncommand = [\"go\", \"run\", \"example.com/legacy\"]\nwasm = \"plugin.wasm\"\nprotocol = \"0.22\"\n")
+	write(t, filepath.Join(dir, "plugins", "legacy", "hozo-plugin.toml"), "name = \"legacy\"\ncommand = [\"go\", \"run\", \"example.com/legacy\"]\nwasm = \"plugin.wasm\"\nprotocol = \"0.23\"\n")
 	p = Load(dir, "", nil)
 	if got := strings.Join(codes(p.Diags), ","); got != "MAN-4,MAN-6,MAN-3" {
 		t.Fatalf("codes = %v, want [MAN-4 MAN-6 MAN-3]\n%s", got, text(p))
@@ -990,7 +992,7 @@ func userFiles(files []string) string {
 func TestUnsupported(t *testing.T) {
 	dir := t.TempDir()
 	write(t, filepath.Join(dir, "plugins", "t", "hozo-plugin.toml"),
-		"name = \"t\"\nwasm = \"plugin.wasm\"\nprotocol = \"0.22\"\n\n[[transpiler]]\nname = \"t\"\nlanguage = \"go\"\nunsupported = [\"a.legacy\"]\n\n[[transpiler]]\nname = \"u\"\nlanguage = \"go\"\n")
+		"name = \"t\"\nwasm = \"plugin.wasm\"\nprotocol = \"0.23\"\n\n[[transpiler]]\nname = \"t\"\nlanguage = \"go\"\nunsupported = [\"a.legacy\"]\n\n[[transpiler]]\nname = \"u\"\nlanguage = \"go\"\n")
 	write(t, filepath.Join(dir, "a.hozo"), "namespace a {\n  decorator fn legacy();\n  @legacy fn f();\n}\n")
 	write(t, filepath.Join(dir, "b.hozo"), "namespace a {\n  @legacy fn g();\n}\n")
 	count := func(units string) int {
@@ -1020,5 +1022,212 @@ func TestUnsupported(t *testing.T) {
 	// unsupported を持たないトランスパイラだけの単位には出ない
 	if n := count(unit("a", "gen/a", "u")); n != 0 {
 		t.Errorf("CFG-6 with another transpiler = %d, want 0", n)
+	}
+}
+
+// readerPlugin は、にせものの語彙のプラグイン（[read] を持ち、トランスパイラを持たない）を plugins/<name> に置く。namespaces は、
+// 読み解く語彙の名前空間、response は、direction "read" の応答、protocol は、マニフェストの protocol。
+func readerPlugin(t *testing.T, dir, name, protocol, response string, namespaces ...string) {
+	t.Helper()
+	pluginDir := filepath.Join(dir, "plugins", name)
+	fakeplugin.Install(t, pluginDir)
+	write(t, filepath.Join(pluginDir, "response.json"), response)
+	write(t, filepath.Join(pluginDir, "hozo-plugin.toml"),
+		"name = \""+name+"\"\nwasm = "+fakeplugin.WasmTOML+"\nprotocol = \""+protocol+"\"\n\n[read]\nnamespaces = [\""+strings.Join(namespaces, "\", \"")+"\"]\n")
+}
+
+// TestVocabularyPlugins は docs/plugin-protocol.md「語彙のプラグイン」「read」: 頼むのは、仕様が、その語彙のデコレータを使っている
+// ときだけで、単位がなくても頼む。一度の実行で、一回。errors は error の診断、warnings は PLUGIN の warning。語彙のプラグインが
+// error を返したら、emit は、頼まない。protocol の合わない語彙のプラグイン（MAN-2）は、頼むときにだけ、報告する。
+func TestVocabularyPlugins(t *testing.T) {
+	const vocabulary = "namespace voc {\n  /** 印 */\n  decorator fn mark();\n  /** フィールドの印 */\n  decorator tag for field;\n}\n"
+	const marked = "namespace a {\n  /** f */\n  @voc.mark\n  export fn f();\n}\n"
+	const plain = "namespace a {\n  /** f */\n  export fn f();\n}\n"
+	const bad = `{"errors":[{"code":"VOC-1","at":"a.f","message":"bad use"}],"warnings":[{"at":"a.f","message":"hint"}]}`
+	const good = `{"errors":[],"warnings":[{"at":"a.f","message":"hint"}]}`
+	setup := func(t *testing.T, spec, response, protocol string, units bool) string {
+		dir := t.TempDir()
+		write(t, filepath.Join(dir, "voc.hozo"), vocabulary)
+		write(t, filepath.Join(dir, "a.hozo"), spec)
+		readerPlugin(t, dir, "reader", protocol, response, "voc", "other")
+		readerPlugin(t, dir, "unused", ir.Version, bad, "nowhere")
+		fakePlugin(t, dir, "pick", "go", "", `{"files":[{"path":"@DIR@/pick.txt","content":"@NS@"}],"warnings":[]}`, 0)
+		config := pluginDirs
+		if units {
+			config += unit("a", "gen/a", "pick")
+		}
+		write(t, filepath.Join(dir, "hozo.toml"), config)
+		return dir
+	}
+
+	t.Run("単位がなくても、頼む", func(t *testing.T) {
+		dir := setup(t, marked, bad, ir.Version, false)
+		p := LoadWith(Options{Root: dir})
+		if p.RunErr != nil {
+			t.Fatalf("RunErr = %v", p.RunErr)
+		}
+		if len(p.Readers) != 1 || p.Readers[0].Name != "reader" || !p.NeedsPlugins() {
+			t.Fatalf("Readers = %+v, NeedsPlugins = %v", p.Readers, p.NeedsPlugins())
+		}
+		got := text(p)
+		for _, want := range []string{"a.hozo:3:3: error[VOC-1]: bad use", "a.hozo:3:3: warning[PLUGIN]: reader: hint"} {
+			if !strings.Contains(got, want) {
+				t.Errorf("診断に %q がない:\n%s", want, got)
+			}
+		}
+		// 使っていない語彙のプラグインには、頼まない。一度の実行で、一回
+		if n, m := launches(t, dir, "reader"), launches(t, dir, "unused"); n != 1 || m != 0 {
+			t.Errorf("起動 = reader %d 回、unused %d 回（期待は 1 回と 0 回）", n, m)
+		}
+		// 要求は、direction "read" と、spec（単位がないので、namespaces は空）だけ
+		data, err := os.ReadFile(filepath.Join(dir, "plugins", "reader", "requests.jsonl"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		var req map[string]json.RawMessage
+		if err := json.Unmarshal(bytes.TrimSpace(data), &req); err != nil {
+			t.Fatalf("要求が一つでない: %v\n%s", err, data)
+		}
+		var spec struct {
+			Version    string                     `json:"version"`
+			Namespaces map[string]json.RawMessage `json:"namespaces"`
+			Program    json.RawMessage            `json:"program"`
+		}
+		if err := json.Unmarshal(req["spec"], &spec); err != nil {
+			t.Fatal(err)
+		}
+		if string(req["direction"]) != `"read"` || string(req["protocol"]) != `"`+ir.Version+`"` || len(req) != 3 ||
+			spec.Version != ir.Version || spec.Namespaces == nil || len(spec.Namespaces) != 0 || !bytes.Contains(spec.Program, []byte(`"a.f"`)) {
+			t.Errorf("要求 = %s", data)
+		}
+	})
+
+	t.Run("フィールドのデコレータでも、頼む", func(t *testing.T) {
+		dir := setup(t, "namespace a {\n  model M {\n    @voc.tag id: string;\n  }\n  /** f */\n  export fn f();\n}\n", good, ir.Version, false)
+		if p := LoadWith(Options{Root: dir}); len(p.Readers) != 1 || launches(t, dir, "reader") != 1 {
+			t.Errorf("Readers = %+v（%v）", p.Readers, codes(p.Diags))
+		}
+	})
+
+	t.Run("使っていなければ、頼まない", func(t *testing.T) {
+		dir := setup(t, plain, bad, ir.Version, true)
+		p := LoadWith(Options{Root: dir})
+		if len(p.Readers) != 0 || p.Errors() != 0 || launches(t, dir, "reader") != 0 || launches(t, dir, "pick") != 1 {
+			t.Errorf("Readers = %+v, 診断 = %v", p.Readers, codes(p.Diags))
+		}
+	})
+
+	t.Run("error を返したら、emit は頼まない", func(t *testing.T) {
+		dir := setup(t, marked, bad, ir.Version, true)
+		p := LoadWith(Options{Root: dir})
+		if !strings.Contains(text(p), "error[VOC-1]: bad use") || len(p.Answers) != 0 {
+			t.Errorf("診断 = %v, Answers = %d", codes(p.Diags), len(p.Answers))
+		}
+		if n, m := launches(t, dir, "reader"), launches(t, dir, "pick"); n != 1 || m != 0 {
+			t.Errorf("起動 = reader %d 回、pick %d 回（期待は 1 回と 0 回）", n, m)
+		}
+	})
+
+	t.Run("error がなければ、emit を頼む", func(t *testing.T) {
+		dir := setup(t, marked, good, ir.Version, true)
+		p := LoadWith(Options{Root: dir})
+		if p.Errors() != 0 || len(p.Answers) != 1 || !strings.Contains(text(p), "warning[PLUGIN]: reader: hint") {
+			t.Errorf("診断 = %v, Answers = %d\n%s", codes(p.Diags), len(p.Answers), text(p))
+		}
+		if n, m := launches(t, dir, "reader"), launches(t, dir, "pick"); n != 1 || m != 1 {
+			t.Errorf("起動 = reader %d 回、pick %d 回（期待は 1 回ずつ）", n, m)
+		}
+	})
+
+	t.Run("仕様に error があれば、頼まない", func(t *testing.T) {
+		dir := setup(t, "namespace a {\n  /** f */\n  @voc.mark\n  export fn f(): Missing;\n}\n", bad, ir.Version, false)
+		p := LoadWith(Options{Root: dir})
+		if p.Errors() == 0 || strings.Contains(text(p), "VOC-1") || launches(t, dir, "reader") != 0 {
+			t.Errorf("診断 = %v", codes(p.Diags))
+		}
+	})
+
+	t.Run("NoPlugins なら、頼まない", func(t *testing.T) {
+		dir := setup(t, marked, bad, ir.Version, false)
+		p := LoadWith(Options{Root: dir, NoPlugins: true})
+		// 頼む相手は、分かっている（言語サーバーが、裏の check を走らせるかを決める）
+		if len(p.Readers) != 1 || !p.NeedsPlugins() || p.Errors() != 0 || launches(t, dir, "reader") != 0 {
+			t.Errorf("Readers = %+v, 診断 = %v", p.Readers, codes(p.Diags))
+		}
+	})
+
+	t.Run("protocol の合わないものは、頼むときにだけ MAN-2", func(t *testing.T) {
+		dir := setup(t, marked, good, "0.1", true)
+		p := LoadWith(Options{Root: dir})
+		if got := codes(p.Diags); len(got) != 1 || got[0] != "MAN-2" {
+			t.Errorf("使っているとき: 診断 = %v（期待は MAN-2 だけ）\n%s", got, text(p))
+		}
+		if n, m := launches(t, dir, "reader"), launches(t, dir, "pick"); n != 0 || m != 0 || p.NeedsPlugins() == false {
+			t.Errorf("起動 = reader %d 回、pick %d 回（期待は、どちらも 0 回）。NeedsPlugins = %v", n, m, p.NeedsPlugins())
+		}
+		dir = setup(t, plain, good, "0.1", true)
+		if p := LoadWith(Options{Root: dir}); p.Errors() != 0 || len(p.Answers) != 1 {
+			t.Errorf("使っていないとき: 診断 = %v（期待は、なし）", codes(p.Diags))
+		}
+	})
+
+	t.Run("形の違う応答は MalformedOutput", func(t *testing.T) {
+		dir := setup(t, marked, `{"errors":[]}`, ir.Version, true)
+		p := LoadWith(Options{Root: dir})
+		if !errors.Is(p.RunErr, hostplugin.ErrMalformedOutput) || launches(t, dir, "pick") != 0 {
+			t.Errorf("RunErr = %v", p.RunErr)
+		}
+	})
+
+	t.Run("read を実装していなければ MAN-5", func(t *testing.T) {
+		dir := setup(t, marked, `{"error":{"code":"unsupported","message":"direction \"read\" is not supported"}}`, ir.Version, true)
+		write(t, filepath.Join(dir, "plugins", "reader", "exit"), "2")
+		p := LoadWith(Options{Root: dir})
+		if got := codes(p.Diags); p.RunErr != nil || len(got) != 1 || got[0] != "MAN-5" || launches(t, dir, "pick") != 0 {
+			t.Errorf("診断 = %v, RunErr = %v（期待は MAN-5 だけ。emit は、頼まない）\n%s", got, p.RunErr, text(p))
+		}
+	})
+
+	t.Run("設定なしなら、頼まない", func(t *testing.T) {
+		dir := setup(t, marked, bad, ir.Version, false)
+		if err := os.Remove(filepath.Join(dir, "hozo.toml")); err != nil {
+			t.Fatal(err)
+		}
+		p := LoadWith(Options{Root: dir, PluginPath: filepath.Join(dir, "plugins")})
+		if !p.NoConfig || len(p.Readers) != 0 || p.NeedsPlugins() || launches(t, dir, "reader") != 0 {
+			t.Errorf("NoConfig = %v, Readers = %+v", p.NoConfig, p.Readers)
+		}
+	})
+}
+
+// TestRequiresVocabulary は CFG-25（docs/plugin-protocol.md「語彙のプラグイン」、docs/config.md「診断」）: 単位のトランスパイラが、
+// マニフェストの requires_vocabulary に書いた名前空間を読み解く、語彙のプラグインが、入っていなければ、error。仕様が、その語彙を
+// 使っているかには、よらない。
+func TestRequiresVocabulary(t *testing.T) {
+	dir := t.TempDir()
+	write(t, filepath.Join(dir, "a.hozo"), "namespace a {\n  /** f */\n  export fn f();\n}\n")
+	fakePlugin(t, dir, "base", "go", "", `{"files":[],"warnings":[]}`, 0)
+	write(t, filepath.Join(dir, "plugins", "needs", "hozo-plugin.toml"), "name = \"needs\"\nwasm = \"plugin.wasm\"\nprotocol = \""+ir.Version+"\"\n\n"+
+		"[[transpiler]]\nname = \"x\"\nlanguage = \"go\"\nrequires = [\"base\"]\nrequires_vocabulary = [\"voc\", \"db\"]\n\n"+
+		"[[transpiler]]\nname = \"y\"\nlanguage = \"go\"\nrequires = [\"base\"]\nrequires_vocabulary = [\"voc\"]\n")
+	write(t, filepath.Join(dir, "hozo.toml"), pluginDirs+unit("a", "gen/a", "base", "x", "y"))
+	p := LoadWith(Options{Root: dir, NoPlugins: true})
+	got := text(p)
+	for _, want := range []string{
+		"hozo.toml: error[CFG-25]: 1 番目の [[emit]]（namespace = \"a\"、out = \"gen/a\"）の x、y は、語彙 voc の語彙のプラグイン",
+		"hozo.toml: error[CFG-25]: 1 番目の [[emit]]（namespace = \"a\"、out = \"gen/a\"）の x は、語彙 db の語彙のプラグイン",
+	} {
+		if !strings.Contains(got, want) {
+			t.Errorf("診断に %q がない:\n%s", want, got)
+		}
+	}
+	if n := strings.Count(got, "CFG-25"); n != 2 {
+		t.Errorf("CFG-25 が %d 件（期待は、名前空間ごとに一つ: 2 件）\n%s", n, got)
+	}
+	// 語彙のプラグインを入れれば、出ない（protocol が合うかは、見ない: 入っているかだけ）
+	readerPlugin(t, dir, "voc-reader", "0.1", `{"errors":[],"warnings":[]}`, "voc")
+	readerPlugin(t, dir, "db-reader", ir.Version, `{"errors":[],"warnings":[]}`, "db")
+	if p := LoadWith(Options{Root: dir, NoPlugins: true}); p.Errors() != 0 {
+		t.Errorf("語彙のプラグインを入れた後の診断 = %v\n%s", codes(p.Diags), text(p))
 	}
 }

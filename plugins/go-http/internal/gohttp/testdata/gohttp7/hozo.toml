@@ -1,8 +1,0 @@
-[options.go]
-module = "example.com/app"
-
-# plugins/go-http の単体テストの入力（docs/testing.md「単体テスト」）: GOHTTP-7（パスが / で始まらない、または { か } を含む）。
-[[emit]]
-namespace   = "app"
-transpilers = ["go", "go-valid", "go-http"]
-out         = "gen/app"

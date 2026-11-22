@@ -1,0 +1,4 @@
+HTTP-10	app.Twice	入力の model app.Twice が、本文の全体の形を二つ以上持つ（フィールド first、second。一つの場所に、高々一つ）
+HTTP-10	app.Mixed	入力の model app.Mixed が、ヘッダに、全体の形（フィールド meta）と項目の形（フィールド trace）の両方を持つ（同じ場所には、一緒に書けない）
+HTTP-10	app.Mixed	入力の model app.Mixed が、クエリに、全体の形（フィールド paging）と項目の形（フィールド page）の両方を持つ（同じ場所には、一緒に書けない）
+HTTP-10	app.Mixed	入力の model app.Mixed が、本文に、全体の形（フィールド item）と項目の形（フィールド note、memo）の両方を持つ（同じ場所には、一緒に書けない）

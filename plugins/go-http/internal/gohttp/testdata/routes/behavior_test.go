@@ -568,7 +568,7 @@ func TestValidate(t *testing.T) {
 	// 制約に合う入力は、op に届く
 	expectJSON(t, call(t, h, "POST", "/orders", `{"lines":[{"name":"a","quantity":1},{"name":"b","quantity":2}]}`), 200, `2`)
 	expectEmpty(t, call(t, h, "POST", "/edit", `{"item":{"name":"a","quantity":1}}`))
-	// @http.default の値（page は 1）は、制約に合う（生成するときに確かめてある。GOHTTP-19）
+	// @http.default の値（page は 1）は、制約に合う（語彙のプラグインが、確かめてある。HTTP-15）
 	if leaves.edit.Page != 1 || leaves.edit.Name != nil || leaves.edit.Extra != nil || leaves.edit.Item.Name != "a" {
 		t.Errorf("入力 = %+v", leaves.edit)
 	}

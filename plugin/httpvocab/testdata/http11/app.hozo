@@ -1,0 +1,24 @@
+// HTTP-11: 位置は、そのフィールドを持つ model。
+namespace app {
+  model Item { name: string; }
+  // 全体の形で受け取る model の中のフィールド: 場所のデコレータがあっても、なくても、付けられない
+  model Paging {
+    @http.required page: string;
+    @http.query @http.default("x") q: string;
+    size: string?;
+  }
+
+  model In {
+    // 全体の形のフィールド
+    @http.bodyObj @http.required item: Item;
+    @http.queryObj paging: Paging;
+    // 項目の形なら、当たらない
+    @http.header("X-Trace") @http.required trace: string;
+    @http.header @http.default("x") lang: string;
+  }
+  @http.post("/in")
+  export fn take(in: In);
+
+  // 入力の model でも、全体の形で受け取る model でもない model のフィールドは、見ない
+  model Elsewhere { @http.required free: string; }
+}

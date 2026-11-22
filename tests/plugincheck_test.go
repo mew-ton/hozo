@@ -11,7 +11,7 @@ import (
 )
 
 // このファイルは、プラグインの診断が、hozoc build --no-emit で出ることを、本物のプラグインで確かめる（docs/cli.md「検査」の 4、
-// docs/plugin-protocol.md「起動」「emit」、docs/decisions.md「決めたこと」404、416）。
+// docs/plugin-protocol.md「語彙のプラグイン」「起動」「read」「emit」、docs/decisions.md「決めたこと」404、410、416）。
 //
 // 検査は、プラグインに emit を頼み、その答えの診断を使う。SDK が、要求の並びを回すことは、plugin の TestRunEmitBatch、hozoc が、
 // プラグインごとに一回、受け持つ出力を並べて頼むことは、internal/project の TestPluginAnswersPerOutput。ここは、その二つが、
@@ -71,11 +71,12 @@ func pluginCheckProject(t *testing.T, plugin, pkg, name string) string {
 	return root
 }
 
-// TestPluginDiagnosticsAtCheck は、通信に出せない union（GOHTTP-5。docs/plugin-go-http.md「通信の形」の「union」）が、
+// TestPluginDiagnosticsAtCheck は、トランスパイラの診断（省略可能な配列を返す経路の GOHTTP-16。docs/plugin-go-http.md「対象」）が、
 // hozoc build --no-emit で、位置と一緒に出て、0 でない終了コードで終わること。hozoc build も、同じ診断で止まり、何も書き出さない。
+// この入力は、http の語彙の検査（語彙のプラグイン http）を通る: 語彙のプラグインの後に、go-http が、頼まれている。
 func TestPluginDiagnosticsAtCheck(t *testing.T) {
-	root := pluginCheckProject(t, "go-http", "gohttp", "gohttp5")
-	want, err := os.ReadFile(filepath.Join(repoPluginsDir, "go-http", "internal", "gohttp", "testdata", "gohttp5", "expected", "errors.txt"))
+	root := pluginCheckProject(t, "go-http", "gohttp", "gohttp16")
+	want, err := os.ReadFile(filepath.Join(repoPluginsDir, "go-http", "internal", "gohttp", "testdata", "gohttp16", "expected", "errors.txt"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -88,13 +89,13 @@ func TestPluginDiagnosticsAtCheck(t *testing.T) {
 		t.Fatalf("hozoc build --no-emit の終了コード = %d（期待は 1: CheckFailed）\n%s", code, out)
 	}
 	// プラグインの単体テストが待つ診断（コード、位置の宣言、文面）が、すべて、位置（ファイル、行、列）と一緒に出る
-	located := regexp.MustCompile(`(?m)^app\.hozo:\d+:\d+: error\[GOHTTP-5\]: `)
+	located := regexp.MustCompile(`(?m)^app\.hozo:\d+:\d+: error\[GOHTTP-16\]: `)
 	if got := len(located.FindAllString(out, -1)); got != len(lines) {
-		t.Errorf("位置の付いた GOHTTP-5 が %d 件（期待は %d 件）\n%s", got, len(lines), out)
+		t.Errorf("位置の付いた GOHTTP-16 が %d 件（期待は %d 件）\n%s", got, len(lines), out)
 	}
 	for _, l := range lines {
 		f := strings.SplitN(l, "\t", 3)
-		if len(f) != 3 || !strings.Contains(out, "error[GOHTTP-5]: "+f[2]) {
+		if len(f) != 3 || !strings.Contains(out, "error[GOHTTP-16]: "+f[2]) {
 			t.Errorf("診断が出ない: %s", l)
 		}
 	}
@@ -105,7 +106,7 @@ func TestPluginDiagnosticsAtCheck(t *testing.T) {
 	// emit も、同じ診断で止まり、何も書き出さない
 	stdout.Reset()
 	stderr.Reset()
-	if code := hozocCorpus(t, root, []string{"build"}, &stdout, &stderr); code != 1 || !strings.Contains(stderr.String(), "error[GOHTTP-5]") {
+	if code := hozocCorpus(t, root, []string{"build"}, &stdout, &stderr); code != 1 || !strings.Contains(stderr.String(), "error[GOHTTP-16]") {
 		t.Errorf("hozoc build の終了コード = %d\n%s", code, stderr.String())
 	}
 	if _, err := os.Stat(filepath.Join(root, "gen")); err == nil {
@@ -128,5 +129,106 @@ func TestCheckPassesThenEmitPasses(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(root, "gen", "api", "http.go")); err != nil {
 		t.Errorf("emit が、gen/api/http.go を書き出していない: %v", err)
+	}
+}
+
+// vocabularyProject は、語彙の読み解きの単体テストの入力 plugin/httpvocab/testdata/<name>/ の .hozo を、一時ディレクトリの
+// プロジェクトに写し、hozo.toml を config の中身で置く。期待する診断（その expected/errors.txt の行）も返す。
+func vocabularyProject(t *testing.T, name, config string) (root string, lines []string) {
+	t.Helper()
+	src := filepath.Join("..", "plugin", "httpvocab", "testdata", name)
+	root = t.TempDir()
+	sources, err := filepath.Glob(filepath.Join(src, "*.hozo"))
+	if err != nil || len(sources) == 0 {
+		t.Fatalf("%s に .hozo がない（%v）", src, err)
+	}
+	for _, path := range sources {
+		data, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(root, filepath.Base(path)), data, 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := os.WriteFile(filepath.Join(root, "hozo.toml"), []byte(config), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	want, err := os.ReadFile(filepath.Join(src, "expected", "errors.txt"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	return root, strings.Split(strings.TrimSpace(string(want)), "\n")
+}
+
+// wantVocabularyDiagnostics は、hozoc の出力 out に、期待する診断 lines（コード、位置の宣言、文面）が、どれも、位置（ファイル、行、列）と
+// 一緒に、一度ずつ出ていて、数が合うことを確かめる。
+func wantVocabularyDiagnostics(t *testing.T, out string, lines []string) {
+	t.Helper()
+	located := regexp.MustCompile(`(?m)^app\.hozo:\d+:\d+: error\[HTTP-5\]: `)
+	if got := len(located.FindAllString(out, -1)); got != len(lines) {
+		t.Errorf("位置の付いた HTTP-5 が %d 件（期待は %d 件）\n%s", got, len(lines), out)
+	}
+	for _, l := range lines {
+		f := strings.SplitN(l, "\t", 3)
+		if len(f) != 3 || strings.Count(out, "error[HTTP-5]: "+f[2]) != 1 {
+			t.Errorf("診断が、ちょうど一度、出ていない: %s", l)
+		}
+	}
+	if !strings.Contains(out, fmt.Sprintf("%d errors, 0 warnings", len(lines))) {
+		t.Errorf("数が合わない（期待は %d errors）\n%s", len(lines), out)
+	}
+}
+
+// TestVocabularyDiagnosticsWithoutUnits は、語彙のプラグインが、出力の単位がなくても、働くこと（docs/plugin-protocol.md
+// 「語彙のプラグイン」、docs/decisions.md「決めたこと」410）: 単位を一つも持たない設定の仕様が、通信に出せない union を、経路に
+// 使っていれば（HTTP-5。docs/plugin-http.md「通信の形」の「union」）、hozoc build --no-emit が、本物の語彙のプラグイン http の診断を、
+// 位置と一緒に出して、0 でない終了コードで終わる。
+func TestVocabularyDiagnosticsWithoutUnits(t *testing.T) {
+	root, lines := vocabularyProject(t, "http5", "# 単位は、一つもない\n[hozo]\nsources = [\"*.hozo\"]\n")
+	var stdout, stderr bytes.Buffer
+	code := hozocCorpus(t, root, []string{"build", "--no-emit"}, &stdout, &stderr)
+	if code != 1 {
+		t.Fatalf("hozoc build --no-emit の終了コード = %d（期待は 1: CheckFailed）\n%s", code, stderr.String())
+	}
+	wantVocabularyDiagnostics(t, stderr.String(), lines)
+
+	// http の語彙を、正しく使っている仕様（plugin/httpvocab の入力 namespaces）は、単位がなくても、通る
+	root, _ = vocabularyProject(t, "http5", "[hozo]\nsources = [\"*.hozo\"]\n")
+	ok, err := os.ReadFile(filepath.Join("..", "plugin", "httpvocab", "testdata", "namespaces", "app.hozo"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "app.hozo"), ok, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	stdout.Reset()
+	stderr.Reset()
+	if code := hozocCorpus(t, root, []string{"build", "--no-emit"}, &stdout, &stderr); code != 0 || !strings.HasPrefix(stdout.String(), "0 errors") {
+		t.Errorf("正しい仕様の hozoc build --no-emit の終了コード = %d\n%s%s", code, stdout.String(), stderr.String())
+	}
+}
+
+// TestVocabularyDiagnosticsBeforeEmit は、同じ仕様に、go-http の単位を足しても、語彙の使い方の診断（HTTP-5）が、一度だけ出ること
+// （docs/plugin-protocol.md「語彙のプラグイン」: 語彙のプラグインが error を返したら、emit は、頼まない。go-http は、同じ診断を、
+// 自分では返さない）。hozoc build も、同じ診断で止まり、何も書き出さない。
+func TestVocabularyDiagnosticsBeforeEmit(t *testing.T) {
+	config := "[options.go]\nmodule = \"example.com/app\"\n\n[[emit]]\nnamespace = \"app\"\ntranspilers = [\"go\", \"go-valid\", \"go-http\"]\nout = \"gen/app\"\n"
+	root, lines := vocabularyProject(t, "http5", config)
+	var stdout, stderr bytes.Buffer
+	if code := hozocCorpus(t, root, []string{"build", "--no-emit"}, &stdout, &stderr); code != 1 {
+		t.Fatalf("hozoc build --no-emit の終了コード = %d（期待は 1: CheckFailed）\n%s", code, stderr.String())
+	}
+	wantVocabularyDiagnostics(t, stderr.String(), lines)
+	if strings.Contains(stderr.String(), "GOHTTP-") {
+		t.Errorf("語彙の使い方の誤りが、go-http の診断としても出た\n%s", stderr.String())
+	}
+	stdout.Reset()
+	stderr.Reset()
+	if code := hozocCorpus(t, root, []string{"build"}, &stdout, &stderr); code != 1 || !strings.Contains(stderr.String(), "error[HTTP-5]") {
+		t.Errorf("hozoc build の終了コード = %d\n%s", code, stderr.String())
+	}
+	if _, err := os.Stat(filepath.Join(root, "gen")); err == nil {
+		t.Error("診断があるのに、build が、ファイルを書き出した")
 	}
 }

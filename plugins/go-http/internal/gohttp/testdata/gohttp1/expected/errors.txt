@@ -1,2 +1,0 @@
-GOHTTP-1	app.hidden	op app.hidden に @http.get が付いているが、export がない（ハンドラは、入口の Ops のメソッドとして op を呼ぶ。経路を黙って飛ばすことはしない）
-GOHTTP-1	app.also	op app.also に @http.post が付いているが、export がない（ハンドラは、入口の Ops のメソッドとして op を呼ぶ。経路を黙って飛ばすことはしない）

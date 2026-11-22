@@ -7,22 +7,22 @@
 namespace carriergw {
   /** 見積もりの依頼 */
   model RateRequest {
-    carriers: carrier.CarrierCode[];
-    size: type.Dimensions;
-    weight: type.Grams;
-    origin: type.Address;
-    destination: type.Address;
+    @http.body carriers: carrier.CarrierCode[];
+    @http.body size: type.Dimensions;
+    @http.body weight: type.Grams;
+    @http.body origin: type.Address;
+    @http.body destination: type.Address;
   }
 
   /** 送り状の依頼 */
   model LabelRequest {
-    carrier: carrier.CarrierCode;
-    account: string;
-    service: carrier.ServiceCode;
-    size: type.Dimensions;
-    weight: type.Grams;
-    origin: type.Address;
-    destination: type.Address;
+    @http.body carrier: carrier.CarrierCode;
+    @http.body account: string;
+    @http.body service: carrier.ServiceCode;
+    @http.body size: type.Dimensions;
+    @http.body weight: type.Grams;
+    @http.body origin: type.Address;
+    @http.body destination: type.Address;
   }
 
   /** 買った送り状 */

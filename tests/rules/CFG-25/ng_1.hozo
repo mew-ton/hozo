@@ -1,0 +1,4 @@
+// CFG-25（docs/plugin-protocol.md「語彙のプラグイン」）: トランスパイラが要る語彙のプラグインが、入っていない（ng_1.toml）
+namespace a {
+  fn f();
+}

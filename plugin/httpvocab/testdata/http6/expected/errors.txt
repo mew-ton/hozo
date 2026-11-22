@@ -1,0 +1,3 @@
+HTTP-6	app.fetch	@http.get の op app.fetch の入力 app.In が、本文のデコレータ（@http.body、@http.bodyObj）のフィールドを持つ（GET の要求は、本文を持たない）
+HTTP-6	app.both	@http.get の op app.both の入力 app.In が、本文のデコレータ（@http.body、@http.bodyObj）のフィールドを持つ（GET の要求は、本文を持たない）
+HTTP-6	app.whole	@http.get の op app.whole の入力 app.WholeIn が、本文のデコレータ（@http.body、@http.bodyObj）のフィールドを持つ（GET の要求は、本文を持たない）

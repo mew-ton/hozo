@@ -6,6 +6,8 @@
 
 **プラグイン**は入れるもの。マニフェストと、本体（WASM のファイル）と、あれば語彙を一つのディレクトリに持つ。**トランスパイラ**は、プラグインが提供する名前の付いた変換で、`hozo.toml` の単位が `transpilers` に名前を書いて選ぶ（`docs/config.md`「単位」）。二つの言葉の定義の持ち主はこの段落で、ほかの文書も同じ意味で使う: 起動される実行ファイルと、マニフェスト、語彙、起動の話は「プラグイン」、設定が選ぶもの、ファイルを出すもの、実装を出すものの話は「トランスパイラ」。
 
+**語彙のプラグイン**は、トランスパイラとは別の役割: ある語彙の、言語に依らない決まりを確かめ、診断だけを返す。定義の持ち主は「語彙のプラグイン」。
+
 **hozoc 本体は、コードを出力しない。** 書き出すファイルは、どれも、どれかのトランスパイラが `emit` の応答で返したもの。本体は特定の言語を知らず、型や op の形を決めるのは、言語ごとの基底のトランスパイラ（`docs/config.md`「基底と相乗り」）。本体がトランスパイラの選択を集めて形を決める仕組み（`select`）は持たない（「選択をなくしたこと」）。
 
 ## マニフェスト `hozo-plugin.toml`
@@ -13,7 +15,7 @@
 ```toml
 name     = "go-http"            # プラグインの名前
 wasm     = "plugin.wasm"        # プラグインの本体（WASM）。マニフェストのディレクトリからの相対パス
-protocol = "0.22"               # 対応する docs/ir.md の version
+protocol = "0.23"               # 対応する docs/ir.md の version
 
 vocabulary = []                 # このプラグインが提供する語彙。マニフェストからの相対パス。省略時は []
 
@@ -23,6 +25,10 @@ language    = "go"              # 出力する言語。必須。空でない文�
 requires    = ["go", "go-valid"]   # このトランスパイラが、出力の形を前提にするトランスパイラの名前。省略時は []（基底）
 unsupported = []                # 意味を保てない記法（デコレータの FQN）。使われていれば CFG-6。省略時は []
 seams       = []                # 継ぎ目を要るデコレータの FQN（docs/config.md「継ぎ目」）。例: ["rate.limited"]。省略時は []
+requires_vocabulary = ["http"]  # このトランスパイラが、語彙のプラグインを要る語彙の名前空間。省略時は []
+
+[read]                          # 語彙のプラグインが書く（「語彙のプラグイン」）。テーブルごと省けば、語彙のプラグインではない
+namespaces = ["rate"]           # 読み解く語彙の名前空間の FQN。一つ以上
 
 [import]
 formats = []                    # 取り込める形式の名前。空なら import を持たない。テーブルごと省けば []
@@ -48,11 +54,17 @@ enabled = false                 # true なら hozoc tests で direction "coverag
   - 書くのは、汎用のデコレータの FQN（名前付きデコレータの FQN は、どの適用にも当たらない）。その FQN のデコレータが宣言されているか、付けられる対象に op があるかは、確かめない。
   - 文字列の配列でない、空の文字列がある、同じ FQN を二度書く、は MAN-4。同じ単位の別のトランスパイラと重なるのは CFG-23（単位に書いたときに分かる）。
   - 基底（`requires` が空）も書ける。オプションによらない。
+- **`requires_vocabulary`** は、このトランスパイラが、語彙のプラグインの検査を前提にする、語彙の名前空間の一覧（単位に掛かる規則の持ち主は「語彙のプラグイン」: 書いた名前空間を読み解く語彙のプラグインが、入っていなければ CFG-25）。
+  - 書くのは、このトランスパイラが、使い方の検査を、自分では返さない語彙（`go-http` の `http`）。
+  - 文字列の配列でない、空の文字列がある、同じ名前を二度書く、は MAN-4。
+- **`[read]`** を書いたプラグインが、語彙のプラグイン。`namespaces` は、読み解く語彙の名前空間の FQN の一覧で、一つ以上、要る。
+  - `namespaces` がない、空の配列、文字列の配列でない、空の文字列がある、同じ名前を二度書く、は MAN-4。
+  - その名前空間が、宣言されているかは、確かめない（使われていなければ、頼まれないだけ）。
 - `language` は、出力する言語の名前。中身は基底が決める（`"go"`、`"ts"`）。hozoc は、単位の中でそろっていること（CFG-16）だけを確かめ、名前の一覧を持たない。空の文字列は MAN-4。
 - 言語を持つのはトランスパイラで、プラグインは持たない（一つのプラグインが言語の違うトランスパイラを提供してよい）。単位の言語の決め方は `docs/config.md`「基底と相乗り」。
 - トランスパイラが受け取るオプション（`docs/config.md`「オプション」）は、マニフェストには書かない。キーと値の型を確かめるのはトランスパイラ自身で、一覧はそのプラグインの文書が持つ。
 - `protocol` が hozoc の `docs/ir.md` の `version` と違えば MAN-2（省いたときも、違うものとして MAN-2）。
-- 省いたときの値: `vocabulary` は `[]`、`[[transpiler]]` はなし、`requires` と `unsupported` と `seams` は `[]`、`[import]` は `formats = []`（`import` を持たない）、`[coverage]` は `enabled = false`（`coverage` を呼ばない）。`name` と `wasm` は省けない（MAN-4）。
+- 省いたときの値: `vocabulary` は `[]`、`[[transpiler]]` はなし、`requires` と `unsupported` と `seams` と `requires_vocabulary` は `[]`、`[read]` はなし（語彙のプラグインではない）、`[import]` は `formats = []`（`import` を持たない）、`[coverage]` は `enabled = false`（`coverage` を呼ばない）。`name` と `wasm` は省けない（MAN-4）。
 - 前にあった `[check]`（検査のための頼みごと direction `check` を、呼ぶか）は、なくした（`docs/decisions.md`「決めたこと」416。「検査のための頼みごとを、なくしたこと」）。書けば、知らないキーで MAN-4。
 - `vocabulary` の `.hozo` の読み込みは `docs/vocab.md`「読み込み」。
 
@@ -66,9 +78,34 @@ enabled = false                 # true なら hozoc tests で direction "coverag
 
 - 2 と 3 はプロジェクトの外の場所で、探索（`internal/plugin`）と解析（`internal/project`）は自分ではプロセスの環境を読まない。`hozoc` が、環境変数を `cli.hozo` の入力 `pluginPath` として（`docs/cli.md`「cli.hozo」）、ホームディレクトリを `cmd/hozoc` から受け取って渡す。渡されなければ 1 だけを探す。同じ入力から同じ結果にするためで、テストは実行する人の環境に入っているプラグインに左右されない（`docs/testing.md`「環境からの独立」）。
 - 単位の `transpilers` の名前 t（`docs/config.md`「単位」）からトランスパイラを探す手続きの持ち主はここ: 入っているすべてのプラグインのマニフェストの `[[transpiler]]` の `name` から探す。どのプラグインにもなければ CFG-14。二つ以上のプラグインにあれば CFG-15（以降の処理は、上の順で最初のプラグインのものを使う）。
-- **使うプラグイン**は、どれかの単位の `transpilers` に書かれたトランスパイラを提供するプラグイン（依存していても、書かれていなければ使うプラグインではない。足りない依存は CFG-19）。語彙を読むのも（`docs/vocab.md`「読み込み」）、起動するのも（「起動」）、使うプラグインだけ。入っているだけのプラグインは、名前を探す相手になる以外は何もしない。
+- **使うプラグイン**は、どれかの単位の `transpilers` に書かれたトランスパイラを提供するプラグイン（依存していても、書かれていなければ使うプラグインではない。足りない依存は CFG-19）。語彙を読むのも（`docs/vocab.md`「読み込み」）、起動するのも（「起動」）、使うプラグインだけ。入っているだけのプラグインは、名前を探す相手になる以外は何もしない。語彙のプラグインを、いつ起動するかは、単位に依らない別の決まり（「語彙のプラグイン」）。
 - マニフェストは入っているプラグインのすべてについて読む（トランスパイラの名前を知るため）。読めないマニフェスト（MAN-4）と、`name` がディレクトリの名前 p と違うマニフェスト（MAN-3）は、使っていなくても報告する。`protocol` の不一致（MAN-2）は、使うプラグインにだけ報告する（ホームに入れた古いプラグインが、それを使わないプロジェクトを止めないようにするため）。
 - 設定なし（`docs/config.md`「置き場と探し方」）のときは探索しない（選ぶ単位がない）。
+
+## 語彙のプラグイン
+
+`docs/decisions.md`「決めたこと」410、416、428。**語彙のプラグイン**は、ある語彙の、言語に依らない決まりを確かめるプラグイン: マニフェストに `[read]` を持つ（「マニフェスト `hozo-plugin.toml`」）。頼みごとは一つで、`read`（「read」）: 仕様を受け取り、診断を返す。今あるのは `http`（`docs/plugin-http.md`）。
+
+| | 語彙のプラグイン | トランスパイラを提供するプラグイン |
+|---|---|---|
+| マニフェスト | `[read]` | `[[transpiler]]` |
+| 選ぶのは | 仕様（その語彙のデコレータが、付いているか） | 設定（単位の `transpilers`） |
+| 頼みごと | `read` | `emit` |
+| 受け取るもの | 仕様 | 仕様と、受け持つ出力 |
+| 返すもの | 診断 | 診断と、ファイル |
+
+- **頼むのは、仕様が、その語彙を使っているとき。** 相手は、入っているプラグイン（「探索」）のうち、`[read]` の `namespaces` のどれかの名前空間のデコレータが、仕様のどこか（宣言、model のフィールド、分類のケース）に、一つでも付いているもの。出力の単位は、見ない: 単位が一つもない設定でも、頼む。
+  - デコレータの名前空間は、適用の、汎用のデコレータの FQN（名前付きデコレータを通した適用は、展開した先。`docs/ir.md`「デコレータの適用」の `decorator`）から、最後の名前を除いたもの。
+- **一度の実行で、プラグインごとに、多くて一回、起動する。** 順は、プラグインの名前の辞書順で、どの `emit` よりも先。
+- **起動するのは、仕様と設定の検査（`docs/cli.md`「検査」の 1〜3）に、error がないときだけ。** `emit` と同じ理由（「起動」）: 語彙のプラグインも、検査を通った仕様を前提にする。
+- **語彙のプラグインが error を返したら、`emit` は、頼まない。** トランスパイラは、語彙の決まりを通った仕様を前提にし、その語彙の使い方の診断を、自分では返さない（`docs/plugin-go-http.md`「診断」）。
+- **`protocol` の合わない語彙のプラグイン（MAN-2）は、頼むときにだけ、報告する。** その語彙を使っていないプロジェクトを、止めない（「探索」の、使うプラグインと同じ理由）。
+- **トランスパイラは、要る語彙のプラグインを、マニフェストの `requires_vocabulary` で言う。** 単位の `transpilers` に書いたトランスパイラが、そこに書いた名前空間を、`[read]` の `namespaces` に持つプラグインが、一つも入っていなければ CFG-25（`docs/config.md`「診断」）。確かめるのは、入っているかだけで、仕様が、その語彙を使っているかには、よらない。
+- **同梱の語彙（`vocab/*.hozo`）の宣言は、hozoc が持ち、その決まりは、語彙のプラグインが持つ。** 宣言は、プラグインが入っていなくても、読める（`docs/vocab.md`「読み込み」）。語彙のプラグインは、hozoc に組み込まず、ほかのプラグインと同じに、探索で見つける。
+- **語彙のプラグインが入っていなければ、その語彙の決まりは、確かめない。** 知らせもしない（`requires_vocabulary` に書いたトランスパイラが、単位にあるときの CFG-25 のほかは）。
+- 設定なしのときは、探索しないので（「探索」）、語彙のプラグインにも、頼まない。
+- 一つのマニフェストに、`[read]` と `[[transpiler]]` の両方を書いてよい（頼みごとは、別々に届く）。
+- 語彙のプラグインが、自分の語彙の宣言（マニフェストの `vocabulary`）を配る形は、決めていない（`docs/open.md`「語彙とプラグイン」）: 今、`vocabulary` を読むのは、使うプラグインだけ（`docs/vocab.md`「読み込み」）。
 
 ## 起動
 
@@ -110,6 +147,7 @@ enabled = false                 # true なら hozoc tests で direction "coverag
   - **起動するのは、仕様と設定の検査（`docs/cli.md`「検査」の 1〜3）に、error がないときだけ。** error があれば、`View` は、検査を通っていない仕様のもので、トランスパイラは、それを前提にしていない。先の error を直してから、プラグインの診断が出る。
   - **検査だけの実行（`hozoc build --no-emit`、言語サーバー）も、書き出す実行（`hozoc build`、`hozoc tests`）も、同じ頼みごとを使う**（同 416）: 検査は、応答の診断（`errors`、`warnings`）だけを使い、ファイルを書かない。書き出すときは、同じ応答のファイルを書く。hozoc は、一度の実行で、同じプラグインに、同じことを、二度、頼まない。
 - **答えは、出力ごとに独立。** どのトランスパイラも、一つの出力の答えを、仕様と、その出力の `View` だけから作り、同じ要求のほかの出力にも、ほかのトランスパイラの応答（ファイル、warning）にも、依らない。相乗りは、基底の応答を見ずに、基底と同じファイルの置き場と名前を自分で求める（「相乗りが基底の形を知る方法」）。出力の並びと、`transpilers` に書いた順は、起動の順と診断の並びにだけ効き、書き出すファイルを変えない。
+- `read` の相手と、順は「語彙のプラグイン」。語彙のプラグインが error を返した実行では、`emit` を、頼まない。
 - `coverage` は、`hozoc tests` が、プラグインごとに、多くて一回起動する。相手と、渡すものは「coverage」。
 - 並列には起動しない（診断の順序を決定的にするため）。
 - 常駐（起こしたままにして、何度も頼む）は、しない: 「起こして、一つ頼んで、終わる」まま（同 411。エディタで要ると分かったときに、足す）。
@@ -119,6 +157,7 @@ enabled = false                 # true なら hozoc tests で direction "coverag
 | 動かし方 | 時間 |
 |---|---|
 | WASM。機械の言葉に直したものを、覚えた後 | 3.7 秒 |
+| WASM。語彙のプラグイン `http` を足した後（七つのプラグイン。同じ機械で、足す前は 3.8 秒） | 4.3 秒 |
 | WASM。はじめての実行（六つの WASM を、機械の言葉に直す。4 コア） | 8.3 秒 |
 | WASM。途中で止められる形（言語サーバーの中で、二度目から） | 13.7 秒 |
 | （前の形）子プロセス。ビルドした実行ファイル。プラグインごとに一回 | 0.38 秒 |
@@ -171,8 +210,8 @@ enabled = false                 # true なら hozoc tests で direction "coverag
 終了コード 0 の標準出力は、JSON の値一つで、下の各 direction の応答の形をしていなければならない。hozoc は次を確かめ、違えば `proc.MalformedOutput`（「起動」）。
 
 - 応答は JSON のオブジェクト。
-- **必須の項目**がある。`null` は「ない」と同じに扱う。`emit` の応答の `outputs`、その要素の `results`、その要素（トランスパイラ一つの答え）の `files` と `warnings`、`coverage` の応答の `recognized` と `files`（配列は、どれも、空でも `[]` で出す）。要素では、`files` の要素の `path` と `content`、`warnings` の要素の `message`、`errors` の要素の `code` と `message`、`coverage` の応答の `files` の要素の `path` と `lines`。
-- **省ける項目**は、なくても `null` でもよい。トランスパイラ一つの答えの `errors`、`warnings` / `errors` の要素の `at`（省けば位置なし）。`errors` の要素の `severity` は見ない（常に error）。
+- **必須の項目**がある。`null` は「ない」と同じに扱う。`emit` の応答の `outputs`、その要素の `results`、その要素（トランスパイラ一つの答え）の `files` と `warnings`、`read` の応答の `errors` と `warnings`、`coverage` の応答の `recognized` と `files`（配列は、どれも、空でも `[]` で出す）。要素では、`files` の要素の `path` と `content`、`warnings` の要素の `message`、`errors` の要素の `code` と `message`、`coverage` の応答の `files` の要素の `path` と `lines`。
+- **省ける項目**は、なくても `null` でもよい。`emit` の、トランスパイラ一つの答えの `errors`、`warnings` / `errors` の要素の `at`（省けば位置なし）。`errors` の要素の `severity` は見ない（常に error）。
 - 書かれた項目の**型**が合う: 上の配列は配列、その要素はオブジェクト、`path` / `content` / `message` / `code` / `at` は文字列。`coverage` の応答の `recognized` は真偽値、`lines` は、1 以上の整数二つの配列（始まりの行、終わりの行。始まり ≦ 終わり）の配列。
 - **知らない項目は無視する**。応答のどの階層でも、ここにない名前の項目があってよい（プラグインが新しい版の項目を書いていても、古い hozoc はそれを読まないだけ。版 0.3 までの `select` を書いたままの応答も、読まれないだけで通る）。項目の名前は大文字と小文字を区別する。
 
@@ -180,13 +219,36 @@ enabled = false                 # true なら hozoc tests で direction "coverag
 
 形が合った後に、ファイルを集める実行（`hozoc build`、`hozoc tests`）は、`path`（PLG-1 / PLG-2）と、テストの対応表（PLG-4）を確かめる。`hozoc build --no-emit` も、書かないだけで、集めて、確かめる（`docs/cli.md`「build」）。言語サーバーは、`files` を使わないので、確かめない。`import` の応答の形は、段階 6 で `hozoc import` と一緒に決める。
 
+### read
+
+語彙のプラグインへの、ただ一つの頼みごと（「語彙のプラグイン」）。
+
+```jsonc
+// 要求
+{ "protocol": "0.23", "direction": "read",
+  "spec": {                               // 仕様: emit の spec と同じ形（docs/ir.md「まとめた形」の Spec）
+    "version": "0.23",
+    "namespaces": { /* 名前空間の FQN → その名前空間を出力する単位ごとの設定。単位がなければ {} */ },
+    "program": { /* docs/ir.md の Program */ } } }
+
+// 応答
+{ "errors":   [ { "code": "HTTP-5", "at": "server.login", "message": "..." } ],
+  "warnings": [ { "at": "server.login", "message": "..." } ] }
+```
+
+- **`spec` は、`emit` の要求の `spec` と、同じもの**（同じ実行の中で、同じ中身）。出力ごとの部分（`outputs`）は、ない: 語彙のプラグインは、単位に依らない決まりだけを、確かめる。
+- `errors` と `warnings` の要素は、`emit` の応答のものと、同じ形で、同じに扱う（「emit」: `at` の読み方、`errors` は error の診断で `CheckFailed`、同じ診断は、一度だけ）。`code` は、語彙のプラグインが決め、言語の名前を付けない（HTTP-*。`docs/plugin-http.md`「診断」）。
+- `warnings` は warning の診断（コード `PLUGIN`、メッセージの先頭にプラグインの名前）。
+- ファイルは、返せない（`files` を書いても、読まれない）。
+- 応答は、同じ要求から同じバイト列でなければならない（「emit」と同じ）。
+
 ### emit
 
 ```jsonc
 // 要求
-{ "protocol": "0.22", "direction": "emit",
+{ "protocol": "0.23", "direction": "emit",
   "spec": {                               // 仕様: 出力に依らない部分（docs/ir.md「まとめた形」の Spec）。一度だけ
-    "version": "0.22",
+    "version": "0.23",
     "namespaces": { /* 名前空間の FQN → その名前空間を出力する単位ごとの設定 */ },
     "program": { /* docs/ir.md の Program */ } },
   "outputs": [                            // このプラグインが受け持つ出力（「起動」）。単位の設定の順、名前空間の IR の順
@@ -199,7 +261,7 @@ enabled = false                 # true なら hozoc tests で direction "coverag
     { "results": [                        // その出力の transpilers と、同じ数、同じ順。トランスパイラ一つの答え
         { "files": [ { "path": "gen/server/validate.go", "content": "..." } ],   // path はプロジェクトのルートからの相対パスで、その出力の config.dir（Dir(U, N)）の下
           "warnings": [ { "at": "server.login", "message": "..." } ],            // at は FQN か、"file:line:col" の文字列
-          "errors":   [ { "code": "GOHTTP-1", "at": "server.login", "message": "..." } ] },   // 省略可。一つでもあれば書き出さない
+          "errors":   [ { "code": "GOHTTP-16", "at": "server.login", "message": "..." } ] },   // 省略可。一つでもあれば書き出さない
         { "files": [], "warnings": [] } ] }
   ] }
 ```
@@ -221,7 +283,7 @@ enabled = false                 # true なら hozoc tests で direction "coverag
 
 ```jsonc
 // 要求
-{ "protocol": "0.22", "direction": "coverage",
+{ "protocol": "0.23", "direction": "coverage",
   "coverage": { "path": "/home/me/shop/cover.out", "content": "mode: set\n..." },   // hozoc tests に渡された、カバレッジのファイル
   "files": [ "gen/server/servertest/http.go", "gen/server/servertest/leaves.go" ],  // 実行された行を知りたいファイル
   "outputs": [ { "index": 5, "base": "go", "dir": "gen/server", "options": { "go": { "module": "example.com/shop-server" } }, /* … */ } ] } // files を出した出力の設定
@@ -245,7 +307,7 @@ enabled = false                 # true なら hozoc tests で direction "coverag
 ### import
 
 ```jsonc
-{ "protocol": "0.22", "direction": "import", "format": "openapi", "files": [ { "path": "openapi.yaml", "content": "..." } ] }
+{ "protocol": "0.23", "direction": "import", "format": "openapi", "files": [ { "path": "openapi.yaml", "content": "..." } ] }
 
 { "ir": { /* docs/ir.md の Program */ }, "warnings": [ /* 同上 */ ] }
 ```
@@ -322,13 +384,13 @@ enabled = false                 # true なら hozoc tests で direction "coverag
 |---|---|---|
 | MAN-2 | error | `protocol` が合わない（マニフェストの `protocol` が違う。または起動したプラグインが `code: "protocol"` で断った） |
 | MAN-3 | error | マニフェストの `name` がディレクトリ名と違う |
-| MAN-4 | error | マニフェストを読めない: ファイルを開けない、TOML の構文の誤り、値の型違い、知らないキー、`name` がない、`wasm` がない・空・文字列でない・相対パスでない・ディレクトリの外に出る、`[[transpiler]]` に `name` か `language` がない、`language` が空、`requires` に自分の名前か同じ名前が二度ある、`seams` に空の文字列か同じ FQN が二度ある、同じ名前の `[[transpiler]]` が二つある。使うプラグインの `vocabulary` のファイルを読めないときも MAN-4 |
-| MAN-5 | error | プラグインがその `direction` か、頼まれたトランスパイラを実装していない（マニフェストに書いてあるのに。起動したプラグインが `code: "unsupported"` で断った） |
+| MAN-4 | error | マニフェストを読めない: ファイルを開けない、TOML の構文の誤り、値の型違い、知らないキー、`name` がない、`wasm` がない・空・文字列でない・相対パスでない・ディレクトリの外に出る、`[[transpiler]]` に `name` か `language` がない、`language` が空、`requires` に自分の名前か同じ名前が二度ある、`seams` に空の文字列か同じ FQN が二度ある、`requires_vocabulary` に空の文字列か同じ名前が二度ある、同じ名前の `[[transpiler]]` が二つある、`[read]` の `namespaces` がない・空・空の文字列がある・同じ名前が二度ある。使うプラグインの `vocabulary` のファイルを読めないときも MAN-4 |
+| MAN-5 | error | プラグインがその `direction`（`[read]` を書いたプラグインの `read` を含む）か、頼まれたトランスパイラを実装していない（マニフェストに書いてあるのに。起動したプラグインが `code: "unsupported"` で断った） |
 | MAN-6 | error | マニフェストに `command` がある（子プロセスで起動するコマンド。なくした書き方: 「マニフェスト」の `wasm`）。メッセージは、`wasm` に、WASM のファイルの場所を書くことを、示す。使っていないプラグインにも、報告する（MAN-4 と同じ） |
 | PLG-1 | — | 応答の `files` の `path` が、その出力の Dir(U, N) の下にない（「emit」） |
 | PLG-2 | — | トランスパイラ一つの答えの中で同じ `path` が二度 |
 | PLG-4 | — | 応答の `files` の、テストの対応表の、名前か中身が、約束の形でない（「テストの対応表」） |
-| PLUGIN | warning | トランスパイラの `warnings` |
+| PLUGIN | warning | トランスパイラの `warnings`（「emit」）と、語彙のプラグインの `warnings`（「read」） |
 
 - MAN-1 は欠番。マニフェストの `[emit]` の `entry` も `decorate` も空であることを報告していた規則で、`[emit]` を `[[transpiler]]` に替えたときになくなった。
 - PLG-3 は欠番。応答の `select` が、対象の名前空間にない宣言、種類の違う宣言、単位の対象でない宣言、付いていないデコレータを指していることを報告していた規則で、`select` をなくした（「選択をなくしたこと」）ときになくなった。

@@ -21,7 +21,7 @@ import (
 	"github.com/mew-ton/hozo/ir"
 )
 
-// Handler はプラグインが実装する三つの方向（direction）。
+// Handler は、トランスパイラを提供するプラグインが実装する三つの方向（direction）。語彙のプラグインの方向は [Reader]。
 // 実装しない方向と、Emit で知らないトランスパイラ（EmitRequest.Transpiler）は ErrUnsupported を返す。Main はそれを
 // docs/plugin-protocol.md「起動」の code "unsupported"（終了コード 2）にする。
 //
@@ -33,6 +33,41 @@ type Handler interface {
 	Import(req *ImportRequest) (*ImportResponse, error)
 	Coverage(req *CoverageRequest) (*CoverageResponse, error)
 }
+
+// Reader は、語彙のプラグイン（docs/plugin-protocol.md「語彙のプラグイン」）が実装する、ただ一つの方向（direction "read"）:
+// 仕様を受け取り、その語彙の、言語に依らない決まりの診断を返す。[Run] は、渡された [Handler] が、Reader も満たしていれば、
+// direction "read" で、これを呼ぶ（満たしていなければ、code "unsupported"）。read だけのプラグインは、[ReadOnly] で Handler にする。
+type Reader interface {
+	Read(req *ReadRequest) (*ReadResponse, error)
+}
+
+// ReadRequest は direction "read" の要求（docs/plugin-protocol.md「read」）: 仕様（emit の要求の spec と同じ形）だけ。
+// hozoc が、要求を作るのにも使う。
+type ReadRequest struct {
+	Protocol  string   `json:"protocol"`
+	Direction string   `json:"direction"`
+	Spec      *ir.Spec `json:"spec"`
+}
+
+// NewReadRequest は、仕様 spec を読み解かせる、direction "read" の要求。
+func NewReadRequest(spec *ir.Spec) *ReadRequest {
+	return &ReadRequest{Protocol: ir.Version, Direction: "read", Spec: spec}
+}
+
+// ReadResponse は direction "read" の応答: error の診断と、warning。どちらも、空でも [] で出る（[Run] が、nil を [] にする）。
+type ReadResponse struct {
+	Errors   []Diagnostic `json:"errors"`
+	Warnings []Warning    `json:"warnings"`
+}
+
+// ReadOnly は、read だけを実装するプラグイン（語彙のプラグイン）の [Handler]: emit、import、coverage は [ErrUnsupported]。
+func ReadOnly(r Reader) Handler { return readOnly{r} }
+
+type readOnly struct{ Reader }
+
+func (readOnly) Emit(*EmitRequest) (*EmitResponse, error)             { return nil, ErrUnsupported }
+func (readOnly) Import(*ImportRequest) (*ImportResponse, error)       { return nil, ErrUnsupported }
+func (readOnly) Coverage(*CoverageRequest) (*CoverageResponse, error) { return nil, ErrUnsupported }
 
 // ErrUnsupported は、Handler がその direction か、要求のトランスパイラを実装していないときに返す誤り。
 // errors.Is で比べるので、包んで返してもよい。
@@ -327,6 +362,33 @@ func Run(h Handler, in io.Reader, out, errOut io.Writer) int {
 			return handlerError(out, errOut, head.Direction, err)
 		}
 		resp = r
+	case "read":
+		reader, ok := h.(Reader)
+		if !ok {
+			return refuse(out, errOut, "unsupported", fmt.Sprintf("direction %q is not supported", head.Direction))
+		}
+		var req ReadRequest
+		if err := json.Unmarshal(raw, &req); err != nil {
+			return fail(errOut, fmt.Errorf("decode read request: %w", err))
+		}
+		if req.Spec == nil {
+			return fail(errOut, errors.New("read: request has no spec"))
+		}
+		r, err := reader.Read(&req)
+		if err != nil {
+			return handlerError(out, errOut, head.Direction, err)
+		}
+		if r == nil {
+			r = &ReadResponse{}
+		}
+		one := *r
+		if one.Errors == nil {
+			one.Errors = []Diagnostic{}
+		}
+		if one.Warnings == nil {
+			one.Warnings = []Warning{}
+		}
+		resp = &one
 	case "import":
 		var req ImportRequest
 		if err := json.Unmarshal(raw, &req); err != nil {

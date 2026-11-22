@@ -321,9 +321,9 @@ func TestSession(t *testing.T) {
 	if hov == nil || !strings.Contains(hov.Contents.Value, "classify WarrantyKind of server.Item\n  Yamada") || !strings.Contains(hov.Contents.Value, "ヤマダ電機の専用保証プラン") {
 		t.Errorf("hover(case Yamada) = %+v", hov)
 	}
-	c.result(protocol.MethodHover, protocol.TextDocumentPositionParams{TextDocument: textDoc(serverURI), Position: positionOf(t, enc, serverText, "email 再設定", 0)}, &hov)
-	if hov == nil || !strings.Contains(hov.Contents.Value, "fn requestPasswordReset(email: Email)\n  email: Email") || !strings.Contains(hov.Contents.Value, "再設定するアカウントのメールアドレス") {
-		t.Errorf("hover(@param email) = %+v", hov)
+	c.result(protocol.MethodHover, protocol.TextDocumentPositionParams{TextDocument: textDoc(serverURI), Position: positionOf(t, enc, serverText, "in 再設定の依頼", 0)}, &hov)
+	if hov == nil || !strings.Contains(hov.Contents.Value, "fn requestPasswordReset(in: PasswordResetInput)\n  in: PasswordResetInput") || !strings.Contains(hov.Contents.Value, "再設定の依頼") {
+		t.Errorf("hover(@param in) = %+v", hov)
 	}
 	// @throws / @see の名前は宣言へ飛ぶ（docs/lsp.md「定義へジャンプ」の表）
 	c.result(protocol.MethodDefinition, protocol.TextDocumentPositionParams{TextDocument: textDoc(serverURI), Position: positionOf(t, enc, serverText, "RateLimited 同じアドレス", 0)}, &loc)

@@ -45,6 +45,10 @@ type Project struct {
 	Plugins []*hostplugin.Plugin
 	// Units は解決した単位（Config.Units と同じ順）: 言語、基底、解決できたトランスパイラ、単位の継ぎ目、in に合ったファイル。
 	Units []Unit
+	// Readers は、頼む語彙のプラグイン（docs/plugin-protocol.md「語彙のプラグイン」）: 入っているプラグインのうち、[read] の
+	// namespaces のどれかの名前空間のデコレータが、仕様のどこかに付いているもの。名前の辞書順。protocol の合わないもの（MAN-2 を
+	// 報告して、起動しない）も含む。設定なしなら空。
+	Readers []*hostplugin.Plugin
 	// Answers は、プラグインから受け取った答え（docs/cli.md「検査」の 4、docs/plugin-protocol.md「起動」）: トランスパイラ一つの、
 	// 出力一つへの答え。単位の設定の順、名前空間の IR の順、transpilers に書いた順。プラグインを起動しなかったとき
 	// （Options.NoPlugins、1〜3 に error がある、設定なし）は、空。途中で止まったとき（RunErr）は、そこまでの分。
@@ -208,6 +212,11 @@ func LoadWith(opts Options) *Project {
 		// CFG-22（docs/config.md「型の置き場」）
 		diags = append(diags, checker.CheckHomes(p.Sema.Program, p.Config, p.checkUnits())...)
 	}
+	// 頼む語彙のプラグイン（docs/plugin-protocol.md「語彙のプラグイン」）。MAN-2 は、頼むものにだけ
+	p.Readers = p.readers()
+	for _, pl := range p.Readers {
+		diags = append(diags, pl.Mismatch...)
+	}
 
 	// 4. プラグインに頼む（docs/cli.md「検査」の 4）。1〜3 に error があれば、起動しない: View は、検査を通っていない仕様のもので、
 	// トランスパイラは、それを前提にしていない（docs/plugin-protocol.md「起動」）
@@ -272,7 +281,8 @@ func (p *Project) usedPlugins() []*hostplugin.Plugin {
 // 診断は MAN-3 / MAN-4（入っているプラグインのすべて）、MAN-2（使うプラグインだけ）、CFG-14（どのプラグインも提供して
 // いない）、CFG-15（二つ以上のプラグインが提供している。以降は探した順で最初のものを使う）、CFG-16（一つの単位の
 // トランスパイラの language がそろっていない）、CFG-19（requires の名前が単位の transpilers にない）、CFG-20（基底が
-// ちょうど一つでない）、CFG-23（二つ以上のトランスパイラが同じデコレータの継ぎ目を宣言している）。
+// ちょうど一つでない）、CFG-23（二つ以上のトランスパイラが同じデコレータの継ぎ目を宣言している）、CFG-25（requires_vocabulary の
+// 名前空間を読み解く、語彙のプラグインが、入っていない）。
 func (p *Project) resolveUnits(env hostplugin.SearchEnv) []diag.Diagnostic {
 	var diags []diag.Diagnostic
 	if p.NoConfig {
@@ -359,6 +369,30 @@ func (p *Project) resolveUnits(env hostplugin.SearchEnv) []diag.Diagnostic {
 		for _, r := range missing {
 			errorf("CFG-19", "%sの %s は %s を要るが、transpilers にない（依存は、すべて transpilers に書く）",
 				cu.Label(), strings.Join(needs[r], "、"), r)
+		}
+		// CFG-25: requires_vocabulary の名前空間を読み解く、語彙のプラグインが、入っていない。単位と名前空間の組ごとに一つ
+		var absent []string
+		wants := map[string][]string{}
+		for _, t := range certain {
+			for _, ns := range t.Decl.RequiresVocabulary {
+				installed := false
+				for _, pl := range p.Plugins {
+					if pl.Manifest.Reads(ns) {
+						installed = true
+					}
+				}
+				if installed {
+					continue
+				}
+				if _, seen := wants[ns]; !seen {
+					absent = append(absent, ns)
+				}
+				wants[ns] = append(wants[ns], t.Name)
+			}
+		}
+		for _, ns := range absent {
+			errorf("CFG-25", "%sの %s は、語彙 %s の語彙のプラグイン（マニフェストの [read] の namespaces に %s を持つプラグイン）を要るが、入っていない（plugin_dirs、%s、~/.hozo/plugins を探した）",
+				cu.Label(), strings.Join(wants[ns], "、"), ns, ns, hostplugin.PluginPathEnv)
 		}
 		// CFG-20: 基底（requires が空）がちょうど一つでない。解決できなかった名前があれば出さない（それが基底かもしれない）
 		if !unresolved {
@@ -645,10 +679,134 @@ func (p *Project) pluginJobs() []*pluginJob {
 	return jobs
 }
 
-// NeedsPlugins は、起動する相手（docs/plugin-protocol.md「起動」: 受け持つ出力のある、使うプラグイン）が、一つでもあるか。
-func (p *Project) NeedsPlugins() bool { return len(p.pluginJobs()) > 0 }
+// NeedsPlugins は、起動する相手（docs/plugin-protocol.md「語彙のプラグイン」: 仕様が使っている語彙のプラグイン。同「起動」:
+// 受け持つ出力のある、使うプラグイン）が、一つでもあるか。
+func (p *Project) NeedsPlugins() bool {
+	for _, pl := range p.Readers {
+		if len(pl.Mismatch) == 0 {
+			return true
+		}
+	}
+	return len(p.pluginJobs()) > 0
+}
 
-// runPlugins は、使うプラグインごとに一回、direction "emit" を送り、返った答えを p.Answers に置いて、その診断を返す
+// readers は、頼む語彙のプラグイン（Project.Readers）を求める: 仕様に付いたデコレータの名前空間（適用の、汎用のデコレータの FQN から、
+// 最後の名前を除いたもの）を集め、それを [read] の namespaces に持つ、入っているプラグインを、名前の辞書順に返す。
+func (p *Project) readers() []*hostplugin.Plugin {
+	if p.Sema == nil || p.Sema.Program == nil {
+		return nil
+	}
+	var candidates []*hostplugin.Plugin
+	for _, pl := range p.Plugins {
+		if pl.Manifest.HasRead() {
+			candidates = append(candidates, pl)
+		}
+	}
+	if len(candidates) == 0 {
+		return nil
+	}
+	used := map[string]bool{}
+	note := func(apps []ir.Application) {
+		for i := range apps {
+			if dot := strings.LastIndexByte(apps[i].Decorator, '.'); dot > 0 {
+				used[apps[i].Decorator[:dot]] = true
+			}
+		}
+	}
+	for i := range p.Sema.Program.Namespaces {
+		for _, d := range p.Sema.Program.Namespaces[i].Decls {
+			if d == nil {
+				continue
+			}
+			note(d.Common().Decorators)
+			switch x := d.(type) {
+			case *ir.Model:
+				for j := range x.Fields {
+					note(x.Fields[j].Decorators)
+				}
+			case *ir.Classify:
+				for j := range x.Cases {
+					note(x.Cases[j].Decorators)
+				}
+			}
+		}
+	}
+	var out []*hostplugin.Plugin
+	for _, pl := range candidates {
+		for _, ns := range pl.Manifest.Read.Namespaces {
+			if used[ns] {
+				out = append(out, pl)
+				break
+			}
+		}
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].Name < out[j].Name })
+	return out
+}
+
+// Spec は、仕様の、出力に依らない部分（docs/ir.md「まとめた形」の Spec）: 語彙のプラグインへの要求（docs/plugin-protocol.md「read」）に
+// 入れるもの。同じ実行の、emit の要求の spec と、同じ中身。出力が一つもなければ、namespaces は空。
+func (p *Project) Spec() *ir.Spec {
+	for _, views := range p.Views() {
+		names := make([]string, 0, len(views))
+		for ns := range views {
+			names = append(names, ns)
+		}
+		sort.Strings(names)
+		for _, ns := range names {
+			if views[ns] != nil {
+				spec, _ := views[ns].Split()
+				return spec
+			}
+		}
+	}
+	spec := &ir.Spec{Namespaces: map[string][]ir.NamespaceConfig{}}
+	if p.Sema != nil {
+		spec.Program = p.Sema.Program
+	}
+	return spec
+}
+
+// runReaders は、頼む語彙のプラグイン（p.Readers のうち、protocol の合うもの）ごとに一回、direction "read" を送り、その診断を返す
+// （docs/plugin-protocol.md「語彙のプラグイン」「read」）。errors は error の診断、warnings は PLUGIN の warning（メッセージの先頭に、
+// プラグインの名前）。code "protocol" / "unsupported" の応答は MAN-2 / MAN-5 の診断。proc.Crashed / proc.MalformedOutput なら、
+// そこで止めて、その誤りを返す。add は、同じ診断を、一度だけ足す口（emit の診断と、共有する）。
+func (p *Project) runReaders(opts Options, runner hostplugin.Runner, add func(diag.Diagnostic)) error {
+	var spec *ir.Spec
+	for _, pl := range p.Readers {
+		if len(pl.Mismatch) > 0 {
+			continue
+		}
+		if opts.Context != nil {
+			if err := opts.Context.Err(); err != nil {
+				return err
+			}
+		}
+		if spec == nil {
+			spec = p.Spec()
+		}
+		var resp sdk.ReadResponse
+		if err := runner.Run(pl.Name, pl.Manifest.WasmPath(pl.Dir), sdk.NewReadRequest(spec), &resp); err != nil {
+			var pe *hostplugin.PluginError
+			if errors.As(err, &pe) {
+				add(pe.Diagnostic(pl.ManifestPath()))
+				continue
+			}
+			return err
+		}
+		for _, e := range resp.Errors {
+			e.Severity = "error"
+			add(p.PluginDiagnostic(pl.Name, e))
+		}
+		for _, w := range resp.Warnings {
+			add(p.PluginWarning(pl.Name, w))
+		}
+	}
+	return nil
+}
+
+// runPlugins は、はじめに、語彙のプラグインに direction "read" を送り（runReaders）、その応答に error がなければ、
+// 使うプラグインごとに一回、direction "emit" を送り、返った答えを p.Answers に置いて、その診断を返す
 // （docs/cli.md「検査」の 4、docs/plugin-protocol.md「起動」「emit」）。一つの要求に、仕様を一度と、そのプラグインが受け持つ
 // 出力を並べる。errors は error の診断、warnings は PLUGIN の warning。重さ、code、位置、メッセージが、すべて同じ診断は、最初の
 // 一つだけを残す（同じ名前空間を、二つの単位が出力しているとき）。
@@ -664,6 +822,13 @@ func (p *Project) runPlugins(opts Options) ([]diag.Diagnostic, error) {
 			seen[key] = true
 			diags = append(diags, d)
 		}
+	}
+	// 語彙のプラグインが先。error を返したら、emit は、頼まない（docs/plugin-protocol.md「語彙のプラグイン」）
+	if err := p.runReaders(opts, runner, add); err != nil {
+		return diags, err
+	}
+	if errs, _ := diag.Count(diags); errs > 0 {
+		return diags, nil
 	}
 	type slot struct {
 		answer Answer
