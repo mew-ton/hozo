@@ -119,6 +119,15 @@
               "name": "variable.other.jsdoc"
             }
           }
+        },
+        {
+          "comment": "デコレータのタグ: 行の頭の、@ と、. を含む名前（後ろは、空白か、行の終わり）。宣言の前のデコレータと、同じ scope",
+          "match": "(?:^|(?\u003c=\\*))\\s*(@[A-Za-z_][A-Za-z0-9_]*(?:\\.[A-Za-z_][A-Za-z0-9_]*)+)(?=\\s|$)",
+          "captures": {
+            "1": {
+              "name": "entity.name.function.decorator.hozo"
+            }
+          }
         }
       ]
     },

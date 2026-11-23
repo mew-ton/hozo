@@ -1,0 +1,22 @@
+// DEC-13（docs/check.md「コメントの中のタグ」）: コメントの中のタグと、宣言の前の適用を、合わせて数える
+namespace note {
+  /** 状況。@repeatable ではない */
+  @hint
+  decorator context(text: string) for model;
+}
+
+namespace a {
+  /**
+   * 注文
+   * @note.context コメントの中
+   */
+  @note.context("宣言の前") // ERROR: DEC-13
+  model Order { id: string; }
+
+  /**
+   * 荷物
+   * @note.context 一つ目
+   * @note.context 二つ目
+   */
+  model Parcel { id: string; } // ERROR(-2): DEC-13
+}

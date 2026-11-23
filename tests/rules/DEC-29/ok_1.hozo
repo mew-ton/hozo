@@ -1,0 +1,60 @@
+// DEC-29 に当たらない（docs/check.md「コメントの中のタグ」）: 説明のコメントの中の、デコレータのタグは、文字列を一つ取る
+// デコレータの適用。文章は、その行の残りと、続きの行。省ける引数（string?）でも、書ける
+namespace note {
+  /** 状況 */
+  @hint @repeatable
+  decorator context(text: string) for case of never, model, field, state, exception, scalar, union, classify, decorator;
+  /** 覚え。省ける引数 */
+  @hint
+  decorator memo(text: string?) for model;
+  /** 重さ。文字列を取らない（宣言の前に書く） */
+  @hint
+  decorator weight(n: int) for model;
+}
+
+namespace a {
+  /**
+   * 決めたこと。
+   *
+   * @note.context 分類そのものにも、書ける
+   */
+  classify Decision of never {
+    /**
+     * 包んだ関数は、最初の引数で受け取る。
+     *
+     * @note.context 決まった語は、ふつうの関数の呼び出しと、形が同じで、
+     *   読み分けられない（続きの行）
+     * @note.context 二つ目（@repeatable）
+     */
+    D447;
+  }
+
+  /**
+   * 注文。
+   *
+   * @note.context 言語のタグ（@see）と、並べて書ける
+   * @see Decision
+   * @note.memo 覚え
+   */
+  @note.weight(3)
+  model Order {
+    /**
+     * 番号
+     * @note.context フィールドにも、書ける
+     */
+    id: string;
+  }
+
+  /**
+   * 接頭語のない @context と、名前の直後が、空白でない行は、本文:
+   * @context これは、本文
+   * @note.context("これも、本文") と書いた行
+   */
+  model Plain { id: string; }
+
+  /** @note.context 一行のコメントにも、書ける */
+  exception Failed;
+
+  /** @note.context 自分の宣言に、同じ名前空間でも、接頭語を付けて書く */
+  scalar Name extends string;
+}

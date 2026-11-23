@@ -25,7 +25,7 @@ namespace lib {
   @db.table state notes: list<Note>;
   /** 行を受け取るメソッド（@db.insert、@db.update、Post）を持たない表: dbScan<Model> だけが出て、dbArgs<Model> は出ない */
   @db.table state stamps: list<Stamp>;
-  /** @db.table のない状態は、表にならない（単位は、人が書く） */
+  /** `@db.table` のない状態は、表にならない（単位は、人が書く） */
   state drafts: list<Note>;
 
   // ---- books: デコレータを付けた read と効果と、付けていない read と効果 ----

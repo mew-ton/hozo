@@ -55,7 +55,7 @@ type DocComment struct {
 	// Body は本文。各行の先頭の空白と * とその後ろの空白一つを落とし、改行でつないだもの。
 	// タグの行は含まない。前後の空行は落とす。
 	Body string
-	// Tags は @param / @throws / @see の行。
+	// Tags は @param / @throws / @see の行と、デコレータのタグ（DocApply）の行。
 	Tags []DocTag
 }
 
@@ -72,6 +72,8 @@ const (
 	DocThrows
 	// DocSee は @see 名前。
 	DocSee
+	// DocApply は、デコレータのタグ（@接頭語.名前 文章）。Name は DecoratorRef、Text は文章。
+	DocApply
 )
 
 // String はタグの名前（"@param" など）。
@@ -83,6 +85,8 @@ func (k DocTagKind) String() string {
 		return "@throws"
 	case DocSee:
 		return "@see"
+	case DocApply:
+		return "@<デコレータ>"
 	}
 	return "@?"
 }
@@ -164,6 +168,9 @@ type Decorator struct {
 	Name QualifiedName
 	// Args は引数。"( )" がなければ nil、"()" なら空でない nil 以外（長さ 0）。
 	Args []*Arg
+	// FromDoc は、説明のコメントの中の、デコレータのタグから作った適用（docs/grammar.md「ドキュメンテーションコメント」）。
+	// Args は、文章を値に持つ、文字列のリテラル一つ。Span は、タグの行（と、続きの行）。
+	FromDoc bool
 }
 
 // NodeSpan は Node の実装。

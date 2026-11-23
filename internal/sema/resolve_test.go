@@ -1,6 +1,7 @@
 package sema
 
 import (
+	"encoding/json"
 	"fmt"
 	"sort"
 	"strings"
@@ -630,6 +631,53 @@ namespace a {
 // 本体の中の名前は、デコレータを宣言した名前空間で解決し、値の引数は、そのデコレータの引数を指す。包んだ関数の引数の呼び出しは、
 // 包んだ op の中身の呼び出し（Callee の proceed）になり、その引数への参照を残す（同じ名前の op を隠す）。IR は、Decorator.fn と
 // Decorator.body で、包んだ関数の引数は、Decorator.params に入らない。
+// TestDocDecoratorTag は、説明のコメントの中の、デコレータのタグ（docs/check.md「コメントの中のタグ」）の、IR:
+// その宣言の decorators に、ふつうの適用として入り（コメントの中のタグが、宣言の前の適用より、先）、引数は、文章の
+// 文字列のリテラル一つ。Doc.body には、入らない。
+func TestDocDecoratorTag(t *testing.T) {
+	res, fs := analyzeProject(t, project{"a.hozo": `
+namespace note {
+  @hint @repeatable
+  decorator context(text: string) for model;
+  @hint
+  decorator weight(n: int) for model;
+}
+namespace a {
+  /**
+   * 注文。
+   *
+   * @note.context 二つの画面で、
+   *   同じ形を使う
+   */
+  @note.weight(3)
+  @note.context("宣言の前")
+  model Order { id: string; }
+}`}, false)
+	noErrors(t, res, fs)
+	m := res.Program.Lookup("a.Order").(*ir.Model)
+	if doc := m.Common().Description; doc == nil || doc.Body != "注文。" {
+		t.Errorf("Doc = %+v（期待は、本文が「注文。」だけ）", doc)
+	}
+	decorators := m.Common().Decorators
+	b, err := json.Marshal(decorators)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := string(b)
+	for _, want := range []string{
+		`"decorator":"note.context","args":[{"param":"text","value":{"kind":"literal","literal":{"kind":"string","value":"二つの画面で、\n同じ形を使う"}}}]`,
+		`"decorator":"note.weight"`,
+		`"value":"宣言の前"`,
+	} {
+		if !strings.Contains(got, want) {
+			t.Errorf("decorators に %s がない:\n%s", want, got)
+		}
+	}
+	if len(decorators) != 3 || decorators[0].Decorator != "note.context" || decorators[1].Decorator != "note.weight" || decorators[2].Decorator != "note.context" {
+		t.Errorf("並びの順 = %s（期待は、コメントの中のタグ、宣言の前の二つ、の順）", got)
+	}
+}
+
 func TestResolveDecoratorBody(t *testing.T) {
 	res, fs := analyzeProject(t, project{"a.hozo": `
 namespace a {

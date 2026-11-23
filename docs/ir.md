@@ -53,7 +53,7 @@ interface Pos { line: number; col: number; }              // 1 始まり。col �
 ```ts
 interface Doc {
   summary: string;                // 最初の段落（Markdown）
-  body: string;                   // 全文（Markdown。summary を含む。タグの行は含まない）
+  body: string;                   // 全文（Markdown。summary を含む。タグの行は含まない。デコレータのタグ（docs/grammar.md「ドキュメンテーションコメント」）は、ここではなく、その宣言の decorators に、適用として入る）
   params: { name: string; text: string }[];      // @param。name は解決済み（op の引数名）
   throws: { exception: string; text: string }[]; // @throws。exception は FQN
   see: string[];                  // @see。FQN

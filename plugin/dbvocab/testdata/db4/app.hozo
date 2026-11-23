@@ -37,7 +37,7 @@ namespace app {
   read fn rowsNoted(id: string): Row[] reads rows;
   @db.delete
   effect fn deleteNoted(note: string): effects rows.delete;
-  /** @db.insert と @db.update の引数の名前は、列ではない */
+  /** `@db.insert` と @db.update の引数の名前は、列ではない */
   @db.insert
   effect fn createRow(anything: Row): effects rows.post;
 }

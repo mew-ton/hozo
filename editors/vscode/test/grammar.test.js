@@ -760,6 +760,21 @@ test('予約語のデコレータ名（宣言、適用、別名の先、@see）'
   assertScope(see, '@see', 'db.list', 'variable.other.jsdoc');
 });
 
+test('説明のコメントの中の、デコレータのタグ（docs/grammar.md「ドキュメンテーションコメント」）', () => {
+  const deco = 'entity.name.function.decorator.hozo';
+  const doc = tokensOf(
+    ['/**', ' * 注文', ' * @adr.context 二つの画面で、同じ形を使う', ' * @context これは、本文', ' * @adr.context("これも、本文") と書いた行', ' */'].join('\n'),
+  );
+  // 行の頭の、@ と、. を含む名前（後ろは、空白）は、デコレータのタグ
+  assertScope(doc, '@adr.context 二つ', '@adr.context', deco);
+  assertScope(doc, '@adr.context 二つ', '@adr.context', 'comment.block.documentation.hozo');
+  // 接頭語のない @語 と、名前の直後が、空白でない行は、本文
+  assert.ok(!doc.find((l) => l.text.includes('@context これは')).tokens.some((t) => t.scopes.includes(deco)));
+  assert.ok(!doc.find((l) => l.text.includes('@adr.context("')).tokens.some((t) => t.scopes.includes(deco)));
+  const oneLine = tokensOf('/** @adr.context 一行のコメント */');
+  assertScope(oneLine, '@adr.context', '@adr.context', deco);
+});
+
 test('包んだ関数の引数（docs/grammar.md「デコレータの本体」）', () => {
   const t = tokensOf('decorator fn audited(next: fn) {\n  next();\n  record();\n}');
   // 頭の fn と、型の位置の fn は、どちらも、予約語。名前と、その呼び出しは、ほかの引数、ほかの呼び出しと同じ

@@ -258,6 +258,10 @@ func (p *parser) parseDecl() ast.Decl {
 	if p.at(token.DocComment) {
 		p.fail(p.tok().Span, "ドキュメンテーションコメントはデコレータの前に置く")
 	}
+	if !p.at(token.Namespace) && !p.at(token.Bind) {
+		// 説明のコメントの中の、デコレータのタグは、宣言の前の適用と、同じ（docs/grammar.md「ドキュメンテーションコメント」）
+		decorators = docDecorators(doc, decorators)
+	}
 	if p.at(token.Export) {
 		export := p.advance().Span
 		if p.at(token.Op) {
@@ -274,6 +278,9 @@ func (p *parser) parseDecl() ast.Decl {
 	case token.Namespace:
 		if len(decorators) > 0 {
 			p.fail(decorators[0].Span, "namespace にデコレータは付けられない（docs/grammar.md「決めたこと」）")
+		}
+		if tag := firstDocApply(doc); tag != nil {
+			p.errorAt(tag.Span, "namespace にデコレータは付けられない（説明のコメントの中の、デコレータのタグも、同じ。docs/grammar.md「ドキュメンテーションコメント」）")
 		}
 		return p.parseNamespace(start, doc)
 	case token.Bind:
@@ -651,6 +658,7 @@ func (p *parser) parseMember() (*ast.Field, *ast.Override, *ast.Index) {
 	doc := p.parseLeadingDoc()
 	start := p.tok().Span.Start
 	decorators, marks := p.parseDecorators()
+	decorators = docDecorators(doc, decorators)
 	// parseDecorators は直後の字句が decorator なら核の印を通すが、ここでの decorator はフィールド名。
 	marks.each(func(mark string, span source.Span) {
 		p.fail(span, "@"+mark+" はデコレータの宣言の直前にだけ書ける（docs/grammar.md「decorator の宣言」）")
@@ -733,6 +741,9 @@ func (p *parser) parseUnion(start source.Offset, doc *ast.DocComment, decorators
 // parseUnionMember は UnionMember = [ DocComment ] ( Ident ":" ArmType ";" | QualifiedName ";" ) を読む。
 func (p *parser) parseUnionMember() *ast.UnionMember {
 	m := &ast.UnionMember{Doc: p.parseLeadingDoc()}
+	if tag := firstDocApply(m.Doc); tag != nil {
+		p.errorAt(tag.Span, "union のアームにデコレータは付けられない（説明のコメントの中の、デコレータのタグも、同じ。docs/grammar.md「ドキュメンテーションコメント」）")
+	}
 	start := p.tok().Span.Start
 	if m.Doc != nil && p.at(token.RBrace) {
 		p.fail(m.Doc.Span, "付く先のないドキュメンテーションコメント（docs/grammar.md「決めたこと」）")
@@ -1108,6 +1119,7 @@ func (p *parser) parseClassifyCase() *ast.ClassifyCase {
 		p.fail(c.Doc.Span, "付く先のないドキュメンテーションコメント（docs/grammar.md「決めたこと」）")
 	}
 	c.Decorators, _ = p.parseDecorators()
+	c.Decorators = docDecorators(c.Doc, c.Decorators)
 	if p.at(token.DocComment) {
 		p.fail(p.tok().Span, "ドキュメンテーションコメントは、デコレータより上に書く（docs/grammar.md「ファイルと宣言」）")
 	}

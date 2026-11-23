@@ -55,7 +55,7 @@ namespace shop {
   /** デコレータのない効果は、見ない */
   effect fn addDraft(draft: Draft): effects drafts.post;
 
-  /** @db.transaction は、確かめない（表の状態のない名前空間の op に付いていても） */
+  /** `@db.transaction` は、確かめない（表の状態のない名前空間の op に付いていても） */
   @db.transaction
   export fn register(user: User): throws EmailTaken effects createUser {
     createUser(user);

@@ -3,7 +3,7 @@
 
 namespace app {
   model Row { @db.key @db.text id: string; }
-  /** @db.table のない状態 */
+  /** `@db.table` のない状態 */
   state rows: list<Row>;
   effect fn createRow(row: Row): effects rows.post;
 

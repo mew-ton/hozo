@@ -3,7 +3,7 @@
 
 namespace app {
   model Row { @db.key @db.text id: string; }
-  /** @db.table のない状態は、表の状態ではない */
+  /** `@db.table` のない状態は、表の状態ではない */
   state rows: list<Row>;
   read fn rowById(id: string): Row? reads rows;
   effect fn createRow(row: Row): effects rows.post;

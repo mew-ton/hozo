@@ -1,0 +1,35 @@
+// DEC-29（docs/check.md「コメントの中のタグ」）: 説明のコメントの中に、タグとして書けるのは、文字列を一つ取るデコレータだけ
+namespace note {
+  /** 引数がない */
+  @hint
+  decorator mark for model;
+  /** 数を取る */
+  @hint
+  decorator weight(n: int) for model;
+  /** 引数が二つ */
+  @hint
+  decorator owner(doc: string, heading: string) for model;
+  /** 残りの引数 */
+  @hint
+  decorator words(...texts: string) for model;
+  /** 型を二つ書いた引数 */
+  @hint
+  decorator either(value: string | int) for model;
+  /** 文字列を一つ取る */
+  @hint
+  decorator context(text: string) for model;
+  /** 名前付きデコレータ（引数を固定している） */
+  decorator fixed = context("決まった文章");
+}
+
+namespace a {
+  /**
+   * @note.mark 引数のないデコレータ
+   * @note.weight 3
+   * @note.owner docs/x.md 見出し
+   * @note.words 一つ 二つ
+   * @note.either 文章
+   * @note.fixed 文章
+   */
+  model M { id: string; } // ERROR(-7): DEC-29 // ERROR(-6): DEC-29 // ERROR(-5): DEC-29 // ERROR(-4): DEC-29 // ERROR(-3): DEC-29 // ERROR(-2): DEC-29
+}

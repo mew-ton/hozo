@@ -4,7 +4,7 @@
 namespace app {
   model Row { @db.key @db.text id: string; @db.text note: string; }
   @db.table state rows: list<Row>;
-  /** @db.table が付いていない状態 */
+  /** `@db.table` が付いていない状態 */
   state plain: list<Row>;
 
   // read: @db.find、@db.list

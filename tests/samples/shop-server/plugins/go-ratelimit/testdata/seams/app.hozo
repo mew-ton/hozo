@@ -84,7 +84,7 @@ namespace mixed {
   export fn traced(n: int): int;
 }
 
-/** @rate.limited の付いた op のない名前空間 */
+/** `@rate.limited` の付いた op のない名前空間 */
 namespace plain {
   export fn hello(name: string): string;
 }

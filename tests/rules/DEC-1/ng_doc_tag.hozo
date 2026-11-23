@@ -1,0 +1,14 @@
+// DEC-1（docs/check.md「コメントの中のタグ」）: 説明のコメントの中の、デコレータのタグにも、付けられる先の検査が、同じに当たる
+namespace note {
+  /** 状況。分類のケースにだけ */
+  @hint
+  decorator context(text: string) for case of never;
+}
+
+namespace a {
+  /**
+   * 注文
+   * @note.context model には、付けられない
+   */
+  model Order { id: string; } // ERROR(-2): DEC-1
+}

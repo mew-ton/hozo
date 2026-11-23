@@ -7,10 +7,10 @@ namespace app {
   exception Taken;
   exception Banned;
 
-  /** @db.conflict がない */
+  /** `@db.conflict` がない */
   @db.insert
   effect fn add(user: User): throws Taken effects users.post;
-  /** @db.conflict が名指ししたほかに、もう一つ */
+  /** `@db.conflict` が名指ししたほかに、もう一つ */
   @db.update @db.conflict(Taken)
   effect fn save(user: User): throws Taken, Banned effects users.put;
   @db.delete

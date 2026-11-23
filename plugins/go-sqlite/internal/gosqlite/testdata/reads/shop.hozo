@@ -77,7 +77,7 @@ namespace shop {
   @db.latest("at")
   read fn lastAuditOf(item: ItemId): Audit? reads audits;
 
-  /** @db.where の条件だけ */
+  /** `@db.where` の条件だけ */
   @db.find
   @db.where("active", true)
   @db.latest("addedAt")
@@ -89,23 +89,23 @@ namespace shop {
   @db.list
   read fn allItems(): Item[] reads items;
 
-  /** @db.int の列 */
+  /** `@db.int` の列 */
   @db.list
   read fn itemsOnShelf(shelf: Shelf): Item[] reads items;
 
-  /** @db.float の列 */
+  /** `@db.float` の列 */
   @db.list
   read fn itemsPriced(price: Price): Item[] reads items;
 
-  /** @db.bool の列 */
+  /** `@db.bool` の列 */
   @db.list
   read fn itemsActive(active: boolean): Item[] reads items;
 
-  /** @db.datetime の列 */
+  /** `@db.datetime` の列 */
   @db.list
   read fn itemsAddedAt(addedAt: datetime): Item[] reads items;
 
-  /** @db.json の列 */
+  /** `@db.json` の列 */
   @db.list
   read fn itemsTagged(tags: string[]): Item[] reads items;
 
@@ -129,27 +129,27 @@ namespace shop {
 
   // ---- @db.where: 決まった値の条件。しまい方ごとのリテラル ----
 
-  /** @db.text の列に、文字列 */
+  /** `@db.text` の列に、文字列 */
   @db.list
   @db.where("kind", "book")
   read fn books(): Item[] reads items;
 
-  /** @db.int の列に、整数 */
+  /** `@db.int` の列に、整数 */
   @db.list
   @db.where("stock", 0)
   read fn soldOut(): Item[] reads items;
 
-  /** @db.float の列に、小数 */
+  /** `@db.float` の列に、小数 */
   @db.list
   @db.where("price", 9.5)
   read fn atNineFifty(): Item[] reads items;
 
-  /** @db.float の列に、整数（Go では、小数のリテラルで書く） */
+  /** `@db.float` の列に、整数（Go では、小数のリテラルで書く） */
   @db.list
   @db.where("price", 10)
   read fn atTen(): Item[] reads items;
 
-  /** @db.bool の列に、真偽値 */
+  /** `@db.bool` の列に、真偽値 */
   @db.list
   @db.where("active", false)
   read fn retired(): Item[] reads items;
@@ -177,22 +177,22 @@ namespace shop {
 
   // ---- @db.list と @db.latest: 新しい順 ----
 
-  /** @db.datetime の列 */
+  /** `@db.datetime` の列 */
   @db.list
   @db.latest("addedAt")
   read fn newestFirst(): Item[] reads items;
 
-  /** @db.int の列 */
+  /** `@db.int` の列 */
   @db.list
   @db.latest("stock")
   read fn mostStocked(): Item[] reads items;
 
-  /** @db.float の、省略可能な列: 値のない行は最後 */
+  /** `@db.float` の、省略可能な列: 値のない行は最後 */
   @db.list
   @db.latest("weight")
   read fn heaviest(): Audit[] reads audits;
 
-  /** @db.datetime の、省略可能な列と、引数の条件 */
+  /** `@db.datetime` の、省略可能な列と、引数の条件 */
   @db.list
   @db.latest("soldAt")
   read fn lastSoldOn(shelf: Shelf): Item[] reads items;

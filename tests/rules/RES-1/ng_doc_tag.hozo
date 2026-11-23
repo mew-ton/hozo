@@ -1,0 +1,13 @@
+// RES-1（docs/check.md「コメントの中のタグ」）: 説明のコメントの中の、デコレータのタグの名前も、解決する
+namespace a {
+  /**
+   * 注文
+   * @note.context 名前空間 note が、ない
+   */
+  model Order { id: string; } // ERROR(-2): RES-1
+}
+
+// この規則の hozo.toml が、名前空間 b を求める
+namespace b {
+  model X { id: string; }
+}

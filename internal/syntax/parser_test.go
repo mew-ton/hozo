@@ -2133,6 +2133,71 @@ func TestDocTagShortName(t *testing.T) {
 	}
 }
 
+// TestDocDecoratorTag は、説明のコメントの中の、デコレータのタグ（docs/grammar.md「ドキュメンテーションコメント」）:
+// 文章を、文字列のリテラル一つの引数にした、デコレータの適用になり、宣言の前の適用より、先に並ぶ。本文には、入らない。
+func TestDocDecoratorTag(t *testing.T) {
+	src := `/**
+ * 注文。
+ * @context これは、本文（接頭語がない）
+ * @note.context("これも、本文") と書いた行
+ *
+ * @note.context 二つの画面で、
+ *   同じ形を使う
+ * @see Other
+ * @note.default 最後の要素は、予約語でもよい
+ */
+@db.table
+model Order {}`
+	m := firstDecl[*ast.ModelDecl](t, src)
+	if want := "注文。\n@context これは、本文（接頭語がない）\n@note.context(\"これも、本文\") と書いた行"; m.Doc.Body != want {
+		t.Errorf("Body = %q, want %q", m.Doc.Body, want)
+	}
+	if len(m.Doc.Tags) != 3 || m.Doc.Tags[0].Kind != ast.DocApply || m.Doc.Tags[1].Kind != ast.DocSee || m.Doc.Tags[2].Kind != ast.DocApply {
+		t.Fatalf("Tags = %+v", m.Doc.Tags)
+	}
+	if len(m.Decorators) != 3 {
+		t.Fatalf("Decorators = %+v", m.Decorators)
+	}
+	first, second, third := m.Decorators[0], m.Decorators[1], m.Decorators[2]
+	if !first.FromDoc || first.Name.String() != "note.context" || len(first.Args) != 1 || first.Args[0].Name != nil ||
+		first.Args[0].Value.Terms[0].Literal.Kind != ast.StringLit || first.Args[0].Value.Terms[0].Literal.Str != "二つの画面で、\n同じ形を使う" {
+		t.Errorf("一つ目 = %+v（引数 %+v）", first, first.Args)
+	}
+	if got := src[first.Name.Span.Start:first.Name.Span.End]; got != "note.context" || src[first.Name.Span.Start-1] != '@' {
+		t.Errorf("一つ目の名前の位置 = %q", got)
+	}
+	if !second.FromDoc || second.Name.String() != "note.default" {
+		t.Errorf("二つ目 = %+v", second)
+	}
+	if third.FromDoc || third.Name.String() != "db.table" {
+		t.Errorf("三つ目（宣言の前の適用）= %+v", third)
+	}
+	// フィールドと、分類のケースにも
+	f := firstDecl[*ast.ModelDecl](t, "model A {\n  /** @note.context フィールド */\n  id: string;\n}").Body.Fields[0]
+	if len(f.Decorators) != 1 || !f.Decorators[0].FromDoc {
+		t.Errorf("フィールドの Decorators = %+v", f.Decorators)
+	}
+	c := firstDecl[*ast.ClassifyDecl](t, "classify D of never {\n  /** @note.context ケース */\n  @note.mark\n  D1;\n}").Cases[0]
+	if len(c.Decorators) != 2 || !c.Decorators[0].FromDoc || c.Decorators[1].FromDoc {
+		t.Errorf("ケースの Decorators = %+v", c.Decorators)
+	}
+}
+
+// TestDocDecoratorTagReject は、デコレータのタグの、書けない形（docs/grammar.md「ドキュメンテーションコメント」）。
+func TestDocDecoratorTagReject(t *testing.T) {
+	tests := []struct{ name, src, want string }{
+		{"no text", "/** @note.mark */\nmodel A {}", "@note.mark の後ろに文章がない"},
+		{"no text, multi-line", "/**\n * 説明\n * @note.mark\n */\nmodel A {}", "@note.mark の後ろに文章がない"},
+		{"on namespace", "/** @note.context 文章 */\nnamespace a {}", "namespace にデコレータは付けられない"},
+		{"on union arm", "union U {\n  /** @note.context 文章 */\n  X: A;\n}", "union のアームにデコレータは付けられない"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mustFail(t, tt.src, tt.want)
+		})
+	}
+}
+
 func TestDocComment(t *testing.T) {
 	src := `/**
  * パスワードの再設定メールを送る。

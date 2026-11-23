@@ -11,7 +11,8 @@ import (
 // parseDocComment は DocComment の中身を本文とタグに分ける（docs/grammar.md「ドキュメンテーションコメント」）。
 //
 //   - 各行の先頭の空白と "*" と、その後ろの空白一つを落としてから読む。行末の空白も落とす。
-//   - タグは @param / @throws / @see だけ。ほかの "@" で始まる行は本文。
+//   - 言語のタグは @param / @throws / @see。"@" と、"." を含む名前で始まり、その後ろが空白か行の終わりの行は、
+//     デコレータのタグ（DocApply）。ほかの "@" で始まる行は本文。
 //   - タグの行より後ろの、タグでない行は、直前のタグの説明の続きとして扱う（文法は「本文の行」の後に「タグの行」が並ぶとだけ決めている）。
 //   - 名前の形が合わないタグの行（"@param" だけ、"@see 1" など）は SYNTAX にし、本文として残す。
 func (p *parser) parseDocComment(tok token.Token) *ast.DocComment {
@@ -74,7 +75,7 @@ func (p *parser) parseDocTag(text string, span source.Span) (*ast.DocTag, bool) 
 	case "@see":
 		kind = ast.DocSee
 	default:
-		return nil, false
+		return p.parseDocApply(text, fields[0], span)
 	}
 	if len(fields) < 2 {
 		p.errorAt(span, fields[0]+" の後ろに名前がない")
@@ -101,6 +102,62 @@ func (p *parser) parseDocTag(text string, span source.Span) (*ast.DocTag, bool) 
 		tag.Text = rest
 	}
 	return tag, true
+}
+
+// parseDocApply は、デコレータのタグ "@接頭語.名前 文章" の行を読む（docs/grammar.md「ドキュメンテーションコメント」）。
+// head は、行の最初の語（"@adr.context"）。"." を含む DecoratorRef でなければ、タグではない（本文）。
+// 文章がなければ SYNTAX にして、本文として残す。
+func (p *parser) parseDocApply(text, head string, span source.Span) (*ast.DocTag, bool) {
+	if !strings.Contains(head, ".") {
+		return nil, false
+	}
+	at := strings.Index(text, head)
+	name, ok := qualifiedNameOf(head[1:], p.file, int(span.Start)+at+1, true)
+	if !ok {
+		return nil, false
+	}
+	rest := strings.TrimSpace(text[at+len(head):])
+	if rest == "" {
+		p.errorAt(span, head+" の後ろに文章がない（説明のコメントの中のタグは、文章を一つ渡す。引数のないデコレータは、宣言の前に "+head+" と書く。docs/grammar.md「ドキュメンテーションコメント」）")
+		return nil, false
+	}
+	return &ast.DocTag{Span: span, Kind: ast.DocApply, Name: name, Text: rest}, true
+}
+
+// docDecorators は、説明のコメントの中の、デコレータのタグを、デコレータの適用にする: 文章を、文字列のリテラル一つの
+// 引数にする（docs/grammar.md「ドキュメンテーションコメント」）。宣言の前に書いた適用 decorators の、前に並べる（ソースの順）。
+func docDecorators(doc *ast.DocComment, decorators []*ast.Decorator) []*ast.Decorator {
+	if doc == nil {
+		return decorators
+	}
+	var out []*ast.Decorator
+	for i := range doc.Tags {
+		tag := &doc.Tags[i]
+		if tag.Kind != ast.DocApply {
+			continue
+		}
+		lit := &ast.Literal{Span: tag.Span, Kind: ast.StringLit, Raw: tag.Text, Str: tag.Text}
+		term := &ast.ArgTerm{Span: tag.Span, Literal: lit}
+		value := &ast.ArgValue{Span: tag.Span, Terms: []*ast.ArgTerm{term}}
+		out = append(out, &ast.Decorator{Span: tag.Span, Name: tag.Name, Args: []*ast.Arg{{Span: tag.Span, Value: value}}, FromDoc: true})
+	}
+	if out == nil {
+		return decorators
+	}
+	return append(out, decorators...)
+}
+
+// firstDocApply は、説明のコメントの中の、最初の、デコレータのタグ。なければ nil。
+func firstDocApply(doc *ast.DocComment) *ast.DocTag {
+	if doc == nil {
+		return nil
+	}
+	for i := range doc.Tags {
+		if doc.Tags[i].Kind == ast.DocApply {
+			return &doc.Tags[i]
+		}
+	}
+	return nil
 }
 
 // qualifiedNameOf は文字列を QualifiedName にする。識別子の形でなければ ok は false。

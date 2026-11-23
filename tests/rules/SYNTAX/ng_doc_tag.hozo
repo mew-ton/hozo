@@ -1,0 +1,29 @@
+// SYNTAX（docs/grammar.md「ドキュメンテーションコメント」）: デコレータのタグの、書けない形
+namespace note {
+  /** 状況 */
+  @hint
+  decorator context(text: string) for model, union;
+  /** 印 */
+  @hint
+  decorator mark for model;
+}
+
+/**
+ * 名前空間の説明
+ * @note.context namespace には、デコレータを付けられない
+ */
+namespace a { // ERROR(-2): SYNTAX
+  /**
+   * 文章のないタグ
+   * @note.mark
+   */
+  model M { id: string; } // ERROR(-2): SYNTAX
+
+  union U {
+    /**
+     * アーム
+     * @note.context union のアームには、デコレータを付けられない
+     */
+    X: M; // ERROR(-2): SYNTAX
+  }
+}

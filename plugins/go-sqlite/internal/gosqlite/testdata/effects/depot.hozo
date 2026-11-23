@@ -46,7 +46,7 @@ namespace depot {
 
   // ---- crates ----
 
-  /** @db.insert */
+  /** `@db.insert` */
   @db.insert
   effect fn createCrate(crate: Crate): effects crates.post;
 
@@ -90,11 +90,11 @@ namespace depot {
 
   // ---- tags: @db.conflict ----
 
-  /** @db.insert と @db.conflict: キーか、一意の列が、同じ行があれば、例外 */
+  /** `@db.insert` と @db.conflict: キーか、一意の列が、同じ行があれば、例外 */
   @db.insert @db.conflict(TagTaken)
   effect fn createTag(tag: Tag): throws TagTaken effects tags.post;
 
-  /** @db.update と @db.conflict: 書き換えた行の、一意の列が、別の行と同じになれば、例外 */
+  /** `@db.update` と @db.conflict: 書き換えた行の、一意の列が、別の行と同じになれば、例外 */
   @db.update @db.conflict(TagTaken)
   effect fn renameTag(tag: Tag): throws TagTaken effects tags.put;
 

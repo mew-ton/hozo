@@ -256,6 +256,13 @@ func Build() Grammar {
 						"2": {Name: "variable.other.jsdoc"},
 					},
 				},
+				{
+					Comment: "デコレータのタグ: 行の頭の、@ と、. を含む名前（後ろは、空白か、行の終わり）。宣言の前のデコレータと、同じ scope",
+					Match:   `(?:^|(?<=\*))\s*(@` + ident + `(?:\.` + ident + `)+)(?=\s|$)`,
+					Captures: Captures{
+						"1": {Name: "entity.name.function.decorator.hozo"},
+					},
+				},
 			},
 		}},
 		{Key: "block-comment", Rule: Rule{

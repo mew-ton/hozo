@@ -95,7 +95,7 @@ namespace vault {
   @db.update
   effect fn updateSecret(err: Secret): effects secrets.put;
 
-  /** @db.delete の引数（= 列の名前） */
+  /** `@db.delete` の引数（= 列の名前） */
   @db.delete
   effect fn deleteSecret(t: Key, ctx: Num, dbGet: string): effects secrets.delete;
 

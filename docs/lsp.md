@@ -133,6 +133,7 @@ capabilities: `textDocumentSync: { openClose: true, change: Full, save: { includ
 | `match` のケース名 | `classify` のケース。標準の分類（`by list` / `by nullable`）のケース（`Empty` / `HasItems`、`None` / `Some`）と、`by` の後ろの `list` / `nullable` は宣言を持たないので `null`。アームの頭の `else` も、一つのケースを指さないので `null` |
 | デコレータの引数名（`name:`） | デコレータの宣言の `Param` |
 | ドキュメンテーションコメントの `@param` / `@throws` / `@see` の名前 | 同上（`internal/sema` の `Refs` にはないので、言語サーバーが構文木から解決する） |
+| ドキュメンテーションコメントの中の、デコレータのタグの名前（`@adr.context`） | デコレータの宣言（宣言の前に書いた適用の名前と、同じ扱い。ホバーも、同じ） |
 | 語彙の宣言 | `hozo:` の URI の位置 |
 
 解決できなければ `null`。

@@ -720,6 +720,7 @@ Go にした理由は「プラグインの書き方」に依る。設計書の�
 | DEC-26 | `@hint` は、振る舞いを言う節、本体、`@entry` を持つ宣言には、付けられない | `docs/decisions.md` の 420: `docs/grammar.md`「decorator の宣言」 |
 | DEC-27 | 包んだ関数の呼び出しの例外を受けて、「返らない」でない `catch` を持つデコレータは、値を返す op には、付けられない | `docs/decisions.md` の 419: `docs/check.md`「デコレータの本体」 |
 | DEC-28 | 本体のある `decorator fn` は、包んだ関数の引数（最初の引数。型の位置に `fn`）を持ち、本体のないものは、持たない。その名前は、ほかの引数と重ならない | `docs/decisions.md` の 447: `docs/grammar.md`「デコレータの本体」、`docs/check.md`「デコレータ」 |
+| DEC-29 | 説明のコメントの中に、タグとして書けるのは、文字列を一つ取るデコレータだけ | `docs/decisions.md` の 477、478: `docs/check.md`「コメントの中のタグ」 |
 | WIRE-1 | 書けるのは、`val` の宣言、値を入れる文、集める文、`return`、`match`、値を返さない呼び出し（op か効果）、`disjoint`、`for`、例外を受ける文（`try`。`catch` のブロックの最後には `throw`）だけ | §9。効果の呼び出し: `docs/check.md`「配線からの呼び出し」。`val`、`disjoint`、`for`: `docs/grammar.md`「配線」 |
 | WIRE-2 | 値を返す呼び出しを `val` に受けずに書く、値を返さない（か、決して返らない）呼び出しを `val` に受ける、はどちらもエラー | §9。S19: `docs/types.md`「式の型」 |
 | WIRE-3 | 値を返さない配線の op は `return` を書かない | §9 |

@@ -253,6 +253,10 @@ func (a *analyzer) lowerApplication(d *ast.Decorator, site *appSite) (ir.Applica
 	if !ok {
 		return ir.Application{}, false
 	}
+	if d.FromDoc && !takesOneString(dec) {
+		a.errorf("DEC-29", d.Name.Span, "説明のコメントの中に、タグとして書けるのは、文章を一つ取るデコレータ（引数が string の一つ）だけ。%s は、宣言の前に @%s(…) と書く", dec.Name, d.Name.String())
+		return ir.Application{}, false
+	}
 	app := ir.Application{Decorator: dec.Name, Span: a.irSpan(d.Span)}
 	generic := dec
 	if dec.Alias != nil {
@@ -270,6 +274,20 @@ func (a *analyzer) lowerApplication(d *ast.Decorator, site *appSite) (ir.Applica
 	}
 	a.checkDEC1(generic, site, d)
 	return app, true
+}
+
+// takesOneString は、dec が、文字列を一つ取るデコレータか（docs/check.md「コメントの中のタグ」）: 名前付きデコレータでなく、
+// 引数が、ちょうど一つで、残りの引数でなく、型が string 一つ（省ける引数でもよい）。
+func takesOneString(dec *ir.Decorator) bool {
+	if dec.Alias != nil || len(dec.Params) != 1 || dec.Params[0].Rest {
+		return false
+	}
+	pt, ok := dec.Params[0].Type.(ir.TypeParam)
+	if !ok || len(pt.Types) != 1 {
+		return false
+	}
+	core, ok := pt.Types[0].(ir.CoreType)
+	return ok && core.Name == "string"
 }
 
 // aliasTarget は名前付きデコレータの汎用デコレータ。別名の別名（DEC-12）なら ok は false。

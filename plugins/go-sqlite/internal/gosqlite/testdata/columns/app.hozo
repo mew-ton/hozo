@@ -41,7 +41,7 @@ namespace app {
   /** 名前ごとの数 */
   model Counts { [name: string]: int; }
 
-  /** @db.json の列（array、インデックスの model、model）。自分を指す model も JSON */
+  /** `@db.json` の列（array、インデックスの model、model）。自分を指す model も JSON */
   model Doc {
     @db.json tags: string[];
     @db.json attrs: Counts;
@@ -105,7 +105,7 @@ namespace app {
   @db.table state sharedA: list<Shared>;
   @db.table state sharedB: list<Shared>;
   @db.table state links: list<Link>;
-  /** @db.table のない状態は、表にならない */
+  /** `@db.table` のない状態は、表にならない */
   state plain: list<Core>;
 
   @db.insert effect fn createCore(row: Core): effects cores.post;

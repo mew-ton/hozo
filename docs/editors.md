@@ -54,7 +54,7 @@ editors/vscode/
 | 文字列 | `string.quoted.double.hozo` | エスケープは `constant.character.escape.hozo` |
 | 数値 | `constant.numeric.hozo` | `Int` / `Float` / `Duration`（単位も含む） |
 | コメント | `comment.line.double-slash.hozo`、`comment.block.hozo` | |
-| ドキュメンテーションコメント | `comment.block.documentation.hozo` | 中の `@param` / `@throws` / `@see` は `storage.type.class.jsdoc`、続く名前は `variable.other.jsdoc` |
+| ドキュメンテーションコメント | `comment.block.documentation.hozo` | 中の `@param` / `@throws` / `@see` は `storage.type.class.jsdoc`、続く名前は `variable.other.jsdoc`。行の頭の、デコレータのタグ（`@adr.context`。`docs/grammar.md`「ドキュメンテーションコメント」）は、`@` と名前を、宣言の前のデコレータと同じ scope（`entity.name.function.decorator.hozo`） |
 
 - 予約語の部分は `internal/tools/tmgrammar` が `token.Keywords` から生成する（`docs/packages.md`「生成するもの」）。それ以外のパターンも同じ道具の中（`grammar.go`）に手で書き、ファイル全体を `go generate ./editors/...`（`syntaxes/generate.go`）で決定的に生成する。生成物とのずれは `internal/tools/tmgrammar` のテストと CI が見る（`docs/testing.md`「生成物の一致」）。
 - `is`、`omit`、`condition` は予約語ではない（`docs/grammar.md`「予約語」）ので、どのパターンにも現れない。

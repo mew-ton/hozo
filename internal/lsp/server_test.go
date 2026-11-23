@@ -1843,6 +1843,66 @@ func TestDeclarationTargets(t *testing.T) {
 	c.shutdown()
 }
 
+// TestDocDecoratorTag は、説明のコメントの中の、デコレータのタグ（docs/grammar.md「ドキュメンテーションコメント」、
+// docs/lsp.md「定義へジャンプ」）: タグの名前の上のホバーと、定義への移動は、宣言の前に書いた適用と、同じ。
+// 文字列を一つ取らないデコレータのタグは、タグの名前の位置に DEC-29。
+func TestDocDecoratorTag(t *testing.T) {
+	root := t.TempDir()
+	text := `namespace note {
+  /** 状況: なぜ、決める必要があったか */
+  @hint
+  decorator context(text: string) for model;
+  /** 重さ */
+  @hint
+  decorator weight(n: int) for model;
+}
+namespace a {
+  /**
+   * 注文
+   * @note.context 二つの画面で、同じ形を使う
+   */
+  model Order { id: string; }
+  /**
+   * 荷物
+   * @note.weight 3
+   */
+  model Parcel { id: string; }
+}
+`
+	path := filepath.Join(root, "a.hozo")
+	writeFile(t, path, text)
+	c := startServer(t, Options{})
+	_, byURI := c.initialize(root, protocol.ClientCapabilities{})
+	uri, enc := fileURI(path), encUTF16
+	tagWeight := positionOf(t, enc, text, "@note.weight 3", 0)
+	var got []string
+	for _, d := range byURI[uri] {
+		if d.Code == codeNoConfig {
+			continue
+		}
+		got = append(got, d.Code)
+		if d.Code != "DEC-29" || d.Range.Start.Line != tagWeight.Line {
+			t.Errorf("診断 %s が、行 %d にある（want DEC-29 が、行 %d）: %s", d.Code, d.Range.Start.Line, tagWeight.Line, d.Message)
+		}
+	}
+	if len(got) != 1 {
+		t.Errorf("診断 = %v, want DEC-29 が一つ", got)
+	}
+	decl := positionOf(t, enc, text, "decorator context", 0)
+	at := shift(positionOf(t, enc, text, "@note.context 二つ", 0), 7)
+	var hov *protocol.Hover
+	c.result(protocol.MethodHover, protocol.TextDocumentPositionParams{TextDocument: textDoc(uri), Position: at}, &hov)
+	if hov == nil || !strings.Contains(hov.Contents.Value, "@hint decorator note.context(text: string) for model") || !strings.Contains(hov.Contents.Value, "状況: なぜ、決める必要があったか") {
+		t.Errorf("hover(コメントの中のタグ) = %+v", hov)
+	}
+	var loc *protocol.Location
+	c.result(protocol.MethodDefinition, protocol.TextDocumentPositionParams{TextDocument: textDoc(uri), Position: at}, &loc)
+	if loc == nil || loc.URI != uri || loc.Range.Start.Line != decl.Line {
+		t.Errorf("definition(コメントの中のタグ) = %+v, want 行 %d", loc, decl.Line)
+	}
+	c.shutdown()
+}
+
 // TestTryHover は、例外を受ける文の中の、ホバーと、定義への移動（docs/lsp.md「定義へジャンプ」「ホバー」）: try と catch のブロックの中の
 // 呼び出しと val、受けた例外の名前（match (e by …) の対象、throw e）、catch (e by C) の分類とケース、例外の分類の見出し。
 func TestTryHover(t *testing.T) {
