@@ -426,8 +426,10 @@ func (r *Route) HasBody() bool
 type Input struct { Field *ir.Field; Decorator string; Place Place; Whole bool; Name string; Required bool; Default ir.Literal }   // フィールド一つの読み方（デコレータが言ったことだけ）
 func (in *Input) Location() string                     // 通信の上の場所（header.<名前>、body など）
 type Place int                                         // InHeader / InQuery / InBody。Word() は header / query / body
-type Union struct { Decl *ir.Union; Arms []Arm }       // 通信に出せる union
-type Arm struct { Name string; Model *ir.Model; Keys []string }   // Keys は、決め手
+func (r *Reader) LiteralModels() []*ir.Model           // ここまでに読み解いた経路の、通信に出る型の中の、リテラルの型のフィールドを持つ model（最初に現れた順）
+type Union struct { Decl *ir.Union; Arms []Arm; Tag string }   // 通信に出せる union。Tag は、印のキー（なければ ""）
+type Arm struct { Name string; Model *ir.Model; Literal ir.Literal; Keys []string; TagValue ir.Literal }   // model のアームは Model、リテラルの型のアームは Literal。Keys は、決め手。TagValue は、印の値
+func LiteralJSON(lit ir.Literal) string                // リテラルの JSON（「通信の形」の表の、リテラルの型の行）
 func Statuses(p *ir.Program, routes []Route) []ExceptionStatus    // 経路の op が投げうる例外のうち、@http.status を持つもの（最初に現れた順）
 type ExceptionStatus struct { Exception *ir.Exception; Code int64 }
 ```

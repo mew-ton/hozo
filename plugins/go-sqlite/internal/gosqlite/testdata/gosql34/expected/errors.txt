@@ -1,0 +1,6 @@
+GOSQL-34	app.Bad	model app.Bad のフィールド inner の型 app.Inner は、列にできない（リテラルの型のフィールドを持つ model を中に持つ型。JSON での、リテラルの型の形を、まだ決めていない）
+GOSQL-34	app.Bad	model app.Bad のフィールド maybe の型 app.Inner? は、列にできない（リテラルの型のフィールドを持つ model を中に持つ型。JSON での、リテラルの型の形を、まだ決めていない）
+GOSQL-34	app.Bad	model app.Bad のフィールド inners の型 app.Inner[] は、列にできない（リテラルの型のフィールドを持つ model を中に持つ型。JSON での、リテラルの型の形を、まだ決めていない）
+GOSQL-34	app.Bad	model app.Bad のフィールド outer の型 app.Outer は、列にできない（リテラルの型のフィールドを持つ model を中に持つ型。JSON での、リテラルの型の形を、まだ決めていない）
+GOSQL-34	app.Bad	model app.Bad のフィールド byName の型 app.InnersByName は、列にできない（リテラルの型のフィールドを持つ model を中に持つ型。JSON での、リテラルの型の形を、まだ決めていない）
+GOSQL-34	app.Bad	model app.Bad のフィールド text の型 app.Inner は、列にできない（リテラルの型のフィールドを持つ model を中に持つ型。JSON での、リテラルの型の形を、まだ決めていない）

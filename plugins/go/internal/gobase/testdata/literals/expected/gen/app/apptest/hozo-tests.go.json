@@ -1,0 +1,16 @@
+{
+  "tests": [
+    {"name": "app.report/OK", "file": "gen/app/apptest/leaves.go", "lines": [136, 143]},
+    {"name": "app.pick/OK", "file": "gen/app/apptest/leaves.go", "lines": [149, 156]},
+    {"name": "app.say/OK", "file": "gen/app/apptest/leaves.go", "lines": [162, 169]},
+    {"name": "app.count/OK", "file": "gen/app/apptest/leaves.go", "lines": [175, 182]},
+    {"name": "app.show/OK", "file": "gen/app/apptest/leaves.go", "lines": [188, 195]},
+    {"name": "app.keep/OK", "file": "gen/app/apptest/leaves.go", "lines": [201, 208]},
+    {"name": "app.draw/OK", "file": "gen/app/apptest/leaves.go", "lines": [214, 221]},
+    {"name": "app.risky/OK", "file": "gen/app/apptest/leaves.go", "lines": [227, 234]},
+    {"name": "app.risky/Bad", "file": "gen/app/apptest/leaves.go", "lines": [237, 245]},
+    {"name": "app.Mood/Glad", "file": "gen/app/apptest/classify.go", "lines": [28, 34]},
+    {"name": "app.Mood/Calm", "file": "gen/app/apptest/classify.go", "lines": [37, 43]},
+    {"name": "app.Mood/Sad", "file": "gen/app/apptest/classify.go", "lines": [46, 52]}
+  ]
+}

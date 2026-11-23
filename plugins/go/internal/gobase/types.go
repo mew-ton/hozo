@@ -96,10 +96,14 @@ type armType struct {
 	typ     ir.Type // アームの型
 	goName  string  // 修飾なしの Go の型の名前（N の model の構造体か、包む型）
 	wrapped bool    // 包む型（`type <Union><アーム名> struct{ Value <型> }`）か
+	// literal は、アームの型が、リテラルの型そのものなら、そのリテラル（包む型は、値を持たない: `type <Union><アーム名> struct{}`）。
+	// そうでなければ nil。
+	literal ir.Literal
 }
 
 // armTypes は union u のアームの Go の型（docs/plugin-go.md「union」）: アームの型が、u を宣言した名前空間の model への ref なら、
 // その構造体。それ以外（別の名前空間の model、scalar、核の型、optional、array、union）は、包む型 `<Union><アーム名>`。
+// リテラルの型のアームは、値を持たない、包む型（armType.literal）。
 func (e *emitter) armTypes(u *ir.Union) []armType {
 	ns := e.declNS[u.Name]
 	var out []armType
@@ -113,6 +117,9 @@ func (e *emitter) armTypes(u *ir.Union) []armType {
 			}
 		}
 		at.goName, at.wrapped = e.typeName(u.Name)+golang.Capitalize(a.Name), true
+		if lt, ok := a.Type.(ir.LiteralType); ok {
+			at.literal = lt.Literal
+		}
 		out = append(out, at)
 	}
 	return out
@@ -163,7 +170,7 @@ func (e *emitter) genTypes() *fileGen {
 }
 
 // genModel は model 一つ: 構造体だけ（docs/plugin-go.md「model」: 値を作る関数は出さない。フィールドの既定値は、言語にない）。
-// インデックスの model は、名前付きのマップの型。
+// インデックスの model は、名前付きのマップの型。リテラルの型のフィールドは、項目を持たず、コメントの行になる（同「model」）。
 func (e *emitter) genModel(f *fileGen, m *ir.Model) {
 	name := e.typeName(m.Name)
 	f.print(e.modelComment(m))
@@ -171,16 +178,42 @@ func (e *emitter) genModel(f *fileGen, m *ir.Model) {
 		f.printf("type %s map[%s]%s\n\n", name, f.goType(m.Index.Key), f.goType(m.Index.Value))
 		return
 	}
-	if len(m.Fields) == 0 {
-		f.printf("type %s struct{}\n\n", name)
-	} else {
-		f.printf("type %s struct {\n", name)
-		for _, fd := range m.Fields {
-			f.print(indent(comment(body(fd.Description))))
-			f.printf("\t%s\n", f.structField(fd.Name, fd.Type))
+	stored := 0
+	for _, fd := range m.Fields {
+		if !isLiteralType(fd.Type) {
+			stored++
 		}
-		f.print("}\n\n")
 	}
+	if stored == 0 {
+		// フィールドが、リテラルの型のものだけなら、型の前の行に、同じコメント
+		for _, fd := range m.Fields {
+			f.print(comment(body(fd.Description)))
+			f.print(literalFieldComment(fd))
+		}
+		f.printf("type %s struct{}\n\n", name)
+		return
+	}
+	f.printf("type %s struct {\n", name)
+	for _, fd := range m.Fields {
+		f.print(indent(comment(body(fd.Description))))
+		if isLiteralType(fd.Type) {
+			f.print(indent(literalFieldComment(fd)))
+			continue
+		}
+		f.printf("\t%s\n", f.structField(fd.Name, fd.Type))
+	}
+	f.print("}\n\n")
+}
+
+// isLiteralType は、型 t が、リテラルの型そのものか（optional や array の中のものは、数えない）。
+func isLiteralType(t ir.Type) bool {
+	_, ok := t.(ir.LiteralType)
+	return ok
+}
+
+// literalFieldComment は、リテラルの型のフィールド fd の、項目の代わりの、コメントの行（docs/plugin-go.md「model」）。
+func literalFieldComment(fd ir.Field) string {
+	return comment(fd.Name + " は、いつも " + golang.TypeDisplay(fd.Type) + "（Go の項目は、ない）")
 }
 
 // structField は、構造体のフィールド一つ（model のフィールドと、例外の引数。docs/plugin-go.md「名前」）: 名前は先頭を大文字に、
@@ -209,6 +242,11 @@ func (e *emitter) genUnion(f *fileGen, u *ir.Union) {
 	for _, a := range arms {
 		if a.wrapped {
 			f.print(wrapperComment(a.goName, u.Name, a.name, a.typ))
+			if a.literal != nil {
+				// リテラルの型のアーム: 値は、型で決まっているので、持たせない
+				f.printf("type %s struct{}\n\n", a.goName)
+				continue
+			}
 			f.printf("type %s struct{ Value %s }\n\n", a.goName, f.goType(a.typ))
 		}
 	}

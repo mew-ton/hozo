@@ -202,6 +202,9 @@ type override struct {
 	typ   ir.Type  // アームの中での型
 	value string   // 対象を値として使う位置の式
 	base  string   // 対象を先頭に持つ、より長いパスの、先頭の式
+	// lit は、対象が、リテラルの型のアームに絞られたとき（variant）の、そのリテラル。value は、そのリテラルの式
+	// （当てはめる型のない形）。そうでなければ nil。
+	lit ir.Literal
 }
 
 // matchMode は match の使われ方。
@@ -478,6 +481,8 @@ func (e *emitter) goKey(t ir.Type) string {
 		return "[]" + e.goKey(x.Of)
 	case ir.CaseType:
 		return e.goKey(x.Of)
+	case ir.LiteralType:
+		return e.goKey(ir.LiteralCore(x.Literal)) // Go の型は、対応する核の型
 	}
 	return ""
 }
@@ -557,15 +562,24 @@ func (b *bodyGen) narrowedFor(name, state string, path []string) *override {
 // ref は、名前の Atom（束縛・引数か、状態）とパスを、Go の式とその型にする。途中に省略可能な model があれば、文の前に途中の値を作る
 // （docs/plugin-go.md「値」の「省略可能を通るパス」）。emit が false なら、型だけを求める（コードを書かない）。
 func (b *bodyGen) ref(name, state string, path []string, emit bool) (string, ir.Type) {
+	expr, typ, _ := b.refLiteral(name, state, path, emit)
+	return expr, typ
+}
+
+// refLiteral は ref と同じ。加えて、式が、リテラルの型で値が決まるもの（リテラルの型のフィールドを読む式と、リテラルの型の
+// アームに絞られた対象。docs/plugin-go.md「値」の「リテラルの型のフィールド」、「match」の variant）なら、そのリテラルを返す。
+// そのとき、式は、当てはめる型のない形のリテラルの式（当てはめる型に合わせるのは、atom）。
+func (b *bodyGen) refLiteral(name, state string, path []string, emit bool) (string, ir.Type, ir.Literal) {
 	var expr string
 	var typ ir.Type
+	var lit ir.Literal
 	rest := path
 	if ov := b.narrowedFor(name, state, path); ov != nil {
 		rest = path[len(ov.path):]
 		typ = ov.typ
 		expr = ov.base
 		if len(rest) == 0 {
-			expr = ov.value
+			expr, lit = ov.value, ov.lit
 		}
 	} else if state != "" {
 		v, _ := b.stateVar(state)
@@ -582,20 +596,26 @@ func (b *bodyGen) ref(name, state string, path []string, emit bool) (string, ir.
 	}
 	for i, seg := range rest {
 		if inner, ok := b.e.optionalModel(typ); ok {
-			return b.optionalPath(expr, inner, rest[i:], emit)
+			expr, typ = b.optionalPath(expr, inner, rest[i:], emit)
+			return expr, typ, nil
 		}
 		m := b.e.modelOf(typ)
 		if m == nil {
-			return expr, nil
+			return expr, nil, nil
 		}
 		fd := fieldOf(m, seg)
 		if fd == nil {
-			return expr, nil
+			return expr, nil, nil
+		}
+		typ = fd.Type
+		if lt, ok := fd.Type.(ir.LiteralType); ok {
+			// リテラルの型のフィールド: 構造体に項目がない。値は、型が言う
+			expr, lit = b.f.literal(lt.Literal, nil), lt.Literal
+			continue
 		}
 		expr += "." + golang.FieldName(seg)
-		typ = fd.Type
 	}
-	return expr, typ
+	return expr, typ, lit
 }
 
 // optionalPath は、省略可能な model の値 x（中の型は inner）の先のフィールド rest を読む。式の型は optional(<フィールドの型>) で、
@@ -612,8 +632,12 @@ func (b *bodyGen) optionalPath(x string, inner ir.Type, rest []string, emit bool
 		if fd == nil {
 			return expr, nil
 		}
-		expr += "." + golang.FieldName(seg)
 		typ = fd.Type
+		if lt, ok := fd.Type.(ir.LiteralType); ok {
+			expr = b.f.literal(lt.Literal, nil) // リテラルの型のフィールド: 項目がない。値は、型が言う
+		} else {
+			expr += "." + golang.FieldName(seg)
+		}
 		if i < len(rest)-1 {
 			if in, ok := b.e.optionalModel(typ); ok {
 				conds = append(conds, expr+" != nil")
@@ -730,10 +754,16 @@ func (b *bodyGen) atom(a ir.Atom, target ir.Type) (string, ir.Type) {
 		if len(x.Path) == 0 {
 			return "nil", nil
 		}
-		expr, t := b.ref(x.Path[0], "", x.Path[1:], true)
+		expr, t, lit := b.refLiteral(x.Path[0], "", x.Path[1:], true)
+		if lit != nil {
+			return b.f.literal(lit, target), t
+		}
 		return b.convert(expr, t, target), t
 	case ir.StateAtom:
-		expr, t := b.ref("", x.State, x.Path, true)
+		expr, t, lit := b.refLiteral("", x.State, x.Path, true)
+		if lit != nil {
+			return b.f.literal(lit, target), t
+		}
 		return b.convert(expr, t, target), t
 	case ir.LiteralAtom:
 		return b.f.literal(x.Literal, target), literalType(x.Literal)
@@ -759,10 +789,14 @@ func (b *bodyGen) armOf(ref *ir.ArmRef) (*ir.Union, armType, bool) {
 }
 
 // enter は、アーム a（union u のもの）の型の式 expr を、u の位置に入れる式（docs/plugin-go.md「値」の「union に入れる」）:
-// マーカーを生やした構造体のアームは、式のまま。包む型のアームは、`<Union><アーム名>{Value: <式>}`。
+// マーカーを生やした構造体のアームは、式のまま。包む型のアームは、`<Union><アーム名>{Value: <式>}`。リテラルの型のアームは、
+// `<Union><アーム名>{}`（式は、使わない: 値は、型で決まっている）。
 func (b *bodyGen) enter(u *ir.Union, a armType, expr string) string {
 	if !a.wrapped {
 		return expr
+	}
+	if a.literal != nil {
+		return b.e.armGoType(b.f, u, a) + "{}"
 	}
 	return b.e.armGoType(b.f, u, a) + "{Value: " + expr + "}"
 }
@@ -784,6 +818,9 @@ func (b *bodyGen) placed(a ir.Atom, target ir.Type, arm *ir.ArmRef, path []strin
 	if !ok {
 		return "nil"
 	}
+	if at.literal != nil {
+		return b.enter(u, at, "") // アームの型の式は、書かない
+	}
 	return b.enter(u, at, value(at.typ))
 }
 
@@ -803,6 +840,10 @@ func (b *bodyGen) entered(ex ir.Expr, arm *ir.ArmRef) string {
 		v := b.temp()
 		b.line(v + ", err := " + ci.expr)
 		b.fail()
+		if at.literal != nil {
+			b.line("_ = " + v) // 受けた値は、使わない
+			return b.enter(u, at, "")
+		}
 		return b.enter(u, at, b.convert(v, ci.ret, at.typ))
 	case ir.AtomExpr:
 		var states []string
@@ -812,6 +853,9 @@ func (b *bodyGen) entered(ex ir.Expr, arm *ir.ArmRef) string {
 	case ir.MatchExpr:
 		v := b.temp()
 		b.matchInto(&ex.Match, v, at.typ)
+		if at.literal != nil {
+			b.line("_ = " + v) // 受けた値は、使わない
+		}
 		return b.enter(u, at, v)
 	}
 	return "nil"
@@ -824,6 +868,9 @@ func (b *bodyGen) convert(expr string, from, to ir.Type) string {
 		return expr
 	}
 	from, to = strip(from), strip(to)
+	if lt, ok := from.(ir.LiteralType); ok {
+		from = ir.LiteralCore(lt.Literal) // リテラルの型の値の Go の型は、対応する核の型
+	}
 	if topt, ok := to.(ir.OptionalType); ok {
 		if _, fromOpt := from.(ir.OptionalType); fromOpt {
 			return expr
@@ -933,6 +980,9 @@ func (b *bodyGen) record(rec *ir.RecordAtom, target ir.Type, path []string, boun
 	var fields []string
 	for i := range m.Fields {
 		fd := &m.Fields[i]
+		if isLiteralType(fd.Type) {
+			continue // リテラルの型のフィールド: 構造体に項目がない。書いた値が合うことは、検査が確かめている
+		}
 		fpath := append(append([]string{}, path...), fd.Name)
 		var exact *boundValue
 		below := false
@@ -1700,7 +1750,8 @@ type matchPlan struct {
 	m        *ir.Match
 	classify *ir.Classify // 標準の分類なら nil
 	// form は分け方: "nil"（`if <対象> != nil`）、"len"（`if len(<対象>) != 0`）、"type"（`switch <対象>.(type)`）、
-	// "value"（述語で決まる値の分類・op の分類）、"state"（述語で決まる状態の分類）。
+	// "value"（述語で決まる値の分類・op の分類）、"state"（述語で決まる状態の分類）、"bool"（`if <対象>`）、
+	// "optbool"（三つに分ける形。対象の型が boolean?）。
 	form string
 	// 対象
 	subject     string   // Go の式
@@ -1748,7 +1799,10 @@ func (b *bodyGen) plan(m *ir.Match) *matchPlan {
 					p.form = "type"
 				}
 				if len(cs.As) > 0 && cs.As[0].By == ir.NarrowByLiteral {
-					p.form = "bool" // 対象が boolean の値（そうでない分類は、GO-9 が断っている）
+					p.form = "bool" // 対象が boolean の値
+					if _, optional := strip(c.SubjectType()).(ir.OptionalType); optional {
+						p.form = "optbool" // 対象が boolean?（状態の分類は、GO-9 が断っている）
+					}
 				}
 			}
 		}
@@ -1875,6 +1929,10 @@ func (b *bodyGen) narrow(p *matchPlan, a *ir.MatchArm) string {
 						ov.value = subject + ".(" + b.e.armGoType(b.f, u, arm) + ")"
 						if arm.wrapped {
 							ov.value += ".Value"
+						}
+						if arm.literal != nil {
+							// リテラルの型のアーム: 包む型は、値を持たない。対象は、そのリテラルの式
+							ov.value, ov.lit = b.f.literal(arm.literal, nil), arm.literal
 						}
 						ov.base = ov.value
 					}
@@ -2177,6 +2235,8 @@ func (b *bodyGen) match(m *ir.Match, mode matchMode, bindName string, typ ir.Typ
 	switch p.form {
 	case "nil", "len", "bool":
 		b.matchIf(p, inner, x, t)
+	case "optbool":
+		b.matchThree(p, inner, x, t)
 	default:
 		b.matchSwitch(p, inner, x, t)
 	}
@@ -2224,6 +2284,8 @@ func (b *bodyGen) matchInto(m *ir.Match, v string, typ ir.Type) {
 	switch p.form {
 	case "nil", "len", "bool":
 		b.matchIf(p, modeConst, v, t)
+	case "optbool":
+		b.matchThree(p, modeConst, v, t)
 	default:
 		b.matchSwitch(p, modeConst, v, t)
 	}
@@ -2351,6 +2413,95 @@ func (b *bodyGen) matchIf(p *matchPlan, mode matchMode, x string, t ir.Type) {
 	case p.freshState:
 		b.line("_ = " + p.subject)
 	}
+}
+
+// matchThree は、三つに分ける形（docs/plugin-go.md「match」の「三つに分ける形」。literal の分類で、対象の型が boolean?）:
+// 式のない switch。三つの側（真、偽、値がない）を、この順に見て、同じアームが受ける側（ケースのない側どうしは、分類の誤りの枝）を、
+// 一つの節にまとめる。最後の節は default:。
+func (b *bodyGen) matchThree(p *matchPlan, mode matchMode, x string, t ir.Type) {
+	m, c := p.m, p.classify
+	// 側ごとのケース: 真は as true、偽は as false。どちらも、なければ、残りのケース。値がない側は、残りのケース
+	var trueCase, falseCase, rest string
+	for _, cs := range c.Cases {
+		switch lit := literalOf(cs); {
+		case cs.IsElse():
+			rest = cs.Name
+		case lit != nil && *lit:
+			trueCase = cs.Name
+		case lit != nil:
+			falseCase = cs.Name
+		}
+	}
+	if trueCase == "" {
+		trueCase = rest
+	}
+	if falseCase == "" {
+		falseCase = rest
+	}
+	// group は、節一つ: アーム（nil なら、分類の誤りの枝）と、まとめた側（0: 真、1: 偽、2: 値がない）
+	type group struct {
+		arm   *ir.MatchArm
+		sides [3]bool
+	}
+	var groups []*group
+	for side, name := range []string{trueCase, falseCase, rest} {
+		var arm *ir.MatchArm
+		if name != "" {
+			if arm = armFor(m, name); arm == nil {
+				b.e.errorf(codeInternal, b.op.Name, "op %s の配線の match（%s）のアームが、すべてのケースを尽くしていない（検査を通った IR には来ないはずの形）", b.op.Name, m.Classify)
+				return
+			}
+		}
+		var g *group
+		for _, have := range groups {
+			if have.arm == arm {
+				g = have
+			}
+		}
+		if g == nil {
+			g = &group{arm: arm}
+			groups = append(groups, g)
+		}
+		g.sides[side] = true
+	}
+	if len(groups) == 1 && groups[0].arm != nil {
+		// 三つの側を、一つのアームが受けていれば、分けずに、そのアームの本体だけを書く
+		text, terminated := b.branch(p, groups[0].arm, mode, x, t, false)
+		if text == "" && p.freshState {
+			b.line("_ = " + p.subject)
+		}
+		b.buf.WriteString(text)
+		b.terminated = terminated
+		return
+	}
+	s := p.subject
+	b.line("switch {")
+	allEnd := true
+	for i, g := range groups {
+		switch {
+		case i == len(groups)-1:
+			b.line("default:")
+		case g.sides == [3]bool{true, false, false}:
+			b.line("case " + s + " != nil && *" + s + ":")
+		case g.sides == [3]bool{false, true, false}:
+			b.line("case " + s + " != nil && !*" + s + ":")
+		case g.sides == [3]bool{true, true, false}:
+			b.line("case " + s + " != nil:")
+		default: // 真と、値がない（最後でない節が持ちうる組は、この四つだけ）
+			b.line("case " + s + " == nil || *" + s + ":")
+		}
+		b.depth++
+		if g.arm == nil {
+			b.buf.WriteString(b.errorBranch(m.Classify))
+		} else {
+			text, ends := b.branch(p, g.arm, mode, x, t, true)
+			b.buf.WriteString(text)
+			allEnd = allEnd && ends
+		}
+		b.depth--
+	}
+	b.line("}")
+	b.terminated = mode == modeReturn || allEnd
 }
 
 // literalOf は、ケース cs の、literal の絞り込みの as に書いた、真偽の値。そういう as を持たなければ nil。

@@ -1,0 +1,45 @@
+// docs/plugin-http.md「通信の形」の、リテラルの型の行と「union」: リテラルの型のフィールドは、そのリテラルの JSON。リテラルの型の
+// アームは、値そのもので、印を持つ union の model のアームは、印の値で、見分ける。
+
+/** 別の名前空間の model（union のアームにすると、包む型になる） */
+namespace kinds {
+  /** 写像の型 */
+  model MapType { kind: "map"; key: string; }
+}
+
+namespace api {
+  /** 重さ（値の集まり） */
+  union Severity { Error: "error"; Warning: "warning"; }
+  model Count { n: int; }
+  /** 量。整数、小数、真偽のリテラルの型のアームと、model のアーム（印を持たないので、決め手で見分ける） */
+  union Amount { None: 0; Half: 0.5; All: true; Exact: Count; }
+  /** 核の型。印 kind は、フィールドの途中 */
+  model CoreType { name: string; kind: "core"; nullable: boolean?; }
+  /** 並びの型。印のほかは、CoreType と同じ名前のフィールド */
+  model ListType { kind: "list"; name: string; }
+  /** 型（印 kind で見分ける union）。別の名前空間の model のアームは、包む型 */
+  union Type { Core: CoreType; List: ListType; Map: kinds.MapType; }
+  /** 報告。リテラルの型のフィールドが、最後 */
+  model Report { severity: Severity; of: Type; amount: Amount?; version: 2; }
+
+  model ReportIn { @http.bodyObj report: Report; }
+  /** 本文の全体と、結果が、リテラルの型のフィールドと、union を持つ model */
+  @http.post("/report")
+  export fn putReport(in: ReportIn): Report;
+
+  model PartsIn { @http.body severity: Severity; @http.body types: Type[]; }
+  /** 本文の項目と、結果が、union と、その配列 */
+  @http.post("/parts")
+  export fn putParts(in: PartsIn): Type[];
+
+  /** 結果が、値の集まりの union */
+  @http.get("/severity")
+  export fn severity(): Severity;
+
+  /** 例外の引数が、値の集まりの union と、リテラルの型のフィールドを持つ model */
+  @http.status(409)
+  exception Clash(level: Severity, other: CoreType);
+  @http.get("/clash")
+  export fn clash(): string
+    throws Clash;
+}

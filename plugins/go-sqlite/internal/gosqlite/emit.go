@@ -22,6 +22,7 @@ const (
 	codeSQLLatest      = "GOSQL-27" // @db.latest の列のしまい方が、@db.datetime / @db.date / @db.time / @db.int / @db.float のどれでもない
 	codeSQLTransaction = "GOSQL-29" // op に @db.transaction が付いているのに、N に表の状態が一つもない
 	codeSQLThrows      = "GOSQL-33" // db のデコレータで中身を作る効果の throws に、@db.conflict が名指ししていない例外がある
+	codeSQLLiteral     = "GOSQL-34" // リテラルの型のフィールドを持つ model を中に持つ型のフィールドがある
 )
 
 // 出力で名指しする、db の語彙のデコレータの FQN（語彙の持ち主は plugin/dbvocab）。

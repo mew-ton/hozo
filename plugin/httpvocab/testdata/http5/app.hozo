@@ -1,7 +1,7 @@
-// HTTP-5: 位置は op。通信に出せない union（docs/plugin-http.md「通信の形」の「union」の二つの条件）。
+// HTTP-5: 位置は op。通信に出せない union（docs/plugin-http.md「通信の形」の「union」の三つの条件）。
 namespace app {
   model Card { n: int; }
-  // アームの型が、model でない
+  // アームの型が、model でも、リテラルの型でもない
   union Shape { Dot: Card; Label: string; }
   model Drawing { title: string; shape: Shape; }
   model Album { drawings: Drawing[]; }
@@ -66,4 +66,21 @@ namespace app {
   @http.get("/quiet")
   export fn quiet(): Card
     throws Quiet, Missing;
+
+  // リテラルの型のアームの、JSON の値が同じ（整数の 1 と、小数の 1.0 は、同じ数）
+  union Twice { One: 1; Unit: 1.0; }
+  @http.get("/twice")
+  export fn getTwice(): Twice;
+  // 同じ名前の、リテラルの型のフィールドの値が、アームごとに違わない（印にならない）。決め手も、ない
+  union SameTag { A: { kind: "x"; n: int; }; B: { kind: "x"; n: int; }; }
+  @http.get("/sametag")
+  export fn getSameTag(): SameTag;
+  // 通信に出せる union は、当たらない: 値の集まり、印で見分ける union（ほかのフィールドは、同じ）、model のアームと、
+  // リテラルの型のアームが混ざる union
+  union Level { Low: "low"; High: "high"; Zero: 0; Yes: true; }
+  union Tagged { A: { kind: "a"; n: int; }; B: { kind: "b"; n: int; }; }
+  union Mixed { Card: Card; None: "none"; }
+  model Fines { level: Level; tagged: Tagged; mixed: Mixed; }
+  @http.get("/fines")
+  export fn getFines(): Fines;
 }

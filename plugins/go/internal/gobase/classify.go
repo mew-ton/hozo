@@ -195,11 +195,19 @@ func (e *emitter) genClassify(part classifyPart) *fileGen {
 					case ir.NarrowByPresence:
 						guard = "v != nil"
 					case ir.NarrowByLiteral:
-						// 対象は boolean の値（そうでない分類は、GO-9 が断っている）
+						// 対象は boolean か boolean?（v は bool か *bool）
+						has := ""
+						if _, optional := strip(subject).(ir.OptionalType); optional {
+							has = "v != nil && "
+						}
+						star := ""
+						if has != "" {
+							star = "*"
+						}
 						if lit := literalOf(cs); lit != nil && *lit {
-							guard = "v"
+							guard = has + star + "v"
 						} else if lit != nil {
-							guard = "!v"
+							guard = has + "!" + star + "v"
 						}
 					case ir.NarrowByVariant:
 						if u := e.unionOf(subject); u != nil {

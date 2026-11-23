@@ -159,6 +159,8 @@ type generator struct {
 
 	// unions は、通信に出る union（最初に現れた順。unions.go）。
 	unions []*wireUnion
+	// consts は、通信に出る、リテラルの型のフィールドを持つ model（最初に現れた順。unions.go）。
+	consts []*wireConst
 
 	errs []plugin.Diagnostic
 	seen map[string]bool
@@ -243,6 +245,7 @@ func (g *generator) check() ([]route, error) {
 		g.checkResult(r.Op)
 	}
 	g.wireUnions(reader.Unions())
+	g.wireConsts(reader.LiteralModels())
 	if len(routes) > 0 {
 		g.checkName()
 	}

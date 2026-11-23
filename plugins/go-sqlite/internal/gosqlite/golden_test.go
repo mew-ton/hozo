@@ -219,6 +219,7 @@ var diagnosticFixtures = []struct{ name, code string }{
 	{"gosql27", codeSQLLatest},      // @db.latest の列のしまい方が、@db.datetime / @db.int / @db.float のどれでもない
 	{"gosql29", codeSQLTransaction}, // op に @db.transaction が付いているのに、N に表の状態が一つもない
 	{"gosql33", codeSQLThrows},      // db のデコレータで中身を作る効果の throws に、@db.conflict が名指ししていない例外がある
+	{"gosql34", codeSQLLiteral},     // リテラルの型のフィールドを持つ model を中に持つ型のフィールドがある
 }
 
 // TestDiagnostics は docs/plugin-go-sqlite.md「診断」の表の各行: 診断のコード・位置・メッセージがゴールデンと同じで、

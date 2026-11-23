@@ -25,6 +25,7 @@ var goldenFixtures = []struct {
 	{name: "uniforma", covers: "型に依らない形の確かめ（docs/testing.md「単体テスト」）の一つ目: 核の型、省略可能でないフィールド、引数のない例外、戻り値のある op"},
 	{name: "uniformb", covers: "同、二つ目: scalar、省略可能なフィールド、引数を持つ例外（一つと、二つ以上。省略可能な引数）、省略可能な戻り値の op。uniforma と同じテキストになる（TestUniform）"},
 	{name: "unions", covers: "「通信の形」の「union」（印を書かない。決め手のキーで、アームを決める。包む型は、その Value）と、「補助」の「union の読み書き」（表 httpUnions と、読み書きの補助を、二つの http.go に）", behavior: true},
+	{name: "literals", covers: "「補助」の「union の読み書き」の、リテラルの型: 表 httpConsts（リテラルの型のフィールドを持つ model）、httpUnions の、リテラルの型のアームと、印で見分ける union。合わない値と、決められないアームは 400", behavior: true},
 	{name: "cases", covers: "「インテグレーションテストの口」のうち、routes が使わない場合: 結果の名前が当たるとき、never を返す op、Given・Request・Then と当たる引数の名前、基底が、テストのパッケージを作らない出力"},
 }
 

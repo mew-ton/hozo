@@ -1,0 +1,218 @@
+// docs/plugin-go.md「型」の、リテラルの型の行: 「model」のリテラルの型のフィールド、「union」のリテラルの型のアーム、「値」の、
+// リテラルの型のアームに入れる式とリテラルの型のフィールドを読む式、「match」の variant（リテラルの型のアーム）と、
+// 三つに分ける形（対象が boolean?）、「分類」の、対象が boolean? の literal の確かめ。
+// op はどれも export（出力は一つのパッケージ）。
+
+/** リテラルの型 */
+namespace app {
+  /** 診断の重さ（値の集まり） */
+  union Severity {
+    Error: "error";
+    Warning: "warning";
+    Info: "info";
+  }
+  /** 核の型 */
+  model CoreType {
+    /** 見分ける項目 */
+    kind: "core";
+    name: string;
+  }
+  /** 並びの型 */
+  model ListType { kind: "list"; of: string; }
+  /** 型（kind の値で見分ける union） */
+  union Type { Core: CoreType; List: ListType; }
+  /** リテラルの型のフィールドだけの model */
+  model Marker { tag: "marker"; version: 2; }
+  /** model のアームと、リテラルの型（文字列、整数、小数、真偽）のアーム */
+  union Shape { Ready: CoreType; Fixed: "fixed"; Count: 0; Ratio: 1.5; Yes: true; }
+  model Report { severity: Severity; flag: boolean?; shape: Shape?; }
+  exception Bad(level: Severity);
+
+  classify Level of Severity {
+    Fatal: Severity as "error";
+    Loud: Severity as "warning";
+    Quiet: Severity as else;
+  }
+  classify Kind of Type {
+    Core: Type as CoreType;
+    List: Type as ListType;
+  }
+  classify Form of Shape {
+    Page: Shape as CoreType;
+    Fixed: Shape as "fixed";
+    Number: Shape as else;
+  }
+  /** 真、偽、値がない、のそれぞれに名前 */
+  classify Flag of boolean? {
+    On: boolean? as true;
+    Off: boolean? as false;
+    Unset: boolean? as else;
+  }
+  /** 値がない側にケースがない（分類の誤り） */
+  classify Strict of boolean? {
+    Yes: boolean? as true;
+    No: boolean? as false;
+  }
+  /** 残りのケースが、偽と、値がない、の両方 */
+  classify Lax of boolean? {
+    Yes: boolean? as true;
+    Other: boolean? as else;
+  }
+  /** 述語で決まる分類（as true を、二つのケースが持つ） */
+  classify Mood of boolean? {
+    Glad: boolean? as true;
+    Calm: boolean? as true;
+    Sad: boolean? as false;
+  }
+
+  export fn report(level: Severity);
+  export fn pick(): Severity;
+  export fn say(text: string);
+  export fn count(n: int);
+  export fn show(lit: boolean);
+  export fn keep(r: Report);
+  export fn draw(shape: Shape);
+  export fn risky(): throws Bad;
+
+  // union に入れる（リテラルの型のアーム）: 引数。アームの型の式は、書かない
+  export fn raise() {
+    report("error");
+  }
+
+  // union に入れる: return
+  export fn level(): Severity {
+    return "warning";
+  }
+
+  // union に入れる: レコードリテラルのフィールド（省略可能な union の位置も）
+  export fn file() {
+    keep({ severity: "info", shape: "fixed" });
+  }
+
+  // union に入れる: 型を書いた val
+  export fn held(): Severity {
+    val s: Severity = "error";
+    return s;
+  }
+
+  // union に入れる: throw の引数
+  export fn fail(): throws Bad {
+    try {
+      risky();
+    } catch (e) {
+      throw Bad("warning");
+    }
+  }
+
+  // union に入れる: 整数、小数、真偽のリテラルの型のアームと、model のアーム（リテラルの型のフィールドを持つ）
+  export fn shapes() {
+    draw(0);
+    draw(1.5);
+    draw(true);
+    draw({ kind: "core", name: "int" });
+  }
+
+  // レコードリテラル: リテラルの型のフィールドの値は、書かない
+  export fn core(name: string): Type {
+    return { kind: "core", name: name };
+  }
+
+  // レコードリテラル: リテラルの型のフィールドだけの model は、空の構造体リテラル
+  export fn mark(): Marker {
+    return { tag: "marker", version: 2 };
+  }
+
+  // リテラルの型のフィールドを読む: リテラルの式
+  export fn kindOf(c: CoreType): string {
+    return c.kind;
+  }
+
+  // リテラルの型のフィールドを読む: 整数
+  export fn version(m: Marker) {
+    count(m.version);
+  }
+
+  // variant: リテラルの型のアームは、値を持たない包む型の case。アームの中の対象は、リテラルの式（残りのアームが一つなら、残りのケースでも）
+  export fn speak(r: Report) {
+    match (r.severity by Level) {
+      Fatal => say(r.severity);
+      Loud  => say("loud");
+      Quiet => say(r.severity);
+    };
+  }
+
+  // 見分ける項目を持つ union: model のアームの union と同じ（型の switch）。アームの中で、見分ける項目を読めば、リテラルの式
+  export fn name(t: Type) {
+    match (t by Kind) {
+      Core => say(t.name);
+      List => say(t.kind);
+    };
+  }
+
+  // variant: 残りのケースが、リテラルの型のアームを、二つ以上受ける
+  export fn form(shape: Shape): string {
+    return match (shape by Form) {
+      Page   => "page";
+      Fixed  => "fixed";
+      Number => "number";
+    };
+  }
+
+  // 三つに分ける形: return match。真、偽、値がない、の順
+  export fn flag(r: Report): string {
+    return match (r.flag by Flag) {
+      Unset => "unset";
+      Off   => "off";
+      On    => "on";
+    };
+  }
+
+  // 三つに分ける形: 文の match。偽と、値がない、を、一つのアームが受ける（最後の節 default:）
+  export fn merged(r: Report) {
+    match (r.flag by Flag) {
+      On         => say("on");
+      Off, Unset => say("rest");
+    };
+  }
+
+  // 三つに分ける形: val match。真と、値がない、を、一つのアームが受ける
+  export fn apart(r: Report): string {
+    val text = match (r.flag by Flag) {
+      On, Unset => "kept";
+      Off       => "off";
+    };
+    return text;
+  }
+
+  // 三つに分ける形: 値がない側にケースがないので、最後の節は、分類の誤りの枝
+  export fn strict(r: Report): string {
+    return match (r.flag by Strict) {
+      Yes => "yes";
+      No  => "no";
+    };
+  }
+
+  // 三つに分ける形: 残りのケースが、偽と、値がない、の両方。as true のアームの中の対象は *<対象>
+  export fn lax(lit: boolean?) {
+    match (lit by Lax) {
+      Yes   => show(lit);
+      Other => say("other");
+    };
+  }
+
+  // 三つの側を、一つのアームが受けていれば、分けない
+  export fn all(r: Report) {
+    match (r.flag by Flag) {
+      On, Off, Unset => say("any");
+    };
+  }
+
+  // 述語で決まる分類は、判定関数と switch。as true / as false は、判定関数の中の確かめ
+  export fn mood(r: Report): string {
+    return match (r.flag by Mood) {
+      Glad => "glad";
+      Calm => "calm";
+      Sad  => "sad";
+    };
+  }
+}

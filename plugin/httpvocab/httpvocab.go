@@ -9,6 +9,7 @@
 package httpvocab
 
 import (
+	"encoding/json"
 	"fmt"
 	"strconv"
 	"strings"
@@ -53,6 +54,7 @@ const (
 	CodeBoth       = "HTTP-13" // 一つのフィールドに、@http.required と @http.default の両方がある
 	CodeDefault    = "HTTP-14" // @http.default のリテラルが、フィールドの型に渡せない
 	CodeConstraint = "HTTP-15" // @http.default の値が、フィールドの制約（@valid.*）に合わない
+	CodeLiteral    = "HTTP-16" // 本文の項目のフィールドの型が、リテラルの型そのもの（項目を、リテラルの型で読む形を、まだ決めていない）
 )
 
 // Place は、入力の model のフィールドを読む、通信の上の場所。
@@ -132,15 +134,23 @@ func (r *Route) HasBody() bool {
 type Union struct {
 	Decl *ir.Union
 	Arms []Arm
+	// Tag は、印のキー: model のアームの、すべてが持つ、同じ名前の、リテラルの型のフィールドで、値が、アームごとに違うもの。
+	// 印を持たなければ ""（model のアームは、決め手で見分ける）。
+	Tag string
 }
 
 // Arm は、通信に出せる union のアーム一つ。
 type Arm struct {
 	Name string
-	// Model は、アームの型の model（フィールドを持つ）。
+	// Model は、アームの型の model（フィールドを持つ）。リテラルの型のアームなら nil。
 	Model *ir.Model
-	// Keys は、決め手: そのアームの model の、省略可能でないフィールドのうち、ほかのどのアームの、どのフィールドとも、名前が違うもの。
+	// Literal は、リテラルの型のアームの、そのリテラル。model のアームなら nil。
+	Literal ir.Literal
+	// Keys は、決め手: そのアームの model の、省略可能でないフィールドのうち、ほかのどの model のアームの、どのフィールドとも、
+	// 名前が違うもの。印を持つ union と、リテラルの型のアームでは、空。
 	Keys []string
+	// TagValue は、印を持つ union の、model のアームの、印の値。
+	TagValue ir.Literal
 }
 
 // ExceptionStatus は、@http.status を持つ例外と、そのステータス。
@@ -157,6 +167,9 @@ type Reader struct {
 	// unions は、通信に出せる union（最初に現れた順）。unionOf は、調べた union（出せないものも）。
 	unions  []*Union
 	unionOf map[string]*wireUnion
+	// consts は、通信に出る型の中の、リテラルの型のフィールドを持つ model（最初に現れた順）。
+	consts  []*ir.Model
+	constOf map[string]bool
 
 	errs []plugin.Diagnostic
 	seen map[string]bool
@@ -171,7 +184,7 @@ type wireUnion struct {
 
 // NewReader は、仕様 p を読み解く Reader。
 func NewReader(p *ir.Program) *Reader {
-	return &Reader{p: p, read: map[string][]Input{}, unionOf: map[string]*wireUnion{}, seen: map[string]bool{}}
+	return &Reader{p: p, read: map[string][]Input{}, unionOf: map[string]*wireUnion{}, constOf: map[string]bool{}, seen: map[string]bool{}}
 }
 
 // Check は、仕様 p の、すべての名前空間の経路を読み解いて、診断（HTTP-*）を返す（docs/plugin-http.md「対象」「診断」）。
@@ -191,6 +204,60 @@ func (r *Reader) Errors() []plugin.Diagnostic { return r.errs }
 
 // Unions は、ここまでに読み解いた経路の、本文、結果、@http.status を持つ例外の引数の型の中の、通信に出せる union。最初に現れた順。
 func (r *Reader) Unions() []*Union { return r.unions }
+
+// LiteralModels は、Routes が見た経路の、本文、結果、@http.status を持つ例外の引数の型の中の、リテラルの型のフィールドを持つ
+// model（最初に現れた順。union と同じ辿り方）。通信の上では、そのフィールドも、キーと値を持つ（docs/plugin-http.md「通信の形」）。
+func (r *Reader) LiteralModels() []*ir.Model { return r.consts }
+
+// LiteralJSON は、リテラル lit の JSON（docs/plugin-http.md「通信の形」の表の、リテラルの型の行）。
+func LiteralJSON(lit ir.Literal) string {
+	var v any
+	switch x := lit.(type) {
+	case ir.StringLiteral:
+		v = x.Value
+	case ir.IntLiteral:
+		v = x.Value
+	case ir.FloatLiteral:
+		v = x.Value
+	case ir.BooleanLiteral:
+		v = x.Value
+	case ir.DurationLiteral:
+		v = int64(x.Value)
+	}
+	data, err := json.Marshal(v)
+	if err != nil {
+		return "null"
+	}
+	return string(data)
+}
+
+// sameJSON は、二つのリテラルの JSON が、同じ値か（数は、数として比べる: 整数の 1 と、小数の 1.0 は、同じ）。
+func sameJSON(a, b ir.Literal) bool {
+	num := func(l ir.Literal) (float64, bool) {
+		switch x := l.(type) {
+		case ir.IntLiteral:
+			return float64(x.Value), true
+		case ir.FloatLiteral:
+			return x.Value, true
+		case ir.DurationLiteral:
+			return float64(x.Value), true
+		}
+		return 0, false
+	}
+	if x, ok := num(a); ok {
+		y, isNum := num(b)
+		return isNum && x == y
+	}
+	switch x := a.(type) {
+	case ir.StringLiteral:
+		y, ok := b.(ir.StringLiteral)
+		return ok && x.Value == y.Value
+	case ir.BooleanLiteral:
+		y, ok := b.(ir.BooleanLiteral)
+		return ok && x.Value == y.Value
+	}
+	return false
+}
 
 func (r *Reader) errorf(code, at, format string, args ...any) {
 	d := plugin.Diagnostic{Code: code, At: at, Message: fmt.Sprintf(format, args...)}
@@ -264,6 +331,12 @@ func (r *Reader) Routes(namespace string, target func(op *ir.Op) bool) []Route {
 		// HTTP-5: 本文、結果、@http.status を持つ例外の引数の型
 		for i := range route.Inputs {
 			if in := &route.Inputs[i]; in.Place == InBody {
+				// HTTP-16: 本文の項目のフィールドの型が、リテラルの型そのもの
+				if lt, direct := in.Field.Type.(ir.LiteralType); direct {
+					r.errorf(CodeLiteral, op.Name, "経路の op %s の本文の項目（model %s のフィールド %s）の型が、リテラルの型 %s そのもの。本文の項目を、リテラルの型で読む形を、まだ決めていない",
+						op.Name, model.Name, in.Field.Name, display(lt))
+					continue
+				}
 				r.checkJSON(op, in.Field.Type, fmt.Sprintf("本文（model %s のフィールド %s）の型", model.Name, in.Field.Name))
 			}
 		}
@@ -619,10 +692,12 @@ func literalDisplay(lit ir.Literal) string {
 
 // checkJSON は HTTP-5: 型 t（what: 本文、結果、例外の引数の、どの型か）の中の union が、どれも、通信に出せること。
 // 出せる union は、最初に現れた順に、r.unions に集まる。
+// 通信に出る、リテラルの型のフィールドを持つ model（r.consts）も、ここで集める。
 func (r *Reader) checkJSON(op *ir.Op, t ir.Type, what string) {
+	r.constsIn(t, map[string]bool{})
 	for _, u := range r.unionsIn(t, map[string]bool{}) {
 		if u.problem != "" {
-			r.errorf(CodeJSON, op.Name, "経路の op %s の%s %s が、通信に出せない union %s を中に持つ: %s（通信に出せるのは、アームが、どれも、フィールドを持つ model で、アームごとに、そのアームだけが持つ、省略可能でないフィールドがある union）",
+			r.errorf(CodeJSON, op.Name, "経路の op %s の%s %s が、通信に出せない union %s を中に持つ: %s（通信に出せる union の条件は、docs/plugin-http.md「通信の形」の「union」）",
 				op.Name, what, display(t), u.decl.Name, u.problem)
 		}
 	}
@@ -666,7 +741,44 @@ func (r *Reader) unionsIn(t ir.Type, visited map[string]bool) []*wireUnion {
 	return nil
 }
 
-// wireUnion は、union u を、通信に出せるか調べた結果（一度だけ調べる。docs/plugin-http.md「通信の形」の「union」の二つの条件）。
+// constsIn は、型 t の中の、リテラルの型のフィールドを持つ model を、辿った順に、r.consts に足す（optional、array、model の
+// フィールドとインデックスの値、union のアームの型を辿る）。
+func (r *Reader) constsIn(t ir.Type, visited map[string]bool) {
+	switch x := t.(type) {
+	case ir.OptionalType:
+		r.constsIn(x.Of, visited)
+	case ir.ArrayType:
+		r.constsIn(x.Of, visited)
+	case ir.CaseType:
+		r.constsIn(x.Of, visited)
+	case ir.RefType:
+		if visited[x.Target] {
+			return
+		}
+		visited[x.Target] = true
+		switch d := r.p.Lookup(x.Target).(type) {
+		case *ir.Union:
+			for _, a := range d.Arms {
+				r.constsIn(a.Type, visited)
+			}
+		case *ir.Model:
+			for _, f := range d.Fields {
+				if _, direct := f.Type.(ir.LiteralType); direct && !r.constOf[d.Name] {
+					r.constOf[d.Name] = true
+					r.consts = append(r.consts, d)
+				}
+			}
+			for _, f := range d.Fields {
+				r.constsIn(f.Type, visited)
+			}
+			if d.Index != nil {
+				r.constsIn(d.Index.Value, visited)
+			}
+		}
+	}
+}
+
+// wireUnion は、union u を、通信に出せるか調べた結果（一度だけ調べる。docs/plugin-http.md「通信の形」の「union」の三つの条件）。
 // 出せる union は、r.unions に足す。
 func (r *Reader) wireUnion(u *ir.Union) *wireUnion {
 	if w, ok := r.unionOf[u.Name]; ok {
@@ -674,41 +786,107 @@ func (r *Reader) wireUnion(u *ir.Union) *wireUnion {
 	}
 	w := &wireUnion{decl: u}
 	r.unionOf[u.Name] = w
+	// 1: アームの型は、フィールドを持つ model か、リテラルの型
 	models := make([]*ir.Model, len(u.Arms))
+	lits := make([]ir.Literal, len(u.Arms))
 	for i, a := range u.Arms {
-		if ref, ok := a.Type.(ir.RefType); ok {
-			if m, isModel := r.p.Lookup(ref.Target).(*ir.Model); isModel && m.Index == nil {
+		switch x := a.Type.(type) {
+		case ir.LiteralType:
+			lits[i] = x.Literal
+		case ir.RefType:
+			if m, isModel := r.p.Lookup(x.Target).(*ir.Model); isModel && m.Index == nil {
 				models[i] = m
 			}
 		}
-		if models[i] == nil {
-			w.problem = fmt.Sprintf("アーム %s の型 %s が、フィールドを持つ model でない", a.Name, display(a.Type))
+		if models[i] == nil && lits[i] == nil {
+			w.problem = fmt.Sprintf("アーム %s の型 %s が、フィールドを持つ model でも、リテラルの型でもない", a.Name, display(a.Type))
 			return w
 		}
 	}
-	ok := &Union{Decl: u}
+	// 2: リテラルの型のアームどうしは、JSON の値が違う
+	for i := range u.Arms {
+		for j := i + 1; j < len(u.Arms); j++ {
+			if lits[i] != nil && lits[j] != nil && sameJSON(lits[i], lits[j]) {
+				w.problem = fmt.Sprintf("アーム %s と、アーム %s の、リテラルの型の JSON の値が、同じ（%s）", u.Arms[i].Name, u.Arms[j].Name, LiteralJSON(lits[i]))
+				return w
+			}
+		}
+	}
+	// 3: model のアームは、印か、決め手で見分ける
+	ok := &Union{Decl: u, Tag: tagOf(models)}
 	for i, a := range u.Arms {
-		arm := Arm{Name: a.Name, Model: models[i]}
-		others := map[string]bool{}
-		for j := range models {
-			if j != i {
-				for _, f := range models[j].Fields {
-					others[f.Name] = true
+		arm := Arm{Name: a.Name, Model: models[i], Literal: lits[i]}
+		switch {
+		case models[i] == nil:
+		case ok.Tag != "":
+			arm.TagValue = literalField(models[i], ok.Tag)
+		default:
+			others := map[string]bool{}
+			for j := range models {
+				if j != i && models[j] != nil {
+					for _, f := range models[j].Fields {
+						others[f.Name] = true
+					}
 				}
 			}
-		}
-		for _, f := range models[i].Fields {
-			if _, optional := f.Type.(ir.OptionalType); !optional && !others[f.Name] {
-				arm.Keys = append(arm.Keys, f.Name)
+			for _, f := range models[i].Fields {
+				if _, optional := f.Type.(ir.OptionalType); !optional && !others[f.Name] {
+					arm.Keys = append(arm.Keys, f.Name)
+				}
 			}
-		}
-		if len(arm.Keys) == 0 {
-			w.problem = fmt.Sprintf("アーム %s（%s）に、そのアームだけが持つ、省略可能でないフィールドがない", a.Name, models[i].Name)
-			return w
+			if len(arm.Keys) == 0 {
+				w.problem = fmt.Sprintf("アーム %s（%s）に、印も、そのアームだけが持つ、省略可能でないフィールドもない", a.Name, models[i].Name)
+				return w
+			}
 		}
 		ok.Arms = append(ok.Arms, arm)
 	}
 	w.ok = ok
 	r.unions = append(r.unions, ok)
 	return w
+}
+
+// literalField は、model m のフィールド name の型が、リテラルの型そのものなら、そのリテラル。そうでなければ nil。
+func literalField(m *ir.Model, name string) ir.Literal {
+	for _, f := range m.Fields {
+		if f.Name == name {
+			if lt, ok := f.Type.(ir.LiteralType); ok {
+				return lt.Literal
+			}
+		}
+	}
+	return nil
+}
+
+// tagOf は、model のアーム（models の、nil でないもの）の印（docs/plugin-http.md「通信の形」の「union」）: すべてが持つ、同じ名前の、
+// リテラルの型のフィールドで、JSON の値が、アームごとに違うもの。最初の model の、フィールドの順で、最初のもの。なければ ""。
+func tagOf(models []*ir.Model) string {
+	var arms []*ir.Model
+	for _, m := range models {
+		if m != nil {
+			arms = append(arms, m)
+		}
+	}
+	if len(arms) == 0 {
+		return ""
+	}
+	for _, f := range arms[0].Fields {
+		values := make([]ir.Literal, len(arms))
+		distinct := true
+		for i, m := range arms {
+			if values[i] = literalField(m, f.Name); values[i] == nil {
+				distinct = false
+				break
+			}
+			for j := 0; j < i; j++ {
+				if sameJSON(values[j], values[i]) {
+					distinct = false
+				}
+			}
+		}
+		if distinct {
+			return f.Name
+		}
+	}
+	return ""
 }

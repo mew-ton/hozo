@@ -1,0 +1,20 @@
+// GOSQL-34: 位置は model。リテラルの型のフィールドを持つ model を中に持つ型のフィールド（docs/plugin-go-sqlite.md「しまい方」）。
+namespace app {
+  model Inner { kind: "inner"; n: int; }
+  model Outer { inner: Inner; }
+  model InnersByName { [name: string]: Inner; }
+  model Fine { n: int; }
+  model Bad {
+    @db.key @db.text id: string;
+    @db.json inner: Inner;
+    @db.json maybe: Inner?;
+    @db.json inners: Inner[];
+    @db.json outer: Outer;
+    @db.json byName: InnersByName;
+    // しまい方が @db.json でなくても、同じ（合わないしまい方 GOSQL-17 とは、重ねて報告しない）
+    @db.text text: Inner;
+    // リテラルの型のフィールドを持たない model は、列にできる
+    @db.json fine: Fine;
+  }
+  @db.table state bads: list<Bad>;
+}

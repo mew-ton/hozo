@@ -1,6 +1,7 @@
-// GO-9（docs/plugin-go.md「診断」）: リテラルの型を、型の位置（フィールド、union のアーム、引数）に使う宣言と、対象の型が boolean? の、
-// literal の分類ごとに、一つ。リテラルの型を使わない宣言（Plain、plain）と、対象の型が boolean の literal の分類（Done）には、出ない。
-// 位置は、その宣言。
+// GO-9（docs/plugin-go.md「診断」）: リテラルの型を、Go の形のない位置に使う宣言ごとに、一つ: optional の中（Maybe）、array の中（Many）、
+// union のアームの array の中（Loose）、インデックスの model の値（Table）、例外の引数（Bad）、op の引数（retry）、op の戻り値（fixed）。
+// Go の形のある使い方には、出ない: リテラルの型を使わない宣言（Plain、plain）、model のフィールドの型そのもの（Report）、
+// union のアームの型そのもの（Severity）、分類のケースの as（Level、Done、Flag）。位置は、その宣言。
 
 namespace a {
   model Plain { id: string; }
@@ -9,17 +10,31 @@ namespace a {
     Error: "error";
     Warning: "warning";
   }
-  /** 型で決まる分類（literal）。対象の型が boolean なら、出せる */
+  /** variant の分類。残りのケースでの対象の型が、リテラルの型（"warning"）になる */
+  classify Level of Severity {
+    Fatal: Severity as "error";
+    Other: Severity as else;
+  }
+  /** literal の分類（対象の型が boolean） */
   classify Done of boolean {
     Yes: boolean as true;
     No: boolean as false;
   }
-  /** 対象の型が boolean? の literal の分類は、まだ、出せない */
+  /** literal の分類（対象の型が boolean?） */
   classify Flag of boolean? {
     On: boolean? as true;
     Off: boolean? as false;
     Unset: boolean? as else;
   }
+  model Maybe { kind: "x"?; }
+  model Many { kinds: "x"[]; }
+  union Loose {
+    Some: "a"[];
+    Count: int;
+  }
+  model Table { [name: string]: "x"; }
+  exception Bad(level: "error");
   export fn plain(p: Plain): int;
   export fn retry(times: 3): int;
+  export fn fixed(): "ok";
 }

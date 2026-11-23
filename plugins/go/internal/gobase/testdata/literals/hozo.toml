@@ -1,0 +1,8 @@
+[options.go]
+module = "example.com/app"
+
+# plugins/go の単体テストの入力（docs/testing.md「単体テスト」）: docs/plugin-go.md「型」の、リテラルの型の行。
+[[emit]]
+namespace   = "app"
+transpilers = ["go"]
+out         = "gen/app"

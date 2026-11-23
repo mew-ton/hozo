@@ -6,13 +6,14 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"testing"
 
 	"github.com/mew-ton/hozo/ir"
 	"github.com/mew-ton/hozo/plugin"
 )
 
-// このファイルは、http の語彙の、書いたものの整合の検査（docs/plugin-http.md「診断」の HTTP-1〜HTTP-15）の単体テスト
+// このファイルは、http の語彙の、書いたものの整合の検査（docs/plugin-http.md「診断」の HTTP-1〜HTTP-16）の単体テスト
 // （docs/testing.md「単体テスト」の `plugin/httpvocab`）。
 //
 // 入力は testdata/<名前>/ の .hozo。このパッケージは internal/ を import できない（docs/packages.md「依存の向き」）ので、
@@ -54,25 +55,26 @@ var diagnosticFixtures = []struct{ name, code string }{
 	{"http13", CodeBoth},       // 一つのフィールドに、@http.required と @http.default の両方がある
 	{"http14", CodeDefault},    // @http.default のリテラルが、フィールドの型に渡せない
 	{"http15", CodeConstraint}, // @http.default の値が、フィールドの制約（@valid.*）に合わない
+	{"http16", CodeLiteral},    // 本文の項目のフィールドの型が、リテラルの型そのもの
 }
 
-// TestDiagnosticCodes は、「診断」の表の ID（HTTP-1〜HTTP-15。欠番はない）のどれもが、入力を一つ持つこと。
+// TestDiagnosticCodes は、「診断」の表の ID（HTTP-1〜HTTP-16。欠番はない）のどれもが、入力を一つ持つこと。
 func TestDiagnosticCodes(t *testing.T) {
 	seen := map[string]bool{}
 	for _, fx := range diagnosticFixtures {
 		seen[fx.code] = true
 	}
-	for n := 1; n <= 15; n++ {
+	for n := 1; n <= 16; n++ {
 		if code := "HTTP-" + strconv.Itoa(n); !seen[code] {
 			t.Errorf("%s の入力がない", code)
 		}
 	}
-	if len(seen) != 15 {
-		t.Errorf("診断の入力のコードが %d 種類（15 のはず）", len(seen))
+	if len(seen) != 16 {
+		t.Errorf("診断の入力のコードが %d 種類（16 のはず）", len(seen))
 	}
 }
 
-// TestDiagnostics は docs/plugin-http.md「診断」の HTTP-1〜HTTP-15: 診断のコード・位置・メッセージがゴールデンと同じこと。
+// TestDiagnostics は docs/plugin-http.md「診断」の HTTP-1〜HTTP-16: 診断のコード・位置・メッセージがゴールデンと同じこと。
 // 同じ仕様から、同じ診断を返すこと（決定性）も確かめる。
 func TestDiagnostics(t *testing.T) {
 	for _, fx := range diagnosticFixtures {
@@ -124,7 +126,7 @@ func TestDiagnosticPositions(t *testing.T) {
 		"http3": {"app.In"},
 		// 全体の形で受け取る model のフィールドの型は、その model の位置
 		"http4":  {"app.HeaderIn", "app.QueryIn", "app.Meta", "app.Paging"},
-		"http5":  {"app.putShape", "app.putAlbum", "app.putDrawing", "app.getDrawing", "app.getShapes", "app.getSame", "app.getEmpty", "app.getSub", "app.getIndexed", "app.clash", "app.refused"},
+		"http5":  {"app.putShape", "app.putAlbum", "app.putDrawing", "app.getDrawing", "app.getShapes", "app.getSame", "app.getEmpty", "app.getSub", "app.getIndexed", "app.clash", "app.refused", "app.getTwice", "app.getSameTag"},
 		"http6":  {"app.fetch", "app.both", "app.whole"},
 		"http7":  {"app.relative", "app.empty", "app.absolute", "app.byId", "app.brace"},
 		"http8":  {"app.second", "app.third", "app.again"},
@@ -136,6 +138,7 @@ func TestDiagnosticPositions(t *testing.T) {
 		"http13": {"app.In"},
 		"http14": {"app.In"},
 		"http15": {"app.In"},
+		"http16": {"app.putItem"},
 	} {
 		got := map[string]bool{}
 		for _, d := range Check(loadSpec(t, name).Program) {
@@ -173,5 +176,49 @@ func TestRoutesByNamespace(t *testing.T) {
 	}
 	if got := NewReader(spec.Program).Routes("nowhere", nil); got != nil {
 		t.Errorf("ない名前空間の経路 = %+v", got)
+	}
+}
+
+// TestWireUnions は「通信の形」の「union」: 通信に出せる union の、アームの見分け方（リテラルの型のアームは、そのリテラルの JSON。
+// 印を持つ union の model のアームは、印の値。印を持たない union の model のアームは、決め手）と、通信に出る、リテラルの型の
+// フィールドを持つ model（LiteralModels。最初に現れた順）。期待は、文書から、手で書いた。入力は http5（通信に出せる union も持つ）。
+func TestWireUnions(t *testing.T) {
+	r := NewReader(loadSpec(t, "http5").Program)
+	r.Routes("app", nil)
+	got := map[string]string{}
+	for _, u := range r.Unions() {
+		var arms []string
+		for _, a := range u.Arms {
+			switch {
+			case a.Literal != nil:
+				arms = append(arms, a.Name+" lit="+LiteralJSON(a.Literal))
+			case a.TagValue != nil:
+				arms = append(arms, a.Name+" "+u.Tag+"="+LiteralJSON(a.TagValue))
+			default:
+				arms = append(arms, a.Name+" keys="+strings.Join(a.Keys, ","))
+			}
+		}
+		got[u.Decl.Name] = strings.Join(arms, " | ")
+	}
+	want := map[string]string{
+		"app.Fine":   "Card keys=n | Text keys=text",
+		"app.Level":  `Low lit="low" | High lit="high" | Zero lit=0 | Yes lit=true`,
+		"app.Tagged": `A kind="a" | B kind="b"`,
+		"app.Mixed":  `Card keys=n | None lit="none"`,
+	}
+	if len(got) != len(want) {
+		t.Errorf("通信に出せる union = %v, want %v", got, want)
+	}
+	for name, w := range want {
+		if got[name] != w {
+			t.Errorf("union %s のアーム = %s, want %s", name, got[name], w)
+		}
+	}
+	var models []string
+	for _, m := range r.LiteralModels() {
+		models = append(models, m.Name)
+	}
+	if w := "app.SameTag.A,app.SameTag.B,app.Tagged.A,app.Tagged.B"; strings.Join(models, ",") != w {
+		t.Errorf("リテラルの型のフィールドを持つ model = %v, want %s", models, w)
 	}
 }

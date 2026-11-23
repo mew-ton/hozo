@@ -111,6 +111,7 @@ func (e *emitter) collectTables() (marked int) {
 
 // columns は、表の model m の列を、語彙の読み解きの列（vm.Columns。フィールドの順）から作り、しまい方を読んで、フィールドの
 // デコレータと型の食い違いを確かめる（どれも、位置は model）: どのしまい方でも列にできない型（union と、union を中に持つ型）は GOSQL-3、
+// リテラルの型のフィールドを持つ model を中に持つ型は GOSQL-34、
 // しまい方がちょうど一つでなければ GOSQL-16、しまい方が型に合わなければ GOSQL-17。
 func (e *emitter) columns(m *model, vm *dbvocab.Model) {
 	for i, f := range m.decl.Fields {
@@ -139,6 +140,12 @@ func (e *emitter) columns(m *model, vm *dbvocab.Model) {
 			e.errorf(codeSQLColumn, m.decl.Name, "model %s のフィールド %s の型 %s は、どのしまい方でも列にできない（union と、union を中に持つ型。JSON での union の形を、まだ決めていない）",
 				m.decl.Name, f.Name, golang.TypeDisplay(f.Type))
 		}
+		// GOSQL-34: リテラルの型のフィールドを持つ model を中に持つ型（基底の構造体が、その項目を持たない）
+		literal := !union && e.hasLiteralField(inner, map[string]bool{})
+		if literal {
+			e.errorf(codeSQLLiteral, m.decl.Name, "model %s のフィールド %s の型 %s は、列にできない（リテラルの型のフィールドを持つ model を中に持つ型。JSON での、リテラルの型の形を、まだ決めていない）",
+				m.decl.Name, f.Name, golang.TypeDisplay(f.Type))
+		}
 		switch {
 		case len(stores) == 0:
 			e.errorf(codeSQLStorage, m.decl.Name, "model %s のフィールド %s が、しまい方のデコレータ（%s）を持たない（表の model のフィールドは、ちょうど一つ要る）",
@@ -146,7 +153,7 @@ func (e *emitter) columns(m *model, vm *dbvocab.Model) {
 		case len(stores) > 1:
 			e.errorf(codeSQLStorage, m.decl.Name, "model %s のフィールド %s が、しまい方のデコレータを二つ以上持つ（%s。ちょうど一つ要る）",
 				m.decl.Name, f.Name, storageNames(stores))
-		case !union && !fits(c.store, dbvocab.ClassOf(e.p, inner)):
+		case !union && !literal && !fits(c.store, dbvocab.ClassOf(e.p, inner)):
 			e.errorf(codeSQLFit, m.decl.Name, "model %s のフィールド %s のしまい方 @%s が、型 %s に合わない（@%s に合う型は %s）",
 				m.decl.Name, f.Name, c.store.decorator, golang.TypeDisplay(f.Type), c.store.decorator, c.store.fits)
 		}
@@ -168,6 +175,32 @@ func fits(s *storage, class string) bool {
 	for _, c := range s.classes {
 		if c == class {
 			return true
+		}
+	}
+	return false
+}
+
+// hasLiteralField は、型 t が、リテラルの型のフィールドを持つ model か、それを中に持つ array / model（インデックスの model を含む）か。
+// seen は、辿った model（自分を指す model で止まる）。union は、辿らない（GOSQL-3 が、先に断る）。
+func (e *emitter) hasLiteralField(t ir.Type, seen map[string]bool) bool {
+	switch x := t.(type) {
+	case ir.OptionalType:
+		return e.hasLiteralField(x.Of, seen)
+	case ir.ArrayType:
+		return e.hasLiteralField(x.Of, seen)
+	case ir.CaseType:
+		return e.hasLiteralField(x.Of, seen)
+	case ir.RefType:
+		if d, ok := e.p.Lookup(x.Target).(*ir.Model); ok && !seen[d.Name] {
+			seen[d.Name] = true
+			for _, f := range d.Fields {
+				if _, direct := f.Type.(ir.LiteralType); direct || e.hasLiteralField(f.Type, seen) {
+					return true
+				}
+			}
+			if d.Index != nil {
+				return e.hasLiteralField(d.Index.Value, seen)
+			}
 		}
 	}
 	return false

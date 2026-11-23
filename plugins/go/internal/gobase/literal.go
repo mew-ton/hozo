@@ -9,21 +9,22 @@ import (
 // checkLiteralTypes は GO-9（docs/plugin-go.md「診断」）: 名前空間 N の宣言が、基底が、まだ Go の形を持たない、リテラルの型の
 // 使い方をしていれば、その宣言を断る。形を当て推量して、コードを出さない。断るのは、次の二つ。
 //
-//   - リテラルの型（ir.LiteralType）を、型の位置（フィールド、引数、戻り値、union のアーム、状態、分類の対象）に使う。
-//     配線の本体の中の型（アームの中の対象の型が、as に書いたリテラルの型になる）は、見ない: Go の型は、もとの型と同じ。
-//   - literal の絞り込み（ir.NarrowByLiteral）を持つ分類の対象が、型 boolean の値でない（boolean? と、状態の分類）。
+//   - リテラルの型（ir.LiteralType）を、Go の形のない位置に使う: op・read・効果・デコレータの引数と戻り値、例外の引数、状態の型、
+//     optional と array の中、インデックスの model のキーと値、分類の対象。
+//   - literal の絞り込み（ir.NarrowByLiteral）を持つ分類の対象が、型 boolean か boolean? の値でない（状態の分類）。
 //
-// 対象の型が boolean の、値の分類と op の分類の literal の絞り込みは、出せる（同「match」）。
+// 断らないのは、Go の形のあるもの: model のフィールドの型そのもの（同「model」）、union のアームの型そのもの（同「union」）、
+// 分類のケースの as の型（同「match」。型を作らない）。配線の本体の中の型は、見ない。
 func (e *emitter) checkLiteralTypes() {
 	const tail = "。トランスパイラ go は、まだ、その Go の形を持たない"
 	for _, d := range e.ns.Decls {
 		name := d.Common().Name
-		if c, ok := d.(*ir.Classify); ok && hasLiteralNarrowing(c) && !isBoolean(c.SubjectType()) {
-			e.errorf(codeLiteralType, name, "%s %s は、リテラルの型で決まる絞り込み（literal）を持つが、対象が、型 boolean の値でない（boolean? と、状態の分類は、まだ）%s", d.Kind(), name, tail)
+		if c, ok := d.(*ir.Classify); ok && hasLiteralNarrowing(c) && !isBooleanOrOptional(c.SubjectType()) {
+			e.errorf(codeLiteralType, name, "%s %s は、リテラルの型で決まる絞り込み（literal）を持つが、対象が、型 boolean か boolean? の値でない（状態の分類は、まだ）%s", d.Kind(), name, tail)
 			continue
 		}
 		if usesLiteralType(reflect.ValueOf(d)) {
-			e.errorf(codeLiteralType, name, "%s %s は、リテラルの型を、型の位置に使う%s", d.Kind(), name, tail)
+			e.errorf(codeLiteralType, name, "%s %s は、リテラルの型を、Go の形のない位置に使う（形があるのは、model のフィールドの型そのものと、union のアームの型そのもの）%s", d.Kind(), name, tail)
 		}
 	}
 }
@@ -40,8 +41,11 @@ func hasLiteralNarrowing(c *ir.Classify) bool {
 	return false
 }
 
-// isBoolean は、型 t が、核の型 boolean そのものか（optional でも、絞り込んだ型でもない）。
-func isBoolean(t ir.Type) bool {
+// isBooleanOrOptional は、型 t が、核の型 boolean か、その optional か（絞り込んだ型でない）。値の分類と op の分類でなければ、t は nil。
+func isBooleanOrOptional(t ir.Type) bool {
+	if o, ok := t.(ir.OptionalType); ok {
+		t = o.Of
+	}
 	c, ok := t.(ir.CoreType)
 	return ok && c.Name == ir.CoreBoolean
 }
@@ -50,10 +54,13 @@ var (
 	literalTypeType = reflect.TypeOf(ir.LiteralType{})
 	caseTypingType  = reflect.TypeOf(ir.CaseTyping{})
 	wiringType      = reflect.TypeOf(ir.Wiring{})
+	fieldType       = reflect.TypeOf(ir.Field{})
+	unionArmType    = reflect.TypeOf(ir.UnionArm{})
 )
 
-// usesLiteralType は、値 v の中（構造体の項目、並び、ポインタとインターフェースの先）に、リテラルの型があるか。配線の本体
-// （ir.Wiring）と、literal の絞り込みの as の型（ir.CaseTyping。型を作らない）は、見ない。
+// usesLiteralType は、値 v の中（構造体の項目、並び、ポインタとインターフェースの先）に、Go の形のない位置の、リテラルの型があるか。
+// 見ないもの: 配線の本体（ir.Wiring）、分類のケースの as の型（ir.CaseTyping。型を作らない）、型がリテラルの型そのものの、
+// model のフィールド（ir.Field）と union のアーム（ir.UnionArm）。
 // IR は木（宣言は、ほかの宣言を、FQN の文字列で指す）なので、辿り切れる。
 func usesLiteralType(v reflect.Value) bool {
 	switch v.Kind() {
@@ -75,10 +82,14 @@ func usesLiteralType(v reflect.Value) bool {
 		switch v.Type() {
 		case literalTypeType:
 			return true
-		case wiringType:
+		case wiringType, caseTypingType:
 			return false
-		case caseTypingType:
-			if v.Interface().(ir.CaseTyping).By == ir.NarrowByLiteral {
+		case fieldType:
+			if isLiteralType(v.Interface().(ir.Field).Type) {
+				return false
+			}
+		case unionArmType:
+			if isLiteralType(v.Interface().(ir.UnionArm).Type) {
 				return false
 			}
 		}

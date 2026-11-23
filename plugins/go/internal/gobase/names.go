@@ -59,6 +59,9 @@ func (e *emitter) checkNames() {
 			}
 			fields := e.names("model " + x.Name + " の構造体")
 			for _, fd := range x.Fields {
+				if isLiteralType(fd.Type) {
+					continue // リテラルの型のフィールドは、構造体に項目を持たない
+				}
 				fields.add(golang.FieldName(fd.Name), "フィールド "+fd.Name, x.Name)
 			}
 		case *ir.Exception:

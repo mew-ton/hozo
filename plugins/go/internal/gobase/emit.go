@@ -17,7 +17,7 @@ import (
 // 診断のコード（docs/plugin-go.md「診断」）。
 const (
 	codeNoModule    = "GO-8"        // オプション module が、書かれていない、文字列でない、空（GO-1 は欠番）
-	codeLiteralType = "GO-9"        // 宣言が、リテラルの型か、literal の絞り込みを使う（基底は、まだ、Go の形を持たない）
+	codeLiteralType = "GO-9"        // 宣言が、リテラルの型を、Go の形のない位置に使う（基底は、まだ、その Go の形を持たない）
 	codeCollision   = "GO-2"        // 生成する名前が当たる
 	codeImportCycle = "GO-3"        // 出力どうしの import が循環する
 	codeInnerDir    = "GO-4"        // 内側のフォルダが、子の名前空間 N.inner の出力先と重なる

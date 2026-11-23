@@ -1,0 +1,11 @@
+{
+  "tests": [
+    {"name": "api.putReport/OK", "file": "gen/api/apitest/http.go", "lines": [122, 128]},
+    {"name": "api.putReport/BadRequest", "file": "gen/api/apitest/http.go", "lines": [131, 137]},
+    {"name": "api.putParts/OK", "file": "gen/api/apitest/http.go", "lines": [156, 162]},
+    {"name": "api.putParts/BadRequest", "file": "gen/api/apitest/http.go", "lines": [165, 171]},
+    {"name": "api.severity/OK", "file": "gen/api/apitest/http.go", "lines": [188, 194]},
+    {"name": "api.clash/OK", "file": "gen/api/apitest/http.go", "lines": [211, 217]},
+    {"name": "api.clash/Clash/api.clash", "file": "gen/api/apitest/http.go", "lines": [221, 225]}
+  ]
+}

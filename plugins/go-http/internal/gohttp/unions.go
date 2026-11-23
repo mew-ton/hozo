@@ -28,6 +28,22 @@ type wireArm struct {
 	wrapped bool
 	// keys は、決め手（httpvocab.Arm.Keys）。
 	keys []string
+	// tag は、印のキー（httpvocab.Union.Tag。印を持つ union の、model のアーム）。value は、その印の JSON。
+	// リテラルの型のアーム（literal）では、tag は空で、value は、そのリテラルの JSON。
+	tag, value string
+	literal    bool
+}
+
+// wireConst は、通信に出る、リテラルの型のフィールドを持つ model 一つと、そのフィールドの並び（フィールドの順）。
+type wireConst struct {
+	decl   *ir.Model
+	fields []constField
+}
+
+// constField は、リテラルの型のフィールド一つ: JSON のキー、値の JSON、その前にある Go の項目の数。
+type constField struct {
+	at         int
+	key, value string
 }
 
 // wireUnions は、httpvocab が読み解いた、通信に出せる union（最初に現れた順）に、Go の型の名前を足して、g.unions に置く。
@@ -37,10 +53,17 @@ func (g *generator) wireUnions(unions []*httpvocab.Union) {
 		w := &wireUnion{decl: u.Decl}
 		for _, a := range u.Arms {
 			arm := wireArm{name: a.Name, keys: a.Keys}
-			if g.declNS[a.Model.Name] == ns {
+			switch {
+			case a.Literal != nil:
+				// リテラルの型のアーム: 値を持たない、包む型（docs/plugin-go.md「union」）
+				arm.goName, arm.literal, arm.value = golang.TypeName(u.Decl.Name, ns)+golang.Capitalize(a.Name), true, httpvocab.LiteralJSON(a.Literal)
+			case g.declNS[a.Model.Name] == ns:
 				arm.goName = golang.TypeName(a.Model.Name, ns)
-			} else {
+			default:
 				arm.goName, arm.wrapped = golang.TypeName(u.Decl.Name, ns)+golang.Capitalize(a.Name), true
+			}
+			if a.TagValue != nil {
+				arm.tag, arm.value = u.Tag, httpvocab.LiteralJSON(a.TagValue)
 			}
 			w.arms = append(w.arms, arm)
 		}
@@ -48,7 +71,31 @@ func (g *generator) wireUnions(unions []*httpvocab.Union) {
 	}
 }
 
-// unionTable は、表 httpUnions（docs/plugin-go-http.md「補助」の「union の読み書き」）。qualifier は、名前空間のパッケージの修飾
+// wireConsts は、httpvocab が集めた、通信に出る、リテラルの型のフィールドを持つ model（最初に現れた順）を、g.consts に置く。
+func (g *generator) wireConsts(models []*ir.Model) {
+	for _, m := range models {
+		c := &wireConst{decl: m}
+		stored := 0
+		for _, f := range m.Fields {
+			if lt, ok := f.Type.(ir.LiteralType); ok {
+				c.fields = append(c.fields, constField{at: stored, key: f.Name, value: httpvocab.LiteralJSON(lt.Literal)})
+				continue
+			}
+			stored++
+		}
+		g.consts = append(g.consts, c)
+	}
+}
+
+// rawString は、文字列 s の、Go の文字列リテラル: バッククォートを含まなければ、生の文字列リテラル。
+func rawString(s string) string {
+	if strings.Contains(s, "`") {
+		return strconv.Quote(s)
+	}
+	return "`" + s + "`"
+}
+
+// unionTable は、表 httpUnions と、表 httpConsts（docs/plugin-go-http.md「補助」の「union の読み書き」）。qualifier は、名前空間のパッケージの修飾
 // （Imports.Qualifier）。reflect の名前は、決まった名前（helperPackages）。
 func (g *generator) unionTable(qualifier func(namespace string) string) string {
 	var b strings.Builder
@@ -63,11 +110,29 @@ func (g *generator) unionTable(qualifier func(namespace string) string) string {
 			for i, k := range a.keys {
 				keys[i] = strconv.Quote(k)
 			}
+			how := "keys: []string{" + strings.Join(keys, ", ") + "}"
+			switch {
+			case a.literal:
+				how = "value: " + rawString(a.value)
+			case a.tag != "":
+				how = "tag: " + strconv.Quote(a.tag) + ", value: " + rawString(a.value)
+			}
 			wrap := ""
 			if a.wrapped {
 				wrap = ", wrap: true"
 			}
-			fmt.Fprintf(&b, "{typ: reflect.TypeFor[%s%s](), keys: []string{%s}%s},\n", q, a.goName, strings.Join(keys, ", "), wrap)
+			fmt.Fprintf(&b, "{typ: reflect.TypeFor[%s%s](), %s%s},\n", q, a.goName, how, wrap)
+		}
+		b.WriteString("},\n")
+	}
+	b.WriteString("}\n\n")
+	b.WriteString("// httpConsts は、リテラルの型のフィールドを持つ model ごとの、そのフィールドの並び（フィールドの順）。\n")
+	b.WriteString("var httpConsts = map[reflect.Type][]httpConst{\n")
+	for _, c := range g.consts {
+		ns := g.declNS[c.decl.Name]
+		fmt.Fprintf(&b, "reflect.TypeFor[%s%s](): {\n", qualifier(ns), golang.TypeName(c.decl.Name, ns))
+		for _, f := range c.fields {
+			fmt.Fprintf(&b, "{at: %d, key: %s, value: %s},\n", f.at, strconv.Quote(f.key), rawString(f.value))
 		}
 		b.WriteString("},\n")
 	}
@@ -92,21 +157,33 @@ func withUnions(h helper) helper {
 }
 
 // helperUnionCodec は、union の読み書きの補助（docs/plugin-go-http.md「補助」の「union の読み書き」）。表 httpUnions の後ろに出す。
-var helperUnionCodec = helper{imports: []string{"bytes", "encoding/json", "errors", "fmt", "reflect", "strings"}, text: `// httpArm は、通信に出る union のアーム一つ: 値として持つ Go の型と、決め手（そのアームだけが持つ、省略可能でないフィールドの、
-// JSON のキー）。wrap は、包む型（中身は、フィールド Value）。
+var helperUnionCodec = helper{imports: []string{"bytes", "encoding/json", "errors", "fmt", "reflect", "strings"}, text: `// httpArm は、通信に出る union のアーム一つ: 値として持つ Go の型と、見分け方。keys は、決め手（そのアームだけが持つ、
+// 省略可能でないフィールドの、JSON のキー）。tag と value は、印のキーと、そのアームの印の JSON。tag がなく、value だけなら、
+// リテラルの型のアームで、value は、その値の JSON。wrap は、包む型（中身は、フィールド Value）。
 type httpArm struct {
-	typ  reflect.Type
-	keys []string
-	wrap bool
+	typ   reflect.Type
+	keys  []string
+	tag   string
+	value string
+	wrap  bool
+}
+
+// httpConst は、リテラルの型のフィールド一つ: JSON のキーと、値の JSON。at は、その前にある、Go の項目の数（書く位置）。
+type httpConst struct {
+	at    int
+	key   string
+	value string
 }
 
 // httpUnmarshal は、JSON の data を、dst（ポインタ）の指す先に読む。union は、アームの値の JSON、そのままで、どのアームかは、
-// 決め手のキーで決める。union を中に持たない型は、encoding/json に、そのまま渡す。
+// リテラルの型のアームなら、値で、model のアームなら、印の値か、決め手のキーで決める。リテラルの型のフィールドは、キーがないか、
+// 値が違えば、誤り。union も、リテラルの型のフィールドも、中に持たない型は、encoding/json に、そのまま渡す。
 func httpUnmarshal(data []byte, dst any) error {
 	return httpDecode(data, reflect.ValueOf(dst).Elem())
 }
 
-// httpMarshal は、v を JSON にする。union は、アームの値の JSON、そのまま（包む型は、その Value）。
+// httpMarshal は、v を JSON にする。union は、アームの値の JSON、そのまま（包む型は、その Value。リテラルの型のアームは、その値）。
+// リテラルの型のフィールドは、仕様のフィールドの順の位置に、キーと値を足す。
 func httpMarshal(v any) ([]byte, error) {
 	if v == nil {
 		return []byte("null"), nil
@@ -126,12 +203,26 @@ func httpDecode(data []byte, dst reflect.Value) error {
 			dst.SetZero()
 			return nil
 		}
+		arms, found := httpUnions[t], -1
 		var obj map[string]json.RawMessage
 		if err := json.Unmarshal(data, &obj); err != nil {
-			return err
+			// オブジェクトでない: リテラルの型のアームのうち、値が同じもの
+			for i := range arms {
+				if arms[i].tag == "" && arms[i].value != "" && httpSame(data, arms[i].value) {
+					dst.Set(reflect.New(arms[i].typ).Elem())
+					return nil
+				}
+			}
+			return fmt.Errorf("union %s: no arm's value", t)
 		}
-		arms, found := httpUnions[t], -1
 		for i := range arms {
+			if arms[i].tag != "" {
+				// 印で見分ける union: 印のキーの値が、同じアーム
+				if raw, ok := obj[arms[i].tag]; ok && found < 0 && httpSame(raw, arms[i].value) {
+					found = i
+				}
+				continue
+			}
 			for _, k := range arms[i].keys {
 				if _, ok := obj[k]; !ok {
 					continue
@@ -210,6 +301,11 @@ func httpDecode(data []byte, dst reflect.Value) error {
 		if err := json.Unmarshal(data, &obj); err != nil {
 			return err
 		}
+		for _, c := range httpConsts[t] {
+			if raw, ok := obj[c.key]; !ok || !httpSame(raw, c.value) {
+				return fmt.Errorf("%s: field %s is not %s", t, c.key, c.value)
+			}
+		}
 		for i := 0; i < t.NumField(); i++ {
 			name, _, _ := strings.Cut(t.Field(i).Tag.Get("json"), ",")
 			if name == "" {
@@ -269,13 +365,34 @@ func httpEncode(v reflect.Value) ([]byte, error) {
 		}
 		return json.Marshal(items)
 	case reflect.Struct:
-		if httpWrapped(t) {
+		if arm := httpArmOf(t); arm != nil {
+			if !arm.wrap {
+				return []byte(arm.value), nil
+			}
 			return httpEncode(v.Field(0))
 		}
 		var b bytes.Buffer
 		b.WriteByte('{')
 		first := true
-		for i := 0; i < t.NumField(); i++ {
+		consts := httpConsts[t]
+		for i := 0; i <= t.NumField(); i++ {
+			// リテラルの型のフィールド: 仕様のフィールドの順の位置に
+			for _, c := range consts {
+				if c.at != i {
+					continue
+				}
+				key, _ := json.Marshal(c.key)
+				if !first {
+					b.WriteByte(',')
+				}
+				first = false
+				b.Write(key)
+				b.WriteByte(':')
+				b.WriteString(c.value)
+			}
+			if i == t.NumField() {
+				break
+			}
 			name, opts, _ := strings.Cut(t.Field(i).Tag.Get("json"), ",")
 			if !t.Field(i).IsExported() || name == "-" || strings.Contains(opts, "omitempty") && httpEmpty(v.Field(i)) {
 				continue
@@ -302,7 +419,8 @@ func httpEncode(v reflect.Value) ([]byte, error) {
 	return nil, errors.New("union: unsupported type " + t.String())
 }
 
-// httpHasUnion は、型 t の値の中に、union（か、実行時に型の決まる値）が現れうるか。現れない型は、encoding/json に、そのまま渡す。
+// httpHasUnion は、型 t の値の中に、union（か、実行時に型の決まる値）か、リテラルの型のフィールドを持つ model が現れうるか。
+// 現れない型は、encoding/json に、そのまま渡す。
 func httpHasUnion(t reflect.Type, seen map[reflect.Type]bool) bool {
 	if seen[t] {
 		return false
@@ -314,7 +432,7 @@ func httpHasUnion(t reflect.Type, seen map[reflect.Type]bool) bool {
 	case reflect.Pointer, reflect.Slice, reflect.Map:
 		return httpHasUnion(t.Elem(), seen)
 	case reflect.Struct:
-		if httpWrapped(t) {
+		if httpArmOf(t) != nil || httpConsts[t] != nil {
 			return true
 		}
 		if t.Implements(reflect.TypeFor[json.Marshaler]()) || reflect.PointerTo(t).Implements(reflect.TypeFor[json.Unmarshaler]()) {
@@ -329,16 +447,25 @@ func httpHasUnion(t reflect.Type, seen map[reflect.Type]bool) bool {
 	return false
 }
 
-// httpWrapped は、型 t が、union のアームを包む型か。
-func httpWrapped(t reflect.Type) bool {
+// httpArmOf は、型 t が、union のアームを包む型（中身を持つ型と、リテラルの型のアームの、値を持たない型）なら、そのアーム。
+func httpArmOf(t reflect.Type) *httpArm {
 	for _, arms := range httpUnions {
 		for i := range arms {
-			if arms[i].wrap && arms[i].typ == t {
-				return true
+			if arms[i].typ == t && (arms[i].wrap || arms[i].tag == "" && arms[i].value != "") {
+				return &arms[i]
 			}
 		}
 	}
-	return false
+	return nil
+}
+
+// httpSame は、JSON の raw が、JSON の value と、同じ値か（数は、数として比べる）。
+func httpSame(raw []byte, value string) bool {
+	var a, b any
+	if json.Unmarshal(raw, &a) != nil || json.Unmarshal([]byte(value), &b) != nil {
+		return false
+	}
+	return reflect.DeepEqual(a, b)
 }
 
 // httpEmpty は、encoding/json の omitempty が、キーを省く値か。

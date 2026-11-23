@@ -20,6 +20,7 @@ var goldenFixtures = []struct {
 	behavior bool
 }{
 	{name: "matchliteral", covers: "「match」の、絞り込みが literal の分け方（if <対象>）と、ケースのない側の、分類の誤りの枝", behavior: true},
+	{name: "literals", covers: "「型」の、リテラルの型の行: 「model」のリテラルの型のフィールド、「union」のリテラルの型のアーム、「値」の、リテラルの型のアームに入れる式とフィールドを読む式、「match」の variant（リテラルの型のアーム）と三つに分ける形（対象が boolean?）、「分類」の、対象が boolean? の literal の確かめ", behavior: true},
 	{name: "types", covers: "「型」（model、scalar、union、exception、effect）と「コメント」、予約語の名前空間のパッケージ名、op のない名前空間の状態の単位、「分類」の、対象のない分類（何も出さない）"},
 	{name: "names", covers: "「名前」の局所の名前、「パッケージと import パス」の import の名前、「New」の引数の名前、「別の名前空間の op」"},
 	{name: "pkgnames", covers: "「パッケージと import パス」の import の名前のうち、名前空間のパッケージ名が、基底が決まった名前で使う識別子（ops、ptr、o、ctx、err）や、途中の値（v0、k0）と同じとき。「New」の引数の名前 ops"},
@@ -135,7 +136,7 @@ var diagnosticFixtures = []struct{ name, code string }{
 	{"go5", codeOption},      // [emit.options.go] に、知らないキーがある
 	{"go6", codeVariant},     // variant の絞り込みの型と等しい型のアームが、union に二つ以上ある
 	{"go7", codeSeamOnBody},  // 単位のトランスパイラが、本体のあるデコレータに、継ぎ目を宣言している
-	{"go9", codeLiteralType}, // 宣言が、リテラルの型か、literal の絞り込みを使う
+	{"go9", codeLiteralType}, // 宣言が、リテラルの型を、Go の形のない位置に使う
 }
 
 // TestDiagnostics は docs/plugin-go.md「診断」の GO-2〜GO-7、GO-9: 診断のコード・位置・メッセージがゴールデンと同じで、

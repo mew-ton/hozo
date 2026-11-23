@@ -714,7 +714,7 @@ func (f *testFile) helpers(entries []entry) string {
 	// 全体の形は、項目の形のメソッドで、項目を一つずつ足す
 	header, query = header || headerObj, query || queryObj
 
-	unions := len(f.g.unions) > 0
+	unions := len(f.g.unions) > 0 || len(f.g.consts) > 0
 	var b strings.Builder
 	add := func(on bool, h helper) {
 		if !on {

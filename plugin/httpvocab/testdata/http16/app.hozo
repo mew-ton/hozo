@@ -1,0 +1,23 @@
+// HTTP-16: 位置は op。本文の項目（@http.body）のフィールドの型が、リテラルの型そのもの。フィールドごとに、一つ。
+// リテラルの型のフィールドを持つ model を、本文の全体、本文の項目の型、結果、例外の引数にする経路（putCore、putPart、clash）には、出ない。
+namespace app {
+  model Core { kind: "core"; name: string; }
+
+  model ItemIn { @http.body kind: "item"; @http.body name: string; @http.body version: 2; }
+  @http.post("/item")
+  export fn putItem(in: ItemIn): string;
+
+  model CoreIn { @http.bodyObj core: Core; }
+  @http.post("/core")
+  export fn putCore(in: CoreIn): Core;
+
+  model PartIn { @http.body core: Core; @http.body cores: Core[]; }
+  @http.post("/part")
+  export fn putPart(in: PartIn): string;
+
+  @http.status(409)
+  exception Clash(other: Core);
+  @http.get("/clash")
+  export fn clash(): string
+    throws Clash;
+}

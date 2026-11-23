@@ -1,0 +1,2 @@
+HTTP-16	app.putItem	経路の op app.putItem の本文の項目（model app.ItemIn のフィールド kind）の型が、リテラルの型 "item" そのもの。本文の項目を、リテラルの型で読む形を、まだ決めていない
+HTTP-16	app.putItem	経路の op app.putItem の本文の項目（model app.ItemIn のフィールド version）の型が、リテラルの型 2 そのもの。本文の項目を、リテラルの型で読む形を、まだ決めていない
