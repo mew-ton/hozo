@@ -164,6 +164,7 @@ namespace hozo.plugin {
    * @param req 要求
    * @returns 応答
    */
+  @prd.ref(hozo.diagnostics.Http.HTTP_1, hozo.diagnostics.Valid.VALID_1, hozo.diagnostics.Db.DB_1)
   export fn readVocabulary(req: ReadRequest): ReadResponse;
 
   /**
@@ -172,6 +173,7 @@ namespace hozo.plugin {
    * @param req 要求
    * @returns 応答
    */
+  @prd.ref(hozo.diagnostics.Go.GO_8, hozo.diagnostics.GoHttp.GOHTTP_16, hozo.diagnostics.GoValid.GOVALID_5)
   export fn emit(req: EmitRequest): EmitResponse;
 
   /**

@@ -1,0 +1,271 @@
+// Hozo 自身の仕様（docs/decisions.md「決めたこと」442、468、469）。診断を、要求として持つ名前空間 hozo.diagnostics。
+// **写し。持ち主は、文書**（規則の一覧は docs/requirements.md「検査の規則の一覧」、条件と重さは、それぞれの文書の「診断」の表。
+// ケースごとの @owner が、その文書と見出しを言う）。食い違えば、文書が正しい。どの単位の対象でもない: コードには、ならない。
+//
+// 写したのは、代表の 24 個（本体の規則が 80、プラグインの診断が 142 あるうち）。種類ごとに、一つずつは入れてある:
+// 本体の error と warning、診断を出さない規則、欠番、設定とマニフェスト、hozoc tests、プラグインの応答の誤り、
+// 語彙のプラグイン、Go のトランスパイラ。残りは、同じ形で書けるはず（写していないので、確かめては、いない）。
+//
+// ケースの説明は、文書の条件を、短く言い直したもの。診断の文言（メッセージ）は、写していない: 今の文言は、Go のコードが組み立てる
+// 日本語で、文書は、文言そのものを持たない（英語にするのは、後: 決定 442）。
+//
+// 書けなかった所の持ち主は docs/open.md「サンプルと、hozoc 自身の仕様」（下の「穴 30」などは、その番号）:
+//   穴 30: 診断の ID を、そのままの綴りで書けない（RES-1 の - は、名前に書けない）。RES_1 と書き、もとの綴りは、説明に書いた
+//   穴 31: 印の付け方の決まり（どのケースにも、重さか欠番の、どちらかが、ちょうど一つ）を、言えない
+//   穴 32: 要求を、それを確かめる内部の op（cli.hozo の check、collectOutputs、matchTests）に、結べない。自前の印 @checkedBy で、
+//          外から呼べるユースケース（verify、confirmTests）に結んだ
+//   穴 33: プラグインの診断を、そのプラグインに結べない（プラグインは、別の製品で、Hozo の宣言を持たない）。やり取りの op
+//          （plugin.hozo の readVocabulary、emit）に、@prd.ref で結んだ: どのプラグインかは、分類の名前が言うだけ
+//   穴 34: 規則の例（通る例と、落ちる例）を、要求に結ぶ書き方が、ない
+//   穴 35: 文言の型（どの値を埋めるか）は、Data を持つ診断にしか、書けていない
+//   穴 10（兄弟の名前空間を、短く引けない）、穴 13（列挙）は、ここでも当たった
+
+/** 診断を、要求として持つ。番号（ID）が、ケースの名前。番号を鍵に、重さ、出どころ、持ち主、文言に埋める値を引く */
+namespace hozo.diagnostics {
+  /** 診断の重さ（docs/diagnostics.md「構造」）。Silent は、診断を出さない規則（文書の表の、重さの列が「—」のもの） */
+  classify Severity of never {
+    /** 終了コードを、失敗にする */
+    Error;
+    /** 知らせるだけ。終了コードは、変えない */
+    Warning;
+    /** 診断を出さない。決まりを言うだけの行（計算や、正規化で行う）か、診断にならず、例外になる誤り */
+    Silent;
+  }
+
+  /**
+   * 重さ。欠番でないケースに、ちょうど一つ付ける（その決まりは、仕様では、言えない: 穴 31）。
+   *
+   * @param level 重さ
+   */
+  @hint
+  decorator severity(level: any case of Severity) for case of never;
+
+  /**
+   * 出どころの決定（docs/decisions.md「決めたこと」の番号）。文書が、番号を言っているものにだけ、付けてある。
+   *
+   * @param decisions 決定の番号
+   */
+  @hint
+  decorator origin(...decisions: int) for case of never;
+
+  /**
+   * 持ち主の文書と、その見出し（条件と、重さを決めている所）。
+   *
+   * @param doc 文書の場所（リポジトリのルートから）
+   * @param heading 見出し
+   */
+  @hint
+  @repeatable
+  decorator owner(doc: string, heading: string) for case of never;
+
+  /**
+   * 欠番。なくした ID で、別の意味に、使い回さない（CLAUDE.md「番号は使い回さない」）。
+   *
+   * @param replacedBy 置き換えた先の ID（なければ、書かない）
+   */
+  @hint
+  decorator retired(...replacedBy: any case of never) for case of never;
+
+  /**
+   * 文言に埋める値のうち、機械が読む形で持つもの（Diagnostic.data。docs/check.md「Data」）。
+   *
+   * @param data 値の形
+   */
+  @hint
+  decorator carries(data: any model) for case of never;
+
+  /**
+   * その診断を出すユースケース（cli.hozo の hozo.compiler の、外から呼べる op）。確かめる op そのもの（内部の check など）は、
+   * 別の名前空間からは、指せない（NS-5: 穴 32）。
+   *
+   * @param ops ユースケースの op
+   */
+  @hint
+  decorator checkedBy(...ops: any op) for case of never;
+
+  /** RES-1 の Data: 候補の名前（docs/resolve.md「診断」） */
+  model Candidates {
+    /** 候補の FQN */
+    candidates: string[];
+  }
+
+  /**
+   * hozoc 自身が出す診断: 言語の規則、設定、マニフェスト、hozoc tests、プラグインの応答の誤り。
+   * どのユースケースが出すかは、@checkedBy が言う（検査するものは verify。同じ検査は、preview、write、confirmTests も通る:
+   * docs/cli.md「検査」）。
+   */
+  classify Rule of never {
+    /** RES-1: 名前が見つからない。候補を、Data と、メッセージに示す */
+    @severity(Severity.Error)
+    @owner("docs/resolve.md", "診断")
+    @carries(Candidates)
+    @checkedBy(hozo.compiler.verify)
+    RES_1;
+
+    /** TYPE-4: 引数の値の型が、引数の型に渡せない。または、渡した値の数が、引数の数を超える */
+    @severity(Severity.Error)
+    @owner("docs/types.md", "診断")
+    @checkedBy(hozo.compiler.verify)
+    TYPE_4;
+
+    /** WIRE-2: 値を返す呼び出しを、val に受けずに書いた。値を返さない呼び出しを、val に受けた */
+    @severity(Severity.Error)
+    @owner("docs/check.md", "配線")
+    @checkedBy(hozo.compiler.verify)
+    WIRE_2;
+
+    /** WIRE-8: 代入の済んだ val が、どこからも読まれていない */
+    @severity(Severity.Warning)
+    @owner("docs/check.md", "配線")
+    @checkedBy(hozo.compiler.verify)
+    WIRE_8;
+
+    /** EFF-4: 配線の op が、effects の節に、計算した分にない効果を書いた */
+    @severity(Severity.Warning)
+    @origin(451)
+    @owner("docs/check.md", "状態と効果")
+    @checkedBy(hozo.compiler.verify)
+    EFF_4;
+
+    /** THROWS-4: 配線の op が throws の節に書いた例外は、計算した例外に、足す。診断は、ない */
+    @severity(Severity.Silent)
+    @origin(381, 466)
+    @owner("docs/check.md", "throws")
+    @checkedBy(hozo.compiler.verify)
+    THROWS_4;
+
+    /** THROWS-1: 欠番。節を書いた配線の op が、伝わってくる例外を、その節に書いていないこと */
+    @retired
+    @origin(381)
+    @owner("docs/requirements.md", "検査の規則の一覧")
+    THROWS_1;
+
+    /** THROWS-2: 欠番。配線の op が、throws の節に、多めに書いた例外を、許すこと。広げた意味は THROWS-4 */
+    @retired(Rule.THROWS_4)
+    @origin(466)
+    @owner("docs/requirements.md", "検査の規則の一覧")
+    THROWS_2;
+
+    /** CFG-7: hozo.toml に、知らないキー、値の型の違い、TOML の構文の誤り、ほか */
+    @severity(Severity.Error)
+    @owner("docs/config.md", "診断")
+    @checkedBy(hozo.compiler.verify)
+    CFG_7;
+
+    /** CFG-24: [options.<名前>] の名前が、どの単位の transpilers にもない */
+    @severity(Severity.Error)
+    @origin(425)
+    @owner("docs/config.md", "診断")
+    @checkedBy(hozo.compiler.verify)
+    CFG_24;
+
+    /** CFG-26: 本体のない、@hint でないデコレータを、設定のどの単位のトランスパイラも、解釈しない */
+    @severity(Severity.Warning)
+    @origin(420, 432)
+    @owner("docs/config.md", "診断")
+    @checkedBy(hozo.compiler.verify)
+    CFG_26;
+
+    /** MAN-2: マニフェストの protocol が、hozoc の版と合わない */
+    @severity(Severity.Error)
+    @origin(421, 467)
+    @owner("docs/plugin-protocol.md", "診断")
+    @checkedBy(hozo.compiler.verify)
+    MAN_2;
+
+    /** MAN-4: マニフェストを読めない（開けない、構文の誤り、値の型の違い、知らないキー、ほか） */
+    @severity(Severity.Error)
+    @owner("docs/plugin-protocol.md", "診断")
+    @checkedBy(hozo.compiler.verify)
+    MAN_4;
+
+    /** TESTS-1: 求めるテストが、走ったと確かめられない */
+    @severity(Severity.Error)
+    @origin(380)
+    @owner("docs/cli.md", "tests")
+    @checkedBy(hozo.compiler.confirmTests)
+    TESTS_1;
+
+    /** TESTS-2: テストの対応表か、それが指すファイルが、置き場にない、または、今の仕様から集めたものと違う */
+    @severity(Severity.Error)
+    @origin(380)
+    @owner("docs/cli.md", "tests")
+    @checkedBy(hozo.compiler.confirmTests)
+    TESTS_2;
+
+    /** PLG-1: 応答の files の path が、その出力の置き場の下にない。診断にならず、例外 MalformedOutput になる */
+    @severity(Severity.Silent)
+    @owner("docs/plugin-protocol.md", "診断")
+    @checkedBy(hozo.compiler.verify)
+    PLG_1;
+
+    /** PLG-4: 応答の files の、テストの対応表の、名前か中身が、約束の形でない。診断にならず、例外 MalformedOutput になる */
+    @severity(Severity.Silent)
+    @origin(380)
+    @owner("docs/plugin-protocol.md", "診断")
+    @checkedBy(hozo.compiler.verify)
+    PLG_4;
+  }
+
+  /** 語彙のプラグイン http が返す診断（docs/plugin-http.md） */
+  classify Http of never {
+    /** HTTP-1: @http.get か @http.post の付いた op に、export がない */
+    @severity(Severity.Error)
+    @origin(410)
+    @owner("docs/plugin-http.md", "診断")
+    HTTP_1;
+  }
+
+  /** 語彙のプラグイン valid が返す診断（docs/plugin-valid.md） */
+  classify Valid of never {
+    /** VALID-1: 制約が、付けた先に合わない */
+    @severity(Severity.Error)
+    @origin(410)
+    @owner("docs/plugin-valid.md", "診断")
+    VALID_1;
+  }
+
+  /** 語彙のプラグイン db が返す診断（docs/plugin-db.md） */
+  classify Db of never {
+    /** DB-1: @db.table の付いた状態の要素の型が、model でないか、インデックスの model */
+    @severity(Severity.Error)
+    @origin(410)
+    @owner("docs/plugin-db.md", "診断")
+    DB_1;
+  }
+
+  /** Go の基底のトランスパイラ go が返す診断（docs/plugin-go.md） */
+  classify Go of never {
+    /** GO-8: オプション module が、書かれていない、文字列でない、空 */
+    @severity(Severity.Error)
+    @origin(425)
+    @owner("docs/plugin-go.md", "診断")
+    GO_8;
+  }
+
+  /** トランスパイラ go-http が返す診断（docs/plugin-go-http.md） */
+  classify GoHttp of never {
+    /** GOHTTP-16: 経路の op の結果の型が、省略可能な配列か、省略可能な、インデックスの model */
+    @severity(Severity.Error)
+    @owner("docs/plugin-go-http.md", "診断")
+    GOHTTP_16;
+  }
+
+  /** トランスパイラ go-valid が返す診断（docs/plugin-go-valid.md） */
+  classify GoValid of never {
+    /** GOVALID-5: 標準でない valid の制約が、付いている */
+    @severity(Severity.Error)
+    @origin(463)
+    @owner("docs/plugin-go-valid.md", "診断")
+    GOVALID_5;
+  }
+
+  /** トランスパイラ go-sqlite が返す診断（docs/plugin-go-sqlite.md） */
+  classify GoSqlite of never {
+    /** GOSQL-1: 欠番。語彙のプラグイン db の DB-1 に、移した */
+    @retired(Db.DB_1)
+    @origin(410)
+    @owner("docs/plugin-go-sqlite.md", "診断")
+    GOSQL_1;
+  }
+}

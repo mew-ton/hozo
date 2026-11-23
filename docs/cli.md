@@ -16,6 +16,8 @@ hozoc 自身の仕様は、リポジトリ直下の `cli.hozo`。下のコード
 
 IDE と、MCP サーバー（`ide.hozo`）も、同じに、写してある（同 468）: 画面の入口 `hozo.ide`（語彙 `browser.page`）、AI の道具の入口 `hozo.mcp`、チャットの AI（外）の `hozo.assistant`、操作の続きの `hozo.operation`。**写しで、持ち主は、文書**（`docs/tools.md`、`docs/ide-screens.md`）。IDE も、MCP サーバーも、実装は、まだ、ない。単位の対象ではなく、コードには、ならない。担い手「設計する人」（下の `Actor.Designer`）は、この写しと一緒に、足した（同 474）。
 
+診断（`diagnostics.hozo` の `hozo.diagnostics`）も、要求として、写してある（同 442、468、469）: 診断の ID が、対象のない分類のケースで、重さ、出どころの決定、持ち主の文書と見出し、欠番、文言に埋める値を、自前の印で結ぶ。写したのは、代表の 24 個。**写しで、持ち主は、文書**（`docs/requirements.md`「検査の規則の一覧」と、それぞれの文書の「診断」の表）。単位の対象ではなく、コードには、ならない。書けなかった所は `docs/open.md`「サンプルと、hozoc 自身の仕様」の 30〜35。
+
 設計書の `examples/hozoc.hozo` を元に、次を変えたもの。変えた理由はそれぞれの項目に書く（決定の一覧での番号は `docs/decisions.md` の 20 と 36）。
 
 `examples/hozoc.hozo` が「書けなかったもの」として挙げた三つは、次のように解く。
@@ -568,7 +570,7 @@ namespace hozo.cli {
 
 ```toml
 [hozo]
-sources     = ["cli.hozo", "flows.hozo", "ide.hozo", "ir.hozo", "lsp.hozo", "plugin.hozo"]   # vocab/ と tests/ の .hozo を読まないため
+sources     = ["cli.hozo", "diagnostics.hozo", "flows.hozo", "ide.hozo", "ir.hozo", "lsp.hozo", "plugin.hozo"]   # vocab/ と tests/ の .hozo を読まないため
 plugin_dirs = ["plugins"]
 
 # Go のモジュールの名前（go.mod の module と同じもの。docs/plugin-go.md「マニフェスト」）。プロジェクト全体のオプション
