@@ -6,7 +6,7 @@ import (
 	"io"
 	"strings"
 
-	"github.com/mew-ton/hozo/internal/gen/hozo/compiler/cli"
+	"github.com/mew-ton/hozo/internal/gen/hozo/cli/cli"
 )
 
 // exitUsageError は、使い方の誤りの終了コード（docs/diagnostics.md「終了コード」の 64）。

@@ -9,7 +9,7 @@ type Ops interface {
 	// Check は仕様を検査する。使うプラグインに、展開を頼み、その診断も集める。ファイルは書き出さない。
 	//
 	// 引数:
-	//   - in: コマンドの入力
+	//   - in: 検査の入力
 	//
 	// Throws: hozo.compiler.CheckFailed, hozo.compiler.ConfigInvalid, hozo.compiler.LanguageMismatch, hozo.compiler.Crashed, hozo.compiler.MalformedOutput
 	Check(ctx context.Context, in CheckInput) (CheckResult, error)
@@ -17,56 +17,78 @@ type Ops interface {
 	// CollectOutputs は検査がプラグインから受け取った答えから、出力ごとのファイルを集める。プラグインは、起動しない。ファイルには触れない。
 	//
 	// 引数:
-	//   - in: コマンドの入力
+	//   - in: ユースケースの入力
 	//   - checked: 検査の結果
 	//
 	// Throws: hozo.compiler.OutputConflict, hozo.compiler.UnknownNamespace, hozo.compiler.MalformedOutput
-	CollectOutputs(ctx context.Context, in BuildInput, checked CheckResult) (EmitPlan, error)
+	CollectOutputs(ctx context.Context, in EmitInput, checked CheckResult) (EmitPlan, error)
 
-	// WriteOutputs は検査がプラグインから受け取った答えの、出力ごとのファイルを書き出す。in の noEmit が真なら、集めて確かめるだけで、書き出さない。
-	// 例外は、どれも書き出しを始める前に起きる（集めるのが先）。
+	// VerifyOutputs は検査がプラグインから受け取った答えから、出力ごとのファイルを集めて、確かめる（パスと、ファイルの衝突）。集めたファイルは、返さない:
+	// 返すのは、warning だけの結果（written も removed も空）。プラグインは、起動しない。ファイルには触れない。
+	// hozo.toml がなければ、集めるものがなく、検査の warning だけを返す。
 	//
 	// 引数:
-	//   - in: コマンドの入力
+	//   - in: ユースケースの入力
 	//   - checked: 検査の結果
 	//
 	// Throws: hozo.compiler.OutputConflict, hozo.compiler.UnknownNamespace, hozo.compiler.MalformedOutput
-	// Reads: hozo.compiler.outputs
-	// Effects: hozo.compiler.syncOutputs
-	WriteOutputs(ctx context.Context, in BuildInput, checked CheckResult) (BuildResult, error)
+	VerifyOutputs(ctx context.Context, in EmitInput, checked CheckResult) (BuildResult, error)
 
-	// Build は仕様を検査し、プラグインから受け取ったファイルを書き出す。--no-emit なら、検査だけを行い、ファイルを書き出さない。
+	// Verify は仕様を検査する。プラグインに展開を頼み、返ってきたファイルを集めて確かめるところまで行う。ファイルには、触れない（読みも、書きも、消しもしない）。
 	//
 	// 引数:
-	//   - in: コマンドの入力
+	//   - in: ユースケースの入力
+	//
+	// Throws: hozo.compiler.CheckFailed, hozo.compiler.ConfigInvalid, hozo.compiler.LanguageMismatch, hozo.compiler.Crashed, hozo.compiler.MalformedOutput, hozo.compiler.OutputConflict, hozo.compiler.UnknownNamespace
+	Verify(ctx context.Context, in EmitInput) (BuildResult, error)
+
+	// PlannedChanges は書き出す予定を、結果の形にする: written は、書く予定のファイルのパス（内容が同じで、書き直さないものも入る）。removed は、空
+	// （消すファイルは、今の生成したファイルを読まないと決まらないので、決めない）。ファイルには触れない。
+	//
+	// 引数:
+	//   - plan: 書き出す予定
+	PlannedChanges(ctx context.Context, plan EmitPlan) (BuildResult, error)
+
+	// Preview は仕様を検査し、書き出す予定のファイルを返す。書き出さない。今の生成したファイルも、読まない（消すファイルは、決めない）。
+	//
+	// 引数:
+	//   - in: ユースケースの入力
+	//
+	// Throws: hozo.compiler.CheckFailed, hozo.compiler.ConfigInvalid, hozo.compiler.LanguageMismatch, hozo.compiler.Crashed, hozo.compiler.MalformedOutput, hozo.compiler.OutputConflict, hozo.compiler.UnknownNamespace
+	Preview(ctx context.Context, in EmitInput) (BuildResult, error)
+
+	// Write は仕様を検査し、プラグインから受け取ったファイルを書き出す。例外は、どれも書き出しを始める前に起きる（集めるのが先）。
+	//
+	// 引数:
+	//   - in: ユースケースの入力
 	//
 	// Throws: hozo.compiler.CheckFailed, hozo.compiler.ConfigInvalid, hozo.compiler.LanguageMismatch, hozo.compiler.Crashed, hozo.compiler.MalformedOutput, hozo.compiler.OutputConflict, hozo.compiler.UnknownNamespace
 	// Reads: hozo.compiler.outputs
 	// Effects: hozo.compiler.syncOutputs
-	Build(ctx context.Context, in BuildInput) (BuildResult, error)
+	Write(ctx context.Context, in EmitInput) (BuildResult, error)
 
 	// MatchTests は検査がプラグインから受け取った答えから、テストの対応表を集め、カバレッジの「実行された行」と突き合わせる。ファイルは書き出さない。
 	//
 	// 引数:
-	//   - in: コマンドの入力
+	//   - in: ユースケースの入力
 	//   - checked: 検査の結果
 	//
 	// Throws: hozo.compiler.ConfigInvalid, hozo.compiler.OutputConflict, hozo.compiler.TestsNotRun, hozo.compiler.CoverageUnusable, hozo.compiler.Crashed, hozo.compiler.MalformedOutput
-	MatchTests(ctx context.Context, in TestsInput, checked CheckResult) (TestsResult, error)
+	MatchTests(ctx context.Context, in CoverageInput, checked CheckResult) (TestsResult, error)
 
-	// Tests は仕様を検査し、求めるテストが走ったかを、カバレッジと突き合わせて確かめる。テストは走らせない。
+	// ConfirmTests は仕様を検査し、求めるテストが走ったかを、カバレッジと突き合わせて確かめる。テストは走らせない。
 	//
 	// 引数:
-	//   - in: コマンドの入力
+	//   - in: ユースケースの入力
 	//
 	// Throws: hozo.compiler.CheckFailed, hozo.compiler.ConfigInvalid, hozo.compiler.LanguageMismatch, hozo.compiler.Crashed, hozo.compiler.MalformedOutput, hozo.compiler.OutputConflict, hozo.compiler.TestsNotRun, hozo.compiler.CoverageUnusable
-	Tests(ctx context.Context, in TestsInput) (TestsResult, error)
+	ConfirmTests(ctx context.Context, in CoverageInput) (TestsResult, error)
 
-	// Lsp は言語サーバーとして標準入出力で動く（docs/lsp.md）。クライアントが exit を送るまで戻らない。
+	// Serve は言語サーバーとして標準入出力で動く（docs/lsp.md）。クライアントが exit を送るまで戻らない。
 	//
 	// 引数:
-	//   - in: コマンドの入力
-	Lsp(ctx context.Context, in LspInput) error
+	//   - in: ユースケースの入力
+	Serve(ctx context.Context, in ServeInput) error
 
 	// RunEmit はプラグインを一つ、hozoc の中の WASM の実行環境で動かして、受け持つ出力のすべてを、まとめて展開させる
 	// （docs/plugin-protocol.md「起動」）。入力は、標準入力に JSON で渡し、標準出力の JSON を、出力として受け取る。
@@ -85,7 +107,7 @@ type Leaves interface {
 	// Check は仕様を検査する。使うプラグインに、展開を頼み、その診断も集める。ファイルは書き出さない。
 	//
 	// 引数:
-	//   - in: コマンドの入力
+	//   - in: 検査の入力
 	//
 	// Throws: hozo.compiler.CheckFailed, hozo.compiler.ConfigInvalid, hozo.compiler.LanguageMismatch, hozo.compiler.Crashed, hozo.compiler.MalformedOutput
 	Check(ctx context.Context, in CheckInput) (CheckResult, error)
@@ -93,26 +115,44 @@ type Leaves interface {
 	// CollectOutputs は検査がプラグインから受け取った答えから、出力ごとのファイルを集める。プラグインは、起動しない。ファイルには触れない。
 	//
 	// 引数:
-	//   - in: コマンドの入力
+	//   - in: ユースケースの入力
 	//   - checked: 検査の結果
 	//
 	// Throws: hozo.compiler.OutputConflict, hozo.compiler.UnknownNamespace, hozo.compiler.MalformedOutput
-	CollectOutputs(ctx context.Context, in BuildInput, checked CheckResult) (EmitPlan, error)
+	CollectOutputs(ctx context.Context, in EmitInput, checked CheckResult) (EmitPlan, error)
+
+	// VerifyOutputs は検査がプラグインから受け取った答えから、出力ごとのファイルを集めて、確かめる（パスと、ファイルの衝突）。集めたファイルは、返さない:
+	// 返すのは、warning だけの結果（written も removed も空）。プラグインは、起動しない。ファイルには触れない。
+	// hozo.toml がなければ、集めるものがなく、検査の warning だけを返す。
+	//
+	// 引数:
+	//   - in: ユースケースの入力
+	//   - checked: 検査の結果
+	//
+	// Throws: hozo.compiler.OutputConflict, hozo.compiler.UnknownNamespace, hozo.compiler.MalformedOutput
+	VerifyOutputs(ctx context.Context, in EmitInput, checked CheckResult) (BuildResult, error)
+
+	// PlannedChanges は書き出す予定を、結果の形にする: written は、書く予定のファイルのパス（内容が同じで、書き直さないものも入る）。removed は、空
+	// （消すファイルは、今の生成したファイルを読まないと決まらないので、決めない）。ファイルには触れない。
+	//
+	// 引数:
+	//   - plan: 書き出す予定
+	PlannedChanges(ctx context.Context, plan EmitPlan) (BuildResult, error)
 
 	// MatchTests は検査がプラグインから受け取った答えから、テストの対応表を集め、カバレッジの「実行された行」と突き合わせる。ファイルは書き出さない。
 	//
 	// 引数:
-	//   - in: コマンドの入力
+	//   - in: ユースケースの入力
 	//   - checked: 検査の結果
 	//
 	// Throws: hozo.compiler.ConfigInvalid, hozo.compiler.OutputConflict, hozo.compiler.TestsNotRun, hozo.compiler.CoverageUnusable, hozo.compiler.Crashed, hozo.compiler.MalformedOutput
-	MatchTests(ctx context.Context, in TestsInput, checked CheckResult) (TestsResult, error)
+	MatchTests(ctx context.Context, in CoverageInput, checked CheckResult) (TestsResult, error)
 
-	// Lsp は言語サーバーとして標準入出力で動く（docs/lsp.md）。クライアントが exit を送るまで戻らない。
+	// Serve は言語サーバーとして標準入出力で動く（docs/lsp.md）。クライアントが exit を送るまで戻らない。
 	//
 	// 引数:
-	//   - in: コマンドの入力
-	Lsp(ctx context.Context, in LspInput) error
+	//   - in: ユースケースの入力
+	Serve(ctx context.Context, in ServeInput) error
 
 	// RunEmit はプラグインを一つ、hozoc の中の WASM の実行環境で動かして、受け持つ出力のすべてを、まとめて展開させる
 	// （docs/plugin-protocol.md「起動」）。入力は、標準入力に JSON で渡し、標準出力の JSON を、出力として受け取る。
@@ -144,16 +184,24 @@ func (o *ops) Check(ctx context.Context, in CheckInput) (CheckResult, error) {
 	return o.leaves.Check(ctx, in)
 }
 
-func (o *ops) CollectOutputs(ctx context.Context, in BuildInput, checked CheckResult) (EmitPlan, error) {
+func (o *ops) CollectOutputs(ctx context.Context, in EmitInput, checked CheckResult) (EmitPlan, error) {
 	return o.leaves.CollectOutputs(ctx, in, checked)
 }
 
-func (o *ops) MatchTests(ctx context.Context, in TestsInput, checked CheckResult) (TestsResult, error) {
+func (o *ops) VerifyOutputs(ctx context.Context, in EmitInput, checked CheckResult) (BuildResult, error) {
+	return o.leaves.VerifyOutputs(ctx, in, checked)
+}
+
+func (o *ops) PlannedChanges(ctx context.Context, plan EmitPlan) (BuildResult, error) {
+	return o.leaves.PlannedChanges(ctx, plan)
+}
+
+func (o *ops) MatchTests(ctx context.Context, in CoverageInput, checked CheckResult) (TestsResult, error) {
 	return o.leaves.MatchTests(ctx, in, checked)
 }
 
-func (o *ops) Lsp(ctx context.Context, in LspInput) error {
-	return o.leaves.Lsp(ctx, in)
+func (o *ops) Serve(ctx context.Context, in ServeInput) error {
+	return o.leaves.Serve(ctx, in)
 }
 
 func (o *ops) RunEmit(ctx context.Context, plugin Plugin, req EmitRequest) (EmitResponse, error) {

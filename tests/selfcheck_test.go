@@ -12,11 +12,11 @@ import (
 	"testing"
 
 	"github.com/mew-ton/hozo/internal/app"
-	"github.com/mew-ton/hozo/internal/gen/hozo/compiler/cli"
+	"github.com/mew-ton/hozo/internal/gen/hozo/cli/cli"
 )
 
 // hozocMain は cmd/hozoc/main.go と同じ組み立て（docs/cli.md「手で書くもの」）: 生成した cli.Main に
-// internal/app の App の Ops（葉の op と状態の単位の実装を compiler.New に渡したもの）と Presenter を渡す。作業ディレクトリは tests/ で、
+// internal/app の App の Ops（コマンドの行の Ops。葉の op と状態の単位の実装を compiler.New に渡したものを、呼ぶ）と Presenter を渡す。作業ディレクトリは tests/ で、
 // hozo.toml は親（リポジトリ直下）に見つかる。
 func hozocMain(args []string, stdout, stderr io.Writer) int {
 	return hozocMainIn("", args, stdout, stderr)
@@ -64,8 +64,8 @@ func splitUninterpreted(stdout string) (rest string, warnings []string) {
 	return strings.Join(kept, ""), warnings
 }
 
-// TestSelfEmitDryRun は hozoc 自身への emit --dry-run が、コミット済みの生成物（二つの単位の出力: 基底 go と go-valid と go-cli の
-// internal/gen/hozo/compiler/）と、ちょうど同じファイルを書く予定にすること（出力先ごとの記録
+// TestSelfEmitDryRun は hozoc 自身への emit --dry-run が、コミット済みの生成物（二つの単位の出力: 基底 go と go-valid の
+// internal/gen/hozo/compiler/ と、それに go-cli を足した internal/gen/hozo/cli/）と、ちょうど同じファイルを書く予定にすること（出力先ごとの記録
 // .hozoc-outputs.json は、トランスパイラのファイルではないので、予定には出ない）。書き出さないこと。プラグインの WASM は、
 // go でビルドするので、go がなければ飛ばす。
 func TestSelfEmitDryRun(t *testing.T) {
@@ -113,7 +113,7 @@ func TestSelfEmitDryRun(t *testing.T) {
 	if len(committed) == 0 || strings.Join(written, "\n") != strings.Join(committed, "\n") {
 		t.Errorf("書く予定のファイルが、コミット済みの生成物と違う:\n予定:\n  %s\nコミット済み:\n  %s", strings.Join(written, "\n  "), strings.Join(committed, "\n  "))
 	}
-	for _, want := range []string{"internal/gen/hozo/compiler/cli/cli.go", "internal/gen/hozo/compiler/types/validate.go", "internal/gen/hozo/compiler/ops.go", "internal/gen/hozo/compiler/types/types.go"} {
+	for _, want := range []string{"internal/gen/hozo/cli/cli/cli.go", "internal/gen/hozo/cli/types/validate.go", "internal/gen/hozo/cli/ops.go", "internal/gen/hozo/compiler/ops.go", "internal/gen/hozo/compiler/types/types.go"} {
 		if _, ok := before[want]; !ok {
 			t.Errorf("%s がコミットされていない", want)
 		}

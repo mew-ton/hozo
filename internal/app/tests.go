@@ -24,7 +24,7 @@ import (
 // カバレッジのファイルを、読むだけ）。hozoc は、テストを走らせず、カバレッジの形も知らない: 形を読むのは、単位の基底の
 // プラグイン（direction "coverage"。docs/plugin-protocol.md「coverage」）。checked は Check が返したもの（[App.CollectOutputs]
 // と同じ扱い）。
-func (a *App) MatchTests(ctx context.Context, in compiler.TestsInput, checked compiler.CheckResult) (compiler.TestsResult, error) {
+func (a *App) MatchTests(ctx context.Context, in compiler.CoverageInput, checked compiler.CheckResult) (compiler.TestsResult, error) {
 	p := a.checked
 	if p == nil || len(checked.Warnings) != len(p.Diags) {
 		return compiler.TestsResult{}, errors.New("hozoc: MatchTests の checked が直前の Check の結果でない")

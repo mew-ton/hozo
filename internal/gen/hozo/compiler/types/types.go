@@ -7,9 +7,6 @@ import "github.com/mew-ton/hozo/runtime"
 // Path はファイルのパス。相対パスの基準は使う場所が決める（docs/config.md「置き場と探し方」など）
 type Path string
 
-// OutputFormat は表示の形式。text か json
-type OutputFormat string
-
 // SourceFile は読み込むファイル
 type SourceFile struct {
 	Path    Path   `json:"path"`
@@ -114,7 +111,7 @@ func (CoverageUnusable) HozoException() string { return "hozo.compiler.CoverageU
 
 var _ runtime.Exception = CoverageUnusable{}
 
-// UnknownNamespace: emit の引数の名前空間も、その子孫も、どの単位の対象でもない
+// UnknownNamespace: 書き出す名前空間として指定されたものも、その子孫も、どの単位の対象でもない
 type UnknownNamespace struct{}
 
 func (UnknownNamespace) Error() string         { return "hozo.compiler.UnknownNamespace" }
@@ -143,7 +140,7 @@ type CheckResult struct {
 	Warnings []Diagnostic `json:"warnings"`
 }
 
-// BuildResult は build の結果。--no-emit なら、written も removed も空
+// BuildResult は検査と書き出しのユースケース（verify、preview、write）の結果。検査だけ（verify）なら、written も removed も空
 type BuildResult struct {
 	Warnings []Diagnostic `json:"warnings"`
 	// 書いたファイル（新規と更新）
@@ -159,42 +156,32 @@ type TestsResult struct {
 	Ran []string `json:"ran"`
 }
 
-// CheckInput は検査（check）の入力。コマンドの入力（BuildInput、TestsInput）から、配線が作る
+// CheckInput は検査（check）の入力。ユースケースの入力（EmitInput、CoverageInput）から、配線が作る
 type CheckInput struct {
 	// 設定ファイルの場所
 	Config *Path `json:"config,omitempty"`
-	// 表示の形式
-	Format *OutputFormat `json:"format,omitempty"`
 	// プラグインを探すディレクトリ（OS のパス区切りで複数）
 	PluginPath *string `json:"pluginPath,omitempty"`
 	// プラグインの WASM を、機械の言葉に直したものを、覚える置き場
 	CacheDir *Path `json:"cacheDir,omitempty"`
 }
 
-// BuildInput は build の入力
-type BuildInput struct {
+// EmitInput は検査と書き出しのユースケース（verify、preview、write）の入力
+type EmitInput struct {
 	// 設定ファイルの場所
 	Config *Path `json:"config,omitempty"`
-	// 表示の形式
-	Format *OutputFormat `json:"format,omitempty"`
 	// 生成する名前空間（一つもなければすべて）。その名前空間と子孫を出力する単位の分を書き出す
 	Namespaces []string `json:"namespaces"`
-	// 検査だけを行い、ファイルを書き出さない
-	NoEmit *bool `json:"noEmit,omitempty"`
-	// 書き出さずに、書き出す予定のファイルだけを表示する
-	DryRun *bool `json:"dryRun,omitempty"`
 	// プラグインを探すディレクトリ（OS のパス区切りで複数）
 	PluginPath *string `json:"pluginPath,omitempty"`
 	// プラグインの WASM を、機械の言葉に直したものを、覚える置き場
 	CacheDir *Path `json:"cacheDir,omitempty"`
 }
 
-// TestsInput は tests の入力
-type TestsInput struct {
+// CoverageInput は求めるテストが走ったかを確かめるユースケース（confirmTests）の入力
+type CoverageInput struct {
 	// 設定ファイルの場所
 	Config *Path `json:"config,omitempty"`
-	// 表示の形式
-	Format *OutputFormat `json:"format,omitempty"`
 	// テストを走らせたときに取った、カバレッジのファイル
 	Coverage Path `json:"coverage"`
 	// プラグインを探すディレクトリ（OS のパス区切りで複数）
@@ -203,8 +190,8 @@ type TestsInput struct {
 	CacheDir *Path `json:"cacheDir,omitempty"`
 }
 
-// LspInput は lsp の入力
-type LspInput struct {
+// ServeInput は言語サーバーとして動くユースケース（serve）の入力
+type ServeInput struct {
 	// 設定ファイルの場所
 	Config *Path `json:"config,omitempty"`
 	// ログの書き出し先
@@ -219,10 +206,6 @@ type LspInput struct {
 type EmitPlan struct {
 	Warnings []Diagnostic `json:"warnings"`
 	Files    []OutputFile `json:"files"`
-	// 書き出さずに、書き出す予定だけを返す
-	DryRun *bool `json:"dryRun,omitempty"`
-	// 検査だけ: 書き出さず、書き出す予定も返さない
-	NoEmit *bool `json:"noEmit,omitempty"`
 }
 
 // EffectSyncOutputs は生成したファイルを今の仕様と設定に合わせる（足りないものを書き、古いものを書き換え、余分なものを消す）。

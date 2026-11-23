@@ -122,7 +122,7 @@ hozoc <command> [flags] [args]
 
 ## コマンドごとの関数
 
-`run<Op>` と `fail<Op>` の中は、フィールドの型と、例外が引数を持つかどうかによらず、同じ形。細部のテキストは、`go-cli` の単体テストのゴールデンと、hozoc 自身の生成物（`internal/gen/hozo/compiler/cli/cli.go`）が固定する（`docs/testing.md`「単体テスト」「生成物の一致」）。
+`run<Op>` と `fail<Op>` の中は、フィールドの型と、例外が引数を持つかどうかによらず、同じ形。細部のテキストは、`go-cli` の単体テストのゴールデンと、hozoc 自身の生成物（`internal/gen/hozo/cli/cli/cli.go`）が固定する（`docs/testing.md`「単体テスト」「生成物の一致」）。
 
 ```go
 func runEmit(ctx context.Context, ops hozoc.Ops, p Presenter, prog string, args []string, env func(string) string, stdout, stderr io.Writer) int {

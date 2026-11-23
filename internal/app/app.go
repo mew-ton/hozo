@@ -1,19 +1,22 @@
 // Package app は hozoc の葉の op の実装と表示（docs/cli.md「手で書くもの」）。
 //
 // 骨組み（型、op の形、実装を受け取る口、配線、引数の解釈、例外の見分けと終了コード、使い方の表示）は cli.hozo から生成した
-// internal/gen/hozo/compiler（基底 go と go-valid。docs/plugin-go.md、docs/plugin-go-valid.md）と internal/gen/hozo/compiler/cli（go-cli。
-// docs/plugin-go-cli.md）が持ち、ここは、生成した口を満たす [App] と、cli.Presenter の実装 [Presenter] を持つ:
+// internal/gen/hozo/compiler と internal/gen/hozo/cli（基底 go と go-valid。docs/plugin-go.md、docs/plugin-go-valid.md）と
+// internal/gen/hozo/cli/cli（go-cli。docs/plugin-go-cli.md）が持ち、ここは、生成した口を満たす [App] と、cli.Presenter の実装 [Presenter] を持つ:
 //
-//   - 葉の op（状態に触れない）check、collectOutputs、matchTests、lsp、runEmit は compiler.Leaves のメソッドで、*App がそれを満たす。
+//   - 葉の op（状態に触れない）check、collectOutputs、verifyOutputs、plannedChanges、matchTests、serve、runEmit は compiler.Leaves の
+//     メソッドで、*App がそれを満たす。
 //   - 状態に触れるのは、状態の単位のメソッドだけ（docs/plugin-go.md「状態の単位」）。read outputChanges は、その状態 outputs の単位
 //     （compiler.OutputsState）の問い合わせで、形で決まる問い合わせ（IsEmpty と Get）と一緒に、[App.Outputs] が返す値が持つ。
 //     効果 syncOutputs は、その宛先の状態の分類 OutputsSync の単位（compiler.OutputsSyncState）の命令で、同じ単位の問い合わせ
 //     （述語 UpToDate と OutOfDate）と一緒に、[App.OutputsSync] が返す値が持つ。
 //   - 状態 sources、config の単位（形で決まる問い合わせ IsEmpty と Get だけ）は、[App.Sources]、[App.Config] が返す値。
-//   - 配線の writeOutputs（collectOutputs、outputChanges、syncOutputs を、この順に呼ぶ）と emit は、生成した本体が持つ。
+//   - 配線（ユースケース verify、preview、write、confirmTests と、コマンドの行の build、tests、lsp）は、生成した本体が持つ。
+//   - コマンドの行の build が、フラグから、何を頼まれたかを分ける述語（分類 hozo.cli.Request）は、[requestCases]。
 //
-// [App.Ops] が、これらを compiler.New に渡す。口はどれもインターフェースで、実装は New の位置引数なので、メソッドの書き忘れも、
-// 渡し忘れも、コンパイルできない。cmd/hozoc/main.go は、その結果を cli.Main に渡す。
+// [App.Usecases] が、これらを compiler.New に渡し、[App.Ops] が、その結果と述語を、コマンドの行の New に渡す。口はどれも
+// インターフェースで、実装は New の位置引数なので、メソッドの書き忘れも、渡し忘れも、コンパイルできない。cmd/hozoc/main.go は、
+// その結果を cli.Main に渡す。
 //
 // 境界の型は生成したもの（compiler.CheckInput、compiler.Diagnostic、compiler.CheckFailed など）で、中の豊かな型
 // （internal/project.Project、internal/diag.Diagnostic）は App の中にとどめる。例外は生成した exception の型を値で
@@ -31,6 +34,7 @@ import (
 	"strings"
 
 	"github.com/mew-ton/hozo/internal/diag"
+	hozocli "github.com/mew-ton/hozo/internal/gen/hozo/cli"
 	"github.com/mew-ton/hozo/internal/gen/hozo/compiler"
 	"github.com/mew-ton/hozo/internal/lsp"
 	hostplugin "github.com/mew-ton/hozo/internal/plugin"
@@ -73,22 +77,29 @@ type App struct {
 	planned *outputPlan
 }
 
-// *App は、人が実装する葉の op（check、collectOutputs、matchTests、lsp、runEmit）の口を満たす。メソッドが一つでも足りなければ、ここで
-// コンパイルできない。
+// *App は、人が実装する葉の op（check、collectOutputs、verifyOutputs、plannedChanges、matchTests、serve、runEmit）の口を満たす。
+// メソッドが一つでも足りなければ、ここでコンパイルできない。
 var _ compiler.Leaves = (*App)(nil)
 
-// Ops は a の実装で hozoc の Ops を組み立てる（docs/cli.md「手で書くもの」）: compiler.New に、葉の op（a 自身）と、状態の単位を
-// 宣言順に渡す。返る値は a だけを持ち、パッケージの変数は使わない（App を二つ作れば、互いに何も共有しない）。
-func (a *App) Ops() compiler.Ops {
+// Ops は a の実装で、コマンドの行（名前空間 hozo.cli）の Ops を組み立てる（docs/cli.md「手で書くもの」）: 入口の op は、フラグから、
+// 何を頼まれたかを分け（[requestCases]）、ユースケース（[App.Usecases]）を呼ぶ。返る値は a だけを持ち、パッケージの変数は使わない
+// （App を二つ作れば、互いに何も共有しない）。
+func (a *App) Ops() hozocli.Ops {
+	return hozocli.New(requestCases{}, a.Usecases())
+}
+
+// Usecases は a の実装で、ユースケース（名前空間 hozo.compiler）の Ops を組み立てる: compiler.New に、葉の op（a 自身）と、状態の単位を
+// 宣言順に渡す。
+func (a *App) Usecases() compiler.Ops {
 	return compiler.New(a, a.Sources(), a.Config(), a.Outputs(), a.OutputsSync())
 }
 
-// Lsp は cli.hozo の op lsp: 言語サーバーとして標準入出力で動く（docs/lsp.md、docs/cli.md「lsp」）。
+// Serve は cli.hozo の op serve: 言語サーバーとして標準入出力で動く（docs/lsp.md、docs/cli.md「lsp」）。
 // internal/lsp.Serve を呼び、クライアントが exit を送るまで戻らない。config（--config / HOZO_CONFIG）は
 // hozo.toml の場所で、なければクライアントの rootUri から探す。log（--log / HOZO_LSP_LOG）はログの書き出し先で、
 // 開けなければその誤りを返す（宣言にない例外なので 70。docs/diagnostics.md「終了コード」）。
 // 標準エラーには書かない（docs/lsp.md「通信」）。
-func (a *App) Lsp(ctx context.Context, in compiler.LspInput) error {
+func (a *App) Serve(ctx context.Context, in compiler.ServeInput) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}

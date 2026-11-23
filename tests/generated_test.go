@@ -13,10 +13,10 @@ import (
 )
 
 // generatedDirs は cli.hozo からの生成物の置き場（hozo.toml の二つの単位 [[emit]] の out。docs/packages.md「生成するもの」）:
-// 名前空間 hozo.compiler の出力（入口、内側の inner、go-cli の cli）。
-var generatedDirs = []string{"internal/gen/hozo/compiler"}
+// 名前空間 hozo.compiler（ユースケース）の出力（入口、内側の inner）と、名前空間 hozo.cli（コマンドの行）の出力（入口、go-cli の cli）。
+var generatedDirs = []string{"internal/gen/hozo/compiler", "internal/gen/hozo/cli"}
 
-// TestGeneratedUpToDate は、コミットされた internal/gen/hozo/compiler/** が cli.hozo から遅れていないこと
+// TestGeneratedUpToDate は、コミットされた internal/gen/hozo/compiler/** と internal/gen/hozo/cli/** が cli.hozo から遅れていないこと
 // （docs/testing.md「生成物の一致」、docs/requirements.md「段階」の 3）。`go test ./...` だけで分かるように、
 // CI の `make generate && git diff --exit-code` と同じことをここでも確かめる。
 //

@@ -14,14 +14,19 @@ import (
 type LeavesFake struct {
 	Check          runtime.Fake[struct{ In compiler.CheckInput }, compiler.CheckResult]
 	CollectOutputs runtime.Fake[struct {
-		In      compiler.BuildInput
+		In      compiler.EmitInput
 		Checked compiler.CheckResult
 	}, compiler.EmitPlan]
-	MatchTests runtime.Fake[struct {
-		In      compiler.TestsInput
+	VerifyOutputs runtime.Fake[struct {
+		In      compiler.EmitInput
+		Checked compiler.CheckResult
+	}, compiler.BuildResult]
+	PlannedChanges runtime.Fake[struct{ Plan compiler.EmitPlan }, compiler.BuildResult]
+	MatchTests     runtime.Fake[struct {
+		In      compiler.CoverageInput
 		Checked compiler.CheckResult
 	}, compiler.TestsResult]
-	Lsp     runtime.FakeVoid[struct{ In compiler.LspInput }]
+	Serve   runtime.FakeVoid[struct{ In compiler.ServeInput }]
 	RunEmit runtime.Fake[struct {
 		Plugin compiler.Plugin
 		Req    compiler.EmitRequest
@@ -40,22 +45,33 @@ func (o leavesFake) Check(ctx context.Context, in compiler.CheckInput) (compiler
 	return o.f.Check.Call(struct{ In compiler.CheckInput }{in}, func() (compiler.CheckResult, error) { return o.impl.Check(ctx, in) })
 }
 
-func (o leavesFake) CollectOutputs(ctx context.Context, in compiler.BuildInput, checked compiler.CheckResult) (compiler.EmitPlan, error) {
+func (o leavesFake) CollectOutputs(ctx context.Context, in compiler.EmitInput, checked compiler.CheckResult) (compiler.EmitPlan, error) {
 	return o.f.CollectOutputs.Call(struct {
-		In      compiler.BuildInput
+		In      compiler.EmitInput
 		Checked compiler.CheckResult
 	}{in, checked}, func() (compiler.EmitPlan, error) { return o.impl.CollectOutputs(ctx, in, checked) })
 }
 
-func (o leavesFake) MatchTests(ctx context.Context, in compiler.TestsInput, checked compiler.CheckResult) (compiler.TestsResult, error) {
+func (o leavesFake) VerifyOutputs(ctx context.Context, in compiler.EmitInput, checked compiler.CheckResult) (compiler.BuildResult, error) {
+	return o.f.VerifyOutputs.Call(struct {
+		In      compiler.EmitInput
+		Checked compiler.CheckResult
+	}{in, checked}, func() (compiler.BuildResult, error) { return o.impl.VerifyOutputs(ctx, in, checked) })
+}
+
+func (o leavesFake) PlannedChanges(ctx context.Context, plan compiler.EmitPlan) (compiler.BuildResult, error) {
+	return o.f.PlannedChanges.Call(struct{ Plan compiler.EmitPlan }{plan}, func() (compiler.BuildResult, error) { return o.impl.PlannedChanges(ctx, plan) })
+}
+
+func (o leavesFake) MatchTests(ctx context.Context, in compiler.CoverageInput, checked compiler.CheckResult) (compiler.TestsResult, error) {
 	return o.f.MatchTests.Call(struct {
-		In      compiler.TestsInput
+		In      compiler.CoverageInput
 		Checked compiler.CheckResult
 	}{in, checked}, func() (compiler.TestsResult, error) { return o.impl.MatchTests(ctx, in, checked) })
 }
 
-func (o leavesFake) Lsp(ctx context.Context, in compiler.LspInput) error {
-	return o.f.Lsp.Call(struct{ In compiler.LspInput }{in}, func() error { return o.impl.Lsp(ctx, in) })
+func (o leavesFake) Serve(ctx context.Context, in compiler.ServeInput) error {
+	return o.f.Serve.Call(struct{ In compiler.ServeInput }{in}, func() error { return o.impl.Serve(ctx, in) })
 }
 
 func (o leavesFake) RunEmit(ctx context.Context, plugin compiler.Plugin, req compiler.EmitRequest) (compiler.EmitResponse, error) {

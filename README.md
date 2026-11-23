@@ -12,7 +12,7 @@ Hozo は、アプリの設計の、ただ一つの正（SSOT）になる仕様�
 ```
 make build      # bin/ に hozoc を作る
 make test
-make generate   # cli.hozo から internal/gen/hozo/compiler を生成し直す（docs/packages.md「自己生成の手順」）
+make generate   # cli.hozo から internal/gen/hozo/compiler と internal/gen/hozo/cli を生成し直す（docs/packages.md「自己生成の手順」）
 ```
 
 ## 状態

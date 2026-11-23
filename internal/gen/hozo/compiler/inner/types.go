@@ -7,9 +7,6 @@ import "github.com/mew-ton/hozo/internal/gen/hozo/compiler/types"
 // Path はファイルのパス。相対パスの基準は使う場所が決める（docs/config.md「置き場と探し方」など）
 type Path = types.Path
 
-// OutputFormat は表示の形式。text か json
-type OutputFormat = types.OutputFormat
-
 // SourceFile は読み込むファイル
 type SourceFile = types.SourceFile
 
@@ -46,7 +43,7 @@ type TestsNotRun = types.TestsNotRun
 // CoverageUnusable: カバレッジを、求めるテストと突き合わせられない（docs/cli.md「tests」の TESTS-2、TESTS-3）
 type CoverageUnusable = types.CoverageUnusable
 
-// UnknownNamespace: emit の引数の名前空間も、その子孫も、どの単位の対象でもない
+// UnknownNamespace: 書き出す名前空間として指定されたものも、その子孫も、どの単位の対象でもない
 type UnknownNamespace = types.UnknownNamespace
 
 // Crashed: プラグインが異常終了した（WASM の実行環境で、0 と 2 のほかの終了コードで終わった、途中で止まった、起動できなかった。docs/plugin-protocol.md「起動」）
@@ -58,23 +55,23 @@ type MalformedOutput = types.MalformedOutput
 // CheckResult は検査の結果（誤りではない指摘）
 type CheckResult = types.CheckResult
 
-// BuildResult は build の結果。--no-emit なら、written も removed も空
+// BuildResult は検査と書き出しのユースケース（verify、preview、write）の結果。検査だけ（verify）なら、written も removed も空
 type BuildResult = types.BuildResult
 
 // TestsResult は突き合わせの結果
 type TestsResult = types.TestsResult
 
-// CheckInput は検査（check）の入力。コマンドの入力（BuildInput、TestsInput）から、配線が作る
+// CheckInput は検査（check）の入力。ユースケースの入力（EmitInput、CoverageInput）から、配線が作る
 type CheckInput = types.CheckInput
 
-// BuildInput は build の入力
-type BuildInput = types.BuildInput
+// EmitInput は検査と書き出しのユースケース（verify、preview、write）の入力
+type EmitInput = types.EmitInput
 
-// TestsInput は tests の入力
-type TestsInput = types.TestsInput
+// CoverageInput は求めるテストが走ったかを確かめるユースケース（confirmTests）の入力
+type CoverageInput = types.CoverageInput
 
-// LspInput は lsp の入力
-type LspInput = types.LspInput
+// ServeInput は言語サーバーとして動くユースケース（serve）の入力
+type ServeInput = types.ServeInput
 
 // EmitPlan は書き出す予定: 単位ごとにトランスパイラを呼んで集めたファイルと、そこまでの warning
 type EmitPlan = types.EmitPlan

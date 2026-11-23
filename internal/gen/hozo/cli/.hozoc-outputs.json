@@ -1,0 +1,16 @@
+[
+  "internal/gen/hozo/cli/classify.go",
+  "internal/gen/hozo/cli/cli/cli.go",
+  "internal/gen/hozo/cli/clitest/classify.go",
+  "internal/gen/hozo/cli/clitest/doc.go",
+  "internal/gen/hozo/cli/clitest/fakes.go",
+  "internal/gen/hozo/cli/clitest/hozo-tests.go.json",
+  "internal/gen/hozo/cli/doc.go",
+  "internal/gen/hozo/cli/ops.go",
+  "internal/gen/hozo/cli/types.go",
+  "internal/gen/hozo/cli/types/classify.go",
+  "internal/gen/hozo/cli/types/doc.go",
+  "internal/gen/hozo/cli/types/types.go",
+  "internal/gen/hozo/cli/types/validate.go",
+  "internal/gen/hozo/cli/wiring.go"
+]

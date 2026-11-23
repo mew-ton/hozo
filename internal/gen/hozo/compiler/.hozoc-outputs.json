@@ -1,6 +1,5 @@
 [
   "internal/gen/hozo/compiler/classify.go",
-  "internal/gen/hozo/compiler/cli/cli.go",
   "internal/gen/hozo/compiler/compilertest/doc.go",
   "internal/gen/hozo/compiler/compilertest/fakes.go",
   "internal/gen/hozo/compiler/compilertest/hozo-tests.go.json",
@@ -16,6 +15,5 @@
   "internal/gen/hozo/compiler/states.go",
   "internal/gen/hozo/compiler/types.go",
   "internal/gen/hozo/compiler/types/doc.go",
-  "internal/gen/hozo/compiler/types/types.go",
-  "internal/gen/hozo/compiler/types/validate.go"
+  "internal/gen/hozo/compiler/types/types.go"
 ]

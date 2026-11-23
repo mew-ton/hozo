@@ -28,8 +28,8 @@ func (a *App) OutputsSync() compiler.OutputsSyncState { return outputsSync{a} }
 type outputsSync struct{ a *App }
 
 // SyncOutputs は cli.hozo の効果 syncOutputs（on OutputsSync: any -> UpToDate。docs/cli.md「書き出し」の 5〜7）: 生成したファイルを、
-// 書き出す予定 plan に合わせる。配線 writeOutputs が、collectOutputs と outputChanges の後に呼ぶ。plan は、直前の
-// CollectOutputs が返したもの（置き場は [App.plannedFor] から取る）。plan が dryRun なら、何もしない（同 4）。
+// 書き出す予定 plan に合わせる。ユースケース write の配線が、collectOutputs と outputChanges の後に呼ぶ。plan は、直前の
+// CollectOutputs が返したもの（置き場は [App.plannedFor] から取る）。
 //
 //  5. 対象の各出力の <Dir(U, N)>/.hozoc-outputs.json を読み、今回書かないパスのファイルを消す（[outputPlan.stale]）。空になった
 //     ディレクトリも、Dir(U, N) の下の範囲で消す。
@@ -45,11 +45,6 @@ func (s outputsSync) SyncOutputs(ctx context.Context, plan compiler.EmitPlan) er
 	if err != nil {
 		return err
 	}
-	// 4. dry-run
-	if noEmit(plan) || dryRun(plan) {
-		return nil
-	}
-
 	// 5. 前回の出力のうち今回書かないものを消す
 	stale, err := pl.stale()
 	if err != nil {

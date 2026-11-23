@@ -6,14 +6,16 @@ import (
 	"io"
 
 	"github.com/mew-ton/hozo/internal/diag"
+	hozocli "github.com/mew-ton/hozo/internal/gen/hozo/cli"
+	"github.com/mew-ton/hozo/internal/gen/hozo/cli/cli"
 	"github.com/mew-ton/hozo/internal/gen/hozo/compiler"
-	"github.com/mew-ton/hozo/internal/gen/hozo/compiler/cli"
 )
 
 // Presenter は結果と例外の表示（docs/cli.md「手で書くもの」の Presenter、docs/plugin-go-cli.md「実行と表示」）。
 // go-cli が生成した cli.Presenter の実装で、cli.Main が結果を標準出力に、例外を標準エラーに出すときに呼ぶ。
 //
-// 形式は input（compiler.CheckInput / compiler.BuildInput / compiler.TestsInput）の format で選ぶ（docs/diagnostics.md「表示」）。なければ text。
+// 形式は input（コマンドの入力 hozo.cli の BuildInput / TestsInput）の format で選ぶ（docs/diagnostics.md「表示」）。なければ text。
+// 表示は、コマンドの行の側の仕事なので、フラグ（format、noEmit）は、ここで、コマンドの入力から読む。
 //
 //   - text: CheckResult は診断（warning）の一覧と件数。EmitResult は warning があればその一覧と件数、続けて
 //     `written: <path>` と `removed: <path>` を一行ずつ。TestsResult は warning があればその一覧と件数、続けて
@@ -35,7 +37,7 @@ func (Presenter) Present(w io.Writer, command string, input any, result any) err
 	switch r := result.(type) {
 	case compiler.BuildResult:
 		// 検査だけ（hozoc build --no-emit）: 検査の結果だけを出す（docs/cli.md「build」の「--no-emit の表示」）
-		if in, ok := input.(compiler.BuildInput); ok && in.NoEmit != nil && *in.NoEmit {
+		if in, ok := input.(hozocli.BuildInput); ok && in.NoEmit != nil && *in.NoEmit {
 			if isJSON(input) {
 				return writeJSON(w, struct {
 					Warnings []diag.Rendered `json:"warnings"`
@@ -117,12 +119,12 @@ func (Presenter) PresentError(w io.Writer, command string, input any, f cli.Fail
 	return err
 }
 
-// isJSON は入力の format が json か（cli.hozo の CheckInput / EmitInput / TestsInput の format。lsp にはない）。
+// isJSON は入力の format が json か（cli.hozo の hozo.cli の BuildInput / TestsInput の format。lsp にはない）。
 func isJSON(input any) bool {
 	switch in := input.(type) {
-	case compiler.BuildInput:
+	case hozocli.BuildInput:
 		return in.Format != nil && *in.Format == "json"
-	case compiler.TestsInput:
+	case hozocli.TestsInput:
 		return in.Format != nil && *in.Format == "json"
 	}
 	return false

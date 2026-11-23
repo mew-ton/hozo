@@ -10,29 +10,45 @@ import (
 
 // Ops は、この名前空間の外から呼べる op: 仕様で export を付けた op。宣言順。New が返す。
 type Ops interface {
-	// Build は仕様を検査し、プラグインから受け取ったファイルを書き出す。--no-emit なら、検査だけを行い、ファイルを書き出さない。
+	// Verify は仕様を検査する。プラグインに展開を頼み、返ってきたファイルを集めて確かめるところまで行う。ファイルには、触れない（読みも、書きも、消しもしない）。
 	//
 	// 引数:
-	//   - in: コマンドの入力
+	//   - in: ユースケースの入力
+	//
+	// Throws: hozo.compiler.CheckFailed, hozo.compiler.ConfigInvalid, hozo.compiler.LanguageMismatch, hozo.compiler.Crashed, hozo.compiler.MalformedOutput, hozo.compiler.OutputConflict, hozo.compiler.UnknownNamespace
+	Verify(ctx context.Context, in EmitInput) (BuildResult, error)
+
+	// Preview は仕様を検査し、書き出す予定のファイルを返す。書き出さない。今の生成したファイルも、読まない（消すファイルは、決めない）。
+	//
+	// 引数:
+	//   - in: ユースケースの入力
+	//
+	// Throws: hozo.compiler.CheckFailed, hozo.compiler.ConfigInvalid, hozo.compiler.LanguageMismatch, hozo.compiler.Crashed, hozo.compiler.MalformedOutput, hozo.compiler.OutputConflict, hozo.compiler.UnknownNamespace
+	Preview(ctx context.Context, in EmitInput) (BuildResult, error)
+
+	// Write は仕様を検査し、プラグインから受け取ったファイルを書き出す。例外は、どれも書き出しを始める前に起きる（集めるのが先）。
+	//
+	// 引数:
+	//   - in: ユースケースの入力
 	//
 	// Throws: hozo.compiler.CheckFailed, hozo.compiler.ConfigInvalid, hozo.compiler.LanguageMismatch, hozo.compiler.Crashed, hozo.compiler.MalformedOutput, hozo.compiler.OutputConflict, hozo.compiler.UnknownNamespace
 	// Reads: hozo.compiler.outputs
 	// Effects: hozo.compiler.syncOutputs
-	Build(ctx context.Context, in BuildInput) (BuildResult, error)
+	Write(ctx context.Context, in EmitInput) (BuildResult, error)
 
-	// Tests は仕様を検査し、求めるテストが走ったかを、カバレッジと突き合わせて確かめる。テストは走らせない。
+	// ConfirmTests は仕様を検査し、求めるテストが走ったかを、カバレッジと突き合わせて確かめる。テストは走らせない。
 	//
 	// 引数:
-	//   - in: コマンドの入力
+	//   - in: ユースケースの入力
 	//
 	// Throws: hozo.compiler.CheckFailed, hozo.compiler.ConfigInvalid, hozo.compiler.LanguageMismatch, hozo.compiler.Crashed, hozo.compiler.MalformedOutput, hozo.compiler.OutputConflict, hozo.compiler.TestsNotRun, hozo.compiler.CoverageUnusable
-	Tests(ctx context.Context, in TestsInput) (TestsResult, error)
+	ConfirmTests(ctx context.Context, in CoverageInput) (TestsResult, error)
 
-	// Lsp は言語サーバーとして標準入出力で動く（docs/lsp.md）。クライアントが exit を送るまで戻らない。
+	// Serve は言語サーバーとして標準入出力で動く（docs/lsp.md）。クライアントが exit を送るまで戻らない。
 	//
 	// 引数:
-	//   - in: コマンドの入力
-	Lsp(ctx context.Context, in LspInput) error
+	//   - in: ユースケースの入力
+	Serve(ctx context.Context, in ServeInput) error
 }
 
 // Leaves は、人が実装する葉の op: 本体のない op。状態には触れない。export の有無によらない。

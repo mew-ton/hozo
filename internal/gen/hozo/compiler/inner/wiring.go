@@ -4,17 +4,51 @@ package inner
 
 import "context"
 
-// WriteOutputs は検査がプラグインから受け取った答えの、出力ごとのファイルを書き出す。in の noEmit が真なら、集めて確かめるだけで、書き出さない。
-// 例外は、どれも書き出しを始める前に起きる（集めるのが先）。
+// Verify は仕様を検査する。プラグインに展開を頼み、返ってきたファイルを集めて確かめるところまで行う。ファイルには、触れない（読みも、書きも、消しもしない）。
 //
 // 引数:
-//   - in: コマンドの入力
-//   - checked: 検査の結果
+//   - in: ユースケースの入力
 //
-// Throws: hozo.compiler.OutputConflict, hozo.compiler.UnknownNamespace, hozo.compiler.MalformedOutput
+// Throws: hozo.compiler.CheckFailed, hozo.compiler.ConfigInvalid, hozo.compiler.LanguageMismatch, hozo.compiler.Crashed, hozo.compiler.MalformedOutput, hozo.compiler.OutputConflict, hozo.compiler.UnknownNamespace
+func (o *ops) Verify(ctx context.Context, in EmitInput) (BuildResult, error) {
+	checked, err := o.Check(ctx, CheckInput{Config: in.Config, PluginPath: in.PluginPath, CacheDir: in.CacheDir})
+	if err != nil {
+		return BuildResult{}, err
+	}
+	return o.VerifyOutputs(ctx, in, checked)
+}
+
+// Preview は仕様を検査し、書き出す予定のファイルを返す。書き出さない。今の生成したファイルも、読まない（消すファイルは、決めない）。
+//
+// 引数:
+//   - in: ユースケースの入力
+//
+// Throws: hozo.compiler.CheckFailed, hozo.compiler.ConfigInvalid, hozo.compiler.LanguageMismatch, hozo.compiler.Crashed, hozo.compiler.MalformedOutput, hozo.compiler.OutputConflict, hozo.compiler.UnknownNamespace
+func (o *ops) Preview(ctx context.Context, in EmitInput) (BuildResult, error) {
+	checked, err := o.Check(ctx, CheckInput{Config: in.Config, PluginPath: in.PluginPath, CacheDir: in.CacheDir})
+	if err != nil {
+		return BuildResult{}, err
+	}
+	plan, err := o.CollectOutputs(ctx, in, checked)
+	if err != nil {
+		return BuildResult{}, err
+	}
+	return o.PlannedChanges(ctx, plan)
+}
+
+// Write は仕様を検査し、プラグインから受け取ったファイルを書き出す。例外は、どれも書き出しを始める前に起きる（集めるのが先）。
+//
+// 引数:
+//   - in: ユースケースの入力
+//
+// Throws: hozo.compiler.CheckFailed, hozo.compiler.ConfigInvalid, hozo.compiler.LanguageMismatch, hozo.compiler.Crashed, hozo.compiler.MalformedOutput, hozo.compiler.OutputConflict, hozo.compiler.UnknownNamespace
 // Reads: hozo.compiler.outputs
 // Effects: hozo.compiler.syncOutputs
-func (o *ops) WriteOutputs(ctx context.Context, in BuildInput, checked CheckResult) (BuildResult, error) {
+func (o *ops) Write(ctx context.Context, in EmitInput) (BuildResult, error) {
+	checked, err := o.Check(ctx, CheckInput{Config: in.Config, PluginPath: in.PluginPath, CacheDir: in.CacheDir})
+	if err != nil {
+		return BuildResult{}, err
+	}
 	plan, err := o.CollectOutputs(ctx, in, checked)
 	if err != nil {
 		return BuildResult{}, err
@@ -29,30 +63,14 @@ func (o *ops) WriteOutputs(ctx context.Context, in BuildInput, checked CheckResu
 	return result, nil
 }
 
-// Build は仕様を検査し、プラグインから受け取ったファイルを書き出す。--no-emit なら、検査だけを行い、ファイルを書き出さない。
+// ConfirmTests は仕様を検査し、求めるテストが走ったかを、カバレッジと突き合わせて確かめる。テストは走らせない。
 //
 // 引数:
-//   - in: コマンドの入力
-//
-// Throws: hozo.compiler.CheckFailed, hozo.compiler.ConfigInvalid, hozo.compiler.LanguageMismatch, hozo.compiler.Crashed, hozo.compiler.MalformedOutput, hozo.compiler.OutputConflict, hozo.compiler.UnknownNamespace
-// Reads: hozo.compiler.outputs
-// Effects: hozo.compiler.syncOutputs
-func (o *ops) Build(ctx context.Context, in BuildInput) (BuildResult, error) {
-	checked, err := o.Check(ctx, CheckInput{Config: in.Config, Format: in.Format, PluginPath: in.PluginPath, CacheDir: in.CacheDir})
-	if err != nil {
-		return BuildResult{}, err
-	}
-	return o.WriteOutputs(ctx, in, checked)
-}
-
-// Tests は仕様を検査し、求めるテストが走ったかを、カバレッジと突き合わせて確かめる。テストは走らせない。
-//
-// 引数:
-//   - in: コマンドの入力
+//   - in: ユースケースの入力
 //
 // Throws: hozo.compiler.CheckFailed, hozo.compiler.ConfigInvalid, hozo.compiler.LanguageMismatch, hozo.compiler.Crashed, hozo.compiler.MalformedOutput, hozo.compiler.OutputConflict, hozo.compiler.TestsNotRun, hozo.compiler.CoverageUnusable
-func (o *ops) Tests(ctx context.Context, in TestsInput) (TestsResult, error) {
-	checked, err := o.Check(ctx, CheckInput{Config: in.Config, Format: in.Format, PluginPath: in.PluginPath, CacheDir: in.CacheDir})
+func (o *ops) ConfirmTests(ctx context.Context, in CoverageInput) (TestsResult, error) {
+	checked, err := o.Check(ctx, CheckInput{Config: in.Config, PluginPath: in.PluginPath, CacheDir: in.CacheDir})
 	if err != nil {
 		return TestsResult{}, err
 	}

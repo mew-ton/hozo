@@ -14,6 +14,7 @@ import (
 	"testing"
 
 	"github.com/mew-ton/hozo/internal/fakeplugin"
+	hozocli "github.com/mew-ton/hozo/internal/gen/hozo/cli"
 	"github.com/mew-ton/hozo/internal/gen/hozo/compiler"
 	"github.com/mew-ton/hozo/internal/gen/hozo/compiler/inner"
 )
@@ -128,8 +129,9 @@ func runHome(t *testing.T, dir, home string, env map[string]string, args ...stri
 	return code, out.String(), errOut.String()
 }
 
-// innerOps は、a の実装で、内側のパッケージの Ops（内部の op writeOutputs と runEmit も持つ）を組み立てる。内部の op のテストは、
-// ここから呼ぶ（docs/cli.md「手で書くもの」、docs/plugin-go.md「内側のフォルダと入口」）。引数は App.Ops と同じ。
+// innerOps は、a の実装で、ユースケース（名前空間 hozo.compiler）の、内側のパッケージの Ops（内部の op check、collectOutputs、runEmit
+// なども持つ）を組み立てる。内部の op のテストは、ここから呼ぶ（docs/cli.md「手で書くもの」、docs/plugin-go.md「内側のフォルダと入口」）。
+// 引数は App.Usecases と同じ。
 func innerOps(a *App) inner.Ops {
 	return inner.New(a, a.Sources(), a.Config(), a.Outputs(), a.OutputsSync())
 }
@@ -272,8 +274,8 @@ func TestCheckWithoutConfig(t *testing.T) {
 	if err != nil || len(res.Warnings) != 1 || res.Warnings[0].Code != "NAME-1" {
 		t.Fatalf("Check = %+v, %v", res, err)
 	}
-	// その後の WriteOutputs（内部の op。内側のパッケージの Ops から呼ぶ）は ConfigInvalid（CFG-7）: 配線の最初の collectOutputs
-	// （葉の op）が投げる。述語 UpToDate と OutOfDate も、生成し直せないので同じ例外
+	// ユースケース write と preview は ConfigInvalid（CFG-7）: 配線の collectOutputs（葉の op）が投げる。
+	// 述語 UpToDate と OutOfDate も、生成し直せないので同じ例外
 	cfg7 := func(what string, err error) {
 		t.Helper()
 		var ci compiler.ConfigInvalid
@@ -284,10 +286,12 @@ func TestCheckWithoutConfig(t *testing.T) {
 			t.Fatalf("%s の診断 = %+v, want CFG-7 と、check の warning", what, diags)
 		}
 	}
-	_, err = innerOps(l).WriteOutputs(ctx, compiler.BuildInput{}, res)
-	cfg7("WriteOutputs", err)
-	_, err = l.CollectOutputs(ctx, compiler.BuildInput{}, res)
+	_, err = l.CollectOutputs(ctx, compiler.EmitInput{}, res)
 	cfg7("CollectOutputs", err)
+	_, err = innerOps(l).Write(ctx, compiler.EmitInput{})
+	cfg7("Write", err)
+	_, err = innerOps(l).Preview(ctx, compiler.EmitInput{})
+	cfg7("Preview", err)
 	_, err = l.OutputsSync().UpToDate(ctx)
 	cfg7("UpToDate", err)
 	_, err = l.OutputsSync().OutOfDate(ctx)
@@ -842,9 +846,9 @@ func TestUpToDate(t *testing.T) {
 	if got := predicates(); got != [2]bool{false, true} {
 		t.Errorf("emit の前の述語（UpToDate、OutOfDate）= %v", got)
 	}
-	// 配線の emit（check → writeOutputs → collectOutputs、outputChanges、syncOutputs）。効果 syncOutputs は、状態の分類
+	// ユースケース write の配線（check → collectOutputs → outputChanges → syncOutputs）。効果 syncOutputs は、状態の分類
 	// OutputsSync の単位の命令で、どの場合からも UpToDate に移す
-	res, err := ops.Build(ctx, compiler.BuildInput{})
+	res, err := ops.Build(ctx, hozocli.BuildInput{})
 	if err != nil || len(res.Written) == 0 {
 		t.Fatalf("Emit = %+v, %v", res, err)
 	}
@@ -883,7 +887,7 @@ func TestUpToDate(t *testing.T) {
 	if got := sync(); got != compiler.OutputsSyncOutOfDate {
 		t.Errorf("基底がファイルを返さなくなった後: %v", got)
 	}
-	if _, err := ops.Build(ctx, compiler.BuildInput{}); err != nil {
+	if _, err := ops.Build(ctx, hozocli.BuildInput{}); err != nil {
 		t.Fatal(err)
 	}
 	if got := sync(); got != compiler.OutputsSyncUpToDate {
@@ -898,10 +902,11 @@ func TestUpToDate(t *testing.T) {
 	}
 }
 
-// TestWriteOutputsSteps は、配線 writeOutputs が呼ぶ三つ（docs/cli.md「書き出し」「手で書くもの」）を、一つずつ動かす: 葉の op collectOutputs
-// は、ファイルに触れずに、書き出す予定を集める。read outputChanges（状態 outputs の単位の問い合わせ）は、予定を今のファイルと比べて、
-// 書くファイルと消すファイルを決めるだけで、何も変えない。効果 syncOutputs（状態の分類 OutputsSync の単位の命令）が、書き出す。
-// dryRun の予定では、消すファイルを決めず、書き出さない。予定は、直前の collectOutputs が返したものでなければ、誤り。
+// TestWriteOutputsSteps は、ユースケース write の配線が呼ぶ三つ（docs/cli.md「書き出し」「手で書くもの」）を、一つずつ動かす: 葉の op
+// collectOutputs は、ファイルに触れずに、書き出す予定を集める。read outputChanges（状態 outputs の単位の問い合わせ）は、予定を今の
+// ファイルと比べて、書くファイルと消すファイルを決めるだけで、何も変えない。効果 syncOutputs（状態の分類 OutputsSync の単位の命令）が、
+// 書き出す。ユースケース preview（葉の op plannedChanges）は、消すファイルを決めず、書き出さない。予定は、直前の collectOutputs が
+// 返したものでなければ、誤り。
 func TestWriteOutputsSteps(t *testing.T) {
 	dir := copyCorpus(t)
 	gen := filepath.Join(dir, "gen")
@@ -910,7 +915,7 @@ func TestWriteOutputsSteps(t *testing.T) {
 	ctx := context.Background()
 	a := &App{Dir: dir, Stderr: &bytes.Buffer{}}
 	ops := innerOps(a)
-	if _, err := ops.Build(ctx, compiler.BuildInput{}); err != nil {
+	if _, err := ops.Write(ctx, compiler.EmitInput{}); err != nil {
 		t.Fatal(err)
 	}
 	// fake を単位から外す: gen/server/extra.txt は、前回書いて、今回は書かないファイル。基底は、内容を変える
@@ -931,7 +936,7 @@ func TestWriteOutputsSteps(t *testing.T) {
 
 	// collectOutputs: トランスパイラのファイル（パスの辞書順）と、check の warning（トランスパイラの warning を含む: check が、
 	// プラグインに頼んで、もう受け取っている。四つの出力の基底が返す、同じ warning は、一度だけ。docs/plugin-protocol.md「emit」）
-	plan, err := ops.CollectOutputs(ctx, compiler.BuildInput{}, checked)
+	plan, err := ops.CollectOutputs(ctx, compiler.EmitInput{}, checked)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -940,8 +945,8 @@ func TestWriteOutputsSteps(t *testing.T) {
 	for _, f := range plan.Files {
 		planned = append(planned, f.Path)
 	}
-	if !reflect.DeepEqual(planned, paths) || plan.Files[3].Content != "new server" || plan.DryRun != nil {
-		t.Fatalf("plan.Files = %+v, DryRun = %v", plan.Files, plan.DryRun)
+	if !reflect.DeepEqual(planned, paths) || plan.Files[3].Content != "new server" {
+		t.Fatalf("plan.Files = %+v", plan.Files)
 	}
 	plugins := 0
 	for _, w := range plan.Warnings {
@@ -964,21 +969,28 @@ func TestWriteOutputsSteps(t *testing.T) {
 		t.Fatalf("OutputChanges = %+v", changes)
 	}
 
-	// dryRun の予定: 書くファイルだけを返し（消すファイルは決めない）、syncOutputs は何もしない
-	yes := true
-	dry, err := ops.CollectOutputs(ctx, compiler.BuildInput{DryRun: &yes}, checked)
-	if err != nil || dry.DryRun == nil || !*dry.DryRun {
-		t.Fatalf("dryRun の plan = %+v, %v", dry, err)
+	// 書き出す予定を見る（葉の op plannedChanges）: 書くファイルだけを返し（消すファイルは決めない）、何も書かない
+	if changes, err = a.PlannedChanges(ctx, plan); err != nil || !reflect.DeepEqual(changes.Written, paths) || changes.Removed == nil || len(changes.Removed) != 0 ||
+		!reflect.DeepEqual(changes.Warnings, plan.Warnings) {
+		t.Fatalf("PlannedChanges = %+v, %v", changes, err)
 	}
-	if changes, err = a.Outputs().OutputChanges(ctx, dry); err != nil || !reflect.DeepEqual(changes.Written, paths) || changes.Removed == nil || len(changes.Removed) != 0 {
-		t.Fatalf("dryRun の OutputChanges = %+v, %v", changes, err)
+	unchanged("PlannedChanges")
+	// ユースケース preview（check → collectOutputs → plannedChanges）も、同じ結果で、何も書かない
+	if changes, err = ops.Preview(ctx, compiler.EmitInput{}); err != nil || !reflect.DeepEqual(changes.Written, paths) || changes.Removed == nil || len(changes.Removed) != 0 {
+		t.Fatalf("Preview = %+v, %v", changes, err)
 	}
-	if err := a.OutputsSync().SyncOutputs(ctx, dry); err != nil {
+	unchanged("Preview")
+	// ユースケース verify（check → verifyOutputs）は、warning だけを返し（書くファイルも、消すファイルも、ない）、何も書かない
+	if changes, err = ops.Verify(ctx, compiler.EmitInput{}); err != nil || changes.Written == nil || len(changes.Written) != 0 || changes.Removed == nil || len(changes.Removed) != 0 ||
+		!reflect.DeepEqual(changes.Warnings, plan.Warnings) {
+		t.Fatalf("Verify = %+v, %v", changes, err)
+	}
+	unchanged("Verify")
+	if plan, err = ops.CollectOutputs(ctx, compiler.EmitInput{}, checked); err != nil {
 		t.Fatal(err)
 	}
-	unchanged("dryRun の SyncOutputs")
 
-	// 予定は、直前の collectOutputs が返したもの（ここでは dry）でなければ、誤り。何も変えない
+	// 予定は、直前の collectOutputs が返したものでなければ、誤り。何も変えない
 	stale := plan
 	stale.Files = plan.Files[:1]
 	if _, err := a.Outputs().OutputChanges(ctx, stale); err == nil {
@@ -987,22 +999,28 @@ func TestWriteOutputsSteps(t *testing.T) {
 	if err := a.OutputsSync().SyncOutputs(ctx, stale); err == nil {
 		t.Error("直前の CollectOutputs の結果でない予定で、SyncOutputs が通った")
 	}
+	if _, err := a.PlannedChanges(ctx, stale); err == nil {
+		t.Error("直前の CollectOutputs の結果でない予定で、PlannedChanges が通った")
+	}
 	unchanged("誤った予定の SyncOutputs")
 
-	// collectOutputs は、受け取った ctx で、トランスパイラを起動する: 中断された ctx では、集めずに、その error を返す。
-	// 配線 writeOutputs も、その error を、そのまま返し、何も書かない
+	// collectOutputs は、受け取った ctx を見る: 中断された ctx では、集めずに、その error を返す。
+	// ユースケース write の配線も、その error を、そのまま返し、何も書かない
 	cancelled, cancel := context.WithCancel(ctx)
 	cancel()
-	if _, err := ops.CollectOutputs(cancelled, compiler.BuildInput{}, checked); !errors.Is(err, context.Canceled) {
+	if _, err := ops.CollectOutputs(cancelled, compiler.EmitInput{}, checked); !errors.Is(err, context.Canceled) {
 		t.Errorf("中断された ctx の CollectOutputs: err = %v, want context.Canceled", err)
 	}
-	if _, err := ops.WriteOutputs(cancelled, compiler.BuildInput{}, checked); !errors.Is(err, context.Canceled) {
-		t.Errorf("中断された ctx の WriteOutputs: err = %v, want context.Canceled", err)
+	if _, err := ops.Write(cancelled, compiler.EmitInput{}); !errors.Is(err, context.Canceled) {
+		t.Errorf("中断された ctx の Write: err = %v, want context.Canceled", err)
 	}
-	unchanged("中断された ctx の WriteOutputs")
+	unchanged("中断された ctx の Write")
+	if checked, err = ops.Check(ctx, compiler.CheckInput{}); err != nil {
+		t.Fatal(err)
+	}
 
 	// syncOutputs: 余分なファイルを消し、古いファイルを書き換え、記録を書く。その後は UpToDate で、消すファイルはない
-	if plan, err = ops.CollectOutputs(ctx, compiler.BuildInput{}, checked); err != nil {
+	if plan, err = ops.CollectOutputs(ctx, compiler.EmitInput{}, checked); err != nil {
 		t.Fatal(err)
 	}
 	if err := a.OutputsSync().SyncOutputs(ctx, plan); err != nil {
@@ -1743,7 +1761,7 @@ func TestStateUnits(t *testing.T) {
 	if empty, err := a.Outputs().IsEmpty(ctx); err != nil || !empty {
 		t.Errorf("emit の前の outputs.IsEmpty = %v, %v", empty, err)
 	}
-	res, err := a.Ops().Build(ctx, compiler.BuildInput{})
+	res, err := a.Ops().Build(ctx, hozocli.BuildInput{})
 	if err != nil {
 		t.Fatal(err)
 	}

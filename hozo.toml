@@ -6,8 +6,14 @@ plugin_dirs = ["plugins"]
 [options.go]
 module = "github.com/mew-ton/hozo"
 
-# hozoc 自身。型と op の形は基底 go、制約の検査は go-valid、コマンドラインは go-cli
+# hozoc 自身（docs/cli.md「cli.hozo」）。1: ユースケース（名前空間 hozo.compiler）。型と op の形は基底 go、制約の検査は go-valid
 [[emit]]
 namespace   = "hozo.compiler"
-transpilers = ["go", "go-valid", "go-cli"]
+transpilers = ["go", "go-valid"]
 out         = "internal/gen/hozo/compiler"
+
+# 2: コマンドの行（入口。名前空間 hozo.cli）。コマンドラインは go-cli
+[[emit]]
+namespace   = "hozo.cli"
+transpilers = ["go", "go-valid", "go-cli"]
+out         = "internal/gen/hozo/cli"

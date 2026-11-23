@@ -47,10 +47,43 @@ type CollectOutputsCases interface {
 
 // CollectOutputsCase は、葉 hozo.compiler.collectOutputs の、ケース一つ: 渡す引数と、足りない確かめ。
 type CollectOutputsCase struct {
-	In      compiler.BuildInput
+	In      compiler.EmitInput
 	Checked compiler.CheckResult
 	// Then は、結果が、そのケースのものだと確かめた後に、呼ばれる（nil なら、呼ばない）。got は、葉が返した値、err は、葉が返した失敗（正常のケースでは nil）。
 	Then func(t *testing.T, got compiler.EmitPlan, err error)
+}
+
+// VerifyOutputsCases は、葉 hozo.compiler.verifyOutputs の、結果ごとのケース。結果の数だけ、メソッドがある。
+type VerifyOutputsCases interface {
+	// OK は、正常に終わるケース。
+	OK() VerifyOutputsCase
+	// OutputConflict は、例外 hozo.compiler.OutputConflict を投げるケース。
+	OutputConflict() VerifyOutputsCase
+	// UnknownNamespace は、例外 hozo.compiler.UnknownNamespace を投げるケース。
+	UnknownNamespace() VerifyOutputsCase
+	// MalformedOutput は、例外 hozo.compiler.MalformedOutput を投げるケース。
+	MalformedOutput() VerifyOutputsCase
+}
+
+// VerifyOutputsCase は、葉 hozo.compiler.verifyOutputs の、ケース一つ: 渡す引数と、足りない確かめ。
+type VerifyOutputsCase struct {
+	In      compiler.EmitInput
+	Checked compiler.CheckResult
+	// Then は、結果が、そのケースのものだと確かめた後に、呼ばれる（nil なら、呼ばない）。got は、葉が返した値、err は、葉が返した失敗（正常のケースでは nil）。
+	Then func(t *testing.T, got compiler.BuildResult, err error)
+}
+
+// PlannedChangesCases は、葉 hozo.compiler.plannedChanges の、結果ごとのケース。結果の数だけ、メソッドがある。
+type PlannedChangesCases interface {
+	// OK は、正常に終わるケース。
+	OK() PlannedChangesCase
+}
+
+// PlannedChangesCase は、葉 hozo.compiler.plannedChanges の、ケース一つ: 渡す引数と、足りない確かめ。
+type PlannedChangesCase struct {
+	Plan compiler.EmitPlan
+	// Then は、結果が、そのケースのものだと確かめた後に、呼ばれる（nil なら、呼ばない）。got は、葉が返した値、err は、葉が返した失敗（正常のケースでは nil）。
+	Then func(t *testing.T, got compiler.BuildResult, err error)
 }
 
 // MatchTestsCases は、葉 hozo.compiler.matchTests の、結果ごとのケース。結果の数だけ、メソッドがある。
@@ -73,21 +106,21 @@ type MatchTestsCases interface {
 
 // MatchTestsCase は、葉 hozo.compiler.matchTests の、ケース一つ: 渡す引数と、足りない確かめ。
 type MatchTestsCase struct {
-	In      compiler.TestsInput
+	In      compiler.CoverageInput
 	Checked compiler.CheckResult
 	// Then は、結果が、そのケースのものだと確かめた後に、呼ばれる（nil なら、呼ばない）。got は、葉が返した値、err は、葉が返した失敗（正常のケースでは nil）。
 	Then func(t *testing.T, got compiler.TestsResult, err error)
 }
 
-// LspCases は、葉 hozo.compiler.lsp の、結果ごとのケース。結果の数だけ、メソッドがある。
-type LspCases interface {
+// ServeCases は、葉 hozo.compiler.serve の、結果ごとのケース。結果の数だけ、メソッドがある。
+type ServeCases interface {
 	// OK は、正常に終わるケース。
-	OK() LspCase
+	OK() ServeCase
 }
 
-// LspCase は、葉 hozo.compiler.lsp の、ケース一つ: 渡す引数と、足りない確かめ。
-type LspCase struct {
-	In compiler.LspInput
+// ServeCase は、葉 hozo.compiler.serve の、ケース一つ: 渡す引数と、足りない確かめ。
+type ServeCase struct {
+	In compiler.ServeInput
 	// Then は、結果が、そのケースのものだと確かめた後に、呼ばれる（nil なら、呼ばない）。err は、葉が返した失敗（正常のケースでは nil）。
 	Then func(t *testing.T, err error)
 }
@@ -115,8 +148,10 @@ type RunEmitCase struct {
 type LeafCases interface {
 	Check() CheckCases
 	CollectOutputs() CollectOutputsCases
+	VerifyOutputs() VerifyOutputsCases
+	PlannedChanges() PlannedChangesCases
 	MatchTests() MatchTestsCases
-	Lsp() LspCases
+	Serve() ServeCases
 	RunEmit() RunEmitCases
 }
 
@@ -237,6 +272,65 @@ func RunLeaves(t *testing.T, leaves compiler.Leaves, c LeafCases) {
 			}
 		})
 	})
+	t.Run("hozo.compiler.verifyOutputs", func(t *testing.T) {
+		cases := c.VerifyOutputs()
+		t.Run("OK", func(t *testing.T) {
+			k := cases.OK()
+			got, err := leaves.VerifyOutputs(context.Background(), k.In, k.Checked)
+			if err != nil {
+				t.Fatalf("want no error, got %v", err)
+			}
+			if k.Then != nil {
+				k.Then(t, got, err)
+			}
+		})
+		t.Run("OutputConflict", func(t *testing.T) {
+			k := cases.OutputConflict()
+			got, err := leaves.VerifyOutputs(context.Background(), k.In, k.Checked)
+			var want compiler.OutputConflict
+			if !errors.As(err, &want) {
+				t.Fatalf("want exception hozo.compiler.OutputConflict, got %v", err)
+			}
+			if k.Then != nil {
+				k.Then(t, got, err)
+			}
+		})
+		t.Run("UnknownNamespace", func(t *testing.T) {
+			k := cases.UnknownNamespace()
+			got, err := leaves.VerifyOutputs(context.Background(), k.In, k.Checked)
+			var want compiler.UnknownNamespace
+			if !errors.As(err, &want) {
+				t.Fatalf("want exception hozo.compiler.UnknownNamespace, got %v", err)
+			}
+			if k.Then != nil {
+				k.Then(t, got, err)
+			}
+		})
+		t.Run("MalformedOutput", func(t *testing.T) {
+			k := cases.MalformedOutput()
+			got, err := leaves.VerifyOutputs(context.Background(), k.In, k.Checked)
+			var want compiler.MalformedOutput
+			if !errors.As(err, &want) {
+				t.Fatalf("want exception hozo.compiler.MalformedOutput, got %v", err)
+			}
+			if k.Then != nil {
+				k.Then(t, got, err)
+			}
+		})
+	})
+	t.Run("hozo.compiler.plannedChanges", func(t *testing.T) {
+		cases := c.PlannedChanges()
+		t.Run("OK", func(t *testing.T) {
+			k := cases.OK()
+			got, err := leaves.PlannedChanges(context.Background(), k.Plan)
+			if err != nil {
+				t.Fatalf("want no error, got %v", err)
+			}
+			if k.Then != nil {
+				k.Then(t, got, err)
+			}
+		})
+	})
 	t.Run("hozo.compiler.matchTests", func(t *testing.T) {
 		cases := c.MatchTests()
 		t.Run("OK", func(t *testing.T) {
@@ -316,11 +410,11 @@ func RunLeaves(t *testing.T, leaves compiler.Leaves, c LeafCases) {
 			}
 		})
 	})
-	t.Run("hozo.compiler.lsp", func(t *testing.T) {
-		cases := c.Lsp()
+	t.Run("hozo.compiler.serve", func(t *testing.T) {
+		cases := c.Serve()
 		t.Run("OK", func(t *testing.T) {
 			k := cases.OK()
-			err := leaves.Lsp(context.Background(), k.In)
+			err := leaves.Serve(context.Background(), k.In)
 			if err != nil {
 				t.Fatalf("want no error, got %v", err)
 			}

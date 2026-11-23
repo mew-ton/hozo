@@ -16,7 +16,7 @@ import (
 // このファイルは、cli.hozo の状態 sources、config、outputs の単位の実装（docs/cli.md「手で書くもの」の表）。どれも、形で決まる
 // 問い合わせ（IsEmpty と Get）を持つ。生成した配線は、それを呼ばない（cli.hozo の配線は、状態を名前で読まない）: テストが、
 // 効果の結果の判定に使うためのもの。値は、作業ディレクトリから探した設定で、ディスクから読む。呼ぶたびに読み直す。
-// outputs の単位は、read outputChanges（配線 writeOutputs が呼ぶ）も持つ。
+// outputs の単位は、read outputChanges（ユースケース write の配線が呼ぶ）も持つ。
 
 // load は、作業ディレクトリから hozo.toml を探して解析する（Check と同じ解析。入力の config は取らない）。plugins が偽なら、
 // プラグインは、起動しない（状態の単位が、仕様と設定を読み直すだけの呼び出し）。真なら、Check と同じに、プラグインに頼み、
@@ -154,14 +154,13 @@ func (s outputsState) IsEmpty(ctx context.Context) (bool, error) {
 
 // OutputChanges は cli.hozo の read outputChanges（on outputs。docs/cli.md「書き出し」の 4〜7 の、書くファイルと消すファイルを決める
 // ところ）: 書き出す予定 plan を、今の生成したファイルと比べる。読むだけで、何も変えない（書き出すのは、効果 syncOutputs。
-// [outputsSync.SyncOutputs]）。配線 writeOutputs が、collectOutputs の後、syncOutputs の前に呼び、その結果を返す。plan は、
+// [outputsSync.SyncOutputs]）。ユースケース write の配線が、collectOutputs の後、syncOutputs の前に呼び、その結果を返す。plan は、
 // 直前の CollectOutputs が返したもの（置き場は [App.plannedFor] から取る）。
 //
 //   - Warnings は、予定の warning（check の warning に、トランスパイラの warning を足したもの）。
 //   - Written は、書く予定のファイル（パスの辞書順）。内容が同じで書き直さないものも入れる（同 6）。
 //   - Removed は、消すファイル: 対象の各出力の記録にあって、今回は書かないパスのうち、ディスクにあるもの（[outputPlan.stale]）。
-//     パスの辞書順。plan が dryRun なら、決めずに空（同 4: 書く予定のパスだけを返す）。
-//   - plan が noEmit（hozoc build --no-emit）なら、Written も Removed も空（同 4）。
+//     パスの辞書順。
 func (s outputsState) OutputChanges(ctx context.Context, plan compiler.EmitPlan) (compiler.BuildResult, error) {
 	if err := ctx.Err(); err != nil {
 		return compiler.BuildResult{}, err
@@ -171,14 +170,8 @@ func (s outputsState) OutputChanges(ctx context.Context, plan compiler.EmitPlan)
 		return compiler.BuildResult{}, err
 	}
 	result := compiler.BuildResult{Warnings: plan.Warnings, Written: make([]compiler.Path, 0, len(plan.Files)), Removed: []compiler.Path{}}
-	if noEmit(plan) {
-		return result, nil // 検査だけ: 書くものも、消すものも、ない（置き場は、読まない）
-	}
 	for _, f := range plan.Files {
 		result.Written = append(result.Written, f.Path)
-	}
-	if dryRun(plan) {
-		return result, nil
 	}
 	stale, err := pl.stale()
 	if err != nil {

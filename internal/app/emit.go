@@ -36,36 +36,31 @@ type output struct {
 
 // CollectOutputs は cli.hozo の op collectOutputs（docs/cli.md「書き出し」の 1〜3）: 検査（Check）が、プラグインから受け取った答えから、
 // 出力ごとのファイルを集める。プラグインは、起動しない。compiler.Leaves のメソッド。葉の op なので、状態（生成したファイル）には触れない: 読むのも書くのも、
-// 配線 writeOutputs が、この後に呼ぶ read outputChanges（[App.Outputs]）と効果 syncOutputs（[App.OutputsSync]）。内部の op で、
+// ユースケース write の配線が、この後に呼ぶ read outputChanges（[App.Outputs]）と効果 syncOutputs（[App.OutputsSync]）。内部の op で、
 // テストは、内側のパッケージ internal/gen/hozo/compiler/inner の Ops から呼ぶ。checked は Check が返したもの（warning）で、その中身
 // （Program、設定、マニフェスト）は Check が a.checked に置いた Project から取る。集めるファイルは、どれもトランスパイラが
 // 返したもの。
 //
 //  0. 設定なし（hozo.toml が見つからない。docs/config.md「置き場と探し方」）なら、書き出すものがないので CFG-7 を
-//     一つ作って ConfigInvalid（docs/cli.md「書き出し」の 0）。check の warning も一緒に運ぶ。検査だけ（in の noEmit）なら、
-//     誤りにせず、空の予定を返す。
+//     一つ作って ConfigInvalid（docs/cli.md「書き出し」の 0）。check の warning も一緒に運ぶ。
 //  1. namespaces が空でなければ、名前空間がそのどれかと同じか子孫である出力だけを対象にする。引数とその子孫のどれも、
 //     どの単位の対象でもなければ UnknownNamespace。
 //  2. 対象の各出力について、単位の各トランスパイラの答えから、files を集める（path とテストの対応表を確かめる:
 //     PLG-1 / PLG-2 / PLG-4 は compiler.MalformedOutput）。
 //  3. すべての出力のファイルを集めてからパスの重複を確かめる（CFG-5 → OutputConflict）。
 //
-// 1〜3 は [App.collect]。返す予定（compiler.EmitPlan）は、warning と、ファイル（パスの辞書順）と、入力の dryRun と noEmit。置き場を含む形は
+// 1〜3 は [App.collect]。返す予定（compiler.EmitPlan）は、warning と、ファイル（パスの辞書順）。置き場を含む形は
 // a.planned に置く（[App.plannedFor]）。
 //
 // ctx が中断されていれば、その error を返す（[App.collect]）。
-func (a *App) CollectOutputs(ctx context.Context, in compiler.BuildInput, checked compiler.CheckResult) (compiler.EmitPlan, error) {
+func (a *App) CollectOutputs(ctx context.Context, in compiler.EmitInput, checked compiler.CheckResult) (compiler.EmitPlan, error) {
 	a.planned = nil
 	p := a.checked
 	if p == nil || len(checked.Warnings) != len(p.Diags) {
 		return compiler.EmitPlan{}, errors.New("hozoc: CollectOutputs の checked が直前の Check の結果でない")
 	}
-	// 0. 設定なし。検査だけ（--no-emit）なら、集めるものがないので、空の予定を返す
+	// 0. 設定なし
 	if p.NoConfig {
-		if in.NoEmit != nil && *in.NoEmit {
-			a.planned = &outputPlan{root: p.Root, warnings: p.Diags}
-			return compiler.EmitPlan{Warnings: toDiagnostics(p.Diags, p.Files), Files: []compiler.OutputFile{}, DryRun: in.DryRun, NoEmit: in.NoEmit}, nil
-		}
 		return compiler.EmitPlan{}, noConfig(p)
 	}
 	pl, err := a.collect(ctx, p, in.Namespaces)
@@ -73,7 +68,7 @@ func (a *App) CollectOutputs(ctx context.Context, in compiler.BuildInput, checke
 		return compiler.EmitPlan{}, err
 	}
 	a.planned = pl
-	plan := compiler.EmitPlan{Warnings: toDiagnostics(pl.warnings, p.Files), Files: make([]compiler.OutputFile, 0, len(pl.outputs)), DryRun: in.DryRun, NoEmit: in.NoEmit}
+	plan := compiler.EmitPlan{Warnings: toDiagnostics(pl.warnings, p.Files), Files: make([]compiler.OutputFile, 0, len(pl.outputs))}
 	for _, o := range pl.outputs {
 		plan.Files = append(plan.Files, compiler.OutputFile{Path: compiler.Path(o.path), Content: string(o.content)})
 	}
@@ -94,12 +89,45 @@ func (a *App) plannedFor(plan compiler.EmitPlan) (*outputPlan, error) {
 	return pl, nil
 }
 
-// dryRun は、予定 plan が、書き出さずに、書き出す予定だけを返すものか（cli.hozo の EmitPlan.dryRun）。
-func dryRun(plan compiler.EmitPlan) bool { return plan.DryRun != nil && *plan.DryRun }
+// VerifyOutputs は cli.hozo の op verifyOutputs（docs/cli.md「書き出し」の 1〜3 を、確かめるためだけに行う）: 検査（Check）が、
+// プラグインから受け取った答えから、出力ごとのファイルを集めて、確かめる（[App.collect]: パスの誤り、テストの対応表、ファイルの
+// 衝突）。集めたファイルは、返さない: 返すのは、warning だけの結果。compiler.Leaves のメソッドで、ユースケース verify（検査だけ）の
+// 配線が、check の後に呼ぶ。ファイルには、触れない。設定なし（hozo.toml が見つからない）なら、集めるものがないので、誤りにせず、
+// 検査の warning だけを返す（[App.CollectOutputs] は、ConfigInvalid）。
+func (a *App) VerifyOutputs(ctx context.Context, in compiler.EmitInput, checked compiler.CheckResult) (compiler.BuildResult, error) {
+	a.planned = nil
+	p := a.checked
+	if p == nil || len(checked.Warnings) != len(p.Diags) {
+		return compiler.BuildResult{}, errors.New("hozoc: VerifyOutputs の checked が直前の Check の結果でない")
+	}
+	warnings := p.Diags
+	if !p.NoConfig {
+		pl, err := a.collect(ctx, p, in.Namespaces)
+		if err != nil {
+			return compiler.BuildResult{}, err
+		}
+		warnings = pl.warnings
+	}
+	return compiler.BuildResult{Warnings: toDiagnostics(warnings, p.Files), Written: []compiler.Path{}, Removed: []compiler.Path{}}, nil
+}
 
-// noEmit は、予定 plan が、検査だけのものか（cli.hozo の EmitPlan.noEmit。hozoc build --no-emit）: 書き出さず、書き出す予定も
-// 返さない。置き場は、読まない。
-func noEmit(plan compiler.EmitPlan) bool { return plan.NoEmit != nil && *plan.NoEmit }
+// PlannedChanges は cli.hozo の op plannedChanges（docs/cli.md「書き出し」の 4）: 書き出す予定 plan を、結果の形にする。Written は、
+// 書く予定のファイルのパス（plan.Files の順: パスの辞書順）、Removed は、空（消すファイルは、今の生成したファイルを読まないと
+// 決まらないので、決めない）。compiler.Leaves のメソッドで、ユースケース preview（書き出す予定を見る）の配線が、collectOutputs の後に呼ぶ。
+// ファイルには、触れない。plan は、直前の CollectOutputs が返したもの（[App.plannedFor] が確かめる）。
+func (a *App) PlannedChanges(ctx context.Context, plan compiler.EmitPlan) (compiler.BuildResult, error) {
+	if err := ctx.Err(); err != nil {
+		return compiler.BuildResult{}, err
+	}
+	if _, err := a.plannedFor(plan); err != nil {
+		return compiler.BuildResult{}, err
+	}
+	result := compiler.BuildResult{Warnings: plan.Warnings, Written: make([]compiler.Path, 0, len(plan.Files)), Removed: []compiler.Path{}}
+	for _, f := range plan.Files {
+		result.Written = append(result.Written, f.Path)
+	}
+	return result, nil
+}
 
 // noConfig は、設定なしで emit しようとしたときの ConfigInvalid（CFG-7。docs/cli.md「手で書くもの」）。
 func noConfig(p *project.Project) error {
