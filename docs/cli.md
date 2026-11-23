@@ -10,6 +10,8 @@ hozoc 自身の仕様は、リポジトリ直下の `cli.hozo`。下のコード
 
 業務の流れ（ユースケースを、順に呼ぶ配線）は、別のファイル `flows.hozo` の、名前空間 `hozo.flows` が持つ（`docs/decisions.md`「決めたこと」475。写しは、ここには、置かない）。hozoc の外の手順（利用者か CI が、テストを走らせる）は、同じファイルの `hozo.toolchain` の op として言う。どちらの名前空間も、単位の対象ではなく、コードには、ならない。
 
+プラグインとのやり取り（`plugin.hozo` の `hozo.plugin`）と、IR（`ir.hozo` の `hozo.ir`）も、Hozo で写してある（同 468）。**写しで、持ち主は、文書**（`docs/plugin-protocol.md`、`docs/ir.md`）: 今の言語で、JSON の上の形を、言い切れない所があり（`docs/open.md`「サンプルと、hozoc 自身の仕様」の 12〜20）、生成には、使っていない。単位の対象ではなく、コードには、ならない。
+
 設計書の `examples/hozoc.hozo` を元に、次を変えたもの。変えた理由はそれぞれの項目に書く（決定の一覧での番号は `docs/decisions.md` の 20 と 36）。
 
 `examples/hozoc.hozo` が「書けなかったもの」として挙げた三つは、次のように解く。
@@ -560,7 +562,7 @@ namespace hozo.cli {
 
 ```toml
 [hozo]
-sources     = ["cli.hozo", "flows.hozo"]   # vocab/ と tests/ の .hozo を読まないため
+sources     = ["cli.hozo", "flows.hozo", "ir.hozo", "plugin.hozo"]   # vocab/ と tests/ の .hozo を読まないため
 plugin_dirs = ["plugins"]
 
 # Go のモジュールの名前（go.mod の module と同じもの。docs/plugin-go.md「マニフェスト」）。プロジェクト全体のオプション

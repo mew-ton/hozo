@@ -1,0 +1,551 @@
+// Hozo 自身の仕様（docs/decisions.md「決めたこと」468）。IR の名前空間 hozo.ir。
+// **写し。持ち主は、文書（docs/ir.md）と、Go の型（ir/）。生成に使うようになるまで。** 食い違えば、文書が正しい。
+// どの単位の対象でもない: コードには、ならない。
+//
+// 今の言語で、JSON の上の形（docs/ir.md「JSON」）を、同じに言えない所は、近い形に曲げず、コメントにしてある。
+// 書けなかった所の持ち主は docs/open.md「サンプルと、hozoc 自身の仕様」の 12〜（下の「穴 12」などは、その番号）:
+//   穴 12: 決まった値を持つ項目（印 kind: "core" など）と、印で見分ける union。項目ごと、コメントにした
+//   穴 13: 決まった値の集まり（列挙）を、型として書けない。scalar と @valid.pattern で、通す値を言った
+//   穴 14: 「項目は、いつもあり、値が null」（Op.returns、Op.body）と、「項目がない」を、分けて書けない。コメントにした
+//   穴 15: 形の決まっていない値（設定のオプション: unknown）を、書けない。コメントにした
+//   穴 16: 決まった長さの組（[始まり, 終わり]）を、書けない
+//   穴 20: インデックスの model の、キーの名前に、予約語を書けない（namespace、op、decorator）。fqn にした
+// どこまで写したか: 構造（宣言、型、配線、その名前空間から見た IR）の、すべての型と、union のすべてのアーム。
+// 項目の説明は、持ち主（docs/ir.md）にあり、ここには、写していない。
+
+/** IR（docs/ir.md）。プラグインが受け取る、仕様の、ただ一つの形 */
+namespace hozo.ir {
+  // ---- 名前と、決まった値の集まり（穴 13: 列挙を、型として書けない） ----
+
+  /** 宣言などの、完全な名前（"server.admin.login"） */
+  scalar Fqn extends string;
+
+  /** 核の型の名前 */
+  @valid.pattern("^(string|boolean|int|float|datetime|date|time|duration)$")
+  scalar CoreName extends string;
+
+  /** union の種類。arms: model のバリアント。set: 例外か効果の集合 */
+  @valid.pattern("^(arms|set)$")
+  scalar UnionVariant extends string;
+
+  /** 状態の形 */
+  @valid.pattern("^(list|nullable|single)$")
+  scalar StateShape extends string;
+
+  /** 基底の状態への操作 */
+  @valid.pattern("^(post|put|delete)$")
+  scalar Operation extends string;
+
+  /** ケースが、何で決まるか */
+  @valid.pattern("^(type|predicate|none)$")
+  scalar DecidedBy extends string;
+
+  /** 絞り込みの種類 */
+  @valid.pattern("^(presence|variant|predicate|else|none)$")
+  scalar NarrowBy extends string;
+
+  /** デコレータを付けられる宣言の種類 */
+  @valid.pattern("^(op|field|state|exception|scalar|model|effect|read|case)$")
+  scalar DecoratorTarget extends string;
+
+  /** `any <種類>` の種類（case を除く） */
+  @valid.pattern("^(exception|effect|state|op|model|variant)$")
+  scalar AnyOf extends string;
+
+  /** 例外と効果の関係の種類 */
+  @valid.pattern("^(prevents|keeps)$")
+  scalar RelationKind extends string;
+
+  /** 例外の受け方 */
+  @valid.pattern("^(recovers|halts|ignores)$")
+  scalar CatchMode extends string;
+
+  /** 効果の状態 */
+  @valid.pattern("^(prevented|kept|unknown)$")
+  scalar EffectState extends string;
+
+  /** 例外の出どころの種類 */
+  @valid.pattern("^(leaf|effect|external|boundary|decorator|arm|never|unknown)$")
+  scalar EntrySourceKind extends string;
+
+  /** 差し替えに言うことの、動詞 */
+  @valid.pattern("^(throws|none|is)$")
+  scalar EntryStepVerb extends string;
+
+  /** 差し替えの相手の種類 */
+  @valid.pattern("^(leaf|effect|read|state|op|decorator|classify)$")
+  scalar EntryTargetKind extends string;
+
+  // ---- Program ----
+
+  model Program {
+    /** この文書の版（今は "0.24"） */
+    version: string;
+    namespaces: Namespace[];
+    binds: Bind[];
+  }
+
+  model Namespace {
+    name: string;
+    description: Doc?;
+    decls: Decl[];
+  }
+
+  /** 宣言。JSON では、印 kind で見分ける（穴 12: 今の言語の union は、印を持たず、構造で見分ける） */
+  union Decl {
+    Model: Model;
+    Scalar: Scalar;
+    Union: Union;
+    State: State;
+    Exception: Exception;
+    Effect: Effect;
+    Read: Read;
+    Classify: Classify;
+    Decorator: Decorator;
+    Op: Op;
+  }
+
+  model DeclBase {
+    // kind: "model" | "scalar" | "union" | "state" | "exception" | "effect" | "read" | "classify" | "decorator" | "op";   （穴 12）
+    name: Fqn;
+    description: Doc?;
+    decorators: Application[];
+    span: Span;
+  }
+
+  model Span { file: string; start: Pos; end: Pos; }
+
+  /** 1 始まり */
+  model Pos { line: int; col: int; }
+
+  model Doc {
+    summary: string;
+    body: string;
+    params: DocParam[];
+    throws: DocThrows[];
+    see: Fqn[];
+  }
+  model DocParam { name: string; text: string; }
+  model DocThrows { exception: Fqn; text: string; }
+
+  // ---- 型 ----
+
+  /** 型。JSON では、印 kind（"core"、"ref"、"optional"、"array"、"case"、"never"）で見分ける（穴 12） */
+  union Type {
+    Core: CoreType;
+    Ref: RefType;
+    Optional: OptionalType;
+    Array: ArrayType;
+    Case: CaseType;
+    Never: NeverType;
+  }
+  model CoreType { /* kind: "core"; */ name: CoreName; }
+  model RefType { /* kind: "ref"; */ target: Fqn; }
+  model OptionalType { /* kind: "optional"; */ of: Type; }
+  model ArrayType { /* kind: "array"; */ of: Type; }
+  model CaseType { /* kind: "case"; */ classify: Fqn; cases: string[]; of: Type; }
+  /** 項目は、印だけ（穴 12: 印を書けないので、項目のない model になり、ほかのアームと、構造では見分けられない） */
+  model NeverType { /* kind: "never"; */ }
+
+  // ---- model / scalar / union ----
+
+  model Model extends DeclBase {
+    // kind: "model";
+    fields: Field[];
+    index: ModelIndex?;
+    extends: ModelExtends?;
+    synthesizedFrom: string?;
+  }
+  model ModelIndex { name: string; key: Type; value: Type; span: Span; }
+  model ModelExtends { base: Fqn; removed: string[]; overridden: string[]; }
+  model Field { name: string; description: Doc?; type: Type; decorators: Application[]; span: Span; }
+
+  model Scalar extends DeclBase {
+    // kind: "scalar";
+    base: Type;
+  }
+
+  model Union extends DeclBase {
+    // kind: "union";
+    variant: UnionVariant;
+    arms: UnionArm[];
+    members: UnionMember[];
+  }
+  model UnionArm { name: string; type: Type; description: Doc?; span: Span; }
+  model UnionMember { target: Fqn; description: Doc?; span: Span; }
+
+  // ---- state / exception / effect / read ----
+
+  model State extends DeclBase {
+    // kind: "state";
+    type: Type;
+    shape: StateShape;
+    element: Type;
+  }
+
+  model Exception extends DeclBase {
+    // kind: "exception";
+    params: OpParam[];
+  }
+
+  model Effect extends DeclBase {
+    // kind: "effect";
+    params: OpParam[];
+    throws: Fqn[];
+    target: EffectTarget;
+    writes: Fqn[];
+    row: RowTransition?;
+  }
+
+  /** 効果の宛先。JSON では、印 kind（"builtin"、"transition"）で見分ける（穴 12） */
+  union EffectTarget {
+    Builtin: BuiltinTarget;
+    Transition: TransitionTarget;
+  }
+  model BuiltinTarget { /* kind: "builtin"; */ state: Fqn; operation: Operation; }
+  model TransitionTarget {
+    // kind: "transition";
+    of: Fqn;
+    // from: CaseSet;   CaseSet は "any" | string[]: 決まった値 "any" か、ケース名の列（穴 12）
+    // to: CaseSet;
+  }
+
+  model RowTransition { param: string; classify: Fqn?; to: string?; }
+
+  model Read extends DeclBase {
+    // kind: "read";
+    params: OpParam[];
+    returns: Type;
+    state: Fqn;
+  }
+
+  // ---- classify ----
+
+  model Classify extends DeclBase {
+    // kind: "classify";
+    subject: ClassifySubject;
+    cases: ClassifyCase[];
+    decidedBy: DecidedBy;
+    absent: string?;
+  }
+
+  /** 分類の対象。JSON では、印 kind（"type"、"op"、"states"、"exception"）で見分ける（穴 12） */
+  union ClassifySubject {
+    Type: TypeSubject;
+    Op: OpSubject;
+    States: StatesSubject;
+    Exception: ExceptionSubject;
+  }
+  model TypeSubject { /* kind: "type"; */ type: Type; }
+  model OpSubject { /* kind: "op"; */ op: Fqn; type: Type; }
+  model StatesSubject { /* kind: "states"; */ states: Fqn[]; }
+  model ExceptionSubject { /* kind: "exception"; */ }
+
+  model ClassifyCase {
+    name: string;
+    description: Doc?;
+    decorators: Application[];
+    as: CaseTyping[];
+    exceptions: Fqn[]?;
+    rest: boolean?;
+    span: Span;
+  }
+  model CaseTyping { state: Fqn?; type: Type; by: NarrowBy; span: Span; }
+
+  // ---- decorator ----
+
+  model Decorator extends DeclBase {
+    // kind: "decorator";
+    params: Param[];
+    fn: boolean;
+    targets: DecoratorTarget[];
+    caseTargets: CaseKind[];
+    entry: boolean;
+    hint: boolean;
+    repeatable: boolean;
+    throws: ThrowsClause[];
+    outerThrows: ThrowsClause[];
+    catches: CatchesClause[];
+    reads: ReadRef[];
+    effects: EffectRef[];
+    body: Wiring?;
+    alias: DecoratorAlias?;
+  }
+  model DecoratorAlias { target: Fqn; args: Arg[]; }
+  model CaseKind { classify: Fqn?; subject: Type?; }
+  model Param { name: string; type: ParamType; optional: boolean; rest: boolean; }
+
+  /**
+   * デコレータの引数の型。JSON では、印 kind（"type"、"any"）で見分け、"any" は、さらに、of が "case" かどうかで、
+   * 持つ項目が変わる（穴 12）
+   */
+  union ParamType {
+    Type: TypeParam;
+    Any: AnyParam;
+    AnyCase: AnyCaseParam;
+  }
+  model TypeParam { /* kind: "type"; */ types: Type[]; }
+  model AnyParam { /* kind: "any"; */ of: AnyOf; on: EffectOn?; }
+  model AnyCaseParam { /* kind: "any"; of: "case"; */ case: CaseKind; }
+  model EffectOn { state: Fqn; operation: Operation; }
+
+  model ThrowsClause { exceptions: string[]; relations: Relation[]; }
+  model Relation { kind: RelationKind; }
+  model CatchesClause { exceptions: string[]; mode: CatchMode; halts: string?; }
+
+  // ---- op ----
+
+  model Op extends DeclBase {
+    // kind: "op";
+    exported: boolean;
+    params: OpParam[];
+    // returns: Type | null;   null は void（穴 14: 項目は、いつもあり、値が null）
+    effects: EffectRef[];
+    reads: ReadRef[];
+    carried: Carried;
+    throws: ThrowsClause[];
+    // body: Wiring | null;    null は葉（穴 14）
+    signature: Signature;
+  }
+  model OpParam { name: string; type: Type; span: Span; }
+  model Carried { reads: ReadRef[]; effects: EffectRef[]; }
+
+  /** JSON では、印 kind（"named"、"direct"）で見分ける（穴 12） */
+  union ReadRef {
+    Named: NamedRead;
+    Direct: DirectRead;
+  }
+  model NamedRead { /* kind: "named"; */ read: Fqn; }
+  model DirectRead { /* kind: "direct"; */ state: Fqn; }
+
+  /** JSON では、印 kind（"named"、"direct"）で見分ける（穴 12） */
+  union EffectRef {
+    Named: NamedEffect;
+    Direct: DirectEffect;
+  }
+  model NamedEffect { /* kind: "named"; */ effect: Fqn; }
+  model DirectEffect { /* kind: "direct"; */ state: Fqn; operation: Operation; }
+
+  model Signature {
+    exceptions: Fqn[];
+    effects: EffectRef[];
+    relations: SignatureRelation[];
+    successEffects: SuccessEffect[];
+    reads: Fqn[];
+    pure: boolean;
+  }
+  model SignatureRelation { exception: Fqn; effect: EffectRef; state: EffectState; }
+  model SuccessEffect { effect: EffectRef; state: EffectState; }
+
+  // ---- 配線 ----
+
+  model Wiring { statements: Statement[]; }
+
+  /** 配線の文。JSON では、印 kind で見分ける（穴 12） */
+  union Statement {
+    Val: ValStmt;
+    Assign: AssignStmt;
+    Collect: CollectStmt;
+    Return: ReturnStmt;
+    Call: CallStmt;
+    Match: MatchStmt;
+    Disjoint: DisjointStmt;
+    For: ForStmt;
+    Try: TryStmt;
+    Throw: ThrowStmt;
+  }
+  model ValStmt { /* kind: "val"; */ name: string; type: Type?; expr: Expr?; collected: boolean; span: Span; }
+  model AssignStmt { /* kind: "assign"; */ name: string; expr: Expr; span: Span; }
+  model CollectStmt { /* kind: "collect"; */ name: string; expr: Expr; span: Span; }
+  model ReturnStmt { /* kind: "return"; */ expr: Expr; span: Span; }
+  model CallStmt { /* kind: "call"; */ call: Call; span: Span; }
+  model MatchStmt { /* kind: "match"; */ match: Match; span: Span; }
+  model DisjointStmt { /* kind: "disjoint"; */ arms: Arm[]; span: Span; }
+  model ForStmt { /* kind: "for"; */ var: string; varType: Type; of: Atom; body: Statement[]; disjoint: boolean; span: Span; }
+  model TryStmt { /* kind: "try"; */ body: Statement[]; catch: Catch; span: Span; }
+  model ThrowStmt { /* kind: "throw"; */ throw: Throw; span: Span; }
+
+  model Catch { name: string; body: Statement[]; never: boolean; span: Span; }
+  model Throw { /* kind: "throw"; */ exception: string; args: CallArg[]; caught: string?; span: Span; }
+  model Arm { block: boolean; statements: Statement[]; span: Span; }
+
+  /** 式。JSON では、印 kind（"call"、"match"、"atom"）で見分ける（穴 12） */
+  union Expr {
+    Call: CallExpr;
+    Match: MatchExpr;
+    Atom: AtomExpr;
+  }
+  model CallExpr { /* kind: "call"; */ call: Call; }
+  model MatchExpr { /* kind: "match"; */ match: Match; }
+  model AtomExpr { /* kind: "atom"; */ atom: Atom; }
+
+  model Call { callee: Callee; args: CallArg[]; bound: BoundPosition[]; span: Span; }
+  model CallArg { param: string; value: Atom; }
+  model BoundPosition { path: string[]; state: Fqn; }
+
+  /** 呼び出し先。JSON では、印 kind（"op"、"read"、"effect"、"proceed"）で見分ける（穴 12） */
+  union Callee {
+    Op: OpCallee;
+    Read: ReadCallee;
+    Effect: EffectCallee;
+    Proceed: ProceedCallee;
+  }
+  model OpCallee { /* kind: "op"; */ op: Fqn; }
+  model ReadCallee { /* kind: "read"; */ read: Fqn; }
+  model EffectCallee { /* kind: "effect"; */ effect: EffectRef; }
+  model ProceedCallee { /* kind: "proceed"; */ }
+
+  /** 値。JSON では、印 kind（"name"、"state"、"literal"、"none"、"record"）で見分ける（穴 12） */
+  union Atom {
+    Name: NameAtom;
+    State: StateAtom;
+    Literal: LiteralAtom;
+    None: NoneAtom;
+    Record: RecordAtom;
+  }
+  model NameAtom { /* kind: "name"; */ path: string[]; span: Span; }
+  model StateAtom { /* kind: "state"; */ state: Fqn; path: string[]; span: Span; }
+  model LiteralAtom { /* kind: "literal"; */ literal: Literal; span: Span; }
+  model NoneAtom { /* kind: "none"; */ span: Span; }
+  model RecordAtom { /* kind: "record"; */ fields: RecordField[]; span: Span; }
+  model RecordField { name: string; value: Atom; }
+
+  model Match { subject: MatchSubject; classify: string; arms: MatchArm[]; span: Span; }
+
+  /** match の対象。JSON では、印 kind（"value"、"classify"、"caught"）で見分ける（穴 12） */
+  union MatchSubject {
+    Value: ValueSubject;
+    Classify: ClassifyOwnedSubject;
+    Caught: CaughtSubject;
+  }
+  model ValueSubject { /* kind: "value"; */ atom: Atom; }
+  model ClassifyOwnedSubject { /* kind: "classify"; */ }
+  model CaughtSubject { /* kind: "caught"; */ name: string; }
+
+  model MatchArm { cases: string[]; else: boolean; body: ArmBody; narrowed: Narrowing[]; span: Span; }
+
+  /** アームの本体。JSON では、印 kind（"call"、"atom"、"none"、"throw"）で見分ける（穴 12） */
+  union ArmBody {
+    Call: CallExpr;
+    Atom: AtomExpr;
+    None: NoneBody;
+    Throw: Throw;
+  }
+  model NoneBody { /* kind: "none"; */ }
+  model Narrowing { state: Fqn?; type: Type; }
+
+  /** リテラル。JSON では、印 kind（"string"、"int"、"float"、"boolean"、"duration"）で見分ける（穴 12） */
+  union Literal {
+    String: StringLiteral;
+    Int: IntLiteral;
+    Float: FloatLiteral;
+    Boolean: BooleanLiteral;
+    Duration: DurationLiteral;
+  }
+  model StringLiteral { /* kind: "string"; */ value: string; }
+  model IntLiteral { /* kind: "int"; */ value: int; }
+  model FloatLiteral { /* kind: "float"; */ value: float; }
+  model BooleanLiteral { /* kind: "boolean"; */ value: boolean; }
+  /** value は、ナノ秒 */
+  model DurationLiteral { /* kind: "duration"; */ value: int; }
+
+  // ---- デコレータの適用、bind ----
+
+  model Application { decorator: Fqn; via: Fqn?; args: Arg[]; span: Span; }
+  model Arg { param: string; value: ArgValue; }
+
+  /** デコレータの引数の値。JSON では、印 kind で見分ける（穴 12） */
+  union ArgValue {
+    Literal: LiteralValue;
+    Ref: RefValue;
+    Refs: RefsValue;
+    Variant: VariantValue;
+    Case: CaseValue;
+    List: ListValue;
+  }
+  model LiteralValue { /* kind: "literal"; */ literal: Literal; }
+  model RefValue { /* kind: "ref"; */ target: string; }
+  model RefsValue { /* kind: "refs"; */ targets: Fqn[]; }
+  model VariantValue { /* kind: "variant"; */ union: Fqn; arm: string; }
+  model CaseValue { /* kind: "case"; */ classify: Fqn; case: string; }
+  model ListValue { /* kind: "list"; */ items: ArgValue[]; }
+
+  model Bind { namespace: Fqn; state: Fqn; target: BindTarget; span: Span; }
+  model BindTarget { namespace: Fqn; deep: boolean; }
+
+  // ---- その名前空間から見た IR（まとめた形） ----
+
+  /** 出力に依らない部分。要求に、一度だけ */
+  model Spec {
+    version: string;
+    namespaces: NamespaceConfigs;
+    program: Program;
+  }
+
+  /** 名前空間の FQN から、その名前空間を出力する単位ごとの設定 */
+  model NamespaceConfigs { [fqn: string]: NamespaceConfig[]; }
+
+  /** 出力（単位と名前空間の組）ごとの部分 */
+  model OutputView {
+    viewer: Fqn;
+    config: NamespaceConfig;
+    files: string[];
+    synthesized: Decl[];
+    entries: Entry[];
+    ops: ViewedSignatures;
+  }
+
+  /** op の FQN から、viewer から見た関数の型 */
+  model ViewedSignatures { [fqn: string]: ViewedSignature; }
+
+  model ViewedSignature extends Signature {
+    params: OpParam[];
+    bound: BoundPosition[];
+  }
+
+  /** 単位 U での、名前空間 N の設定 */
+  model NamespaceConfig {
+    /** U が、何番目の [[emit]] か（1 始まり） */
+    index: int;
+    language: string;
+    base: string;
+    out: string;
+    dir: string;
+    transpilers: string[];
+    // options: Record<string, Record<string, unknown>>;   トランスパイラの名前から、オプション（穴 15: 形の決まっていない値）
+    seams: Seams;
+  }
+
+  /** 継ぎ目を持つデコレータの FQN から、その中身を出すトランスパイラの名前 */
+  model Seams { [fqn: string]: string; }
+
+  model Entry {
+    op: Fqn;
+    normal: boolean;
+    blocked: string;
+    sources: EntrySource[];
+    caught: EntrySource[];
+  }
+
+  model EntrySource {
+    exception: Fqn;
+    kind: EntrySourceKind;
+    label: string;
+    name: string;
+    decorator: string;
+    cases: string[];
+    catch: boolean;
+    steps: EntryStep[];
+    why: string;
+  }
+
+  model EntryStep {
+    via: Fqn[];
+    verb: EntryStepVerb;
+    kind: EntryTargetKind;
+    name: string;
+    decorator: string;
+    exception: string;
+    case: string;
+  }
+}

@@ -1,0 +1,192 @@
+// Hozo 自身の仕様（docs/decisions.md「決めたこと」468）。プラグインとのやり取りの名前空間 hozo.plugin。
+// **写し。持ち主は、文書（docs/plugin-protocol.md）と、Go の型（plugin/plugin.go、internal/plugin/manifest.go）。
+// 生成に使うようになるまで。** 食い違えば、文書が正しい。どの単位の対象でもない: コードには、ならない。
+//
+// cli.hozo の hozo.compiler にも、やり取りの、仮の model がある（Plugin、EmitRequest、EmitOutput、PluginWarning、PluginError、
+// TranspilerResult、OutputResult、EmitResponse、空の Spec と OutputView、例外 Crashed と MalformedOutput）。hozoc の葉の op runEmit の
+// 引数と戻り値で、生成物が使っている。ここの model と、重なっている（どちらに寄せるかは、決めていない: docs/open.md）。
+//
+// 書けなかった所の持ち主は docs/open.md「サンプルと、hozoc 自身の仕様」（下の「穴 12」などは、その番号。12〜16 は ir.hozo の頭）:
+//   穴 17: 頼みごとの名前 read を、op の名前に書けない（read は予約語）。readVocabulary にした
+//   穴 18: やり取りの運び方（WASM の標準入力に JSON の要求、標準出力に JSON の応答、終了コード）を言う語彙が、ない
+//   穴 19: ファイルの形（TOML のマニフェスト）と、省いたときの値を言う語彙が、ない
+// どこまで写したか: マニフェストのすべての鍵。四つの頼みごと（read、emit、coverage、import）の、要求と応答。断りの応答。
+// テストの対応表。鍵や項目ごとの決まり（MAN-*、PLG-*、どれが必須か）は、持ち主（docs/plugin-protocol.md）にあり、写していない。
+
+/** プラグインとのやり取り（docs/plugin-protocol.md） */
+namespace hozo.plugin {
+  // ---- マニフェスト hozo-plugin.toml（穴 19: TOML の形と、省いたときの値は、言えない） ----
+
+  /** マニフェスト。省ける鍵（vocabulary、transpiler、read、import、coverage）は、省けば、空（docs/plugin-protocol.md「マニフェスト」） */
+  model Manifest {
+    /** プラグインの名前 */
+    name: string;
+    /** プラグインの本体（WASM）。マニフェストのディレクトリからの、相対パス */
+    wasm: string;
+    /** このプラグインが話す、IR の版 */
+    protocol: string;
+    /** このプラグインが提供する語彙のファイル。マニフェストからの、相対パス */
+    vocabulary: string[]?;
+    /** このプラグインが提供するトランスパイラ（TOML の [[transpiler]]） */
+    transpiler: Transpiler[]?;
+    /** 語彙のプラグインが書く（TOML の [read]） */
+    read: ReadTable?;
+    /** TOML の [import] */
+    import: ImportTable?;
+    /** TOML の [coverage] */
+    coverage: CoverageTable?;
+  }
+
+  model Transpiler {
+    /** hozo.toml の transpilers に書く名前 */
+    name: string;
+    /** 出力する言語 */
+    language: string;
+    /** 出力の形を前提にするトランスパイラの名前。なければ、基底 */
+    requires: string[]?;
+    /** 意味を保てない記法（デコレータの FQN） */
+    unsupported: hozo.ir.Fqn[]?;
+    /** 継ぎ目を要るデコレータの FQN */
+    seams: hozo.ir.Fqn[]?;
+    /** 解釈するデコレータの FQN */
+    interprets: hozo.ir.Fqn[]?;
+    /** 語彙のプラグインを要る、語彙の名前空間 */
+    requires_vocabulary: string[]?;
+  }
+
+  model ReadTable {
+    /** 読み解く語彙の名前空間の FQN。一つ以上 */
+    namespaces: string[];
+  }
+  model ImportTable {
+    /** 取り込める形式の名前 */
+    formats: string[]?;
+  }
+  model CoverageTable {
+    /** true なら、hozoc tests で、頼みごと coverage を呼ぶ */
+    enabled: boolean?;
+  }
+
+  // ---- 要求と応答に共通の部品 ----
+
+  /** 生成したファイル、取り込むファイル、カバレッジのファイル */
+  model File { path: string; content: string; }
+
+  /** warning。at は、FQN か "file:line:col"。省けば、位置なし */
+  model Warning { at: string?; message: string; }
+
+  /** error。code は、プラグインが決める規則の ID */
+  model Diagnostic { code: string; at: string?; message: string; }
+
+  /**
+   * 断りの応答（終了コード 2 のときの、標準出力）。code は "protocol"（版が合わない）か "unsupported"（その頼みごとを、実装していない）
+   * （穴 13 と同じ: 決まった値の集まり）
+   */
+  model Refusal { error: RefusalError; }
+  @valid.pattern("^(protocol|unsupported)$")
+  scalar RefusalCode extends string;
+  model RefusalError { code: RefusalCode; message: string; }
+
+  // どの要求も、protocol（IR の版）と direction（頼みごとの名前）を持つ。direction は、頼みごとごとに、決まった値
+  // （"read"、"emit"、"coverage"、"import"）で、hozoc とプラグインは、これで、頼みごとを見分ける（穴 12: 決まった値を持つ項目）。
+  // 下の要求の model では、direction を、コメントにしてある。
+
+  // ---- read（語彙のプラグインへの、ただ一つの頼みごと） ----
+
+  model ReadRequest {
+    protocol: string;
+    // direction: "read";
+    spec: hozo.ir.Spec;
+  }
+  model ReadResponse { errors: Diagnostic[]; warnings: Warning[]; }
+
+  // ---- emit ----
+
+  model EmitRequest {
+    protocol: string;
+    // direction: "emit";
+    spec: hozo.ir.Spec;
+    outputs: EmitOutput[];
+  }
+  /** このプラグインが受け持つ、出力一つ */
+  model EmitOutput { transpilers: string[]; view: hozo.ir.OutputView; }
+
+  /** 応答の outputs は、要求の outputs と、同じ数、同じ順 */
+  model EmitResponse { outputs: OutputResult[]; }
+  /** results は、その出力の transpilers と、同じ数、同じ順 */
+  model OutputResult { results: TranspilerResult[]; }
+  /** トランスパイラ一つの答え。errors は、省ける。一つでもあれば、書き出さない */
+  model TranspilerResult { files: File[]; warnings: Warning[]; errors: Diagnostic[]?; }
+
+  // ---- coverage ----
+
+  model CoverageRequest {
+    protocol: string;
+    // direction: "coverage";
+    /** hozoc tests に渡された、カバレッジのファイル（path は、絶対パス） */
+    coverage: File;
+    /** 実行された行を知りたいファイル */
+    files: string[];
+    /** files を出した出力の設定 */
+    outputs: hozo.ir.NamespaceConfig[];
+  }
+  model CoverageResponse { recognized: boolean; files: CoveredFile[]; }
+  /** lines は、実行された所の、行の範囲の並び。範囲は、[始まりの行, 終わりの行]（穴 16: 決まった長さの組を、書けない） */
+  model CoveredFile { path: string; lines: int[][]; }
+
+  // ---- import（形だけ。詳細は、後の段階） ----
+
+  model ImportRequest {
+    protocol: string;
+    // direction: "import";
+    format: string;
+    files: File[];
+  }
+  model ImportResponse { ir: hozo.ir.Program; warnings: Warning[]; }
+
+  // ---- テストの対応表（emit の応答の files に入る、hozo-tests.<トランスパイラの名前>.json の中身） ----
+
+  model TestMap { tests: RequiredTest[]; }
+  /** lines は、[始まりの行, 終わりの行]（穴 16） */
+  model RequiredTest { name: string; file: string; lines: int[]; }
+
+  // ---- 頼みごと（プラグインが実装する口） ----
+  //
+  // 穴 18: 運び方を言う語彙が、ない。hozoc は、プラグインの WASM を、一度動かし、標準入力に、要求を JSON で渡す。
+  // 終了コード 0 なら、標準出力の JSON が、応答。2 なら、標準出力は、断りの応答（Refusal）。ほかは、異常終了
+  // （docs/plugin-protocol.md「起動」）。どの頼みごとに入るかは、要求の direction で決まる。
+  // 外部プロセスの語彙 proc は、なくした（docs/decisions.md「決めたこと」434）。JSON の上の形を言う決まりは、
+  // 今は、語彙 http の中にしか、ない（docs/plugin-http.md「通信の形」）。
+
+  /**
+   * 語彙の、言語に依らない決まりを確かめる（頼みごと read。穴 17: read は予約語で、op の名前に書けない）。
+   *
+   * @param req 要求
+   * @returns 応答
+   */
+  export fn readVocabulary(req: ReadRequest): ReadResponse;
+
+  /**
+   * 受け持つ出力のすべてを、まとめて展開する（頼みごと emit）。
+   *
+   * @param req 要求
+   * @returns 応答
+   */
+  export fn emit(req: EmitRequest): EmitResponse;
+
+  /**
+   * カバレッジのファイルから、どのファイルの、どの行が実行されたかを取り出す（頼みごと coverage）。
+   *
+   * @param req 要求
+   * @returns 応答
+   */
+  export fn coverage(req: CoverageRequest): CoverageResponse;
+
+  /**
+   * ほかの形式のファイルを、IR に取り込む（頼みごと import。形だけ）。
+   *
+   * @param req 要求
+   * @returns 応答
+   */
+  export fn import(req: ImportRequest): ImportResponse;
+}
