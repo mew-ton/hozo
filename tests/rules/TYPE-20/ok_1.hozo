@@ -63,4 +63,8 @@ namespace a {
       throw Bad("warning");
     }
   }
+  // デコレータの引数も、入れられる位置（IR の Application.args は、arm を持たない）
+  @hint decorator fn severity(level: Severity);
+  @severity("error")
+  fn marked();
 }

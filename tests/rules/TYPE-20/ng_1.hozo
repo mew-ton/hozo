@@ -22,4 +22,8 @@ namespace a {
     val p: Pet = { name: "tama" };     // ERROR: TYPE-20
     adopt(p);
   }
+  // デコレータの引数
+  @hint decorator fn word(w: Word);
+  @word("x")                           // ERROR: TYPE-20
+  fn marked();
 }

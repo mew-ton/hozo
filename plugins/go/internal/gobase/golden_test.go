@@ -25,6 +25,7 @@ var goldenFixtures = []struct {
 	{name: "pkgnames", covers: "「パッケージと import パス」の import の名前のうち、名前空間のパッケージ名が、基底が決まった名前で使う識別子（ops、ptr、o、ctx、err）や、途中の値（v0、k0）と同じとき。「New」の引数の名前 ops"},
 	{name: "statements", covers: "「呼び出し」「文」の表の各行（空の val、値を入れる文、集める文、for、disjoint を含む）、「match」の x = match と xs collect match、失敗の扱いの零値"},
 	{name: "values", covers: "「値」の表の各行、「型をそろえる」、「省略可能を通るパス」"},
+	{name: "unionarm", covers: "「値」の「union に入れる」（引数、レコードリテラルのフィールド、return、val、値を入れる文、集める文、throw の引数。構造体のアームと、包む型のアーム）", behavior: true},
 	{name: "states", covers: "「op の置き場」（デコレータが reads と effects を運ぶ葉も Leaves）、「コメント」の Reads / Effects（配線に運ばれたものを含む）、「状態の単位」（read、効果、形で決まる命令）、「呼び出し」の read・効果・直に呼ぶ組み込みの効果、「状態の参照」", behavior: true},
 	{name: "bind", covers: "「bind で埋まる位置」の 1〜4、「別の名前空間の op」"},
 	{name: "matchif", covers: "「match」の二つに分ける形（nullable、list、presence）と、アームの本体の組"},

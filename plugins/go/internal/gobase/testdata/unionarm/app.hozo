@@ -1,0 +1,88 @@
+// docs/plugin-go.md「値」の「union に入れる」: 値を置く位置（引数、レコードリテラルのフィールド、return、val、値を入れる文、集める文、
+// throw の引数）ごとに、アームの Go の型（マーカーを生やした構造体、包む型）ごとに、一か所ずつ。各 op の上のコメントが、その op が確かめる行。
+// op はどれも export（出力は一つのパッケージ）。
+
+/** union に入れる */
+namespace app {
+  scalar Tag extends string;
+  model Dog { name: string; }
+  model Cat { lives: int; }
+  /** ペット。Dog と Cat は、マーカーを生やした構造体。ほかのアームは、包む型 */
+  union Pet {
+    D: Dog;
+    C: Cat;
+    Count: int;
+    Label: Tag;
+    Names: string[];
+  }
+  model Home { pet: Pet; spare: Pet?; }
+  exception Lost(pet: Pet);
+
+  export fn findDog(): Dog;
+  export fn findTag(): Tag;
+  export fn findNames(): string[];
+  export fn keep(pet: Pet, spare: Pet?);
+  export fn settle(home: Home): int;
+
+  // 引数: 構造体のアーム（名前、レコードリテラル）は、式のまま。包む型のアーム（リテラル、名前）は、包む。省略可能な union の位置も、同じ
+  export fn args(dog: Dog, tag: Tag) {
+    keep(dog, 2);
+    keep(tag, { lives: 9 });
+    keep({ name: "pochi" }, dog);
+  }
+
+  // レコードリテラルのフィールド
+  export fn fields(dog: Dog, names: string[]): int {
+    return settle({ pet: names, spare: dog });
+  }
+
+  // return 値
+  export fn value(): Pet {
+    return 3;
+  }
+
+  // return 呼び出し: v<n> に受けてから。構造体のアーム
+  export fn called(): Pet {
+    return findDog();
+  }
+
+  // return 呼び出し: 包む型のアーム。戻り値の型が、省略可能な union
+  export fn tagged(): Pet? {
+    return findTag();
+  }
+
+  // return match: v<n> に受けてから
+  export fn matched(dog: Dog?): Pet {
+    return match (dog by nullable) {
+      Some => dog;
+      None => findDog();
+    };
+  }
+
+  // val（値、呼び出し）、値を入れる文、集める文（呼び出し、値）
+  export fn stmts(dog: Dog): Pet[] {
+    val p: Pet = dog;
+    val q: Pet = findTag();
+    val r: Pet;
+    r = 1;
+    val all: Pet[];
+    val names = findNames();
+    for (val n of names) {
+      all collect findDog();
+      all collect 2;
+    }
+    keep(p, q);
+    keep(r, none);
+    return all;
+  }
+
+  // throw の引数
+  export fn lose(dog: Dog?): int
+    throws Lost
+  {
+    return match (dog by nullable) {
+      Some => throw Lost(dog);
+      None => 0;
+    };
+  }
+}

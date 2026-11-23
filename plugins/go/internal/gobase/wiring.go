@@ -745,6 +745,78 @@ func (b *bodyGen) atom(a ir.Atom, target ir.Type) (string, ir.Type) {
 	return "nil", nil
 }
 
+// armOf は、union に入れる位置の arm（docs/ir.md「配線」の ArmRef）が指す、union と、そのアームの Go の型。
+func (b *bodyGen) armOf(ref *ir.ArmRef) (*ir.Union, armType, bool) {
+	if u, ok := b.e.lookup(ref.Union).(*ir.Union); ok {
+		for _, a := range b.e.armTypes(u) {
+			if a.name == ref.Arm {
+				return u, a, true
+			}
+		}
+	}
+	b.e.errorf(codeInternal, b.op.Name, "op %s の配線が、値を入れる union %s のアーム %s が Program にない（検査を通った IR には来ないはずの形）", b.op.Name, ref.Union, ref.Arm)
+	return nil, armType{}, false
+}
+
+// enter は、アーム a（union u のもの）の型の式 expr を、u の位置に入れる式（docs/plugin-go.md「値」の「union に入れる」）:
+// マーカーを生やした構造体のアームは、式のまま。包む型のアームは、`<Union><アーム名>{Value: <式>}`。
+func (b *bodyGen) enter(u *ir.Union, a armType, expr string) string {
+	if !a.wrapped {
+		return expr
+	}
+	return b.e.armGoType(b.f, u, a) + "{Value: " + expr + "}"
+}
+
+// placed は、Atom a を、型 target の位置に置く式。位置が arm を持てば、当てはめる型は、そのアームの型で、式を、union に入れる
+// （同「union に入れる」）。path と bounds は、レコードリテラルの中の、bind で埋まる位置（record）。
+func (b *bodyGen) placed(a ir.Atom, target ir.Type, arm *ir.ArmRef, path []string, bounds []boundValue) string {
+	value := func(t ir.Type) string {
+		if r, ok := a.(ir.RecordAtom); ok {
+			return b.record(&r, t, path, bounds)
+		}
+		expr, _ := b.atom(a, t)
+		return expr
+	}
+	if arm == nil {
+		return value(target)
+	}
+	u, at, ok := b.armOf(arm)
+	if !ok {
+		return "nil"
+	}
+	return b.enter(u, at, value(at.typ))
+}
+
+// entered は、arm を持つ文（val、値を入れる文、集める文、return）の式 ex を、union に入れた式にする（同「union に入れる」）:
+// 呼び出しと match は、アームの型の途中の値 v<n> に受けてから、入れる。
+func (b *bodyGen) entered(ex ir.Expr, arm *ir.ArmRef) string {
+	u, at, ok := b.armOf(arm)
+	if !ok {
+		return "nil"
+	}
+	switch ex := ex.(type) {
+	case ir.CallExpr:
+		var states []string
+		statesOfCall(&ex.Call, &states)
+		b.read(states, nil)
+		ci := b.call(&ex.Call)
+		v := b.temp()
+		b.line(v + ", err := " + ci.expr)
+		b.fail()
+		return b.enter(u, at, b.convert(v, ci.ret, at.typ))
+	case ir.AtomExpr:
+		var states []string
+		statesOfAtom(ex.Atom, &states)
+		b.read(states, nil)
+		return b.placed(ex.Atom, nil, arm, nil, nil)
+	case ir.MatchExpr:
+		v := b.temp()
+		b.matchInto(&ex.Match, v, at.typ)
+		return b.enter(u, at, v)
+	}
+	return "nil"
+}
+
 // convert は、型 from の式 expr を、型 to の位置に渡す式にする（docs/plugin-go.md「値」の「型をそろえる」）。
 // Go の型が同じなら、そのまま。array の要素をそろえる必要があれば、文の前にループを置く。
 func (b *bodyGen) convert(expr string, from, to ir.Type) string {
@@ -852,10 +924,10 @@ func (b *bodyGen) record(rec *ir.RecordAtom, target ir.Type, path []string, boun
 		b.e.errorf(codeInternal, b.op.Name, "op %s の配線: レコードリテラルを当てはめる model が決まらない（検査を通った IR には来ないはずの形）", b.op.Name)
 		return "nil"
 	}
-	written := map[string]ir.Atom{}
+	written := map[string]*ir.RecordField{}
 	if rec != nil {
-		for _, fd := range rec.Fields {
-			written[fd.Name] = fd.Value
+		for i := range rec.Fields {
+			written[rec.Fields[i].Name] = &rec.Fields[i]
 		}
 	}
 	var fields []string
@@ -876,11 +948,7 @@ func (b *bodyGen) record(rec *ir.RecordAtom, target ir.Type, path []string, boun
 		case exact != nil: // bind で埋まる位置: 読んだ値を書く
 			value = b.convert(exact.expr, exact.typ, fd.Type)
 		case written[fd.Name] != nil:
-			if r, ok := written[fd.Name].(ir.RecordAtom); ok {
-				value = b.record(&r, fd.Type, fpath, bounds)
-			} else {
-				value, _ = b.atom(written[fd.Name], fd.Type)
-			}
+			value = b.placed(written[fd.Name].Value, fd.Type, written[fd.Name].Arm, fpath, bounds)
 		case below: // 書かれていないフィールドの中に、bind で埋まる位置がある
 			value = b.record(nil, fd.Type, fpath, bounds)
 		}
@@ -1071,9 +1139,10 @@ func (b *bodyGen) call(c *ir.Call) callInfo {
 	args := []string{"ctx"}
 	for _, p := range t.params {
 		var written ir.Atom
+		var into *ir.ArmRef
 		for i := range c.Args {
 			if c.Args[i].Param == p.Name {
-				written = c.Args[i].Value
+				written, into = c.Args[i].Value, c.Args[i].Arm
 			}
 		}
 		var whole *boundValue
@@ -1093,11 +1162,7 @@ func (b *bodyGen) call(c *ir.Call) callInfo {
 		case whole != nil: // 位置が引数そのもの
 			arg = b.convert(whole.expr, whole.typ, p.Type)
 		case written != nil:
-			if r, ok := written.(ir.RecordAtom); ok {
-				arg = b.record(&r, p.Type, []string{p.Name}, bounds)
-			} else {
-				arg, _ = b.atom(written, p.Type)
-			}
+			arg = b.placed(written, p.Type, into, []string{p.Name}, bounds)
 		case below: // 渡されていない引数の中のフィールド
 			arg = b.record(nil, p.Type, []string{p.Name}, bounds)
 		default: // 渡されていない省略可能な引数
@@ -1132,7 +1197,7 @@ func (b *bodyGen) throwValue(t *ir.ThrowBody) string {
 		value := "nil"
 		for i := range t.Args {
 			if t.Args[i].Param == p.Name {
-				value, _ = b.atom(t.Args[i].Value, p.Type)
+				value = b.placed(t.Args[i].Value, p.Type, t.Args[i].Arm, nil, nil)
 			}
 		}
 		fields = append(fields, golang.FieldName(p.Name)+": "+value)
@@ -1244,6 +1309,14 @@ func (b *bodyGen) stmt(s ir.Statement, rest []ir.Statement) {
 			b.markUnused(name, x.Name, rest)
 			return
 		}
+		if x.Arm != nil {
+			// union に入れる: var x <union の Go の型> = <包んだ式>
+			expr := b.entered(x.Expr, x.Arm)
+			name := b.bind(x.Name, x.Type)
+			b.line("var " + name + " " + b.f.goType(x.Type) + " = " + expr)
+			b.markUnused(name, x.Name, rest)
+			return
+		}
 		switch ex := x.Expr.(type) {
 		case ir.CallExpr:
 			var states []string
@@ -1289,6 +1362,10 @@ func (b *bodyGen) stmt(s ir.Statement, rest []ir.Statement) {
 			b.e.errorf(codeInternal, b.op.Name, "op %s の配線が、宣言のない val %s に値を入れている（検査を通った IR には来ないはずの形）", b.op.Name, x.Name)
 			return
 		}
+		if x.Arm != nil {
+			b.line(l.expr + " = " + b.entered(x.Expr, x.Arm))
+			return
+		}
 		switch ex := x.Expr.(type) {
 		case ir.CallExpr:
 			var states []string
@@ -1324,6 +1401,10 @@ func (b *bodyGen) stmt(s ir.Statement, rest []ir.Statement) {
 		if arr, isArray := strip(l.typ).(ir.ArrayType); isArray {
 			elem = arr.Of
 		}
+		if x.Arm != nil {
+			b.line(l.expr + " = append(" + l.expr + ", " + b.entered(x.Expr, x.Arm) + ")")
+			return
+		}
 		switch ex := x.Expr.(type) {
 		case ir.CallExpr:
 			var states []string
@@ -1351,6 +1432,10 @@ func (b *bodyGen) stmt(s ir.Statement, rest []ir.Statement) {
 			b.line(l.expr + " = append(" + l.expr + ", " + v + ")")
 		}
 	case ir.ReturnStmt:
+		if x.Arm != nil {
+			b.returnValue(b.entered(x.Expr, x.Arm))
+			return
+		}
 		switch ex := x.Expr.(type) {
 		case ir.CallExpr:
 			var states []string

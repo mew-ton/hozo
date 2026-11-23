@@ -1,0 +1,9 @@
+{
+  "tests": [
+    {"name": "app.findDog/OK", "file": "gen/app/apptest/leaves.go", "lines": [91, 98]},
+    {"name": "app.findTag/OK", "file": "gen/app/apptest/leaves.go", "lines": [104, 111]},
+    {"name": "app.findNames/OK", "file": "gen/app/apptest/leaves.go", "lines": [117, 124]},
+    {"name": "app.keep/OK", "file": "gen/app/apptest/leaves.go", "lines": [130, 137]},
+    {"name": "app.settle/OK", "file": "gen/app/apptest/leaves.go", "lines": [143, 150]}
+  ]
+}
