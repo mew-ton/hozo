@@ -1,0 +1,10 @@
+{
+  "tests": [
+    {"name": "app.plan/OK", "file": "gen/app/apptest/leaves.go", "lines": [65, 72]},
+    {"name": "app.write/OK", "file": "gen/app/apptest/leaves.go", "lines": [78, 85]},
+    {"name": "app.show/OK", "file": "gen/app/apptest/leaves.go", "lines": [91, 98]},
+    {"name": "app.Speed/Fast", "file": "gen/app/apptest/classify.go", "lines": [28, 34]},
+    {"name": "app.Speed/Careful", "file": "gen/app/apptest/classify.go", "lines": [37, 43]},
+    {"name": "app.Speed/Off", "file": "gen/app/apptest/classify.go", "lines": [46, 52]}
+  ]
+}

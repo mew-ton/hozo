@@ -1662,6 +1662,9 @@ func (b *bodyGen) plan(m *ir.Match) *matchPlan {
 				if len(cs.As) > 0 && cs.As[0].By == ir.NarrowByVariant {
 					p.form = "type"
 				}
+				if len(cs.As) > 0 && cs.As[0].By == ir.NarrowByLiteral {
+					p.form = "bool" // 対象が boolean の値（そうでない分類は、GO-9 が断っている）
+				}
 			}
 		}
 	}
@@ -2087,7 +2090,7 @@ func (b *bodyGen) match(m *ir.Match, mode matchMode, bindName string, typ ir.Typ
 		inner = modeConst // アームの本体は、val x = match と同じ（x に入れる）
 	}
 	switch p.form {
-	case "nil", "len":
+	case "nil", "len", "bool":
 		b.matchIf(p, inner, x, t)
 	default:
 		b.matchSwitch(p, inner, x, t)
@@ -2134,7 +2137,7 @@ func (b *bodyGen) matchInto(m *ir.Match, v string, typ ir.Type) {
 	b.matchHead(m)
 	b.line("var " + v + " " + b.f.goType(t))
 	switch p.form {
-	case "nil", "len":
+	case "nil", "len", "bool":
 		b.matchIf(p, modeConst, v, t)
 	default:
 		b.matchSwitch(p, modeConst, v, t)
@@ -2162,18 +2165,45 @@ func (b *bodyGen) matchIf(p *matchPlan, mode matchMode, x string, t ir.Type) {
 			}
 		}
 	}
-	valueArm := armFor(m, valueCase)
-	var otherArm *ir.MatchArm
+	if p.form == "bool" {
+		// literal の分類: if の枝は、真の側のケース（as true のケース。なければ、残りのケース）。もう一方は、偽の側のケース
+		// （as false のケース。なければ、残りのケース）。ケースのない側は、分類の誤りの枝
+		valueCase, otherCase = "", ""
+		rest := ""
+		for _, cs := range p.classify.Cases {
+			switch lit := literalOf(cs); {
+			case cs.IsElse():
+				rest = cs.Name
+			case lit != nil && *lit:
+				valueCase = cs.Name
+			case lit != nil:
+				otherCase = cs.Name
+			}
+		}
+		if valueCase == "" {
+			valueCase = rest
+		}
+		if otherCase == "" {
+			otherCase = rest
+		}
+	}
+	var valueArm, otherArm *ir.MatchArm
+	if valueCase != "" {
+		valueArm = armFor(m, valueCase)
+	}
 	if otherCase != "" {
 		otherArm = armFor(m, otherCase)
 	}
-	if valueArm == nil || (otherCase != "" && otherArm == nil) {
+	if (valueArm == nil && (p.form != "bool" || valueCase != "")) || (otherCase != "" && otherArm == nil) || (valueArm == nil && otherArm == nil) {
 		b.e.errorf(codeInternal, b.op.Name, "op %s の配線の match（%s）のアームが、すべてのケースを尽くしていない（検査を通った IR には来ないはずの形）", b.op.Name, m.Classify)
 		return
 	}
 	cond, neg := p.subject+" != nil", p.subject+" == nil"
 	if p.form == "len" {
 		cond, neg = "len("+p.subject+") != 0", "len("+p.subject+") == 0"
+	}
+	if p.form == "bool" {
+		cond, neg = p.subject, "!"+p.subject
 	}
 	if valueArm == otherArm {
 		// 一つのアームが両方のケースを受けていれば、分けずに、そのアームの本体だけを書く
@@ -2192,10 +2222,17 @@ func (b *bodyGen) matchIf(p *matchPlan, mode matchMode, x string, t ir.Type) {
 		}
 		return b.branch(p, otherArm, mode, x, t, true)
 	}
+	// valueBranch は、if の枝: そのケースのアームか、ケースがなければ（literal の分類の、真の側だけ）、分類の誤りの枝
+	valueBranch := func() (string, bool) {
+		if valueArm == nil {
+			return b.errorBranch(m.Classify), true
+		}
+		return b.branch(p, valueArm, mode, x, t, true)
+	}
 	if mode == modeReturn {
 		// else を書かず、もう一方をそのまま後ろに続ける（どの枝も return で終わる）
 		b.depth++
-		value, _ := b.branch(p, valueArm, mode, x, t, true)
+		value, _ := valueBranch()
 		b.depth--
 		b.line("if " + cond + " {")
 		b.buf.WriteString(value)
@@ -2206,7 +2243,7 @@ func (b *bodyGen) matchIf(p *matchPlan, mode matchMode, x string, t ir.Type) {
 		return
 	}
 	b.depth++
-	value, valueEnds := b.branch(p, valueArm, mode, x, t, true)
+	value, valueEnds := valueBranch()
 	other, otherEnds := otherBranch()
 	b.depth--
 	switch {
@@ -2229,6 +2266,18 @@ func (b *bodyGen) matchIf(p *matchPlan, mode matchMode, x string, t ir.Type) {
 	case p.freshState:
 		b.line("_ = " + p.subject)
 	}
+}
+
+// literalOf は、ケース cs の、literal の絞り込みの as に書いた、真偽の値。そういう as を持たなければ nil。
+func literalOf(cs ir.ClassifyCase) *bool {
+	for _, as := range cs.As {
+		if lt, ok := as.Type.(ir.LiteralType); ok && as.By == ir.NarrowByLiteral {
+			if v, isBool := lt.Literal.(ir.BooleanLiteral); isBool {
+				return &v.Value
+			}
+		}
+	}
+	return nil
 }
 
 // matchSwitch は `switch` の形: アームごとに case を一つ。並びは、アームが受ける最初のケースの、分類の宣言での順。

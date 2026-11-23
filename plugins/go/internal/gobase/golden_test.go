@@ -19,6 +19,7 @@ var goldenFixtures = []struct {
 	covers   string
 	behavior bool
 }{
+	{name: "matchliteral", covers: "「match」の、絞り込みが literal の分け方（if <対象>）と、ケースのない側の、分類の誤りの枝", behavior: true},
 	{name: "types", covers: "「型」（model、scalar、union、exception、effect）と「コメント」、予約語の名前空間のパッケージ名、op のない名前空間の状態の単位、「分類」の、対象のない分類（何も出さない）"},
 	{name: "names", covers: "「名前」の局所の名前、「パッケージと import パス」の import の名前、「New」の引数の名前、「別の名前空間の op」"},
 	{name: "pkgnames", covers: "「パッケージと import パス」の import の名前のうち、名前空間のパッケージ名が、基底が決まった名前で使う識別子（ops、ptr、o、ctx、err）や、途中の値（v0、k0）と同じとき。「New」の引数の名前 ops"},

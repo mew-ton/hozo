@@ -1,4 +1,4 @@
-GO-9	a.Report	model a.Report は、リテラルの型（か、リテラルの型で決まる分類）を使う。トランスパイラ go は、まだ、リテラルの型を出せない
-GO-9	a.Severity	union a.Severity は、リテラルの型（か、リテラルの型で決まる分類）を使う。トランスパイラ go は、まだ、リテラルの型を出せない
-GO-9	a.Done	classify a.Done は、リテラルの型（か、リテラルの型で決まる分類）を使う。トランスパイラ go は、まだ、リテラルの型を出せない
-GO-9	a.retry	op a.retry は、リテラルの型（か、リテラルの型で決まる分類）を使う。トランスパイラ go は、まだ、リテラルの型を出せない
+GO-9	a.Report	model a.Report は、リテラルの型を、型の位置に使う。トランスパイラ go は、まだ、その Go の形を持たない
+GO-9	a.Severity	union a.Severity は、リテラルの型を、型の位置に使う。トランスパイラ go は、まだ、その Go の形を持たない
+GO-9	a.Flag	classify a.Flag は、リテラルの型で決まる絞り込み（literal）を持つが、対象が、型 boolean の値でない（boolean? と、状態の分類は、まだ）。トランスパイラ go は、まだ、その Go の形を持たない
+GO-9	a.retry	op a.retry は、リテラルの型を、型の位置に使う。トランスパイラ go は、まだ、その Go の形を持たない

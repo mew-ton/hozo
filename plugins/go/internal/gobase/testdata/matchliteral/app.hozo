@@ -1,0 +1,91 @@
+// docs/plugin-go.md「match」の、絞り込みが literal の型で決まる分類（対象が boolean。docs/check.md「ケースの型」）: 二つに分ける形で、
+// 真の側が if の枝。使われ方（return / val / 文）と、ケースの持ち方（真と偽、真と残り、片方だけ）の組を、一か所ずつ使う。
+// op はどれも export（出力は一つのパッケージ）。
+
+/** 真偽で分ける match */
+namespace app {
+  model Options { dryRun: boolean; verbose: boolean; }
+
+  export fn plan(opts: Options): string;
+  export fn write(opts: Options): string;
+  export fn show(text: string);
+
+  /** 書き出すか（真と偽の、両方に名前） */
+  classify Emit of boolean {
+    Dry: boolean as true;
+    Write: boolean as false;
+  }
+  /** 詳しく言うか（偽の側は、残りのケース） */
+  classify Talk of boolean {
+    Loud: boolean as true;
+    Quiet: boolean as else;
+  }
+  /** 真だけを受ける（偽は、分類の誤り） */
+  classify Must of boolean {
+    Yes: boolean as true;
+  }
+  /** 偽だけを受ける（真は、分類の誤り） */
+  classify MustNot of boolean {
+    No: boolean as false;
+  }
+
+  /** 述語で決まる分類（as true を、二つのケースが持つ）。as の型に当たらない値では、そのケースの述語を呼ばない */
+  classify Speed of boolean {
+    Fast: boolean as true;
+    Careful: boolean as true;
+    Off: boolean as false;
+  }
+
+  // return match: アームを書いた順によらず、真の側が if の枝。else を書かない
+  export fn run(opts: Options): string
+  {
+    return match (opts.dryRun by Emit) {
+      Write => write(opts);
+      Dry   => plan(opts);
+    };
+  }
+
+  // val match: 値のアーム。else のアーム（Quiet を受ける）は、そのケースを名前で書いたアームと同じコード
+  export fn label(opts: Options): string
+  {
+    val text = match (opts.verbose by Talk) {
+      Loud => "loud";
+      else => "quiet";
+    };
+    return text;
+  }
+
+  // 文の match: 偽の側のケースがないので、もう一方の枝は、分類の誤りの枝
+  export fn check(opts: Options)
+  {
+    match (opts.dryRun by Must) {
+      Yes => show("dry");
+    };
+  }
+
+  // 文の match: 真の側のケースがないので、if の枝が、分類の誤りの枝
+  export fn checkNot(opts: Options)
+  {
+    match (opts.dryRun by MustNot) {
+      No => show("wet");
+    };
+  }
+
+  // 一つのアームが両方のケースを受けていれば、分けずに、そのアームの本体だけ
+  export fn both(opts: Options): string
+  {
+    return match (opts.dryRun by Emit) {
+      Dry, Write => plan(opts);
+    };
+  }
+
+  // 述語で決まる分類の match は、ほかの述語で決まる分類と同じ（判定関数と switch）。as true / as false は、判定関数の中の確かめになる
+  export fn pace(opts: Options): string
+  {
+    return match (opts.verbose by Speed) {
+      Fast    => "fast";
+      Careful => "careful";
+      Off     => "off";
+    };
+  }
+}

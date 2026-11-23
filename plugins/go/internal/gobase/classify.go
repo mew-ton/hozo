@@ -194,6 +194,13 @@ func (e *emitter) genClassify(part classifyPart) *fileGen {
 					switch cs.As[0].By {
 					case ir.NarrowByPresence:
 						guard = "v != nil"
+					case ir.NarrowByLiteral:
+						// 対象は boolean の値（そうでない分類は、GO-9 が断っている）
+						if lit := literalOf(cs); lit != nil && *lit {
+							guard = "v"
+						} else if lit != nil {
+							guard = "!v"
+						}
 					case ir.NarrowByVariant:
 						if u := e.unionOf(subject); u != nil {
 							if a, ok := e.variantArm(u, cs.As[0].Type, c.Name); ok {
