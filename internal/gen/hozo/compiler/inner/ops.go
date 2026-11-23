@@ -11,7 +11,7 @@ type Ops interface {
 	// 引数:
 	//   - in: コマンドの入力
 	//
-	// Throws: hozoc.CheckFailed, hozoc.ConfigInvalid, hozoc.LanguageMismatch, hozoc.Crashed, hozoc.MalformedOutput
+	// Throws: hozo.compiler.CheckFailed, hozo.compiler.ConfigInvalid, hozo.compiler.LanguageMismatch, hozo.compiler.Crashed, hozo.compiler.MalformedOutput
 	Check(ctx context.Context, in CheckInput) (CheckResult, error)
 
 	// CollectOutputs は検査がプラグインから受け取った答えから、出力ごとのファイルを集める。プラグインは、起動しない。ファイルには触れない。
@@ -20,7 +20,7 @@ type Ops interface {
 	//   - in: コマンドの入力
 	//   - checked: 検査の結果
 	//
-	// Throws: hozoc.OutputConflict, hozoc.UnknownNamespace, hozoc.MalformedOutput
+	// Throws: hozo.compiler.OutputConflict, hozo.compiler.UnknownNamespace, hozo.compiler.MalformedOutput
 	CollectOutputs(ctx context.Context, in BuildInput, checked CheckResult) (EmitPlan, error)
 
 	// WriteOutputs は検査がプラグインから受け取った答えの、出力ごとのファイルを書き出す。in の noEmit が真なら、集めて確かめるだけで、書き出さない。
@@ -30,9 +30,9 @@ type Ops interface {
 	//   - in: コマンドの入力
 	//   - checked: 検査の結果
 	//
-	// Throws: hozoc.OutputConflict, hozoc.UnknownNamespace, hozoc.MalformedOutput
-	// Reads: hozoc.outputs
-	// Effects: hozoc.syncOutputs
+	// Throws: hozo.compiler.OutputConflict, hozo.compiler.UnknownNamespace, hozo.compiler.MalformedOutput
+	// Reads: hozo.compiler.outputs
+	// Effects: hozo.compiler.syncOutputs
 	WriteOutputs(ctx context.Context, in BuildInput, checked CheckResult) (BuildResult, error)
 
 	// Build は仕様を検査し、プラグインから受け取ったファイルを書き出す。--no-emit なら、検査だけを行い、ファイルを書き出さない。
@@ -40,9 +40,9 @@ type Ops interface {
 	// 引数:
 	//   - in: コマンドの入力
 	//
-	// Throws: hozoc.CheckFailed, hozoc.ConfigInvalid, hozoc.LanguageMismatch, hozoc.Crashed, hozoc.MalformedOutput, hozoc.OutputConflict, hozoc.UnknownNamespace
-	// Reads: hozoc.outputs
-	// Effects: hozoc.syncOutputs
+	// Throws: hozo.compiler.CheckFailed, hozo.compiler.ConfigInvalid, hozo.compiler.LanguageMismatch, hozo.compiler.Crashed, hozo.compiler.MalformedOutput, hozo.compiler.OutputConflict, hozo.compiler.UnknownNamespace
+	// Reads: hozo.compiler.outputs
+	// Effects: hozo.compiler.syncOutputs
 	Build(ctx context.Context, in BuildInput) (BuildResult, error)
 
 	// MatchTests は検査がプラグインから受け取った答えから、テストの対応表を集め、カバレッジの「実行された行」と突き合わせる。ファイルは書き出さない。
@@ -51,7 +51,7 @@ type Ops interface {
 	//   - in: コマンドの入力
 	//   - checked: 検査の結果
 	//
-	// Throws: hozoc.ConfigInvalid, hozoc.OutputConflict, hozoc.TestsNotRun, hozoc.CoverageUnusable, hozoc.Crashed, hozoc.MalformedOutput
+	// Throws: hozo.compiler.ConfigInvalid, hozo.compiler.OutputConflict, hozo.compiler.TestsNotRun, hozo.compiler.CoverageUnusable, hozo.compiler.Crashed, hozo.compiler.MalformedOutput
 	MatchTests(ctx context.Context, in TestsInput, checked CheckResult) (TestsResult, error)
 
 	// Tests は仕様を検査し、求めるテストが走ったかを、カバレッジと突き合わせて確かめる。テストは走らせない。
@@ -59,7 +59,7 @@ type Ops interface {
 	// 引数:
 	//   - in: コマンドの入力
 	//
-	// Throws: hozoc.CheckFailed, hozoc.ConfigInvalid, hozoc.LanguageMismatch, hozoc.Crashed, hozoc.MalformedOutput, hozoc.OutputConflict, hozoc.TestsNotRun, hozoc.CoverageUnusable
+	// Throws: hozo.compiler.CheckFailed, hozo.compiler.ConfigInvalid, hozo.compiler.LanguageMismatch, hozo.compiler.Crashed, hozo.compiler.MalformedOutput, hozo.compiler.OutputConflict, hozo.compiler.TestsNotRun, hozo.compiler.CoverageUnusable
 	Tests(ctx context.Context, in TestsInput) (TestsResult, error)
 
 	// Lsp は言語サーバーとして標準入出力で動く（docs/lsp.md）。クライアントが exit を送るまで戻らない。
@@ -75,7 +75,7 @@ type Ops interface {
 	//   - plugin: 動かすプラグイン
 	//   - req: プラグインへの入力
 	//
-	// Throws: hozoc.Crashed, hozoc.MalformedOutput
+	// Throws: hozo.compiler.Crashed, hozo.compiler.MalformedOutput
 	RunEmit(ctx context.Context, plugin Plugin, req EmitRequest) (EmitResponse, error)
 }
 
@@ -87,7 +87,7 @@ type Leaves interface {
 	// 引数:
 	//   - in: コマンドの入力
 	//
-	// Throws: hozoc.CheckFailed, hozoc.ConfigInvalid, hozoc.LanguageMismatch, hozoc.Crashed, hozoc.MalformedOutput
+	// Throws: hozo.compiler.CheckFailed, hozo.compiler.ConfigInvalid, hozo.compiler.LanguageMismatch, hozo.compiler.Crashed, hozo.compiler.MalformedOutput
 	Check(ctx context.Context, in CheckInput) (CheckResult, error)
 
 	// CollectOutputs は検査がプラグインから受け取った答えから、出力ごとのファイルを集める。プラグインは、起動しない。ファイルには触れない。
@@ -96,7 +96,7 @@ type Leaves interface {
 	//   - in: コマンドの入力
 	//   - checked: 検査の結果
 	//
-	// Throws: hozoc.OutputConflict, hozoc.UnknownNamespace, hozoc.MalformedOutput
+	// Throws: hozo.compiler.OutputConflict, hozo.compiler.UnknownNamespace, hozo.compiler.MalformedOutput
 	CollectOutputs(ctx context.Context, in BuildInput, checked CheckResult) (EmitPlan, error)
 
 	// MatchTests は検査がプラグインから受け取った答えから、テストの対応表を集め、カバレッジの「実行された行」と突き合わせる。ファイルは書き出さない。
@@ -105,7 +105,7 @@ type Leaves interface {
 	//   - in: コマンドの入力
 	//   - checked: 検査の結果
 	//
-	// Throws: hozoc.ConfigInvalid, hozoc.OutputConflict, hozoc.TestsNotRun, hozoc.CoverageUnusable, hozoc.Crashed, hozoc.MalformedOutput
+	// Throws: hozo.compiler.ConfigInvalid, hozo.compiler.OutputConflict, hozo.compiler.TestsNotRun, hozo.compiler.CoverageUnusable, hozo.compiler.Crashed, hozo.compiler.MalformedOutput
 	MatchTests(ctx context.Context, in TestsInput, checked CheckResult) (TestsResult, error)
 
 	// Lsp は言語サーバーとして標準入出力で動く（docs/lsp.md）。クライアントが exit を送るまで戻らない。
@@ -121,7 +121,7 @@ type Leaves interface {
 	//   - plugin: 動かすプラグイン
 	//   - req: プラグインへの入力
 	//
-	// Throws: hozoc.Crashed, hozoc.MalformedOutput
+	// Throws: hozo.compiler.Crashed, hozo.compiler.MalformedOutput
 	RunEmit(ctx context.Context, plugin Plugin, req EmitRequest) (EmitResponse, error)
 }
 

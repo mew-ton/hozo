@@ -11,9 +11,9 @@ import "context"
 //   - in: コマンドの入力
 //   - checked: 検査の結果
 //
-// Throws: hozoc.OutputConflict, hozoc.UnknownNamespace, hozoc.MalformedOutput
-// Reads: hozoc.outputs
-// Effects: hozoc.syncOutputs
+// Throws: hozo.compiler.OutputConflict, hozo.compiler.UnknownNamespace, hozo.compiler.MalformedOutput
+// Reads: hozo.compiler.outputs
+// Effects: hozo.compiler.syncOutputs
 func (o *ops) WriteOutputs(ctx context.Context, in BuildInput, checked CheckResult) (BuildResult, error) {
 	plan, err := o.CollectOutputs(ctx, in, checked)
 	if err != nil {
@@ -34,9 +34,9 @@ func (o *ops) WriteOutputs(ctx context.Context, in BuildInput, checked CheckResu
 // 引数:
 //   - in: コマンドの入力
 //
-// Throws: hozoc.CheckFailed, hozoc.ConfigInvalid, hozoc.LanguageMismatch, hozoc.Crashed, hozoc.MalformedOutput, hozoc.OutputConflict, hozoc.UnknownNamespace
-// Reads: hozoc.outputs
-// Effects: hozoc.syncOutputs
+// Throws: hozo.compiler.CheckFailed, hozo.compiler.ConfigInvalid, hozo.compiler.LanguageMismatch, hozo.compiler.Crashed, hozo.compiler.MalformedOutput, hozo.compiler.OutputConflict, hozo.compiler.UnknownNamespace
+// Reads: hozo.compiler.outputs
+// Effects: hozo.compiler.syncOutputs
 func (o *ops) Build(ctx context.Context, in BuildInput) (BuildResult, error) {
 	checked, err := o.Check(ctx, CheckInput{Config: in.Config, Format: in.Format, PluginPath: in.PluginPath, CacheDir: in.CacheDir})
 	if err != nil {
@@ -50,7 +50,7 @@ func (o *ops) Build(ctx context.Context, in BuildInput) (BuildResult, error) {
 // 引数:
 //   - in: コマンドの入力
 //
-// Throws: hozoc.CheckFailed, hozoc.ConfigInvalid, hozoc.LanguageMismatch, hozoc.Crashed, hozoc.MalformedOutput, hozoc.OutputConflict, hozoc.TestsNotRun, hozoc.CoverageUnusable
+// Throws: hozo.compiler.CheckFailed, hozo.compiler.ConfigInvalid, hozo.compiler.LanguageMismatch, hozo.compiler.Crashed, hozo.compiler.MalformedOutput, hozo.compiler.OutputConflict, hozo.compiler.TestsNotRun, hozo.compiler.CoverageUnusable
 func (o *ops) Tests(ctx context.Context, in TestsInput) (TestsResult, error) {
 	checked, err := o.Check(ctx, CheckInput{Config: in.Config, Format: in.Format, PluginPath: in.PluginPath, CacheDir: in.CacheDir})
 	if err != nil {

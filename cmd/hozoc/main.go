@@ -1,9 +1,9 @@
 // Command hozoc は Hozo の仕様を検査し、各言語のコードに展開する CLI（docs/cli.md）。
 //
-// 骨組みは cli.hozo から生成したもの（docs/requirements.md「自己展開」の 3）: 名前空間 hozoc の型と op の形と配線
-// internal/gen/hozoc（基底 go と go-valid。docs/plugin-go.md、docs/plugin-go-valid.md）と、go-cli が出した
-// internal/gen/hozoc/cli（docs/plugin-go-cli.md「出力」）。ここは、internal/app の Main を呼ぶだけ: internal/app の葉の op と
-// 状態の単位の実装を hozoc.New に渡したもの（app.App の Ops）を、表示（cli.Presenter）と一緒に cli.Main に渡す
+// 骨組みは cli.hozo から生成したもの（docs/requirements.md「自己展開」の 3）: 名前空間 hozo.compiler の型と op の形と配線
+// internal/gen/hozo/compiler（基底 go と go-valid。docs/plugin-go.md、docs/plugin-go-valid.md）と、go-cli が出した
+// internal/gen/hozo/compiler/cli（docs/plugin-go-cli.md「出力」）。ここは、internal/app の Main を呼ぶだけ: internal/app の葉の op と
+// 状態の単位の実装を compiler.New に渡したもの（app.App の Ops）を、表示（cli.Presenter）と一緒に cli.Main に渡す
 // （docs/cli.md「手で書くもの」）。古い名前のコマンド（check、emit）には、新しい書き方を示す。
 // 骨組みを変えるときは cli.hozo を変えて `make generate`。
 //

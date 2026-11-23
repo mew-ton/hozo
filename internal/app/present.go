@@ -6,14 +6,14 @@ import (
 	"io"
 
 	"github.com/mew-ton/hozo/internal/diag"
-	"github.com/mew-ton/hozo/internal/gen/hozoc"
-	"github.com/mew-ton/hozo/internal/gen/hozoc/cli"
+	"github.com/mew-ton/hozo/internal/gen/hozo/compiler"
+	"github.com/mew-ton/hozo/internal/gen/hozo/compiler/cli"
 )
 
 // Presenter は結果と例外の表示（docs/cli.md「手で書くもの」の Presenter、docs/plugin-go-cli.md「実行と表示」）。
 // go-cli が生成した cli.Presenter の実装で、cli.Main が結果を標準出力に、例外を標準エラーに出すときに呼ぶ。
 //
-// 形式は input（hozoc.CheckInput / hozoc.BuildInput / hozoc.TestsInput）の format で選ぶ（docs/diagnostics.md「表示」）。なければ text。
+// 形式は input（compiler.CheckInput / compiler.BuildInput / compiler.TestsInput）の format で選ぶ（docs/diagnostics.md「表示」）。なければ text。
 //
 //   - text: CheckResult は診断（warning）の一覧と件数。EmitResult は warning があればその一覧と件数、続けて
 //     `written: <path>` と `removed: <path>` を一行ずつ。TestsResult は warning があればその一覧と件数、続けて
@@ -33,9 +33,9 @@ var _ cli.Presenter = Presenter{}
 // Present は成功の結果を w に出す。知らない result（void の nil を含む）は cli.JSONPresenter に委ねる（nil なら何も出さない）。
 func (Presenter) Present(w io.Writer, command string, input any, result any) error {
 	switch r := result.(type) {
-	case hozoc.BuildResult:
+	case compiler.BuildResult:
 		// 検査だけ（hozoc build --no-emit）: 検査の結果だけを出す（docs/cli.md「build」の「--no-emit の表示」）
-		if in, ok := input.(hozoc.BuildInput); ok && in.NoEmit != nil && *in.NoEmit {
+		if in, ok := input.(compiler.BuildInput); ok && in.NoEmit != nil && *in.NoEmit {
 			if isJSON(input) {
 				return writeJSON(w, struct {
 					Warnings []diag.Rendered `json:"warnings"`
@@ -46,8 +46,8 @@ func (Presenter) Present(w io.Writer, command string, input any, result any) err
 		if isJSON(input) {
 			return writeJSON(w, struct {
 				Warnings []diag.Rendered `json:"warnings"`
-				Written  []hozoc.Path    `json:"written"`
-				Removed  []hozoc.Path    `json:"removed"`
+				Written  []compiler.Path `json:"written"`
+				Removed  []compiler.Path `json:"removed"`
 			}{rendered(r.Warnings), orEmpty(r.Written), orEmpty(r.Removed)})
 		}
 		if len(r.Warnings) > 0 {
@@ -66,7 +66,7 @@ func (Presenter) Present(w io.Writer, command string, input any, result any) err
 			}
 		}
 		return nil
-	case hozoc.TestsResult:
+	case compiler.TestsResult:
 		ran := r.Ran
 		if ran == nil {
 			ran = []string{}
@@ -120,9 +120,9 @@ func (Presenter) PresentError(w io.Writer, command string, input any, f cli.Fail
 // isJSON は入力の format が json か（cli.hozo の CheckInput / EmitInput / TestsInput の format。lsp にはない）。
 func isJSON(input any) bool {
 	switch in := input.(type) {
-	case hozoc.BuildInput:
+	case compiler.BuildInput:
 		return in.Format != nil && *in.Format == "json"
-	case hozoc.TestsInput:
+	case compiler.TestsInput:
 		return in.Format != nil && *in.Format == "json"
 	}
 	return false
@@ -130,7 +130,7 @@ func isJSON(input any) bool {
 
 // rendered は cli.hozo の model Diagnostic の列を、表示する形（internal/diag.Rendered）に写す。位置は既に行と列なので
 // 写すだけ。text と json の形そのものは internal/diag が持つ（docs/packages.md「internal/diag」）。
-func rendered(diags []hozoc.Diagnostic) []diag.Rendered {
+func rendered(diags []compiler.Diagnostic) []diag.Rendered {
 	out := make([]diag.Rendered, 0, len(diags))
 	for i := range diags {
 		d := &diags[i]
@@ -160,9 +160,9 @@ func rendered(diags []hozoc.Diagnostic) []diag.Rendered {
 	return out
 }
 
-func orEmpty(paths []hozoc.Path) []hozoc.Path {
+func orEmpty(paths []compiler.Path) []compiler.Path {
 	if paths == nil {
-		return []hozoc.Path{}
+		return []compiler.Path{}
 	}
 	return paths
 }

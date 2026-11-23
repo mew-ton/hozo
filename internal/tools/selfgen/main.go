@@ -1,4 +1,4 @@
-// Command selfgen は `make generate` の中身: hozoc 自身の仕様 cli.hozo から internal/gen/hozoc/**
+// Command selfgen は `make generate` の中身: hozoc 自身の仕様 cli.hozo から internal/gen/hozo/compiler/**
 // （hozo.toml の単位の out。以下、「置き場」）を生成し直す（docs/packages.md「生成するもの」「自己生成の手順」）。
 //
 // 置き場は cmd/hozoc が import するパッケージなので、hozoc がそこへ直に書くと、プラグインの不具合で
@@ -36,9 +36,9 @@ import (
 
 // 自己生成の入力と出力（リポジトリのルートからの相対パス）。
 var (
-	// genDirs は cli.hozo からの生成物の置き場（hozo.toml の二つの単位の out。docs/cli.md「cli.hozo」）: 名前空間 hozoc の出力
+	// genDirs は cli.hozo からの生成物の置き場（hozo.toml の単位の out。docs/cli.md「cli.hozo」）: 名前空間 hozo.compiler の出力
 	// （入口、内側の inner、go-cli の cli）。
-	genDirs = []string{filepath.Join("internal", "gen", "hozoc")}
+	genDirs = []string{filepath.Join("internal", "gen", "hozo", "compiler")}
 	// inputs は一時ディレクトリに写すファイル。
 	inputs = []string{"cli.hozo", "hozo.toml", "go.mod", "go.sum"}
 	// links は一時ディレクトリにシンボリックリンクで足すディレクトリ（プラグインの置き場と、生成物の vet が要るパッケージ）。

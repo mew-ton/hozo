@@ -18,7 +18,7 @@ const (
 	OutputsSyncOutOfDate
 )
 
-// ClassifyOutputsSync は、状態の分類 hozoc.OutputsSync の今のケースを返す。すべての述語を呼び、真になった数を数える。
+// ClassifyOutputsSync は、状態の分類 hozo.compiler.OutputsSync の今のケースを返す。すべての述語を呼び、真になった数を数える。
 func ClassifyOutputsSync(ctx context.Context, s OutputsSyncState) (OutputsSync, error) {
 	var hits []string
 	var kind OutputsSync
@@ -46,5 +46,5 @@ func ClassifyOutputsSync(ctx context.Context, s OutputsSyncState) (OutputsSync, 
 	case 1:
 		return kind, nil
 	}
-	return kind, &runtime.ClassificationError{Classify: "hozoc.OutputsSync", Hits: hits}
+	return kind, &runtime.ClassificationError{Classify: "hozo.compiler.OutputsSync", Hits: hits}
 }

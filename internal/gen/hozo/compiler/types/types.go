@@ -59,8 +59,8 @@ type CheckFailed struct {
 	Diagnostics []Diagnostic `json:"diagnostics"`
 }
 
-func (CheckFailed) Error() string         { return "hozoc.CheckFailed" }
-func (CheckFailed) HozoException() string { return "hozoc.CheckFailed" }
+func (CheckFailed) Error() string         { return "hozo.compiler.CheckFailed" }
+func (CheckFailed) HozoException() string { return "hozo.compiler.CheckFailed" }
 
 var _ runtime.Exception = CheckFailed{}
 
@@ -69,8 +69,8 @@ type ConfigInvalid struct {
 	Diagnostics []Diagnostic `json:"diagnostics"`
 }
 
-func (ConfigInvalid) Error() string         { return "hozoc.ConfigInvalid" }
-func (ConfigInvalid) HozoException() string { return "hozoc.ConfigInvalid" }
+func (ConfigInvalid) Error() string         { return "hozo.compiler.ConfigInvalid" }
+func (ConfigInvalid) HozoException() string { return "hozo.compiler.ConfigInvalid" }
 
 var _ runtime.Exception = ConfigInvalid{}
 
@@ -79,8 +79,8 @@ type LanguageMismatch struct {
 	Diagnostics []Diagnostic `json:"diagnostics"`
 }
 
-func (LanguageMismatch) Error() string         { return "hozoc.LanguageMismatch" }
-func (LanguageMismatch) HozoException() string { return "hozoc.LanguageMismatch" }
+func (LanguageMismatch) Error() string         { return "hozo.compiler.LanguageMismatch" }
+func (LanguageMismatch) HozoException() string { return "hozo.compiler.LanguageMismatch" }
 
 var _ runtime.Exception = LanguageMismatch{}
 
@@ -89,8 +89,8 @@ type OutputConflict struct {
 	Diagnostics []Diagnostic `json:"diagnostics"`
 }
 
-func (OutputConflict) Error() string         { return "hozoc.OutputConflict" }
-func (OutputConflict) HozoException() string { return "hozoc.OutputConflict" }
+func (OutputConflict) Error() string         { return "hozo.compiler.OutputConflict" }
+func (OutputConflict) HozoException() string { return "hozo.compiler.OutputConflict" }
 
 var _ runtime.Exception = OutputConflict{}
 
@@ -99,8 +99,8 @@ type TestsNotRun struct {
 	Diagnostics []Diagnostic `json:"diagnostics"`
 }
 
-func (TestsNotRun) Error() string         { return "hozoc.TestsNotRun" }
-func (TestsNotRun) HozoException() string { return "hozoc.TestsNotRun" }
+func (TestsNotRun) Error() string         { return "hozo.compiler.TestsNotRun" }
+func (TestsNotRun) HozoException() string { return "hozo.compiler.TestsNotRun" }
 
 var _ runtime.Exception = TestsNotRun{}
 
@@ -109,32 +109,32 @@ type CoverageUnusable struct {
 	Diagnostics []Diagnostic `json:"diagnostics"`
 }
 
-func (CoverageUnusable) Error() string         { return "hozoc.CoverageUnusable" }
-func (CoverageUnusable) HozoException() string { return "hozoc.CoverageUnusable" }
+func (CoverageUnusable) Error() string         { return "hozo.compiler.CoverageUnusable" }
+func (CoverageUnusable) HozoException() string { return "hozo.compiler.CoverageUnusable" }
 
 var _ runtime.Exception = CoverageUnusable{}
 
 // UnknownNamespace: emit の引数の名前空間も、その子孫も、どの単位の対象でもない
 type UnknownNamespace struct{}
 
-func (UnknownNamespace) Error() string         { return "hozoc.UnknownNamespace" }
-func (UnknownNamespace) HozoException() string { return "hozoc.UnknownNamespace" }
+func (UnknownNamespace) Error() string         { return "hozo.compiler.UnknownNamespace" }
+func (UnknownNamespace) HozoException() string { return "hozo.compiler.UnknownNamespace" }
 
 var _ runtime.Exception = UnknownNamespace{}
 
 // Crashed: プラグインが異常終了した（WASM の実行環境で、0 と 2 のほかの終了コードで終わった、途中で止まった、起動できなかった。docs/plugin-protocol.md「起動」）
 type Crashed struct{}
 
-func (Crashed) Error() string         { return "hozoc.Crashed" }
-func (Crashed) HozoException() string { return "hozoc.Crashed" }
+func (Crashed) Error() string         { return "hozo.compiler.Crashed" }
+func (Crashed) HozoException() string { return "hozo.compiler.Crashed" }
 
 var _ runtime.Exception = Crashed{}
 
 // MalformedOutput: プラグインの出力が、約束した形（JSON）でなかった（docs/plugin-protocol.md「応答の形」）
 type MalformedOutput struct{}
 
-func (MalformedOutput) Error() string         { return "hozoc.MalformedOutput" }
-func (MalformedOutput) HozoException() string { return "hozoc.MalformedOutput" }
+func (MalformedOutput) Error() string         { return "hozo.compiler.MalformedOutput" }
+func (MalformedOutput) HozoException() string { return "hozo.compiler.MalformedOutput" }
 
 var _ runtime.Exception = MalformedOutput{}
 
@@ -226,8 +226,8 @@ type EmitPlan struct {
 }
 
 // EffectSyncOutputs は生成したファイルを今の仕様と設定に合わせる（足りないものを書き、古いものを書き換え、余分なものを消す）。
-// effects hozoc.OutputsSync as any -> UpToDate
-const EffectSyncOutputs runtime.Effect = "hozoc.syncOutputs"
+// effects hozo.compiler.OutputsSync as any -> UpToDate
+const EffectSyncOutputs runtime.Effect = "hozo.compiler.syncOutputs"
 
 // Plugin はプラグインの起動のしかた（docs/plugin-protocol.md「起動」）。wasm は、プラグインの本体（WASM）のファイル
 type Plugin struct {

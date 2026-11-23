@@ -5,12 +5,12 @@ import (
 	"strings"
 
 	"github.com/mew-ton/hozo/internal/diag"
-	"github.com/mew-ton/hozo/internal/gen/hozoc"
+	"github.com/mew-ton/hozo/internal/gen/hozo/compiler"
 	"github.com/mew-ton/hozo/internal/project"
 	"github.com/mew-ton/hozo/internal/source"
 )
 
-// Check は cli.hozo の op check（docs/cli.md「検査」）。hozoc.Leaves のメソッド。internal/project.LoadWith が 1〜4 を行い、ここは 5:
+// Check は cli.hozo の op check（docs/cli.md「検査」）。compiler.Leaves のメソッド。internal/project.LoadWith が 1〜4 を行い、ここは 5:
 // error が一つでもあれば例外（値は error と warning のすべて）、なければ CheckResult（warning）。
 // 解析した Project は CollectOutputs のために a.checked に置く。
 //
@@ -24,10 +24,10 @@ import (
 // 例外の選び方（docs/cli.md「検査」の 5、docs/config.md「診断」の最後の段落、docs/diagnostics.md「終了コード」）:
 // error の中に CFG-*（CFG-5 以外）か MAN-* があれば設定の誤りで、それらがすべて CFG-16 なら LanguageMismatch、
 // そうでなければ ConfigInvalid。設定の誤りがなければ CheckFailed。
-// プラグインの check が異常終了すれば hozoc.Crashed / hozoc.MalformedOutput（asProc）。
-func (a *App) Check(ctx context.Context, in hozoc.CheckInput) (hozoc.CheckResult, error) {
+// プラグインの check が異常終了すれば compiler.Crashed / compiler.MalformedOutput（asProc）。
+func (a *App) Check(ctx context.Context, in compiler.CheckInput) (compiler.CheckResult, error) {
 	if err := ctx.Err(); err != nil {
-		return hozoc.CheckResult{}, err
+		return compiler.CheckResult{}, err
 	}
 	a.checked, a.planned = nil, nil
 	a.pluginPath = str(in.PluginPath)
@@ -35,14 +35,14 @@ func (a *App) Check(ctx context.Context, in hozoc.CheckInput) (hozoc.CheckResult
 	p := project.LoadWith(project.Options{Root: a.Dir, ConfigPath: str(in.Config), Stderr: a.Stderr, CacheDir: a.cacheDir,
 		PluginPath: a.pluginPath, Home: a.Home})
 	if p.RunErr != nil {
-		return hozoc.CheckResult{}, asProc(p.RunErr)
+		return compiler.CheckResult{}, asProc(p.RunErr)
 	}
 	diags := p.Diags
 	if err := classify(diags, p.Files); err != nil {
-		return hozoc.CheckResult{}, err
+		return compiler.CheckResult{}, err
 	}
 	a.checked = p
-	return hozoc.CheckResult{Warnings: toDiagnostics(diags, p.Files)}, nil
+	return compiler.CheckResult{Warnings: toDiagnostics(diags, p.Files)}, nil
 }
 
 // classify は診断の列から例外を決める。error がなければ nil。

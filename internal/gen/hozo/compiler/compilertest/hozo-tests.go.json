@@ -1,0 +1,25 @@
+{
+  "tests": [
+    {"name": "hozo.compiler.check/OK", "file": "internal/gen/hozo/compiler/compilertest/leaves.go", "lines": [129, 136]},
+    {"name": "hozo.compiler.check/CheckFailed", "file": "internal/gen/hozo/compiler/compilertest/leaves.go", "lines": [139, 147]},
+    {"name": "hozo.compiler.check/ConfigInvalid", "file": "internal/gen/hozo/compiler/compilertest/leaves.go", "lines": [150, 158]},
+    {"name": "hozo.compiler.check/LanguageMismatch", "file": "internal/gen/hozo/compiler/compilertest/leaves.go", "lines": [161, 169]},
+    {"name": "hozo.compiler.check/Crashed", "file": "internal/gen/hozo/compiler/compilertest/leaves.go", "lines": [172, 180]},
+    {"name": "hozo.compiler.check/MalformedOutput", "file": "internal/gen/hozo/compiler/compilertest/leaves.go", "lines": [183, 191]},
+    {"name": "hozo.compiler.collectOutputs/OK", "file": "internal/gen/hozo/compiler/compilertest/leaves.go", "lines": [197, 204]},
+    {"name": "hozo.compiler.collectOutputs/OutputConflict", "file": "internal/gen/hozo/compiler/compilertest/leaves.go", "lines": [207, 215]},
+    {"name": "hozo.compiler.collectOutputs/UnknownNamespace", "file": "internal/gen/hozo/compiler/compilertest/leaves.go", "lines": [218, 226]},
+    {"name": "hozo.compiler.collectOutputs/MalformedOutput", "file": "internal/gen/hozo/compiler/compilertest/leaves.go", "lines": [229, 237]},
+    {"name": "hozo.compiler.matchTests/OK", "file": "internal/gen/hozo/compiler/compilertest/leaves.go", "lines": [243, 250]},
+    {"name": "hozo.compiler.matchTests/ConfigInvalid", "file": "internal/gen/hozo/compiler/compilertest/leaves.go", "lines": [253, 261]},
+    {"name": "hozo.compiler.matchTests/OutputConflict", "file": "internal/gen/hozo/compiler/compilertest/leaves.go", "lines": [264, 272]},
+    {"name": "hozo.compiler.matchTests/TestsNotRun", "file": "internal/gen/hozo/compiler/compilertest/leaves.go", "lines": [275, 283]},
+    {"name": "hozo.compiler.matchTests/CoverageUnusable", "file": "internal/gen/hozo/compiler/compilertest/leaves.go", "lines": [286, 294]},
+    {"name": "hozo.compiler.matchTests/Crashed", "file": "internal/gen/hozo/compiler/compilertest/leaves.go", "lines": [297, 305]},
+    {"name": "hozo.compiler.matchTests/MalformedOutput", "file": "internal/gen/hozo/compiler/compilertest/leaves.go", "lines": [308, 316]},
+    {"name": "hozo.compiler.lsp/OK", "file": "internal/gen/hozo/compiler/compilertest/leaves.go", "lines": [322, 329]},
+    {"name": "hozo.compiler.runEmit/OK", "file": "internal/gen/hozo/compiler/compilertest/leaves.go", "lines": [335, 342]},
+    {"name": "hozo.compiler.runEmit/Crashed", "file": "internal/gen/hozo/compiler/compilertest/leaves.go", "lines": [345, 353]},
+    {"name": "hozo.compiler.runEmit/MalformedOutput", "file": "internal/gen/hozo/compiler/compilertest/leaves.go", "lines": [356, 364]}
+  ]
+}

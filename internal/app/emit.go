@@ -11,7 +11,7 @@ import (
 
 	"github.com/mew-ton/hozo/internal/config"
 	"github.com/mew-ton/hozo/internal/diag"
-	"github.com/mew-ton/hozo/internal/gen/hozoc"
+	"github.com/mew-ton/hozo/internal/gen/hozo/compiler"
 	hostplugin "github.com/mew-ton/hozo/internal/plugin"
 	"github.com/mew-ton/hozo/internal/project"
 	"github.com/mew-ton/hozo/internal/testmap"
@@ -35,9 +35,9 @@ type output struct {
 }
 
 // CollectOutputs は cli.hozo の op collectOutputs（docs/cli.md「書き出し」の 1〜3）: 検査（Check）が、プラグインから受け取った答えから、
-// 出力ごとのファイルを集める。プラグインは、起動しない。hozoc.Leaves のメソッド。葉の op なので、状態（生成したファイル）には触れない: 読むのも書くのも、
+// 出力ごとのファイルを集める。プラグインは、起動しない。compiler.Leaves のメソッド。葉の op なので、状態（生成したファイル）には触れない: 読むのも書くのも、
 // 配線 writeOutputs が、この後に呼ぶ read outputChanges（[App.Outputs]）と効果 syncOutputs（[App.OutputsSync]）。内部の op で、
-// テストは、内側のパッケージ internal/gen/hozoc/inner の Ops から呼ぶ。checked は Check が返したもの（warning）で、その中身
+// テストは、内側のパッケージ internal/gen/hozo/compiler/inner の Ops から呼ぶ。checked は Check が返したもの（warning）で、その中身
 // （Program、設定、マニフェスト）は Check が a.checked に置いた Project から取る。集めるファイルは、どれもトランスパイラが
 // 返したもの。
 //
@@ -47,42 +47,42 @@ type output struct {
 //  1. namespaces が空でなければ、名前空間がそのどれかと同じか子孫である出力だけを対象にする。引数とその子孫のどれも、
 //     どの単位の対象でもなければ UnknownNamespace。
 //  2. 対象の各出力について、単位の各トランスパイラの答えから、files を集める（path とテストの対応表を確かめる:
-//     PLG-1 / PLG-2 / PLG-4 は hozoc.MalformedOutput）。
+//     PLG-1 / PLG-2 / PLG-4 は compiler.MalformedOutput）。
 //  3. すべての出力のファイルを集めてからパスの重複を確かめる（CFG-5 → OutputConflict）。
 //
-// 1〜3 は [App.collect]。返す予定（hozoc.EmitPlan）は、warning と、ファイル（パスの辞書順）と、入力の dryRun と noEmit。置き場を含む形は
+// 1〜3 は [App.collect]。返す予定（compiler.EmitPlan）は、warning と、ファイル（パスの辞書順）と、入力の dryRun と noEmit。置き場を含む形は
 // a.planned に置く（[App.plannedFor]）。
 //
 // ctx が中断されていれば、その error を返す（[App.collect]）。
-func (a *App) CollectOutputs(ctx context.Context, in hozoc.BuildInput, checked hozoc.CheckResult) (hozoc.EmitPlan, error) {
+func (a *App) CollectOutputs(ctx context.Context, in compiler.BuildInput, checked compiler.CheckResult) (compiler.EmitPlan, error) {
 	a.planned = nil
 	p := a.checked
 	if p == nil || len(checked.Warnings) != len(p.Diags) {
-		return hozoc.EmitPlan{}, errors.New("hozoc: CollectOutputs の checked が直前の Check の結果でない")
+		return compiler.EmitPlan{}, errors.New("hozoc: CollectOutputs の checked が直前の Check の結果でない")
 	}
 	// 0. 設定なし。検査だけ（--no-emit）なら、集めるものがないので、空の予定を返す
 	if p.NoConfig {
 		if in.NoEmit != nil && *in.NoEmit {
 			a.planned = &outputPlan{root: p.Root, warnings: p.Diags}
-			return hozoc.EmitPlan{Warnings: toDiagnostics(p.Diags, p.Files), Files: []hozoc.OutputFile{}, DryRun: in.DryRun, NoEmit: in.NoEmit}, nil
+			return compiler.EmitPlan{Warnings: toDiagnostics(p.Diags, p.Files), Files: []compiler.OutputFile{}, DryRun: in.DryRun, NoEmit: in.NoEmit}, nil
 		}
-		return hozoc.EmitPlan{}, noConfig(p)
+		return compiler.EmitPlan{}, noConfig(p)
 	}
 	pl, err := a.collect(ctx, p, in.Namespaces)
 	if err != nil {
-		return hozoc.EmitPlan{}, err
+		return compiler.EmitPlan{}, err
 	}
 	a.planned = pl
-	plan := hozoc.EmitPlan{Warnings: toDiagnostics(pl.warnings, p.Files), Files: make([]hozoc.OutputFile, 0, len(pl.outputs)), DryRun: in.DryRun, NoEmit: in.NoEmit}
+	plan := compiler.EmitPlan{Warnings: toDiagnostics(pl.warnings, p.Files), Files: make([]compiler.OutputFile, 0, len(pl.outputs)), DryRun: in.DryRun, NoEmit: in.NoEmit}
 	for _, o := range pl.outputs {
-		plan.Files = append(plan.Files, hozoc.OutputFile{Path: hozoc.Path(o.path), Content: string(o.content)})
+		plan.Files = append(plan.Files, compiler.OutputFile{Path: compiler.Path(o.path), Content: string(o.content)})
 	}
 	return plan, nil
 }
 
-// plannedFor は、境界の予定 plan（hozoc.EmitPlan。warning とファイルだけ）の、置き場を含む形: 直前の CollectOutputs が a.planned に
+// plannedFor は、境界の予定 plan（compiler.EmitPlan。warning とファイルだけ）の、置き場を含む形: 直前の CollectOutputs が a.planned に
 // 置いたもの。plan が、その CollectOutputs の返したものでなければ（ファイルの並びが違う）、誤り。
-func (a *App) plannedFor(plan hozoc.EmitPlan) (*outputPlan, error) {
+func (a *App) plannedFor(plan compiler.EmitPlan) (*outputPlan, error) {
 	pl := a.planned
 	same := pl != nil && len(plan.Files) == len(pl.outputs)
 	for i := 0; same && i < len(plan.Files); i++ {
@@ -95,11 +95,11 @@ func (a *App) plannedFor(plan hozoc.EmitPlan) (*outputPlan, error) {
 }
 
 // dryRun は、予定 plan が、書き出さずに、書き出す予定だけを返すものか（cli.hozo の EmitPlan.dryRun）。
-func dryRun(plan hozoc.EmitPlan) bool { return plan.DryRun != nil && *plan.DryRun }
+func dryRun(plan compiler.EmitPlan) bool { return plan.DryRun != nil && *plan.DryRun }
 
 // noEmit は、予定 plan が、検査だけのものか（cli.hozo の EmitPlan.noEmit。hozoc build --no-emit）: 書き出さず、書き出す予定も
 // 返さない。置き場は、読まない。
-func noEmit(plan hozoc.EmitPlan) bool { return plan.NoEmit != nil && *plan.NoEmit }
+func noEmit(plan compiler.EmitPlan) bool { return plan.NoEmit != nil && *plan.NoEmit }
 
 // noConfig は、設定なしで emit しようとしたときの ConfigInvalid（CFG-7。docs/cli.md「手で書くもの」）。
 func noConfig(p *project.Project) error {
@@ -108,7 +108,7 @@ func noConfig(p *project.Project) error {
 	return configInvalid(append([]diag.Diagnostic{missing}, p.Diags...), p.Files)
 }
 
-// outputPlan は一度の emit が書き出す予定のすべて（docs/cli.md「書き出し」の 1〜3 の結果）。境界の hozoc.EmitPlan が持たない、
+// outputPlan は一度の emit が書き出す予定のすべて（docs/cli.md「書き出し」の 1〜3 の結果）。境界の compiler.EmitPlan が持たない、
 // 置き場（ルートと、出力ごとの Dir(U, N)）を持つ。
 type outputPlan struct {
 	// root はプロジェクトのルート（パスの基準）。
@@ -158,7 +158,7 @@ func (pl *outputPlan) record(dir string) []byte {
 }
 
 // collect は docs/cli.md「書き出し」の 1〜3: 対象を決め、対象の出力ごとに、単位のトランスパイラの答え（p.Answers）から files を
-// 集め、パスの重複を確かめる。ファイルには触れない。誤りは cli.hozo の例外で返す（UnknownNamespace、hozoc.MalformedOutput、
+// 集め、パスの重複を確かめる。ファイルには触れない。誤りは cli.hozo の例外で返す（UnknownNamespace、compiler.MalformedOutput、
 // OutputConflict）。
 //
 // hozoc 本体はコードを出力しない（docs/plugin-protocol.md「この文書が決めること」）。どのトランスパイラも、一つの出力の答えを、
@@ -167,7 +167,7 @@ func (pl *outputPlan) record(dir string) []byte {
 //
 // トランスパイラの files の path はルートからの相対パスで、その出力の Dir(U, N) の下でなければならない
 // （docs/plugin-protocol.md「emit」）。そうでないもの（`..`、絶対パス、別のディレクトリ、別の出力の Dir、Dir(U, N) そのもの）は
-// PLG-1、同じ応答の中の重複は PLG-2 で、どちらも hozoc.MalformedOutput。
+// PLG-1、同じ応答の中の重複は PLG-2 で、どちらも compiler.MalformedOutput。
 func (a *App) collect(ctx context.Context, p *project.Project, namespaces []string) (*outputPlan, error) {
 	views := p.Views()
 
@@ -290,36 +290,36 @@ func (a *App) collect(ctx context.Context, p *project.Project, namespaces []stri
 }
 
 // RunEmit は cli.hozo の op runEmit: プラグインを一つ起動して、受け持つ出力のすべてを、まとめて展開させる
-// （docs/plugin-protocol.md「起動」）。hozoc.Leaves のメソッド。どの配線からも呼ばれない内部の op で、プラグインとの境界の記述と
+// （docs/plugin-protocol.md「起動」）。compiler.Leaves のメソッド。どの配線からも呼ばれない内部の op で、プラグインとの境界の記述と
 // してある（docs/cli.md「手で書くもの」）: plugin を起動し（WASM のファイルは plugin.wasm。サンドボックスの中で動かす）、
-// req を JSON にして送り、応答を hozoc.EmitResponse に読んで返す。hozoc.Spec と hozoc.OutputView は中身のない
+// req を JSON にして送り、応答を compiler.EmitResponse に読んで返す。compiler.Spec と compiler.OutputView は中身のない
 // model なので、この入口から送る要求の spec と、出力の view は空のオブジェクトになる。hozoc 自身の検査（[App.Check]）は、
 // この入口を呼ばず、internal/project が、本物の仕様を持つ要求で、同じ起動をする。
-// 起動の失敗と異常終了は hozoc.Crashed、応答の形の誤りは hozoc.MalformedOutput。
-func (a *App) RunEmit(ctx context.Context, plugin hozoc.Plugin, req hozoc.EmitRequest) (hozoc.EmitResponse, error) {
+// 起動の失敗と異常終了は compiler.Crashed、応答の形の誤りは compiler.MalformedOutput。
+func (a *App) RunEmit(ctx context.Context, plugin compiler.Plugin, req compiler.EmitRequest) (compiler.EmitResponse, error) {
 	if err := ctx.Err(); err != nil {
-		return hozoc.EmitResponse{}, err
+		return compiler.EmitResponse{}, err
 	}
 	if plugin.Wasm == "" {
-		return hozoc.EmitResponse{}, asProc(&hostplugin.CrashedError{Plugin: plugin.Name, ExitCode: -1, Err: errors.New("wasm が空")})
+		return compiler.EmitResponse{}, asProc(&hostplugin.CrashedError{Plugin: plugin.Name, ExitCode: -1, Err: errors.New("wasm が空")})
 	}
 	var resp sdk.EmitBatchResponse
 	if err := (hostplugin.Runner{Stderr: a.Stderr, CacheDir: a.cacheDir}).Run(plugin.Name, string(plugin.Wasm), &req, &resp); err != nil {
-		return hozoc.EmitResponse{}, asProc(err)
+		return compiler.EmitResponse{}, asProc(err)
 	}
-	out := hozoc.EmitResponse{Outputs: []hozoc.OutputResult{}}
+	out := compiler.EmitResponse{Outputs: []compiler.OutputResult{}}
 	for _, o := range resp.Outputs {
-		output := hozoc.OutputResult{Results: []hozoc.TranspilerResult{}}
+		output := compiler.OutputResult{Results: []compiler.TranspilerResult{}}
 		for _, r := range o.Results {
-			result := hozoc.TranspilerResult{Files: []hozoc.OutputFile{}, Warnings: []hozoc.PluginWarning{}, Errors: []hozoc.PluginError{}}
+			result := compiler.TranspilerResult{Files: []compiler.OutputFile{}, Warnings: []compiler.PluginWarning{}, Errors: []compiler.PluginError{}}
 			for _, f := range r.Files {
-				result.Files = append(result.Files, hozoc.OutputFile{Path: hozoc.Path(f.Path), Content: f.Content})
+				result.Files = append(result.Files, compiler.OutputFile{Path: compiler.Path(f.Path), Content: f.Content})
 			}
 			for _, w := range r.Warnings {
-				result.Warnings = append(result.Warnings, hozoc.PluginWarning{At: w.At, Message: w.Message})
+				result.Warnings = append(result.Warnings, compiler.PluginWarning{At: w.At, Message: w.Message})
 			}
 			for _, e := range r.Errors {
-				result.Errors = append(result.Errors, hozoc.PluginError{Code: e.Code, At: e.At, Message: e.Message})
+				result.Errors = append(result.Errors, compiler.PluginError{Code: e.Code, At: e.At, Message: e.Message})
 			}
 			output.Results = append(output.Results, result)
 		}

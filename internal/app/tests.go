@@ -11,7 +11,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/mew-ton/hozo/internal/diag"
-	"github.com/mew-ton/hozo/internal/gen/hozoc"
+	"github.com/mew-ton/hozo/internal/gen/hozo/compiler"
 	hostplugin "github.com/mew-ton/hozo/internal/plugin"
 	"github.com/mew-ton/hozo/internal/project"
 	"github.com/mew-ton/hozo/internal/testmap"
@@ -20,43 +20,43 @@ import (
 )
 
 // MatchTests は cli.hozo の op matchTests（docs/cli.md「tests」の 1〜6）: 検査を通った仕様から、テストの対応表を集め、
-// カバレッジの「実行された行」と突き合わせる。hozoc.Leaves のメソッド。ファイルは書き出さない（置き場のファイルと、
+// カバレッジの「実行された行」と突き合わせる。compiler.Leaves のメソッド。ファイルは書き出さない（置き場のファイルと、
 // カバレッジのファイルを、読むだけ）。hozoc は、テストを走らせず、カバレッジの形も知らない: 形を読むのは、単位の基底の
 // プラグイン（direction "coverage"。docs/plugin-protocol.md「coverage」）。checked は Check が返したもの（[App.CollectOutputs]
 // と同じ扱い）。
-func (a *App) MatchTests(ctx context.Context, in hozoc.TestsInput, checked hozoc.CheckResult) (hozoc.TestsResult, error) {
+func (a *App) MatchTests(ctx context.Context, in compiler.TestsInput, checked compiler.CheckResult) (compiler.TestsResult, error) {
 	p := a.checked
 	if p == nil || len(checked.Warnings) != len(p.Diags) {
-		return hozoc.TestsResult{}, errors.New("hozoc: MatchTests の checked が直前の Check の結果でない")
+		return compiler.TestsResult{}, errors.New("hozoc: MatchTests の checked が直前の Check の結果でない")
 	}
 	if p.NoConfig {
-		return hozoc.TestsResult{}, noConfig(p)
+		return compiler.TestsResult{}, noConfig(p)
 	}
 	// 1. ファイルを集める（書き出さない）
 	pl, err := a.collect(ctx, p, nil)
 	if err != nil {
-		return hozoc.TestsResult{}, err
+		return compiler.TestsResult{}, err
 	}
 	warnings := toDiagnostics(pl.warnings, p.Files)
-	result := hozoc.TestsResult{Warnings: warnings, Ran: []string{}}
+	result := compiler.TestsResult{Warnings: warnings, Ran: []string{}}
 	// 2. 求めるテスト
 	if len(pl.tests) == 0 {
 		return result, nil
 	}
 	// 3. 置き場の出力が、集めたものと同じか（TESTS-2）
 	if stale := staleOutputs(pl); len(stale) > 0 {
-		return hozoc.TestsResult{}, coverageUnusable(append(stale, warnings...))
+		return compiler.TestsResult{}, coverageUnusable(append(stale, warnings...))
 	}
 	// 4. カバレッジを読む（TESTS-3）
 	covered, unusable, err := a.readCoverage(ctx, p, pl, string(in.Coverage))
 	if err != nil {
-		return hozoc.TestsResult{}, err
+		return compiler.TestsResult{}, err
 	}
 	if len(unusable) > 0 {
-		return hozoc.TestsResult{}, coverageUnusable(append(unusable, warnings...))
+		return compiler.TestsResult{}, coverageUnusable(append(unusable, warnings...))
 	}
 	// 5. 突き合わせる（TESTS-1）。テストは、その単位の基底のプラグインが返した行と比べる
-	var missing []hozoc.Diagnostic
+	var missing []compiler.Diagnostic
 	for i := range pl.tests {
 		t := &pl.tests[i]
 		switch testmap.Match([]testmap.Test{t.Test}, covered[basePlugin(p, t.unit).Name])[0] {
@@ -71,33 +71,33 @@ func (a *App) MatchTests(ctx context.Context, in hozoc.TestsInput, checked hozoc
 		}
 	}
 	if len(missing) > 0 {
-		return hozoc.TestsResult{}, testsNotRun(append(missing, warnings...))
+		return compiler.TestsResult{}, testsNotRun(append(missing, warnings...))
 	}
 	return result, nil
 }
 
 // testsDiagnostic は TESTS-* の診断一つ（error）。位置は、ファイル file（ルートからの相対パスか、カバレッジのファイル）と、
-// line が 1 以上なら、その行の頭。仕様のファイルの位置ではないので、境界の形（hozoc.Diagnostic）で直に作る。
-func testsDiagnostic(code, file string, line int, message string) hozoc.Diagnostic {
-	d := hozoc.Diagnostic{Severity: diag.Error.String(), Code: code, Message: message}
+// line が 1 以上なら、その行の頭。仕様のファイルの位置ではないので、境界の形（compiler.Diagnostic）で直に作る。
+func testsDiagnostic(code, file string, line int, message string) compiler.Diagnostic {
+	d := compiler.Diagnostic{Severity: diag.Error.String(), Code: code, Message: message}
 	if file != "" {
-		path := hozoc.Path(file)
+		path := compiler.Path(file)
 		d.File = &path
 	}
 	if line >= 1 {
-		d.Start = &hozoc.Position{Line: int64(line), Col: 1}
+		d.Start = &compiler.Position{Line: int64(line), Col: 1}
 	}
 	return d
 }
 
 // staleOutputs は docs/cli.md「tests」の 3: 対応表と、対応表が指すファイルのうち、置き場にないもの、集めたものと内容が
 // 違うものごとに、TESTS-2 を一つ（パスの辞書順）。
-func staleOutputs(pl *outputPlan) []hozoc.Diagnostic {
+func staleOutputs(pl *outputPlan) []compiler.Diagnostic {
 	want := map[string]bool{}
 	for _, t := range pl.tests {
 		want[t.mapPath], want[t.File] = true, true
 	}
-	var out []hozoc.Diagnostic
+	var out []compiler.Diagnostic
 	for _, o := range pl.outputs { // パスの辞書順
 		if !want[o.path] {
 			continue
@@ -129,9 +129,9 @@ func basePlugin(p *project.Project, unit int) *hostplugin.Plugin {
 
 // readCoverage は docs/cli.md「tests」の 4: カバレッジのファイル path（相対パスの基準は作業ディレクトリ）を読み、対応表を
 // 持つ単位の基底のプラグインごとに direction "coverage" を送る（docs/plugin-protocol.md「coverage」）。戻り値の covered は、
-// プラグインの名前 → 実行された行。unusable は TESTS-3。誤りは、プラグインの異常終了など（hozoc.Crashed /
-// hozoc.MalformedOutput / ConfigInvalid）。
-func (a *App) readCoverage(ctx context.Context, p *project.Project, pl *outputPlan, path string) (covered map[string][]sdk.CoveredFile, unusable []hozoc.Diagnostic, err error) {
+// プラグインの名前 → 実行された行。unusable は TESTS-3。誤りは、プラグインの異常終了など（compiler.Crashed /
+// compiler.MalformedOutput / ConfigInvalid）。
+func (a *App) readCoverage(ctx context.Context, p *project.Project, pl *outputPlan, path string) (covered map[string][]sdk.CoveredFile, unusable []compiler.Diagnostic, err error) {
 	abs := path
 	if !filepath.IsAbs(abs) {
 		dir := a.Dir
@@ -145,9 +145,9 @@ func (a *App) readCoverage(ctx context.Context, p *project.Project, pl *outputPl
 	content, readErr := os.ReadFile(abs)
 	switch {
 	case readErr != nil:
-		return nil, []hozoc.Diagnostic{testsDiagnostic("TESTS-3", path, 0, fmt.Sprintf("カバレッジのファイル %s を読めない: %v", path, cause(readErr)))}, nil
+		return nil, []compiler.Diagnostic{testsDiagnostic("TESTS-3", path, 0, fmt.Sprintf("カバレッジのファイル %s を読めない: %v", path, cause(readErr)))}, nil
 	case !utf8.Valid(content):
-		return nil, []hozoc.Diagnostic{testsDiagnostic("TESTS-3", path, 0, fmt.Sprintf("カバレッジのファイル %s が、UTF-8 の文字列でない", path))}, nil
+		return nil, []compiler.Diagnostic{testsDiagnostic("TESTS-3", path, 0, fmt.Sprintf("カバレッジのファイル %s が、UTF-8 の文字列でない", path))}, nil
 	}
 
 	// 相手: 対応表を持つ単位の基底のプラグイン（単位の設定の順）と、そのプラグインに聞くファイル

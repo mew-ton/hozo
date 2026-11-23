@@ -2,7 +2,7 @@ package app
 
 import (
 	"github.com/mew-ton/hozo/internal/diag"
-	"github.com/mew-ton/hozo/internal/gen/hozoc"
+	"github.com/mew-ton/hozo/internal/gen/hozo/compiler"
 	"github.com/mew-ton/hozo/internal/source"
 )
 
@@ -16,53 +16,53 @@ import (
 // hozoc の json の表示は、この名前によらない（[Presenter] が docs/diagnostics.md「json」の形で出す）。
 
 // carried は、診断を運ぶ例外の構造体の形: 引数ごとのフィールドが一つ。
-type carried struct{ Diagnostics []hozoc.Diagnostic }
+type carried struct{ Diagnostics []compiler.Diagnostic }
 
-// checkFailed は例外 hozoc.CheckFailed（値）。diags は error と warning のすべて。
+// checkFailed は例外 compiler.CheckFailed（値）。diags は error と warning のすべて。
 func checkFailed(diags []diag.Diagnostic, fs *source.FileSet) error {
-	return hozoc.CheckFailed(carried{toDiagnostics(diags, fs)})
+	return compiler.CheckFailed(carried{toDiagnostics(diags, fs)})
 }
 
-// configInvalid は例外 hozoc.ConfigInvalid（値）。
+// configInvalid は例外 compiler.ConfigInvalid（値）。
 func configInvalid(diags []diag.Diagnostic, fs *source.FileSet) error {
-	return hozoc.ConfigInvalid(carried{toDiagnostics(diags, fs)})
+	return compiler.ConfigInvalid(carried{toDiagnostics(diags, fs)})
 }
 
-// languageMismatch は例外 hozoc.LanguageMismatch（値）。
+// languageMismatch は例外 compiler.LanguageMismatch（値）。
 func languageMismatch(diags []diag.Diagnostic, fs *source.FileSet) error {
-	return hozoc.LanguageMismatch(carried{toDiagnostics(diags, fs)})
+	return compiler.LanguageMismatch(carried{toDiagnostics(diags, fs)})
 }
 
-// outputConflict は例外 hozoc.OutputConflict（値）。
+// outputConflict は例外 compiler.OutputConflict（値）。
 func outputConflict(diags []diag.Diagnostic, fs *source.FileSet) error {
-	return hozoc.OutputConflict(carried{toDiagnostics(diags, fs)})
+	return compiler.OutputConflict(carried{toDiagnostics(diags, fs)})
 }
 
-// testsNotRun は例外 hozoc.TestsNotRun（値）。diags は、既に境界の形（位置は行と列）の、error と warning のすべて。
-func testsNotRun(diags []hozoc.Diagnostic) error {
-	return hozoc.TestsNotRun(carried{diags})
+// testsNotRun は例外 compiler.TestsNotRun（値）。diags は、既に境界の形（位置は行と列）の、error と warning のすべて。
+func testsNotRun(diags []compiler.Diagnostic) error {
+	return compiler.TestsNotRun(carried{diags})
 }
 
-// coverageUnusable は例外 hozoc.CoverageUnusable（値）。
-func coverageUnusable(diags []hozoc.Diagnostic) error {
-	return hozoc.CoverageUnusable(carried{diags})
+// coverageUnusable は例外 compiler.CoverageUnusable（値）。
+func coverageUnusable(diags []compiler.Diagnostic) error {
+	return compiler.CoverageUnusable(carried{diags})
 }
 
 // carriedBy は、例外の値 v（errors.As で取り出した値か、cli.Failure の Value）が、診断を運ぶ例外なら、その診断と true。
-func carriedBy(v any) ([]hozoc.Diagnostic, bool) {
+func carriedBy(v any) ([]compiler.Diagnostic, bool) {
 	var c carried
 	switch e := v.(type) {
-	case hozoc.CheckFailed:
+	case compiler.CheckFailed:
 		c = carried(e)
-	case hozoc.ConfigInvalid:
+	case compiler.ConfigInvalid:
 		c = carried(e)
-	case hozoc.LanguageMismatch:
+	case compiler.LanguageMismatch:
 		c = carried(e)
-	case hozoc.OutputConflict:
+	case compiler.OutputConflict:
 		c = carried(e)
-	case hozoc.TestsNotRun:
+	case compiler.TestsNotRun:
 		c = carried(e)
-	case hozoc.CoverageUnusable:
+	case compiler.CoverageUnusable:
 		c = carried(e)
 	default:
 		return nil, false

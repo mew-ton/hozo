@@ -140,7 +140,7 @@ func TestTestsNotRun(t *testing.T) {
 		t.Fatalf("code=%d stdout=%q\nstderr=%q\n  want=%q", code, stdout, stderr, want)
 	}
 	code, _, stderr = run(t, dir, nil, "tests", "--coverage", "cover.out", "--format=json")
-	if code != exitTestsNotRun || !strings.Contains(stderr, `"error": "hozoc.TestsNotRun"`) || !strings.Contains(stderr, `"code": "TESTS-1"`) || !strings.Contains(stderr, `"errors": 1`) {
+	if code != exitTestsNotRun || !strings.Contains(stderr, `"error": "hozo.compiler.TestsNotRun"`) || !strings.Contains(stderr, `"code": "TESTS-1"`) || !strings.Contains(stderr, `"errors": 1`) {
 		t.Fatalf("json: code=%d stderr=%s", code, stderr)
 	}
 
@@ -177,7 +177,7 @@ func TestTestsStaleOutputs(t *testing.T) {
 		t.Errorf("置き場が違うのに、coverage を %d 回呼んだ", len(reqs))
 	}
 	code, _, stderr = run(t, dir, nil, "tests", "--coverage", "cover.out", "--format=json")
-	if code != exitCoverageUnusable || !strings.Contains(stderr, `"error": "hozoc.CoverageUnusable"`) || !strings.Contains(stderr, `"code": "TESTS-2"`) {
+	if code != exitCoverageUnusable || !strings.Contains(stderr, `"error": "hozo.compiler.CoverageUnusable"`) || !strings.Contains(stderr, `"code": "TESTS-2"`) {
 		t.Fatalf("json: code=%d stderr=%s", code, stderr)
 	}
 }
@@ -221,7 +221,7 @@ func TestTestsCoverageUnusable(t *testing.T) {
 			t.Fatalf("code=%d stderr=%q", code, stderr)
 		}
 	})
-	// 応答の形の誤りは、hozoc.MalformedOutput（docs/plugin-protocol.md「応答の形」）
+	// 応答の形の誤りは、hozo.compiler.MalformedOutput（docs/plugin-protocol.md「応答の形」）
 	for name, response := range map[string]string{
 		"no recognized":   `{"files":[]}`,
 		"no files":        `{"recognized":true}`,
@@ -297,7 +297,7 @@ func TestTestsRider(t *testing.T) {
 	}
 }
 
-// 対応表の名前か中身が、約束の形でなければ、PLG-4（hozoc.MalformedOutput）。emit でも、tests でも。
+// 対応表の名前か中身が、約束の形でなければ、PLG-4（hozo.compiler.MalformedOutput）。emit でも、tests でも。
 func TestTestMapMalformed(t *testing.T) {
 	file := `{"path":"@DIR@/shoptest/leaves.txt","content":"1\n"}`
 	for name, mapFile := range map[string]string{

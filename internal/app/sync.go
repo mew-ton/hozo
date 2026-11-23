@@ -10,7 +10,7 @@ import (
 	"path/filepath"
 
 	"github.com/mew-ton/hozo/internal/config"
-	"github.com/mew-ton/hozo/internal/gen/hozoc"
+	"github.com/mew-ton/hozo/internal/gen/hozo/compiler"
 )
 
 // このファイルは、状態の分類 OutputsSync（cli.hozo の `classify OutputsSync of outputs`）の単位の実装と、生成したファイルと
@@ -21,8 +21,8 @@ import (
 const OutputsFile = ".hozoc-outputs.json"
 
 // OutputsSync は、状態の分類 OutputsSync の単位の実装: 述語 UpToDate と OutOfDate（問い合わせ）と、効果 syncOutputs（命令）。
-// hozoc.New の引数 outputsSync に渡す（[App.Ops]）。
-func (a *App) OutputsSync() hozoc.OutputsSyncState { return outputsSync{a} }
+// compiler.New の引数 outputsSync に渡す（[App.Ops]）。
+func (a *App) OutputsSync() compiler.OutputsSyncState { return outputsSync{a} }
 
 // outputsSync は [App.OutputsSync] が返す値。
 type outputsSync struct{ a *App }
@@ -37,7 +37,7 @@ type outputsSync struct{ a *App }
 //  7. .hozoc-outputs.json を書く。書くものが一つもない出力では作らず、前回のものがあれば消す。
 //
 // 途中で失敗したら、そこまでに書いたものは残る（原子性は持たない）。
-func (s outputsSync) SyncOutputs(ctx context.Context, plan hozoc.EmitPlan) error {
+func (s outputsSync) SyncOutputs(ctx context.Context, plan compiler.EmitPlan) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
@@ -92,7 +92,7 @@ func (s outputsSync) SyncOutputs(ctx context.Context, plan hozoc.EmitPlan) error
 
 // UpToDate は cli.hozo の分類 OutputsSync の述語（docs/cli.md「cli.hozo」「手で書くもの」）: 生成したファイルが、今の仕様と
 // 設定から生成し直したものと一致しているか。生成したコードでは、状態の分類 OutputsSync の単位の問い合わせになり、判定関数
-// hozoc.ClassifyOutputsSync が呼ぶ。
+// compiler.ClassifyOutputsSync が呼ぶ。
 //
 // すべての出力について書き出す予定（[App.collect]。トランスパイラの答えから）を作り、ディスクと比べる。一致していると言うのは、
 // 書く予定のファイルがすべて同じ内容であり、.hozoc-outputs.json が今回の一覧と同じで（何も書かない出力にはなく）、

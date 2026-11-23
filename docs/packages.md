@@ -10,7 +10,7 @@
 go.mod                 module github.com/mew-ton/hozo
 hozo.toml, cli.hozo    hozoc 自身の仕様と設定（docs/cli.md）
 Makefile               build / generate（「自己生成の手順」）/ vet / test
-cmd/hozoc/             CLI の main。app.App の Ops()（実装を hozoc.New に渡したもの）と app.Presenter を、生成した cli.Main に渡すだけ
+cmd/hozoc/             CLI の main。app.App の Ops()（実装を compiler.New に渡したもの）と app.Presenter を、生成した cli.Main に渡すだけ
 ir/                    IR の型（公開）
 plugin/                Go 向けプラグイン SDK（公開）。testdata/ に、二つの SDK のテストが読む表
 plugin/golang/         Go の基底の形の規則: 置き場、名前、型、op の形（公開）
@@ -34,7 +34,7 @@ internal/fakeplugin/   テストのための、にせもののプラグイン（
 internal/project/      一度の解析のすべて
 internal/app/          hozoc の葉の op と状態の単位の実装と表示
 internal/lsp/          言語サーバー（jsonrpc/ は JSON-RPC、protocol/ は LSP の型のうち使うもの）
-internal/gen/hozoc/    cli.hozo からの生成物: 入口のパッケージ（go）。inner/ は内側のパッケージ（go）、types/ は型のパッケージ（go と go-valid）、hozoctest/ はテストのパッケージ（go）、cli/ は go-cli の出力
+internal/gen/hozo/compiler/    cli.hozo からの生成物: 入口のパッケージ（go）。inner/ は内側のパッケージ（go）、types/ は型のパッケージ（go と go-valid）、compilertest/ はテストのパッケージ（go）、cli/ は go-cli の出力
 internal/tools/        生成の道具: irschema/ と tmgrammar/（go generate）、selfgen/（make generate）
 plugins/<name>/        プラグイン。一つのディレクトリが、一つの WASM（main パッケージをビルドした plugin.wasm。リポジトリには入れない）と hozo-plugin.toml（提供するトランスパイラの一覧を持つ）
 plugins/go/            Go の基底のプラグイン（main。中身は internal/gobase/）
@@ -63,7 +63,7 @@ Go のパッケージごとの、このモジュールの中で import してい
 | パッケージ | import する |
 |---|---|
 | `cmd/hozoc` | `internal/app` |
-| `internal/app` | `internal/config`、`internal/diag`、`internal/gen/hozoc`、`internal/gen/hozoc/cli`、`internal/lsp`、`internal/plugin`、`internal/project`、`internal/source`、`internal/testmap`、`ir`、`plugin` |
+| `internal/app` | `internal/config`、`internal/diag`、`internal/gen/hozo/compiler`、`internal/gen/hozo/compiler/cli`、`internal/lsp`、`internal/plugin`、`internal/project`、`internal/source`、`internal/testmap`、`ir`、`plugin` |
 | `internal/lsp` | `internal/diag`、`internal/lsp/jsonrpc`、`internal/lsp/protocol`、`internal/project`、`internal/sema`、`internal/source`、`internal/syntax`、`internal/syntax/ast`、`internal/vocab`、`ir` |
 | `internal/lsp/jsonrpc` | — |
 | `internal/lsp/protocol` | — |
@@ -82,11 +82,11 @@ Go のパッケージごとの、このモジュールの中で import してい
 | `internal/diag` | `internal/source` |
 | `internal/source` | — |
 | `internal/vocab` | `vocab` |
-| `internal/gen/hozoc` | `internal/gen/hozoc/inner` |
-| `internal/gen/hozoc/inner` | `internal/gen/hozoc/types`、`runtime` |
-| `internal/gen/hozoc/types` | `runtime` |
-| `internal/gen/hozoc/hozoctest` | `internal/gen/hozoc`、`runtime` |
-| `internal/gen/hozoc/cli` | `internal/gen/hozoc`、`runtime` |
+| `internal/gen/hozo/compiler` | `internal/gen/hozo/compiler/inner` |
+| `internal/gen/hozo/compiler/inner` | `internal/gen/hozo/compiler/types`、`runtime` |
+| `internal/gen/hozo/compiler/types` | `runtime` |
+| `internal/gen/hozo/compiler/compilertest` | `internal/gen/hozo/compiler`、`runtime` |
+| `internal/gen/hozo/compiler/cli` | `internal/gen/hozo/compiler`、`runtime` |
 | `internal/tools/irschema` | `ir`、`plugin` |
 | `internal/tools/tmgrammar` | `internal/syntax/token` |
 | `internal/tools/selfgen` | — |
@@ -726,7 +726,7 @@ func Match(tests []Test, covered []sdk.CoveredFile) []Status          // tests �
 
 ### `internal/app`
 
-`docs/cli.md`「手で書くもの」。葉の op と状態の単位の実装を持つ `App`（`*App` が生成した `hozoc.Leaves` を満たし、`Sources()` / `Config()` / `Outputs()` / `OutputsSync()` が状態の単位の実装を返し、`Ops()` がそれらを `hozoc.New` に渡す。状態に触れる `read outputChanges` と効果 `syncOutputs` は、`Outputs()` と `OutputsSync()` が返す単位のメソッド）と、`cli.Presenter`（`internal/gen/hozoc/cli`）の実装 `Presenter`。引数の解釈は持たない（生成した `cli.Main`）。入口の `Main(ctx, a, args, env, stdout, stderr)` は、`cli.Main` を呼ぶ前に、古い名前のコマンド（`check`、`emit`）を見て、新しい書き方を示す（`Renamed(args)` が、その文を返す。`docs/cli.md`「build」の「古い名前」）。`App` はプロセスの環境を自分で読まない: ホームディレクトリは `App.Home`（`cmd/hozoc` が入れる）、環境変数は `cli.hozo` の入力のフィールドで届く。特定の言語のコードは持たない: トランスパイラを起動し、返ったファイルを書き出すだけ（`docs/cli.md`「書き出し」）。
+`docs/cli.md`「手で書くもの」。葉の op と状態の単位の実装を持つ `App`（`*App` が生成した `compiler.Leaves` を満たし、`Sources()` / `Config()` / `Outputs()` / `OutputsSync()` が状態の単位の実装を返し、`Ops()` がそれらを `hozoc.New` に渡す。状態に触れる `read outputChanges` と効果 `syncOutputs` は、`Outputs()` と `OutputsSync()` が返す単位のメソッド）と、`cli.Presenter`（`internal/gen/hozo/compiler/cli`）の実装 `Presenter`。引数の解釈は持たない（生成した `cli.Main`）。入口の `Main(ctx, a, args, env, stdout, stderr)` は、`cli.Main` を呼ぶ前に、古い名前のコマンド（`check`、`emit`）を見て、新しい書き方を示す（`Renamed(args)` が、その文を返す。`docs/cli.md`「build」の「古い名前」）。`App` はプロセスの環境を自分で読まない: ホームディレクトリは `App.Home`（`cmd/hozoc` が入れる）、環境変数は `cli.hozo` の入力のフィールドで届く。特定の言語のコードは持たない: トランスパイラを起動し、返ったファイルを書き出すだけ（`docs/cli.md`「書き出し」）。
 
 ### `internal/lsp`
 
@@ -754,7 +754,7 @@ Go のプラグインは、どれも同じ形: `main` パッケージが `plugin
 |---|---|---|
 | `ir` と `plugin` の型 | `schema/ir.schema.json`（`Program` / `View` と、`$defs` にプロトコルの要求と応答） | `internal/tools/irschema`（`go generate ./schema/...`。構造体は reflect で写し、`kind` のユニオンと列挙は道具の表で持つ） |
 | `token.Keywords` | `editors/vscode/syntaxes/hozo.tmLanguage.json`（予約語の部分は `token.Keywords` から、それ以外は道具の中の表から） | `internal/tools/tmgrammar`（`go generate ./editors/...`） |
-| `cli.hozo` | `internal/gen/hozoc/**` | `internal/tools/selfgen`（`make generate`。下の「自己生成の手順」） |
+| `cli.hozo` | `internal/gen/hozo/compiler/**` | `internal/tools/selfgen`（`make generate`。下の「自己生成の手順」） |
 | `plugins/` の下の `testdata/<名前>/` の `hozo.toml` と `.hozo` | `testdata/<名前>/views.json`（プラグインの単体テストの入力の `View`） | `tests/pluginviews_test.go` の `TestPluginViewFixtures`（`go test ./tests -run TestPluginViewFixtures -update`。遅れていれば、このテストが落ちる。`docs/testing.md`「単体テスト」） |
 
 生成物はコミットする。CI で生成し直して差分がないことを確かめる（`docs/testing.md`「生成物の一致」）。
@@ -763,11 +763,11 @@ Go のプラグインは、どれも同じ形: `main` パッケージが `plugin
 
 ### 自己生成の手順
 
-`internal/gen/hozoc`（以下、「置き場」）は `cmd/hozoc` が import するパッケージなので、hozoc がそこへ直に書くと、プラグインの不具合でコンパイルできない Go が出たときに hozoc 自身がビルドできなくなり、生成し直すこともできなくなる。そうならないように、`make generate`（`go run ./internal/tools/selfgen`）は、置き場に、コンパイルできると確かめたものしか置かない。
+`internal/gen/hozo/compiler`（以下、「置き場」）は `cmd/hozoc` が import するパッケージなので、hozoc がそこへ直に書くと、プラグインの不具合でコンパイルできない Go が出たときに hozoc 自身がビルドできなくなり、生成し直すこともできなくなる。そうならないように、`make generate`（`go run ./internal/tools/selfgen`）は、置き場に、コンパイルできると確かめたものしか置かない。
 
 1. 今のソース（今の置き場を含む）で `hozoc` を一時ディレクトリにビルドする。使うプラグイン（`plugins/` の `go`、`go-valid`、`go-cli`）を、WASM にビルドして、それぞれのディレクトリの `plugin.wasm` に置く（`docs/testing.md`「プラグインの WASM」）。
 2. 別の一時ディレクトリに `cli.hozo`、`hozo.toml`、`go.mod`、`go.sum` を写し、プラグインの置き場 `plugins` と、3 の vet が要る `ir`、`plugin`、`runtime` をシンボリックリンクで足して、そこで 1 の `hozoc build` を走らせる（`tests/generated_test.go` と同じ組み立て。import パスは、`hozo.toml` の `[options.go]` の `module` から決まるので、同じになる。`go.mod` は、3 の vet とビルドのために写す）。プラグインの探索が見るプロジェクトの外の場所（`HOZO_PLUGIN_PATH`、ホーム）は空にして、生成物が実行する人の環境に左右されないようにする。WASM を、機械の言葉に直したものの置き場（`HOZO_CACHE_DIR`）は、ホームを空にする前の、もとの場所を渡す（生成のたびに、直し直さないように。答えは、変わらない）。
-3. 生成した `internal/gen/hozoc/**` を、その一時ディレクトリで `go vet` に通し、次に、リポジトリの今のものの代わりに置いたつもりで（`go build -overlay`。ディスクの上の置き場には触れない）、それを import するパッケージ（`cmd/hozoc`、`internal/app`）ごと `go build` する。
+3. 生成した `internal/gen/hozo/compiler/**` を、その一時ディレクトリで `go vet` に通し、次に、リポジトリの今のものの代わりに置いたつもりで（`go build -overlay`。ディスクの上の置き場には触れない）、それを import するパッケージ（`cmd/hozoc`、`internal/app`）ごと `go build` する。
 4. 3 が通ったときだけ、置き場の中身を生成したものに置き換える（なくなったファイルは消し、同じ内容のファイルには触れない）。通らなければ何も変えず、生成したものを残した一時ディレクトリの場所を示して失敗する。
 
 - 生成は不動点: 生成し直した直後にもう一度 `make generate` しても、何も変わらない。置き換えた後の `hozoc build` も同じ内容を書く。

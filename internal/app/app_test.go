@@ -14,8 +14,8 @@ import (
 	"testing"
 
 	"github.com/mew-ton/hozo/internal/fakeplugin"
-	"github.com/mew-ton/hozo/internal/gen/hozoc"
-	"github.com/mew-ton/hozo/internal/gen/hozoc/inner"
+	"github.com/mew-ton/hozo/internal/gen/hozo/compiler"
+	"github.com/mew-ton/hozo/internal/gen/hozo/compiler/inner"
 )
 
 var update = flag.Bool("update", false, "ゴールデンを更新する")
@@ -26,7 +26,7 @@ const (
 	exitConfigInvalid   = 2  // ConfigInvalid / LanguageMismatch
 	exitOutputConflict  = 3  // OutputConflict
 	exitUsage           = 64 // UnknownNamespace、使い方の誤り
-	exitSoftwareOrCrash = 70 // hozoc.Crashed / hozoc.MalformedOutput、宣言にない例外
+	exitSoftwareOrCrash = 70 // compiler.Crashed / compiler.MalformedOutput、宣言にない例外
 )
 
 const corpusDir = "../../tests/corpus/design"
@@ -196,7 +196,7 @@ func TestCheckFailed(t *testing.T) {
 	if err := json.Unmarshal([]byte(stderr), &f); err != nil {
 		t.Fatalf("json: %v\n%s", err, stderr)
 	}
-	if f.Error != "hozoc.CheckFailed" || f.Value.Errors != 1 || f.Value.Warnings != 1 {
+	if f.Error != "hozo.compiler.CheckFailed" || f.Value.Errors != 1 || f.Value.Warnings != 1 {
 		t.Fatalf("%+v", f)
 	}
 	// Diagnostic.Data（docs/check.md「Data」の RES-1 の candidates）は境界（cli.hozo の Diagnostic.data）を越えて json に出る
@@ -237,7 +237,7 @@ func TestCheckWithoutConfig(t *testing.T) {
 		t.Fatalf("emit: code=%d stdout=%q stderr=%q", code, stdout, stderr)
 	}
 	code, _, stderr = run(t, dir, nil, "build", "--dry-run", "--format=json")
-	if code != exitConfigInvalid || !strings.Contains(stderr, `"error": "hozoc.ConfigInvalid"`) || !strings.Contains(stderr, `"code": "CFG-7"`) {
+	if code != exitConfigInvalid || !strings.Contains(stderr, `"error": "hozo.compiler.ConfigInvalid"`) || !strings.Contains(stderr, `"code": "CFG-7"`) {
 		t.Fatalf("emit json: code=%d stderr=%q", code, stderr)
 	}
 	if files := listFiles(t, dir); len(files) != 2 {
@@ -268,7 +268,7 @@ func TestCheckWithoutConfig(t *testing.T) {
 	// 設定なしの App.Check は例外なしで結果（warning）を返す
 	l := &App{Dir: dir}
 	ctx := context.Background()
-	res, err := l.Check(ctx, hozoc.CheckInput{})
+	res, err := l.Check(ctx, compiler.CheckInput{})
 	if err != nil || len(res.Warnings) != 1 || res.Warnings[0].Code != "NAME-1" {
 		t.Fatalf("Check = %+v, %v", res, err)
 	}
@@ -276,7 +276,7 @@ func TestCheckWithoutConfig(t *testing.T) {
 	// （葉の op）が投げる。述語 UpToDate と OutOfDate も、生成し直せないので同じ例外
 	cfg7 := func(what string, err error) {
 		t.Helper()
-		var ci hozoc.ConfigInvalid
+		var ci compiler.ConfigInvalid
 		if !errors.As(err, &ci) {
 			t.Fatalf("%s err = %v, want ConfigInvalid", what, err)
 		}
@@ -284,9 +284,9 @@ func TestCheckWithoutConfig(t *testing.T) {
 			t.Fatalf("%s の診断 = %+v, want CFG-7 と、check の warning", what, diags)
 		}
 	}
-	_, err = innerOps(l).WriteOutputs(ctx, hozoc.BuildInput{}, res)
+	_, err = innerOps(l).WriteOutputs(ctx, compiler.BuildInput{}, res)
 	cfg7("WriteOutputs", err)
-	_, err = l.CollectOutputs(ctx, hozoc.BuildInput{}, res)
+	_, err = l.CollectOutputs(ctx, compiler.BuildInput{}, res)
 	cfg7("CollectOutputs", err)
 	_, err = l.OutputsSync().UpToDate(ctx)
 	cfg7("UpToDate", err)
@@ -329,12 +329,12 @@ func TestCheckLanguageMismatch(t *testing.T) {
 	if code != exitConfigInvalid || !strings.Contains(stderr, "hozo.toml: error[CFG-16]") {
 		t.Fatalf("code=%d stderr=%q", code, stderr)
 	}
-	if code, _, stderr = run(t, dir, nil, "build", "--no-emit", "--format=json"); code != exitConfigInvalid || !strings.Contains(stderr, `"error": "hozoc.LanguageMismatch"`) {
+	if code, _, stderr = run(t, dir, nil, "build", "--no-emit", "--format=json"); code != exitConfigInvalid || !strings.Contains(stderr, `"error": "hozo.compiler.LanguageMismatch"`) {
 		t.Fatalf("json: code=%d stderr=%q", code, stderr)
 	}
 	l := &App{Dir: dir}
-	_, err := l.Check(context.Background(), hozoc.CheckInput{})
-	var lm hozoc.LanguageMismatch
+	_, err := l.Check(context.Background(), compiler.CheckInput{})
+	var lm compiler.LanguageMismatch
 	if !errors.As(err, &lm) {
 		t.Fatalf("err = %v", err)
 	}
@@ -343,8 +343,8 @@ func TestCheckLanguageMismatch(t *testing.T) {
 	}
 	// 知らないトランスパイラ（CFG-14）も一緒なら、設定の誤り（ConfigInvalid）
 	write(t, filepath.Join(dir, "hozo.toml"), corpusConfig(`"base", "tsp", "nope"`))
-	_, err = l.Check(context.Background(), hozoc.CheckInput{})
-	var ci hozoc.ConfigInvalid
+	_, err = l.Check(context.Background(), compiler.CheckInput{})
+	var ci compiler.ConfigInvalid
 	if !errors.As(err, &ci) {
 		t.Fatalf("err = %v, want ConfigInvalid", err)
 	}
@@ -466,7 +466,7 @@ func TestEmit(t *testing.T) {
 	}
 }
 
-// TestEmitStaleAndConflict はトランスパイラの出力の書き出し、単位から外したあとの古いファイルの削除、CFG-5、PLG-*、errors、hozoc.Crashed。
+// TestEmitStaleAndConflict はトランスパイラの出力の書き出し、単位から外したあとの古いファイルの削除、CFG-5、PLG-*、errors、compiler.Crashed。
 func TestEmitStaleAndConflict(t *testing.T) {
 	dir := copyCorpus(t)
 	// fake は server の単位の二つ目のトランスパイラ（基底 base に相乗りする）
@@ -507,7 +507,7 @@ func TestEmitStaleAndConflict(t *testing.T) {
 		}
 	}
 
-	// PLG-1 → hozoc.MalformedOutput → 70。files の path は、その起動の Dir(U, N)（ここでは gen/server）の下でなければ
+	// PLG-1 → compiler.MalformedOutput → 70。files の path は、その起動の Dir(U, N)（ここでは gen/server）の下でなければ
 	// ならない（docs/plugin-protocol.md「emit」）: ルートの外、絶対パス、ルートの中の別のディレクトリ、別の出力の
 	// Dir、Dir そのもの。何も書かない。
 	outside := filepath.Join(filepath.Dir(dir), "x.go")
@@ -527,7 +527,7 @@ func TestEmitStaleAndConflict(t *testing.T) {
 			t.Fatalf("path %q: ルートの外に書いた", path)
 		}
 	}
-	if code, _, stderr = run(t, dir, nil, "build", "--format=json"); code != exitSoftwareOrCrash || !strings.Contains(stderr, `"error": "hozoc.MalformedOutput"`) {
+	if code, _, stderr = run(t, dir, nil, "build", "--format=json"); code != exitSoftwareOrCrash || !strings.Contains(stderr, `"error": "hozo.compiler.MalformedOutput"`) {
 		t.Fatalf("json: code=%d stderr=%q", code, stderr)
 	}
 	// Dir(U, N) の下なら、深い場所でもよい
@@ -535,12 +535,12 @@ func TestEmitStaleAndConflict(t *testing.T) {
 	if code, stdout, stderr = run(t, dir, nil, "build"); code != 0 || !strings.Contains(stdout, "written: gen/server/deep/a.txt\n") {
 		t.Fatalf("code=%d stdout=%q stderr=%q", code, stdout, stderr)
 	}
-	// PLG-2: 同じ応答の中で同じ path が二度 → hozoc.MalformedOutput → 70
+	// PLG-2: 同じ応答の中で同じ path が二度 → compiler.MalformedOutput → 70
 	fakeRider(t, dir, "fake", "go", `"base"`, `{"files":[{"path":"gen/server/a.txt","content":"1"},{"path":"gen/server/./a.txt","content":"2"}],"warnings":[]}`, 0)
 	if code, _, stderr = run(t, dir, nil, "build"); code != exitSoftwareOrCrash || !strings.Contains(stderr, "PLG-2") {
 		t.Fatalf("code=%d stderr=%q", code, stderr)
 	}
-	// 応答の形が違う（必須の files / warnings がない、型が違う）→ 終了コード 0 でも hozoc.MalformedOutput → 70
+	// 応答の形が違う（必須の files / warnings がない、型が違う）→ 終了コード 0 でも compiler.MalformedOutput → 70
 	// （docs/plugin-protocol.md「応答の形」）。知らない項目（版 0.3 までの select を含む）があるだけなら通る
 	for _, resp := range []string{`{"unknown":1}`, `{"files":[]}`, `{"files":[],"warnings":"none"}`, `{"files":[{"path":"gen/server/a.txt"}],"warnings":[]}`} {
 		fakeRider(t, dir, "fake", "go", `"base"`, resp, 0)
@@ -578,7 +578,7 @@ func TestEmitErrors(t *testing.T) {
 	if n := len(requests(t, dir, "base")); n != 4 {
 		t.Errorf("基底 base が %d 回起動された（want 4: 出力ごとに一回）", n)
 	}
-	if code, _, stderr = run(t, dir, nil, "build", "--format=json"); code != exitCheckFailed || !strings.Contains(stderr, `"error": "hozoc.CheckFailed"`) || !strings.Contains(stderr, `"code": "FAKE-2"`) {
+	if code, _, stderr = run(t, dir, nil, "build", "--format=json"); code != exitCheckFailed || !strings.Contains(stderr, `"error": "hozo.compiler.CheckFailed"`) || !strings.Contains(stderr, `"code": "FAKE-2"`) {
 		t.Fatalf("json: code=%d stderr=%q", code, stderr)
 	}
 	// dry-run でも同じ（書く予定を返さない）
@@ -798,7 +798,7 @@ func TestEmitNothing(t *testing.T) {
 }
 
 // TestUpToDate は cli.hozo の分類 OutputsSync の述語 UpToDate と OutOfDate（docs/cli.md「cli.hozo」「手で書くもの」）: 生成し直した
-// 内容とディスクの内容を比べる。生成したコードの判定関数 hozoc.ClassifyOutputsSync が、状態の分類の単位（App.OutputsSync）の
+// 内容とディスクの内容を比べる。生成したコードの判定関数 compiler.ClassifyOutputsSync が、状態の分類の単位（App.OutputsSync）の
 // 二つの述語を呼び、真がちょうど一つのケースを返す（OutOfDate は UpToDate の否定なので、いつも、どちらか一つ）。
 func TestUpToDate(t *testing.T) {
 	dir := copyCorpus(t)
@@ -813,10 +813,10 @@ func TestUpToDate(t *testing.T) {
 	ctx := context.Background()
 	a := &App{Stderr: &bytes.Buffer{}}
 	ops := a.Ops()
-	unit := a.OutputsSync() // 判定関数に渡す、状態の分類の単位（hozoc.New に渡したものと同じ App のもの）
-	sync := func() hozoc.OutputsSync {
+	unit := a.OutputsSync() // 判定関数に渡す、状態の分類の単位（compiler.New に渡したものと同じ App のもの）
+	sync := func() compiler.OutputsSync {
 		t.Helper()
-		got, err := hozoc.ClassifyOutputsSync(ctx, unit)
+		got, err := compiler.ClassifyOutputsSync(ctx, unit)
 		if err != nil {
 			t.Fatalf("ClassifyOutputsSync: %v", err)
 		}
@@ -836,7 +836,7 @@ func TestUpToDate(t *testing.T) {
 		return [2]bool{up, out}
 	}
 	// まだ書き出していない: 足りない
-	if got := sync(); got != hozoc.OutputsSyncOutOfDate {
+	if got := sync(); got != compiler.OutputsSyncOutOfDate {
 		t.Fatalf("emit の前: %v", got)
 	}
 	if got := predicates(); got != [2]bool{false, true} {
@@ -844,11 +844,11 @@ func TestUpToDate(t *testing.T) {
 	}
 	// 配線の emit（check → writeOutputs → collectOutputs、outputChanges、syncOutputs）。効果 syncOutputs は、状態の分類
 	// OutputsSync の単位の命令で、どの場合からも UpToDate に移す
-	res, err := ops.Build(ctx, hozoc.BuildInput{})
+	res, err := ops.Build(ctx, compiler.BuildInput{})
 	if err != nil || len(res.Written) == 0 {
 		t.Fatalf("Emit = %+v, %v", res, err)
 	}
-	if got := sync(); got != hozoc.OutputsSyncUpToDate {
+	if got := sync(); got != compiler.OutputsSyncUpToDate {
 		t.Fatalf("emit の後: %v", got)
 	}
 	if got := predicates(); got != [2]bool{true, false} {
@@ -861,18 +861,18 @@ func TestUpToDate(t *testing.T) {
 		t.Fatal(err)
 	}
 	write(t, types, string(orig)+"\n手で足した行\n")
-	if got := sync(); got != hozoc.OutputsSyncOutOfDate {
+	if got := sync(); got != compiler.OutputsSyncOutOfDate {
 		t.Errorf("書き換えた後: %v", got)
 	}
 	write(t, types, string(orig))
-	if got := sync(); got != hozoc.OutputsSyncUpToDate {
+	if got := sync(); got != compiler.OutputsSyncUpToDate {
 		t.Errorf("戻した後: %v", got)
 	}
 	// 足りない
 	if err := os.Remove(types); err != nil {
 		t.Fatal(err)
 	}
-	if got := sync(); got != hozoc.OutputsSyncOutOfDate {
+	if got := sync(); got != compiler.OutputsSyncOutOfDate {
 		t.Errorf("消した後: %v", got)
 	}
 	write(t, types, string(orig))
@@ -880,20 +880,20 @@ func TestUpToDate(t *testing.T) {
 	fakePlugin(t, dir, "base", "go", "", `{"files":[],"warnings":[]}`, 0)
 	b := &App{Stderr: &bytes.Buffer{}} // 設定を読み直すために新しい App（直前の Check の結果を持たない）
 	ops, unit = b.Ops(), b.OutputsSync()
-	if got := sync(); got != hozoc.OutputsSyncOutOfDate {
+	if got := sync(); got != compiler.OutputsSyncOutOfDate {
 		t.Errorf("基底がファイルを返さなくなった後: %v", got)
 	}
-	if _, err := ops.Build(ctx, hozoc.BuildInput{}); err != nil {
+	if _, err := ops.Build(ctx, compiler.BuildInput{}); err != nil {
 		t.Fatal(err)
 	}
-	if got := sync(); got != hozoc.OutputsSyncUpToDate {
+	if got := sync(); got != compiler.OutputsSyncUpToDate {
 		t.Errorf("もう一度 emit した後: %v", got)
 	}
 	// 仕様に誤りがあって生成し直せなければ、その例外
 	write(t, filepath.Join(dir, "bad.hozo"), "namespace server {\n  model Bad { x: Nope; }\n}\n")
 	c := &App{Stderr: &bytes.Buffer{}}
-	var cf hozoc.CheckFailed
-	if _, err := hozoc.ClassifyOutputsSync(ctx, c.OutputsSync()); !errors.As(err, &cf) {
+	var cf compiler.CheckFailed
+	if _, err := compiler.ClassifyOutputsSync(ctx, c.OutputsSync()); !errors.As(err, &cf) {
 		t.Errorf("誤りのある仕様: err = %v, want CheckFailed", err)
 	}
 }
@@ -910,13 +910,13 @@ func TestWriteOutputsSteps(t *testing.T) {
 	ctx := context.Background()
 	a := &App{Dir: dir, Stderr: &bytes.Buffer{}}
 	ops := innerOps(a)
-	if _, err := ops.Build(ctx, hozoc.BuildInput{}); err != nil {
+	if _, err := ops.Build(ctx, compiler.BuildInput{}); err != nil {
 		t.Fatal(err)
 	}
 	// fake を単位から外す: gen/server/extra.txt は、前回書いて、今回は書かないファイル。基底は、内容を変える
 	write(t, filepath.Join(dir, "hozo.toml"), corpusConfig(`"base"`))
 	fakePlugin(t, dir, "base", "go", "", `{"files":[{"path":"@DIR@/out.txt","content":"new @NS@"}],"warnings":[{"message":"again"}]}`, 0)
-	checked, err := ops.Check(ctx, hozoc.CheckInput{})
+	checked, err := ops.Check(ctx, compiler.CheckInput{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -927,16 +927,16 @@ func TestWriteOutputsSteps(t *testing.T) {
 			t.Fatalf("%s が、生成したファイルに触れた", what)
 		}
 	}
-	paths := []hozoc.Path{"gen/client/out.txt", "gen/http/out.txt", "gen/page/out.txt", "gen/server/out.txt"}
+	paths := []compiler.Path{"gen/client/out.txt", "gen/http/out.txt", "gen/page/out.txt", "gen/server/out.txt"}
 
 	// collectOutputs: トランスパイラのファイル（パスの辞書順）と、check の warning（トランスパイラの warning を含む: check が、
 	// プラグインに頼んで、もう受け取っている。四つの出力の基底が返す、同じ warning は、一度だけ。docs/plugin-protocol.md「emit」）
-	plan, err := ops.CollectOutputs(ctx, hozoc.BuildInput{}, checked)
+	plan, err := ops.CollectOutputs(ctx, compiler.BuildInput{}, checked)
 	if err != nil {
 		t.Fatal(err)
 	}
 	unchanged("CollectOutputs")
-	var planned []hozoc.Path
+	var planned []compiler.Path
 	for _, f := range plan.Files {
 		planned = append(planned, f.Path)
 	}
@@ -959,14 +959,14 @@ func TestWriteOutputsSteps(t *testing.T) {
 		t.Fatal(err)
 	}
 	unchanged("OutputChanges")
-	if !reflect.DeepEqual(changes.Written, paths) || !reflect.DeepEqual(changes.Removed, []hozoc.Path{"gen/server/extra.txt"}) ||
+	if !reflect.DeepEqual(changes.Written, paths) || !reflect.DeepEqual(changes.Removed, []compiler.Path{"gen/server/extra.txt"}) ||
 		!reflect.DeepEqual(changes.Warnings, plan.Warnings) {
 		t.Fatalf("OutputChanges = %+v", changes)
 	}
 
 	// dryRun の予定: 書くファイルだけを返し（消すファイルは決めない）、syncOutputs は何もしない
 	yes := true
-	dry, err := ops.CollectOutputs(ctx, hozoc.BuildInput{DryRun: &yes}, checked)
+	dry, err := ops.CollectOutputs(ctx, compiler.BuildInput{DryRun: &yes}, checked)
 	if err != nil || dry.DryRun == nil || !*dry.DryRun {
 		t.Fatalf("dryRun の plan = %+v, %v", dry, err)
 	}
@@ -993,16 +993,16 @@ func TestWriteOutputsSteps(t *testing.T) {
 	// 配線 writeOutputs も、その error を、そのまま返し、何も書かない
 	cancelled, cancel := context.WithCancel(ctx)
 	cancel()
-	if _, err := ops.CollectOutputs(cancelled, hozoc.BuildInput{}, checked); !errors.Is(err, context.Canceled) {
+	if _, err := ops.CollectOutputs(cancelled, compiler.BuildInput{}, checked); !errors.Is(err, context.Canceled) {
 		t.Errorf("中断された ctx の CollectOutputs: err = %v, want context.Canceled", err)
 	}
-	if _, err := ops.WriteOutputs(cancelled, hozoc.BuildInput{}, checked); !errors.Is(err, context.Canceled) {
+	if _, err := ops.WriteOutputs(cancelled, compiler.BuildInput{}, checked); !errors.Is(err, context.Canceled) {
 		t.Errorf("中断された ctx の WriteOutputs: err = %v, want context.Canceled", err)
 	}
 	unchanged("中断された ctx の WriteOutputs")
 
 	// syncOutputs: 余分なファイルを消し、古いファイルを書き換え、記録を書く。その後は UpToDate で、消すファイルはない
-	if plan, err = ops.CollectOutputs(ctx, hozoc.BuildInput{}, checked); err != nil {
+	if plan, err = ops.CollectOutputs(ctx, compiler.BuildInput{}, checked); err != nil {
 		t.Fatal(err)
 	}
 	if err := a.OutputsSync().SyncOutputs(ctx, plan); err != nil {
@@ -1012,7 +1012,7 @@ func TestWriteOutputsSteps(t *testing.T) {
 	if _, left := after["server/extra.txt"]; left || after["server/out.txt"] != "new server" || after["server/.hozoc-outputs.json"] != "[\n  \"gen/server/out.txt\"\n]\n" {
 		t.Fatalf("SyncOutputs の後の gen = %v", after)
 	}
-	if got, err := hozoc.ClassifyOutputsSync(ctx, a.OutputsSync()); err != nil || got != hozoc.OutputsSyncUpToDate {
+	if got, err := compiler.ClassifyOutputsSync(ctx, a.OutputsSync()); err != nil || got != compiler.OutputsSyncUpToDate {
 		t.Errorf("SyncOutputs の後の OutputsSync = %v, %v", got, err)
 	}
 	if changes, err = a.Outputs().OutputChanges(ctx, plan); err != nil || len(changes.Removed) != 0 || !reflect.DeepEqual(changes.Written, paths) {
@@ -1143,7 +1143,7 @@ func TestEmitUnknownNamespace(t *testing.T) {
 		t.Fatal("書き出している")
 	}
 	code, _, stderr = run(t, dir, nil, "build", "--format=json", "nope")
-	if code != exitUsage || strings.TrimSpace(stderr) != "{\n  \"error\": \"hozoc.UnknownNamespace\"\n}" {
+	if code != exitUsage || strings.TrimSpace(stderr) != "{\n  \"error\": \"hozo.compiler.UnknownNamespace\"\n}" {
 		t.Fatalf("code=%d stderr=%q", code, stderr)
 	}
 }
@@ -1615,10 +1615,10 @@ func TestEmitIn(t *testing.T) {
 	}
 }
 
-// TestRunEmit は cli.hozo の op runEmit（hozoc.Leaves のメソッド。docs/cli.md「手で書くもの」）: plugin を起動し、req を JSON に
-// して送り、応答を hozoc.EmitResponse に読んで返す。内部の op なので、内側のパッケージの Ops から呼ぶ。動かすのは、
-// plugin.wasm の WASM。hozoc.Spec と hozoc.OutputView は中身のない model なので、要求の spec と、
-// 出力の view は空のオブジェクト。異常終了は hozoc.Crashed、形の違う応答は hozoc.MalformedOutput（どちらも、生成した hozoc の型）。
+// TestRunEmit は cli.hozo の op runEmit（compiler.Leaves のメソッド。docs/cli.md「手で書くもの」）: plugin を起動し、req を JSON に
+// して送り、応答を compiler.EmitResponse に読んで返す。内部の op なので、内側のパッケージの Ops から呼ぶ。動かすのは、
+// plugin.wasm の WASM。compiler.Spec と compiler.OutputView は中身のない model なので、要求の spec と、
+// 出力の view は空のオブジェクト。異常終了は compiler.Crashed、形の違う応答は compiler.MalformedOutput（どちらも、生成した hozoc の型）。
 func TestRunEmit(t *testing.T) {
 	root := t.TempDir()
 	dir := filepath.Join(root, "plugins", "echo")
@@ -1626,9 +1626,9 @@ func TestRunEmit(t *testing.T) {
 	fakeplugin.Install(t, dir)
 	write(t, filepath.Join(dir, "response.json"), `{"files":[{"path":"gen/a/@T@.go","content":"package a\n"}],"warnings":[{"at":"a.f","message":"w"}],"errors":[{"code":"X-1","at":"a.g","message":"e"}]}`)
 	write(t, filepath.Join(dir, "exit"), "0")
-	plugin := hozoc.Plugin{Name: "echo", Wasm: hozoc.Path(filepath.Join(dir, fakeplugin.WasmFile))}
+	plugin := compiler.Plugin{Name: "echo", Wasm: compiler.Path(filepath.Join(dir, fakeplugin.WasmFile))}
 	// 出力が二つ: 一つ目は、トランスパイラを二つ、二つ目は、一つ
-	req := hozoc.EmitRequest{Protocol: "0.24", Direction: "emit", Outputs: []hozoc.EmitOutput{
+	req := compiler.EmitRequest{Protocol: "0.24", Direction: "emit", Outputs: []compiler.EmitOutput{
 		{Transpilers: []string{"echo", "echo2"}}, {Transpilers: []string{"echo"}}}}
 	ctx := context.Background()
 	a := &App{Stderr: &bytes.Buffer{}}
@@ -1638,16 +1638,16 @@ func TestRunEmit(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	result := func(name string) hozoc.TranspilerResult {
-		return hozoc.TranspilerResult{
-			Files:    []hozoc.OutputFile{{Path: hozoc.Path("gen/a/" + name + ".go"), Content: "package a\n"}},
-			Warnings: []hozoc.PluginWarning{{At: "a.f", Message: "w"}},
-			Errors:   []hozoc.PluginError{{Code: "X-1", At: "a.g", Message: "e"}},
+	result := func(name string) compiler.TranspilerResult {
+		return compiler.TranspilerResult{
+			Files:    []compiler.OutputFile{{Path: compiler.Path("gen/a/" + name + ".go"), Content: "package a\n"}},
+			Warnings: []compiler.PluginWarning{{At: "a.f", Message: "w"}},
+			Errors:   []compiler.PluginError{{Code: "X-1", At: "a.g", Message: "e"}},
 		}
 	}
-	want := hozoc.EmitResponse{Outputs: []hozoc.OutputResult{
-		{Results: []hozoc.TranspilerResult{result("echo"), result("echo2")}},
-		{Results: []hozoc.TranspilerResult{result("echo")}},
+	want := compiler.EmitResponse{Outputs: []compiler.OutputResult{
+		{Results: []compiler.TranspilerResult{result("echo"), result("echo2")}},
+		{Results: []compiler.TranspilerResult{result("echo")}},
 	}}
 	if !reflect.DeepEqual(resp, want) {
 		t.Errorf("応答 = %+v, want %+v", resp, want)
@@ -1660,27 +1660,27 @@ func TestRunEmit(t *testing.T) {
 		t.Errorf("送った要求 = %s", got)
 	}
 
-	// 異常終了は hozoc.Crashed
+	// 異常終了は compiler.Crashed
 	write(t, filepath.Join(dir, "exit"), "3")
-	var crashed hozoc.Crashed
+	var crashed compiler.Crashed
 	if _, err = ops.RunEmit(ctx, plugin, req); !errors.As(err, &crashed) {
-		t.Errorf("異常終了: err = %v, want hozoc.Crashed", err)
+		t.Errorf("異常終了: err = %v, want compiler.Crashed", err)
 	}
-	// ない WASM も、空の wasm も hozoc.Crashed
-	for _, wasm := range []hozoc.Path{hozoc.Path(filepath.Join(root, "no-such.wasm")), ""} {
+	// ない WASM も、空の wasm も compiler.Crashed
+	for _, wasm := range []compiler.Path{compiler.Path(filepath.Join(root, "no-such.wasm")), ""} {
 		broken := plugin
 		broken.Wasm = wasm
 		if _, err = ops.RunEmit(ctx, broken, req); !errors.As(err, &crashed) {
-			t.Errorf("wasm %q: err = %v, want hozoc.Crashed", wasm, err)
+			t.Errorf("wasm %q: err = %v, want compiler.Crashed", wasm, err)
 		}
 	}
-	// 形の違う応答（必須の files がない）と、JSON でない応答は hozoc.MalformedOutput
+	// 形の違う応答（必須の files がない）と、JSON でない応答は compiler.MalformedOutput
 	write(t, filepath.Join(dir, "exit"), "0")
-	var malformed hozoc.MalformedOutput
+	var malformed compiler.MalformedOutput
 	for _, body := range []string{`{"warnings":[]}`, `not json`} {
 		write(t, filepath.Join(dir, "response.json"), body)
 		if _, err = ops.RunEmit(ctx, plugin, req); !errors.As(err, &malformed) {
-			t.Errorf("応答 %s: err = %v, want hozoc.MalformedOutput", body, err)
+			t.Errorf("応答 %s: err = %v, want compiler.MalformedOutput", body, err)
 		}
 	}
 	// 中断された ctx では、起動しない
@@ -1743,7 +1743,7 @@ func TestStateUnits(t *testing.T) {
 	if empty, err := a.Outputs().IsEmpty(ctx); err != nil || !empty {
 		t.Errorf("emit の前の outputs.IsEmpty = %v, %v", empty, err)
 	}
-	res, err := a.Ops().Build(ctx, hozoc.BuildInput{})
+	res, err := a.Ops().Build(ctx, compiler.BuildInput{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1917,7 +1917,7 @@ func TestBuildNoEmit(t *testing.T) {
 		t.Errorf("build: code=%d stdout=%q", code, stdout)
 	}
 
-	// 集めて確かめるところは、--no-emit でも、行う: 出力先の外の path は PLG-1（hozoc.MalformedOutput。70）
+	// 集めて確かめるところは、--no-emit でも、行う: 出力先の外の path は PLG-1（compiler.MalformedOutput。70）
 	write(t, filepath.Join(dir, "plugins", "rider", "response.json"), `{"files":[{"path":"elsewhere/x.txt","content":"x"}],"warnings":[]}`)
 	if code, _, stderr := run(t, dir, nil, "build", "--no-emit"); code != exitSoftwareOrCrash || !strings.Contains(stderr, "PLG-1") {
 		t.Errorf("PLG-1: code=%d stderr=%q", code, stderr)

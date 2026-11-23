@@ -1,5 +1,5 @@
 /** hozo の仕様を検査し、各言語のコードに展開する CLI */
-namespace hozoc {
+namespace hozo.compiler {
   /** ファイルのパス。相対パスの基準は使う場所が決める（docs/config.md「置き場と探し方」など） */
   scalar Path extends string;
 

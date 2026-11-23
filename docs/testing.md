@@ -52,7 +52,7 @@ hozoc 自身（リポジトリ直下の `cli.hozo` と `hozo.toml`）はコー�
 
 ## 生成物の一致
 
-CI で `go generate ./...` と `make generate`（`cli.hozo` からの自己生成。`docs/packages.md`「自己生成の手順」）を実行し、`git diff --exit-code` で差分がないことを確かめる。対象は `docs/packages.md`「生成するもの」の表。`hozoc build` の分は `tests/generated_test.go` も確かめる: 一時ディレクトリに `cli.hozo` と `hozo.toml` を写して emit し、コミット済みの `internal/gen/hozoc/**` とバイト単位で比べる（`go test ./...` だけで遅れが分かる）。`tests/selfcheck_test.go` は、リポジトリ直下での `emit --dry-run` が、コミット済みの生成物とちょうど同じファイルを書く予定にすることを確かめる。
+CI で `go generate ./...` と `make generate`（`cli.hozo` からの自己生成。`docs/packages.md`「自己生成の手順」）を実行し、`git diff --exit-code` で差分がないことを確かめる。対象は `docs/packages.md`「生成するもの」の表。`hozoc build` の分は `tests/generated_test.go` も確かめる: 一時ディレクトリに `cli.hozo` と `hozo.toml` を写して emit し、コミット済みの `internal/gen/hozo/compiler/**` とバイト単位で比べる（`go test ./...` だけで遅れが分かる）。`tests/selfcheck_test.go` は、リポジトリ直下での `emit --dry-run` が、コミット済みの生成物とちょうど同じファイルを書く予定にすることを確かめる。
 
 手で写すもの（生成しないもの）の一致もテストで確かめる: `docs/cli.md` のブロックがリポジトリ直下のファイルと同じであること（「コーパス」の `TestDocsEmbedRootFiles`）。
 

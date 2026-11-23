@@ -11,7 +11,7 @@ import (
 
 var validPatternOutputFormat = regexp.MustCompile("^(text|json)$")
 
-// Validate は hozoc.OutputFormat の制約を確かめる。違反がなければ nil。
+// Validate は hozo.compiler.OutputFormat の制約を確かめる。違反がなければ nil。
 func (v OutputFormat) Validate() error {
 	var violations []runtime.Violation
 	if !validPatternOutputFormat.MatchString(string(v)) {
@@ -23,7 +23,7 @@ func (v OutputFormat) Validate() error {
 	return &runtime.ValidationError{Violations: violations}
 }
 
-// Validate は hozoc.CheckInput の各フィールドの制約を確かめる。違反の Path はフィールド名を . でつないだもの。
+// Validate は hozo.compiler.CheckInput の各フィールドの制約を確かめる。違反の Path はフィールド名を . でつないだもの。
 func (m CheckInput) Validate() error {
 	var violations []runtime.Violation
 	if m.Format != nil {
@@ -35,7 +35,7 @@ func (m CheckInput) Validate() error {
 	return &runtime.ValidationError{Violations: violations}
 }
 
-// Validate は hozoc.BuildInput の各フィールドの制約を確かめる。違反の Path はフィールド名を . でつないだもの。
+// Validate は hozo.compiler.BuildInput の各フィールドの制約を確かめる。違反の Path はフィールド名を . でつないだもの。
 func (m BuildInput) Validate() error {
 	var violations []runtime.Violation
 	if m.Format != nil {
@@ -47,7 +47,7 @@ func (m BuildInput) Validate() error {
 	return &runtime.ValidationError{Violations: violations}
 }
 
-// Validate は hozoc.TestsInput の各フィールドの制約を確かめる。違反の Path はフィールド名を . でつないだもの。
+// Validate は hozo.compiler.TestsInput の各フィールドの制約を確かめる。違反の Path はフィールド名を . でつないだもの。
 func (m TestsInput) Validate() error {
 	var violations []runtime.Violation
 	if m.Format != nil {

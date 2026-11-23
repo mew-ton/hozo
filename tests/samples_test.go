@@ -864,8 +864,8 @@ func (s *sampleProject) testTests(t *testing.T) {
 				} `json:"diagnostics"`
 			} `json:"value"`
 		}
-		if err := json.Unmarshal(stderr.Bytes(), &failure); err != nil || failure.Error != "hozoc.TestsNotRun" {
-			t.Fatalf("hozoc tests の例外が hozoc.TestsNotRun でない: %v\n%s", err, stderr.String())
+		if err := json.Unmarshal(stderr.Bytes(), &failure); err != nil || failure.Error != "hozo.compiler.TestsNotRun" {
+			t.Fatalf("hozoc tests の例外が hozo.compiler.TestsNotRun でない: %v\n%s", err, stderr.String())
 		}
 		var named []string
 		for _, d := range failure.Value.Diagnostics {
