@@ -35,7 +35,7 @@ internal/project/      一度の解析のすべて
 internal/app/          hozoc の葉の op と状態の単位の実装と表示
 internal/lsp/          言語サーバー（jsonrpc/ は JSON-RPC、protocol/ は LSP の型のうち使うもの）
 internal/gen/hozo/compiler/    cli.hozo からの生成物（名前空間 hozo.compiler: ユースケース）: 入口のパッケージ（go）。inner/ は内側のパッケージ（go）、types/ は型のパッケージ（go）、compilertest/ はテストのパッケージ（go）
-internal/gen/hozo/cli/         cli.hozo からの生成物（名前空間 hozo.cli: コマンドの行）: 名前空間のパッケージ（go）。types/ は型のパッケージ（go と go-valid）、clitest/ はテストのパッケージ（go）、cli/ は go-cli の出力
+internal/gen/hozo/cli/         cli.hozo からの生成物（名前空間 hozo.cli: コマンドの行）: 入口のパッケージ（go）。inner/ は内側のパッケージ（go）、types/ は型のパッケージ（go と go-valid）、clitest/ はテストのパッケージ（go）、cli/ は go-cli の出力
 internal/tools/        生成の道具: irschema/ と tmgrammar/（go generate）、selfgen/（make generate）
 plugins/<name>/        プラグイン。一つのディレクトリが、一つの WASM（main パッケージをビルドした plugin.wasm。リポジトリには入れない）と hozo-plugin.toml（提供するトランスパイラの一覧を持つ）
 plugins/go/            Go の基底のプラグイン（main。中身は internal/gobase/）
@@ -87,7 +87,8 @@ Go のパッケージごとの、このモジュールの中で import してい
 | `internal/gen/hozo/compiler/inner` | `internal/gen/hozo/compiler/types`、`runtime` |
 | `internal/gen/hozo/compiler/types` | `runtime` |
 | `internal/gen/hozo/compiler/compilertest` | `internal/gen/hozo/compiler`、`runtime` |
-| `internal/gen/hozo/cli` | `internal/gen/hozo/cli/types`、`internal/gen/hozo/compiler/types`、`runtime` |
+| `internal/gen/hozo/cli` | `internal/gen/hozo/cli/inner`、`internal/gen/hozo/compiler/types` |
+| `internal/gen/hozo/cli/inner` | `internal/gen/hozo/cli/types`、`internal/gen/hozo/compiler/types` |
 | `internal/gen/hozo/cli/types` | `internal/gen/hozo/compiler/types`、`runtime` |
 | `internal/gen/hozo/cli/clitest` | `internal/gen/hozo/cli`、`internal/gen/hozo/compiler`、`internal/gen/hozo/compiler/compilertest` |
 | `internal/gen/hozo/cli/cli` | `internal/gen/hozo/cli`、`internal/gen/hozo/compiler/types`、`runtime` |
@@ -730,7 +731,7 @@ func Match(tests []Test, covered []sdk.CoveredFile) []Status          // tests �
 
 ### `internal/app`
 
-`docs/cli.md`「手で書くもの」。葉の op と状態の単位の実装を持つ `App`（`*App` が生成した `compiler.Leaves` を満たし、`Sources()` / `Config()` / `Outputs()` / `OutputsSync()` が状態の単位の実装を返し、`Usecases()` がそれらを `compiler.New` に渡し、`Ops()` が、その結果と、分類 `hozo.cli.Request` の述語を、コマンドの行の `New` に渡す。状態に触れる `read outputChanges` と効果 `syncOutputs` は、`Outputs()` と `OutputsSync()` が返す単位のメソッド）と、`cli.Presenter`（`internal/gen/hozo/cli/cli`）の実装 `Presenter`。引数の解釈は持たない（生成した `cli.Main`）。入口の `Main(ctx, a, args, env, stdout, stderr)` は、`cli.Main` を呼ぶ前に、古い名前のコマンド（`check`、`emit`）を見て、新しい書き方を示す（`Renamed(args)` が、その文を返す。`docs/cli.md`「build」の「古い名前」）。`App` はプロセスの環境を自分で読まない: ホームディレクトリは `App.Home`（`cmd/hozoc` が入れる）、環境変数は `cli.hozo` の入力のフィールドで届く。特定の言語のコードは持たない: トランスパイラを起動し、返ったファイルを書き出すだけ（`docs/cli.md`「書き出し」）。
+`docs/cli.md`「手で書くもの」。葉の op と状態の単位の実装を持つ `App`（`*App` が生成した `compiler.Leaves` を満たし、`Sources()` / `Config()` / `Outputs()` / `OutputsSync()` が状態の単位の実装を返し、`Usecases()` がそれらを `compiler.New` に渡し、`Ops()` が、その結果を、コマンドの行の `New` に渡す。状態に触れる `read outputChanges` と効果 `syncOutputs` は、`Outputs()` と `OutputsSync()` が返す単位のメソッド）と、`cli.Presenter`（`internal/gen/hozo/cli/cli`）の実装 `Presenter`。引数の解釈は持たない（生成した `cli.Main`）。入口の `Main(ctx, a, args, env, stdout, stderr)` は、`cli.Main` を呼ぶ前に、古い名前のコマンド（`check`、`emit`）を見て、新しい書き方を示す（`Renamed(args)` が、その文を返す。`docs/cli.md`「build」の「古い名前」）。`App` はプロセスの環境を自分で読まない: ホームディレクトリは `App.Home`（`cmd/hozoc` が入れる）、環境変数は `cli.hozo` の入力のフィールドで届く。特定の言語のコードは持たない: トランスパイラを起動し、返ったファイルを書き出すだけ（`docs/cli.md`「書き出し」）。
 
 ### `internal/lsp`
 

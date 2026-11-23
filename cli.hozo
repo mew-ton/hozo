@@ -436,9 +436,9 @@ namespace hozo.cli {
     /** 生成する名前空間（一つもなければすべて）。その名前空間と子孫を出力する単位の分を書き出す */
     @cli.arg(1) namespaces: string[];
     /** 検査だけを行い、ファイルを書き出さない */
-    @cli.flag("no-emit") noEmit: boolean?;
+    @cli.flag("no-emit") noEmit: boolean;
     /** 書き出さずに、書き出す予定のファイルだけを表示する */
-    @cli.flag("dry-run") dryRun: boolean?;
+    @cli.flag("dry-run") dryRun: boolean;
     /** プラグインを探すディレクトリ（OS のパス区切りで複数） */
     @cli.env("HOZO_PLUGIN_PATH") pluginPath: string?;
     /** プラグインの WASM を、機械の言葉に直したものを、覚える置き場 */
@@ -446,17 +446,16 @@ namespace hozo.cli {
   }
 
   /**
-   * build が、何を頼まれたか。フラグの組から決まり、入るユースケースが、これで分かれる。
-   * どのフラグの組が、どのケースかは、人が書く述語が決める（docs/cli.md「build」）。
+   * フラグが、付いているか。真偽の値の、型で決まる分類（docs/check.md「分類」。リテラルの型: docs/decisions.md「決めたこと」483）。
+   * build は、これで、--no-emit と --dry-run を見て、入るユースケースを分ける: フラグの値から、ユースケースへの対応は、
+   * 人が書く述語ではなく、下の二つの op の配線が、言う（docs/cli.md「build」）。
    */
-  @adr.decided(hozo.decisions.Decision.D472)
-  classify Request of BuildInput {
-    /** 検査だけ（--no-emit。--dry-run と一緒でも、こちら） */
-    CheckOnly;
-    /** 書き出す予定の表示（--dry-run） */
-    Preview;
-    /** 書き出す（どちらのフラグもない） */
-    Write;
+  @adr.decided(hozo.decisions.Decision.D472, hozo.decisions.Decision.D483)
+  classify Flag of boolean {
+    /** 付いている */
+    On: boolean as true;
+    /** 付いていない */
+    Off: boolean as false;
   }
 
   /**
@@ -468,10 +467,23 @@ namespace hozo.cli {
   @cli.command("build")
   @adr.decided(hozo.decisions.Decision.D472, hozo.decisions.Decision.D473)
   export fn build(in: BuildInput): hozo.compiler.BuildResult {
-    return match (in by Request) {
-      CheckOnly => hozo.compiler.verify({ config: in.config, namespaces: in.namespaces, pluginPath: in.pluginPath, cacheDir: in.cacheDir });
-      Preview => hozo.compiler.preview({ config: in.config, namespaces: in.namespaces, pluginPath: in.pluginPath, cacheDir: in.cacheDir });
-      Write => hozo.compiler.write({ config: in.config, namespaces: in.namespaces, pluginPath: in.pluginPath, cacheDir: in.cacheDir });
+    return match (in.noEmit by Flag) {
+      On => hozo.compiler.verify({ config: in.config, namespaces: in.namespaces, pluginPath: in.pluginPath, cacheDir: in.cacheDir });
+      Off => writeOrPreview(in);
+    };
+  }
+
+  /**
+   * --no-emit の付いていない build: --dry-run なら、書き出す予定を見る。そうでなければ、書き出す。
+   * build の、二つ目の分かれ道。アームの本体に、match は書けないので、op を、一つ、分けてある。
+   *
+   * @param in コマンドの入力
+   */
+  @adr.decided(hozo.decisions.Decision.D472, hozo.decisions.Decision.D473)
+  fn writeOrPreview(in: BuildInput): hozo.compiler.BuildResult {
+    return match (in.dryRun by Flag) {
+      On => hozo.compiler.preview({ config: in.config, namespaces: in.namespaces, pluginPath: in.pluginPath, cacheDir: in.cacheDir });
+      Off => hozo.compiler.write({ config: in.config, namespaces: in.namespaces, pluginPath: in.pluginPath, cacheDir: in.cacheDir });
     };
   }
 

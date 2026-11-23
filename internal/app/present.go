@@ -37,7 +37,7 @@ func (Presenter) Present(w io.Writer, command string, input any, result any) err
 	switch r := result.(type) {
 	case compiler.BuildResult:
 		// 検査だけ（hozoc build --no-emit）: 検査の結果だけを出す（docs/cli.md「build」の「--no-emit の表示」）
-		if in, ok := input.(hozocli.BuildInput); ok && in.NoEmit != nil && *in.NoEmit {
+		if in, ok := input.(hozocli.BuildInput); ok && in.NoEmit {
 			if isJSON(input) {
 				return writeJSON(w, struct {
 					Warnings []diag.Rendered `json:"warnings"`

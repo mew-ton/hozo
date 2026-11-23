@@ -5,6 +5,7 @@ package cli
 import (
 	"context"
 
+	"github.com/mew-ton/hozo/internal/gen/hozo/cli/inner"
 	compiler "github.com/mew-ton/hozo/internal/gen/hozo/compiler/types"
 )
 
@@ -37,56 +38,10 @@ type Ops interface {
 
 // HozoCompilerOps は名前空間 hozo.compiler の op のうち、この名前空間の配線が呼ぶもの。実装は New の引数 hozoCompiler に渡す。
 // メソッドの形は相手の op の宣言だけで決まる（どの名前空間から見ても同じ）ので、hozo.compiler の出力の Ops は、そのまま渡せる。
-type HozoCompilerOps interface {
-	// Verify は op hozo.compiler.verify: 仕様を検査する。プラグインに展開を頼み、返ってきたファイルを集めて確かめるところまで行う。ファイルには、触れない（読みも、書きも、消しもしない）。
-	//
-	// 引数:
-	//   - in: ユースケースの入力
-	//
-	// Throws: hozo.compiler.CheckFailed, hozo.compiler.ConfigInvalid, hozo.compiler.LanguageMismatch, hozo.compiler.Crashed, hozo.compiler.MalformedOutput, hozo.compiler.OutputConflict, hozo.compiler.UnknownNamespace
-	Verify(ctx context.Context, in compiler.EmitInput) (compiler.BuildResult, error)
+type HozoCompilerOps = inner.HozoCompilerOps
 
-	// Preview は op hozo.compiler.preview: 仕様を検査し、書き出す予定のファイルを返す。書き出さない。今の生成したファイルも、読まない（消すファイルは、決めない）。
-	//
-	// 引数:
-	//   - in: ユースケースの入力
-	//
-	// Throws: hozo.compiler.CheckFailed, hozo.compiler.ConfigInvalid, hozo.compiler.LanguageMismatch, hozo.compiler.Crashed, hozo.compiler.MalformedOutput, hozo.compiler.OutputConflict, hozo.compiler.UnknownNamespace
-	Preview(ctx context.Context, in compiler.EmitInput) (compiler.BuildResult, error)
-
-	// Write は op hozo.compiler.write: 仕様を検査し、プラグインから受け取ったファイルを書き出す。例外は、どれも書き出しを始める前に起きる（集めるのが先）。
-	//
-	// 引数:
-	//   - in: ユースケースの入力
-	//
-	// Throws: hozo.compiler.CheckFailed, hozo.compiler.ConfigInvalid, hozo.compiler.LanguageMismatch, hozo.compiler.Crashed, hozo.compiler.MalformedOutput, hozo.compiler.OutputConflict, hozo.compiler.UnknownNamespace
-	// Reads: hozo.compiler.outputs
-	// Effects: hozo.compiler.syncOutputs
-	Write(ctx context.Context, in compiler.EmitInput) (compiler.BuildResult, error)
-
-	// ConfirmTests は op hozo.compiler.confirmTests: 仕様を検査し、求めるテストが走ったかを、カバレッジと突き合わせて確かめる。テストは走らせない。
-	//
-	// 引数:
-	//   - in: ユースケースの入力
-	//
-	// Throws: hozo.compiler.CheckFailed, hozo.compiler.ConfigInvalid, hozo.compiler.LanguageMismatch, hozo.compiler.Crashed, hozo.compiler.MalformedOutput, hozo.compiler.OutputConflict, hozo.compiler.TestsNotRun, hozo.compiler.CoverageUnusable
-	ConfirmTests(ctx context.Context, in compiler.CoverageInput) (compiler.TestsResult, error)
-
-	// Serve は op hozo.compiler.serve: 言語サーバーとして標準入出力で動く（docs/lsp.md）。クライアントが exit を送るまで戻らない。
-	//
-	// 引数:
-	//   - in: ユースケースの入力
-	Serve(ctx context.Context, in compiler.ServeInput) error
-}
-
-// New はこの名前空間の Ops を組み立てる。引数の並びは、分類の述語（FQN の辞書順）、別の名前空間（名前の辞書順）。
+// New はこの名前空間の Ops を組み立てる。引数の並びは、別の名前空間（名前の辞書順）。
 // 引数が nil かどうかは確かめない。
-func New(request RequestCases, hozoCompiler HozoCompilerOps) Ops {
-	return &ops{request: request, hozoCompiler: hozoCompiler}
-}
-
-// ops は New が返す非公開の構造体。フィールドは New の引数そのまま。メソッドは、この名前空間の op のすべて。
-type ops struct {
-	request      RequestCases
-	hozoCompiler HozoCompilerOps
+func New(hozoCompiler HozoCompilerOps) Ops {
+	return inner.New(hozoCompiler)
 }

@@ -2,16 +2,16 @@
 
 package cli
 
-import "github.com/mew-ton/hozo/internal/gen/hozo/cli/types"
+import "github.com/mew-ton/hozo/internal/gen/hozo/cli/inner"
 
 // OutputFormat は表示の形式。text か json
-type OutputFormat = types.OutputFormat
+type OutputFormat = inner.OutputFormat
 
 // BuildInput は build の入力
-type BuildInput = types.BuildInput
+type BuildInput = inner.BuildInput
 
 // TestsInput は tests の入力
-type TestsInput = types.TestsInput
+type TestsInput = inner.TestsInput
 
 // LspInput は lsp の入力
-type LspInput = types.LspInput
+type LspInput = inner.LspInput

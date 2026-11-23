@@ -186,6 +186,8 @@ namespace hozo.decisions {
      */
     @adr.amends(Decision.D417)
     D472;
+    // 今の形: 入口での分け方は、真偽の値の分類 hozo.cli.Flag（483 で、言語に入った）。人が書く述語は、なくなり、
+    // フラグの値から、ユースケースへの対応は、cli.hozo の配線に出る。上の文は、決定の行の写しなので、直さない。
 
     /**
      * 472 の置き場: 入口（コマンドの行）の op は、名前空間 hozo.cli に、ユースケースの op は、hozo.compiler に置く。

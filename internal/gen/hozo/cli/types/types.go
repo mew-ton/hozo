@@ -16,9 +16,9 @@ type BuildInput struct {
 	// 生成する名前空間（一つもなければすべて）。その名前空間と子孫を出力する単位の分を書き出す
 	Namespaces []string `json:"namespaces"`
 	// 検査だけを行い、ファイルを書き出さない
-	NoEmit *bool `json:"noEmit,omitempty"`
+	NoEmit bool `json:"noEmit"`
 	// 書き出さずに、書き出す予定のファイルだけを表示する
-	DryRun *bool `json:"dryRun,omitempty"`
+	DryRun bool `json:"dryRun"`
 	// プラグインを探すディレクトリ（OS のパス区切りで複数）
 	PluginPath *string `json:"pluginPath,omitempty"`
 	// プラグインの WASM を、機械の言葉に直したものを、覚える置き場

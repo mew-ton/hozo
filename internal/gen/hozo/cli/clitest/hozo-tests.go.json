@@ -1,7 +1,0 @@
-{
-  "tests": [
-    {"name": "hozo.cli.Request/CheckOnly", "file": "internal/gen/hozo/cli/clitest/classify.go", "lines": [28, 34]},
-    {"name": "hozo.cli.Request/Preview", "file": "internal/gen/hozo/cli/clitest/classify.go", "lines": [37, 43]},
-    {"name": "hozo.cli.Request/Write", "file": "internal/gen/hozo/cli/clitest/classify.go", "lines": [46, 52]}
-  ]
-}

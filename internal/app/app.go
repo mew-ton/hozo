@@ -12,9 +12,9 @@
 //     （述語 UpToDate と OutOfDate）と一緒に、[App.OutputsSync] が返す値が持つ。
 //   - 状態 sources、config の単位（形で決まる問い合わせ IsEmpty と Get だけ）は、[App.Sources]、[App.Config] が返す値。
 //   - 配線（ユースケース verify、preview、write、confirmTests と、コマンドの行の build、tests、lsp）は、生成した本体が持つ。
-//   - コマンドの行の build が、フラグから、何を頼まれたかを分ける述語（分類 hozo.cli.Request）は、[requestCases]。
+//   - コマンドの行の build が、フラグで、道を分ける所（分類 hozo.cli.Flag の match）も、生成した本体が持つ: 人が書く述語は、ない。
 //
-// [App.Usecases] が、これらを compiler.New に渡し、[App.Ops] が、その結果と述語を、コマンドの行の New に渡す。口はどれも
+// [App.Usecases] が、これらを compiler.New に渡し、[App.Ops] が、その結果を、コマンドの行の New に渡す。口はどれも
 // インターフェースで、実装は New の位置引数なので、メソッドの書き忘れも、渡し忘れも、コンパイルできない。cmd/hozoc/main.go は、
 // その結果を cli.Main に渡す。
 //
@@ -81,11 +81,11 @@ type App struct {
 // メソッドが一つでも足りなければ、ここでコンパイルできない。
 var _ compiler.Leaves = (*App)(nil)
 
-// Ops は a の実装で、コマンドの行（名前空間 hozo.cli）の Ops を組み立てる（docs/cli.md「手で書くもの」）: 入口の op は、フラグから、
-// 何を頼まれたかを分け（[requestCases]）、ユースケース（[App.Usecases]）を呼ぶ。返る値は a だけを持ち、パッケージの変数は使わない
-// （App を二つ作れば、互いに何も共有しない）。
+// Ops は a の実装で、コマンドの行（名前空間 hozo.cli）の Ops を組み立てる（docs/cli.md「手で書くもの」）: 入口の op は、フラグで、
+// 道を分け（cli.hozo の分類 Flag の match。生成した本体が行う）、ユースケース（[App.Usecases]）を呼ぶ。返る値は a だけを持ち、
+// パッケージの変数は使わない（App を二つ作れば、互いに何も共有しない）。
 func (a *App) Ops() hozocli.Ops {
-	return hozocli.New(requestCases{}, a.Usecases())
+	return hozocli.New(a.Usecases())
 }
 
 // Usecases は a の実装で、ユースケース（名前空間 hozo.compiler）の Ops を組み立てる: compiler.New に、葉の op（a 自身）と、状態の単位を
