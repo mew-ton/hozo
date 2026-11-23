@@ -1,5 +1,5 @@
 [hozo]
-sources     = ["cli.hozo", "diagnostics.hozo", "flows.hozo", "ide.hozo", "ir.hozo", "lsp.hozo", "plugin.hozo"]   # vocab/ と tests/ の .hozo を読まないため
+sources     = ["cli.hozo", "decisions.hozo", "diagnostics.hozo", "flows.hozo", "ide.hozo", "ir.hozo", "lsp.hozo", "plugin.hozo"]   # vocab/ と tests/ の .hozo を読まないため
 plugin_dirs = ["plugins"]
 
 # Go のモジュールの名前（go.mod の module と同じもの。docs/plugin-go.md「マニフェスト」）。プロジェクト全体のオプション

@@ -758,7 +758,7 @@ Go のプラグインは、どれも同じ形: `main` パッケージが `plugin
 |---|---|---|
 | `ir` と `plugin` の型 | `schema/ir.schema.json`（`Program` / `View` と、`$defs` にプロトコルの要求と応答） | `internal/tools/irschema`（`go generate ./schema/...`。構造体は reflect で写し、`kind` のユニオンと列挙は道具の表で持つ） |
 | `token.Keywords` | `editors/vscode/syntaxes/hozo.tmLanguage.json`（予約語の部分は `token.Keywords` から、それ以外は道具の中の表から） | `internal/tools/tmgrammar`（`go generate ./editors/...`） |
-| `cli.hozo` | `internal/gen/hozo/compiler/**`、`internal/gen/hozo/cli/**` | `internal/tools/selfgen`（`make generate`。下の「自己生成の手順」） |
+| `cli.hozo`（と、それが指す、ルートの `*.hozo`） | `internal/gen/hozo/compiler/**`、`internal/gen/hozo/cli/**` | `internal/tools/selfgen`（`make generate`。下の「自己生成の手順」） |
 | `plugins/` の下の `testdata/<名前>/` の `hozo.toml` と `.hozo` | `testdata/<名前>/views.json`（プラグインの単体テストの入力の `View`） | `tests/pluginviews_test.go` の `TestPluginViewFixtures`（`go test ./tests -run TestPluginViewFixtures -update`。遅れていれば、このテストが落ちる。`docs/testing.md`「単体テスト」） |
 
 生成物はコミットする。CI で生成し直して差分がないことを確かめる（`docs/testing.md`「生成物の一致」）。
@@ -770,7 +770,7 @@ Go のプラグインは、どれも同じ形: `main` パッケージが `plugin
 `internal/gen/hozo/compiler` と `internal/gen/hozo/cli`（以下、「置き場」）は `cmd/hozoc` が import するパッケージなので、hozoc がそこへ直に書くと、プラグインの不具合でコンパイルできない Go が出たときに hozoc 自身がビルドできなくなり、生成し直すこともできなくなる。そうならないように、`make generate`（`go run ./internal/tools/selfgen`）は、置き場に、コンパイルできると確かめたものしか置かない。
 
 1. 今のソース（今の置き場を含む）で `hozoc` を一時ディレクトリにビルドする。使うプラグイン（`plugins/` の `go`、`go-valid`、`go-cli`）を、WASM にビルドして、それぞれのディレクトリの `plugin.wasm` に置く（`docs/testing.md`「プラグインの WASM」）。
-2. 別の一時ディレクトリに `cli.hozo`、`hozo.toml`、`go.mod`、`go.sum` を写し、プラグインの置き場 `plugins` と、3 の vet が要る `ir`、`plugin`、`runtime` をシンボリックリンクで足して、そこで 1 の `hozoc build` を走らせる（`tests/generated_test.go` と同じ組み立て。import パスは、`hozo.toml` の `[options.go]` の `module` から決まるので、同じになる。`go.mod` は、3 の vet とビルドのために写す）。プラグインの探索が見るプロジェクトの外の場所（`HOZO_PLUGIN_PATH`、ホーム）は空にして、生成物が実行する人の環境に左右されないようにする。WASM を、機械の言葉に直したものの置き場（`HOZO_CACHE_DIR`）は、ホームを空にする前の、もとの場所を渡す（生成のたびに、直し直さないように。答えは、変わらない）。
+2. 別の一時ディレクトリに、リポジトリのルートの仕様のファイル（`*.hozo`: `hozo.toml` の `sources` が並べる、`cli.hozo` と、設計だけのファイル。`cli.hozo` の宣言が、設計だけのファイルの宣言を指せるように、すべて写す）、`hozo.toml`、`go.mod`、`go.sum` を写し、プラグインの置き場 `plugins` と、3 の vet が要る `ir`、`plugin`、`runtime` をシンボリックリンクで足して、そこで 1 の `hozoc build` を走らせる（`tests/generated_test.go` と同じ組み立て。import パスは、`hozo.toml` の `[options.go]` の `module` から決まるので、同じになる。`go.mod` は、3 の vet とビルドのために写す）。プラグインの探索が見るプロジェクトの外の場所（`HOZO_PLUGIN_PATH`、ホーム）は空にして、生成物が実行する人の環境に左右されないようにする。WASM を、機械の言葉に直したものの置き場（`HOZO_CACHE_DIR`）は、ホームを空にする前の、もとの場所を渡す（生成のたびに、直し直さないように。答えは、変わらない）。
 3. 生成した置き場の中身を、その一時ディレクトリで `go vet` に通し、次に、リポジトリの今のものの代わりに置いたつもりで（`go build -overlay`。ディスクの上の置き場には触れない）、それを import するパッケージ（`cmd/hozoc`、`internal/app`）ごと `go build` する。
 4. 3 が通ったときだけ、置き場の中身を生成したものに置き換える（なくなったファイルは消し、同じ内容のファイルには触れない）。通らなければ何も変えず、生成したものを残した一時ディレクトリの場所を示して失敗する。
 

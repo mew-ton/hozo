@@ -39,7 +39,7 @@ var (
 	// genDirs は cli.hozo からの生成物の置き場（hozo.toml の二つの単位の out。docs/cli.md「cli.hozo」）: 名前空間 hozo.compiler
 	// （ユースケース）の出力（入口、内側の inner）と、名前空間 hozo.cli（コマンドの行）の出力（入口、go-cli の cli）。
 	genDirs = []string{filepath.Join("internal", "gen", "hozo", "compiler"), filepath.Join("internal", "gen", "hozo", "cli")}
-	// inputs は一時ディレクトリに写すファイル。
+	// inputs は一時ディレクトリに写すファイル。ほかに、ルートの仕様のファイル（*.hozo）を、すべて写す（specFiles）。
 	inputs = []string{"cli.hozo", "hozo.toml", "go.mod", "go.sum"}
 	// links は一時ディレクトリにシンボリックリンクで足すディレクトリ（プラグインの置き場と、生成物の vet が要るパッケージ）。
 	links = []string{"ir", "plugin", "plugins", "runtime"}
@@ -111,6 +111,19 @@ func run(repo string, stdout, stderr io.Writer) error {
 			return err
 		}
 	}
+	specs, err := specFiles(repo)
+	if err != nil {
+		return err
+	}
+	for _, name := range specs {
+		data, err := os.ReadFile(filepath.Join(repo, name))
+		if err != nil {
+			return err
+		}
+		if err := os.WriteFile(filepath.Join(work, name), data, 0o644); err != nil {
+			return err
+		}
+	}
 	for _, dir := range links {
 		if err := os.Symlink(filepath.Join(repo, dir), filepath.Join(work, dir)); err != nil {
 			return fmt.Errorf("シンボリックリンクを作れない: %w", err)
@@ -144,6 +157,22 @@ func run(repo string, stdout, stderr io.Writer) error {
 }
 
 // places は、置き場の一覧（メッセージ用）。
+// specFiles は、リポジトリのルートの仕様のファイル（*.hozo。hozo.toml の sources が並べるもの: cli.hozo と、設計だけのファイル）の
+// 名前。cli.hozo の宣言が、設計だけのファイルの宣言を指す（決定の記録への @adr.decided など）ので、生成するときに、すべて要る
+// （docs/packages.md「自己生成の手順」の 2）。
+func specFiles(repo string) ([]string, error) {
+	matches, err := filepath.Glob(filepath.Join(repo, "*.hozo"))
+	if err != nil {
+		return nil, err
+	}
+	names := make([]string, 0, len(matches))
+	for _, m := range matches {
+		names = append(names, filepath.Base(m))
+	}
+	sort.Strings(names)
+	return names, nil
+}
+
 func places() string {
 	var out []string
 	for _, dir := range genDirs {

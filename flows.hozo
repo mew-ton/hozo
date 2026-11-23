@@ -11,6 +11,7 @@ namespace hozo.toolchain {
    *
    * @returns カバレッジのファイルの場所
    */
+  @adr.decided(hozo.decisions.Decision.D475)
   export fn runTests(): hozo.compiler.Path;
 }
 
@@ -32,6 +33,7 @@ namespace hozo.flows {
    * @returns 書き出した結果と、求めるテストが、走ったかの結果
    */
   @prd.business.flow
+  @adr.decided(hozo.decisions.Decision.D475, hozo.decisions.Decision.FlowsInOwnFile)
   export fn confirmHarness(in: hozo.compiler.EmitInput): Harnessed {
     // 1. 枠を出す。テストの口と、求めるテストの一覧も、一緒に出る
     val written = hozo.compiler.write(in);
@@ -50,6 +52,7 @@ namespace hozo.flows {
    * @returns 検査の結果
    */
   @prd.business.flow
+  @adr.decided(hozo.decisions.Decision.D475, hozo.decisions.Decision.FlowsInOwnFile)
   export fn checkChange(in: hozo.compiler.EmitInput): hozo.compiler.BuildResult {
     // 1. 検査する
     return hozo.compiler.verify(in);
@@ -81,6 +84,7 @@ namespace hozo.flows {
    * @returns 得た診断、移った先、説明、手元の検査と、枠を出し直した結果
    */
   @prd.business.flow
+  @adr.decided(hozo.decisions.Decision.D475, hozo.decisions.Decision.FlowsInOwnFile)
   export fn writeSpec(workspace: hozo.operation.Workspace, at: hozo.operation.Cursor, in: hozo.compiler.EmitInput): Written {
     // 1. 文面を書く。打っている間に、誤りを得る（名前の候補と、機械的な直しは、まだ、ない: docs/lsp.md「段階 4 の後」）
     val found = hozo.operation.diagnose(workspace);
@@ -174,6 +178,7 @@ namespace hozo.flows {
    * @returns 段ごとの結果
    */
   @prd.business.flow
+  @adr.decided(hozo.decisions.Decision.D475, hozo.decisions.Decision.FlowsInOwnFile)
   export fn design(project: hozo.operation.Workspace, prompt: string, about: hozo.operation.Element[], entry: hozo.operation.Element, edit: hozo.operation.ElementEdit, in: hozo.compiler.EmitInput): Designed {
     val shaped = shape(project, prompt, about, entry, edit);
     val realized = realize(project, in);

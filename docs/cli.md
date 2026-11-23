@@ -18,6 +18,8 @@ IDE と、MCP サーバー（`ide.hozo`）も、同じに、写してある（�
 
 診断（`diagnostics.hozo` の `hozo.diagnostics`）も、要求として、写してある（同 442、468、469）: 診断の ID が、対象のない分類のケースで、重さ、出どころの決定、持ち主の文書と見出し、欠番、文言に埋める値を、自前の印で結ぶ。写したのは、代表の 24 個。**写しで、持ち主は、文書**（`docs/requirements.md`「検査の規則の一覧」と、それぞれの文書の「診断」の表）。単位の対象ではなく、コードには、ならない。書けなかった所は `docs/open.md`「サンプルと、hozoc 自身の仕様」の 30〜35。
 
+決定の記録（`decisions.hozo` の `hozo.decisions`）も、写してある（同 471、476〜480）: 決定が、対象のない分類 `Decision` のケースで、理由、結果、採らなかった案、決めた人の言葉を、説明のコメントの中のタグ（`@adr.context` など）で、置き換える決定と、状態（提案）を、印で書く。語彙 `adr` は、同じファイルに、自前のものとして宣言してある（同梱の語彙では、ない）。形を決めた宣言の側には、`@adr.decided(…)` を付けてある（この文書の写しの `cli.hozo` にも、現れる）。写したのは、468〜480 と、それらが置き換えた 417、確かめていない決定の三つ。**写しで、持ち主は `docs/decisions.md`**。単位の対象ではなく、コードには、ならない。書けなかった所は `docs/open.md`「サンプルと、hozoc 自身の仕様」の 36〜39。
+
 設計書の `examples/hozoc.hozo` を元に、次を変えたもの。変えた理由はそれぞれの項目に書く（決定の一覧での番号は `docs/decisions.md` の 20 と 36）。
 
 `examples/hozoc.hozo` が「書けなかったもの」として挙げた三つは、次のように解く。
@@ -60,6 +62,7 @@ namespace hozo.compiler {
    * 担い手は、していることで分ける。道具（エディタ、CLI、MCP サーバー、IDE）は、入口で、担い手ではない。
    * 設計する人が使う操作と、画面は、ide.hozo
    */
+  @adr.decided(hozo.decisions.Decision.D474)
   classify Actor of never {
     /** 仕様（.hozo）の文面を書く AI。文面を書くのは、主に AI */
     @prd.actor.ai Agent;
@@ -85,6 +88,7 @@ namespace hozo.compiler {
     /** 診断: 漏れを指摘するときは、何が漏れているかを、名指しする */
     NamedOmission;
     /** 配布: OS ごとの、単一のバイナリ。実行環境を要求しない。言語サーバーも、別のバイナリにしない */
+    @adr.decided(hozo.decisions.Decision.D470)
     SingleBinary;
     /** ハーネス: 必要なテストケースが、用意されていて、それが、通っていること */
     RequiredTestsRan;
@@ -335,6 +339,7 @@ namespace hozo.compiler {
    */
   @prd.usecase.of(Actor.Agent, Actor.Engineer, Actor.Ci)
   @prd.ref(Requirement.SharedDiagnostics)
+  @adr.decided(hozo.decisions.Decision.D472, hozo.decisions.Decision.D473)
   export fn verify(in: EmitInput): BuildResult {
     val checked = check({ config: in.config, pluginPath: in.pluginPath, cacheDir: in.cacheDir });
     return verifyOutputs(in, checked);
@@ -355,6 +360,7 @@ namespace hozo.compiler {
    * @see write
    */
   @prd.usecase.of(Actor.Agent, Actor.Engineer)
+  @adr.decided(hozo.decisions.Decision.D472, hozo.decisions.Decision.D473)
   export fn preview(in: EmitInput): BuildResult {
     val checked = check({ config: in.config, pluginPath: in.pluginPath, cacheDir: in.cacheDir });
     val plan = collectOutputs(in, checked);
@@ -370,6 +376,7 @@ namespace hozo.compiler {
    */
   @prd.usecase.of(Actor.Agent, Actor.Engineer)
   @prd.ref(Requirement.SingleSource, Requirement.Deterministic)
+  @adr.decided(hozo.decisions.Decision.D472, hozo.decisions.Decision.D473, hozo.decisions.Decision.WriteWithoutCi)
   export fn write(in: EmitInput): BuildResult
     effects syncOutputs
     throws CheckFailed, ConfigInvalid, LanguageMismatch, OutputConflict, UnknownNamespace prevents effects
@@ -405,6 +412,7 @@ namespace hozo.compiler {
    */
   @prd.usecase.of(Actor.Agent, Actor.Engineer, Actor.Ci)
   @prd.ref(Requirement.RequiredTestsRan)
+  @adr.decided(hozo.decisions.Decision.D472, hozo.decisions.Decision.D473)
   export fn confirmTests(in: CoverageInput): TestsResult {
     val checked = check({ config: in.config, pluginPath: in.pluginPath, cacheDir: in.cacheDir });
     return matchTests(in, checked);
@@ -417,6 +425,7 @@ namespace hozo.compiler {
    */
   @prd.usecase.of(Actor.Engineer)
   @prd.ref(Requirement.SharedDiagnostics)
+  @adr.decided(hozo.decisions.Decision.D472, hozo.decisions.Decision.D473, hozo.decisions.Decision.D474)
   export fn serve(in: ServeInput);
 
   /** プラグインの起動のしかた（docs/plugin-protocol.md「起動」）。wasm は、プラグインの本体（WASM）のファイル */
@@ -493,6 +502,7 @@ namespace hozo.cli {
    * build が、何を頼まれたか。フラグの組から決まり、入るユースケースが、これで分かれる。
    * どのフラグの組が、どのケースかは、人が書く述語が決める（docs/cli.md「build」）。
    */
+  @adr.decided(hozo.decisions.Decision.D472)
   classify Request of BuildInput {
     /** 検査だけ（--no-emit。--dry-run と一緒でも、こちら） */
     CheckOnly;
@@ -509,6 +519,7 @@ namespace hozo.cli {
    * @see tests
    */
   @cli.command("build")
+  @adr.decided(hozo.decisions.Decision.D472, hozo.decisions.Decision.D473)
   export fn build(in: BuildInput): hozo.compiler.BuildResult {
     return match (in by Request) {
       CheckOnly => hozo.compiler.verify({ config: in.config, namespaces: in.namespaces, pluginPath: in.pluginPath, cacheDir: in.cacheDir });
@@ -570,7 +581,7 @@ namespace hozo.cli {
 
 ```toml
 [hozo]
-sources     = ["cli.hozo", "diagnostics.hozo", "flows.hozo", "ide.hozo", "ir.hozo", "lsp.hozo", "plugin.hozo"]   # vocab/ と tests/ の .hozo を読まないため
+sources     = ["cli.hozo", "decisions.hozo", "diagnostics.hozo", "flows.hozo", "ide.hozo", "ir.hozo", "lsp.hozo", "plugin.hozo"]   # vocab/ と tests/ の .hozo を読まないため
 plugin_dirs = ["plugins"]
 
 # Go のモジュールの名前（go.mod の module と同じもの。docs/plugin-go.md「マニフェスト」）。プロジェクト全体のオプション

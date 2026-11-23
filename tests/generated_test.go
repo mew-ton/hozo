@@ -36,7 +36,16 @@ func TestGeneratedUpToDate(t *testing.T) {
 		t.Fatalf("リポジトリのルートが見つからない: %v", err)
 	}
 	root := t.TempDir()
-	for _, name := range []string{"cli.hozo", "hozo.toml", "go.mod", "go.sum"} {
+	// 仕様のファイルは、ルートの *.hozo を、すべて（cli.hozo の宣言が、設計だけのファイルの宣言を指す。docs/packages.md「自己生成の手順」の 2）
+	specs, err := filepath.Glob(filepath.Join(repo, "*.hozo"))
+	if err != nil || len(specs) == 0 {
+		t.Fatalf("ルートの仕様のファイルが見つからない: %v", err)
+	}
+	names := []string{"hozo.toml", "go.mod", "go.sum"}
+	for _, s := range specs {
+		names = append(names, filepath.Base(s))
+	}
+	for _, name := range names {
 		data, err := os.ReadFile(filepath.Join(repo, name))
 		if err != nil {
 			t.Fatal(err)
