@@ -11,6 +11,7 @@
 //   採らなかった案      → @adr.rejected（一つずつ）
 //   決めた人の言葉      → @adr.said
 //   置き換える決定      → 印 @adr.supersedes(…)
+//   一部を直す決定      → 印 @adr.amends(…)
 //   形を決めた宣言      → その宣言の側に、印 @adr.decided(…)
 //   確かめていない決定  → 印 @adr.proposed
 //
@@ -69,6 +70,16 @@ namespace adr {
   @adr.decided(hozo.decisions.Decision.D479)
   @hint
   decorator supersedes(...decisions: any case of never) for case of never;
+
+  /**
+   * この決定が、一部を直す決定（一部だけを、置き換える。条件を足す）。直された決定は、直された部分のほかは、効いたまま。
+   * どの部分かは、説明の本文に書く
+   *
+   * @param decisions 一部を直す決定
+   */
+  @adr.decided(hozo.decisions.Decision.D481)
+  @hint
+  decorator amends(...decisions: any case of never) for case of never;
 
   /**
    * この宣言の形を、決めた決定。宣言の側に付ける
@@ -162,7 +173,7 @@ namespace hozo.decisions {
      * フラグを知っているのは、入口だけ。担い手は、ユースケースに結ぶ。
      * 入口での分け方は、今は、述語で決まる分類で書く。言語は、今は、変えない。
      * 置き換えるのは、417 の細部として、聞かずに決めていた形（build 一つが、入口とユースケースを兼ね、
-     * フラグを、値として、奥まで運ぶ）だけ（穴 36: 一部だけを置き換える、を、印では言えない）。
+     * フラグを、値として、奥まで運ぶ）だけ。
      *
      * @adr.context 「CI は、検査だけ」「人と AI は、書き出す」が、別々のユースケースとして、言える。
      *   言語サーバーが、同じ「検査する」に入ることも、形に出る。サンプル shop-server と、同じ分け方。
@@ -173,7 +184,7 @@ namespace hozo.decisions {
      * @adr.said CI の入口と、ユースケースの入口が違ってて、CI -> ユースケース という流れになるのが正しい気がした
      * @adr.said ユースケース側に --no-emit などの ci 側の情報がなくていいはず
      */
-    @adr.supersedes(Decision.D417)
+    @adr.amends(Decision.D417)
     D472;
 
     /**
@@ -270,14 +281,26 @@ namespace hozo.decisions {
 
     /**
      * 説明のコメントの中に、タグとして書けるのは、@hint の付いたデコレータ（解釈されなくてよい、注記）だけ。
-     * 478 に、条件を足す（穴 36: 置き換えるのではなく、条件を足す、を、印では言えない）。
+     * 478 に、条件を足す。
      *
      * @adr.context 478 のままだと、振る舞いを決めるデコレータも、文字列を一つ取るものなら、コメントの中に書くと、本当に、付く。
      *   コメントに書けるのは、注記だけ、という線にすれば、「コメントが、振る舞いを変えることは、ない」と言い切れる。
      * @adr.rejected 今のまま（文字列を一つ取るものなら、何でも書ける）
      * @adr.rejected 振る舞いのデコレータを、コメントに書いたら、本文として読む
      */
+    @adr.amends(Decision.D478)
     D480;
+
+    /**
+     * 決定の記録の語彙に、印 @adr.amends(…) を足す: この決定が、一部を直す決定（一部だけを、置き換える。条件を足す）。
+     * 直された決定は、直された部分のほかは、効いたまま。どの部分かは、説明の本文に書く。
+     *
+     * @adr.context @adr.supersedes は、「置き換える。置き換えられた決定は、効いていない」の意味で、一部だけを直す決定に付けると、
+     *   印だけを見る道具が、もとの決定を、効いていない、と読んでしまう。
+     * @adr.rejected 一部を直す決定にも、@adr.supersedes を付け、どの部分かは、本文に書く
+     */
+    @adr.amends(Decision.D479)
+    D481;
 
     /**
      * ユースケース write（書き出す）の担い手に、Ci を入れない。
