@@ -10,7 +10,7 @@ hozoc 自身の仕様は、リポジトリ直下の `cli.hozo`。下のコード
 
 業務の流れ（ユースケースを、順に呼ぶ配線）は、別のファイル `flows.hozo` の、名前空間 `hozo.flows` が持つ（`docs/decisions.md`「決めたこと」475。写しは、ここには、置かない）。hozoc の外の手順（利用者か CI が、テストを走らせる）は、同じファイルの `hozo.toolchain` の op として言う。どちらの名前空間も、単位の対象ではなく、コードには、ならない。
 
-プラグインとのやり取り（`plugin.hozo` の `hozo.plugin`）と、IR（`ir.hozo` の `hozo.ir`）も、Hozo で写してある（同 468）。**写しで、持ち主は、文書**（`docs/plugin-protocol.md`、`docs/ir.md`）: 今の言語で、JSON の上の形を、言い切れない所があり（`docs/open.md`「サンプルと、hozoc 自身の仕様」の 12〜20）、生成には、使っていない。単位の対象ではなく、コードには、ならない。
+プラグインとのやり取り（`plugin.hozo` の `hozo.plugin`）と、IR（`ir.hozo` の `hozo.ir`）も、Hozo で写してある（同 468）。**写しで、持ち主は、文書**（`docs/plugin-protocol.md`、`docs/ir.md`）: 今の言語で、JSON の上の形を、言い切れない所があり（`docs/open.md`「サンプルと、hozoc 自身の仕様」の 14〜20。印 `kind` などの、決まった値の項目と、列挙は、リテラルの型で書いてある: `docs/decisions.md`「決めたこと」482）、生成には、使っていない。単位の対象ではなく、コードには、ならない。
 
 言語サーバー（`lsp.hozo`）も、同じに、写してある（同 468）: 入口（LSP の要求と通知）の `hozo.lsp`、入口から入る操作の `hozo.operation`、相手（文面のエディタ）の `hozo.editor`。**写しで、持ち主は、文書**（`docs/lsp.md`、`docs/editors.md`、`docs/tools.md`「操作」）。単位の対象ではなく、コードには、ならない。ユースケース `serve`（下の `hozo.compiler`。葉）は、その入口と操作の全体を、一つの op にしたもので、重なっている（`docs/open.md`「サンプルと、hozoc 自身の仕様」）。
 

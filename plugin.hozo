@@ -6,7 +6,7 @@
 // TranspilerResult、OutputResult、EmitResponse、空の Spec と OutputView、例外 Crashed と MalformedOutput）。hozoc の葉の op runEmit の
 // 引数と戻り値で、生成物が使っている。ここの model と、重なっている（どちらに寄せるかは、決めていない: docs/open.md）。
 //
-// 書けなかった所の持ち主は docs/open.md「サンプルと、hozoc 自身の仕様」（下の「穴 12」などは、その番号。12〜16 は ir.hozo の頭）:
+// 書けなかった所の持ち主は docs/open.md「サンプルと、hozoc 自身の仕様」（下の「穴 17」などは、その番号。14〜16 は ir.hozo の頭）:
 //   穴 17: 頼みごとの名前 read を、op の名前に書けない（read は予約語）。readVocabulary にした
 //   穴 18: やり取りの運び方（WASM の標準入力に JSON の要求、標準出力に JSON の応答、終了コード）を言う語彙が、ない
 //   穴 19: ファイルの形（TOML のマニフェスト）と、省いたときの値を言う語彙が、ない
@@ -80,22 +80,20 @@ namespace hozo.plugin {
 
   /**
    * 断りの応答（終了コード 2 のときの、標準出力）。code は "protocol"（版が合わない）か "unsupported"（その頼みごとを、実装していない）
-   * （穴 13 と同じ: 決まった値の集まり）
    */
   model Refusal { error: RefusalError; }
-  @valid.pattern("^(protocol|unsupported)$")
-  scalar RefusalCode extends string;
+  union RefusalCode { Protocol: "protocol"; Unsupported: "unsupported"; }
   model RefusalError { code: RefusalCode; message: string; }
 
   // どの要求も、protocol（IR の版）と direction（頼みごとの名前）を持つ。direction は、頼みごとごとに、決まった値
-  // （"read"、"emit"、"coverage"、"import"）で、hozoc とプラグインは、これで、頼みごとを見分ける（穴 12: 決まった値を持つ項目）。
-  // 下の要求の model では、direction を、コメントにしてある。
+  // （"read"、"emit"、"coverage"、"import"）で、hozoc とプラグインは、これで、頼みごとを見分ける。
+  // 下の要求の model では、direction を、リテラルの型の項目で書いてある（docs/decisions.md「決めたこと」482）。
 
   // ---- read（語彙のプラグインへの、ただ一つの頼みごと） ----
 
   model ReadRequest {
     protocol: string;
-    // direction: "read";
+    direction: "read";
     spec: hozo.ir.Spec;
   }
   model ReadResponse { errors: Diagnostic[]; warnings: Warning[]; }
@@ -104,7 +102,7 @@ namespace hozo.plugin {
 
   model EmitRequest {
     protocol: string;
-    // direction: "emit";
+    direction: "emit";
     spec: hozo.ir.Spec;
     outputs: EmitOutput[];
   }
@@ -122,7 +120,7 @@ namespace hozo.plugin {
 
   model CoverageRequest {
     protocol: string;
-    // direction: "coverage";
+    direction: "coverage";
     /** hozoc tests に渡された、カバレッジのファイル（path は、絶対パス） */
     coverage: File;
     /** 実行された行を知りたいファイル */
@@ -138,7 +136,7 @@ namespace hozo.plugin {
 
   model ImportRequest {
     protocol: string;
-    // direction: "import";
+    direction: "import";
     format: string;
     files: File[];
   }

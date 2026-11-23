@@ -78,10 +78,12 @@ namespace hozo.operation {
   export fn promises(in: Workspace): Promise[];
 
   /**
-   * 差の種類（docs/tools.md「変更を読む」の表）。穴 13: 列挙を、型として書けないので、scalar と pattern
+   * 差の種類（docs/tools.md「変更を読む」の表）
    */
-  @valid.pattern("^(entry|procedure|exceptions|lifecycle|promise|declaration|description)$")
-  scalar ChangeKind extends string;
+  union ChangeKind {
+    Entry: "entry"; Procedure: "procedure"; Exceptions: "exceptions"; Lifecycle: "lifecycle"; Promise: "promise";
+    Declaration: "declaration"; Description: "description";
+  }
 
   /** 二つの版の仕様の差の一つ。設計の言葉で言う（行の足し引きでは、ない） */
   model Change {

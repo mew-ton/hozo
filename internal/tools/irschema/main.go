@@ -132,7 +132,7 @@ var enums = map[reflect.Type][]string{
 	typeOf[ir.RelationKind]():    {"prevents", "keeps"},
 	typeOf[ir.CatchMode]():       {"recovers", "halts", "ignores"},
 	typeOf[ir.EffectState]():     {"prevented", "kept", "unknown"},
-	typeOf[ir.DecidedBy]():       {"type", "predicate"},
+	typeOf[ir.DecidedBy]():       {"type", "predicate", "none"},
 	typeOf[ir.NarrowBy]():        {"presence", "variant", "literal", "predicate", "else", "none"},
 	typeOf[ir.EntrySourceKind](): {"leaf", "effect", "external", "boundary", "decorator", "arm", "never", "unknown"},
 	typeOf[ir.EntryStepVerb]():   {"throws", "none", "is"},

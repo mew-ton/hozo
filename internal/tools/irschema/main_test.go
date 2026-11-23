@@ -193,6 +193,7 @@ func TestNegative(t *testing.T) {
 		{"case typing bad by", "CaseTyping", `{"type":{"kind":"ref","target":"a.M"},"by":"guess","span":{"file":"f","start":{"line":1,"col":1},"end":{"line":1,"col":2}}}`, false},
 		{"classify case without as", "ClassifyCase", `{"name":"A","span":{"file":"f","start":{"line":1,"col":1},"end":{"line":1,"col":2}}}`, false},
 		{"decided by", "DecidedBy", `"type"`, true},
+		{"decided by none", "DecidedBy", `"none"`, true}, // 対象のない分類（docs/ir.md「classify」の decidedBy）
 		{"decided by unknown", "DecidedBy", `"value"`, false},
 		{"type never", "Type", `{"kind":"never"}`, true},
 		{"type never with of", "Type", `{"kind":"never","of":{"kind":"core","name":"int"}}`, false},
@@ -492,7 +493,7 @@ func TestEnumsMatchGo(t *testing.T) {
 		typeOf[ir.RelationKind]():    {string(ir.Prevents), string(ir.Keeps)},
 		typeOf[ir.CatchMode]():       {string(ir.Recovers), string(ir.Halts), string(ir.Ignores)},
 		typeOf[ir.EffectState]():     {string(ir.Prevented), string(ir.Kept), string(ir.Unknown)},
-		typeOf[ir.DecidedBy]():       {string(ir.DecidedByType), string(ir.DecidedByPredicate)},
+		typeOf[ir.DecidedBy]():       {string(ir.DecidedByType), string(ir.DecidedByPredicate), string(ir.DecidedByNone)},
 		typeOf[ir.NarrowBy]():        {string(ir.NarrowByPresence), string(ir.NarrowByVariant), string(ir.NarrowByLiteral), string(ir.NarrowByPredicate), string(ir.NarrowByElse), string(ir.NarrowByNone)},
 		typeOf[ir.EntrySourceKind](): {string(ir.SourceLeaf), string(ir.SourceEffect), string(ir.SourceExternal), string(ir.SourceBoundary), string(ir.SourceDecorator), string(ir.SourceArm), string(ir.SourceNever), string(ir.SourceUnknown)},
 		typeOf[ir.EntryStepVerb]():   {string(ir.StepThrows), string(ir.StepNone), string(ir.StepIs)},

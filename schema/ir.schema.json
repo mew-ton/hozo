@@ -873,7 +873,8 @@
       "description": "分類のケースが何で決まるか（docs/ir.md「classify」の decidedBy、docs/check.md「ケースの判定」）。type なら述語を持たない。",
       "enum": [
         "type",
-        "predicate"
+        "predicate",
+        "none"
       ],
       "type": "string"
     },

@@ -3,9 +3,10 @@
 // どの単位の対象でもない: コードには、ならない。
 //
 // 今の言語で、JSON の上の形（docs/ir.md「JSON」）を、同じに言えない所は、近い形に曲げず、コメントにしてある。
-// 書けなかった所の持ち主は docs/open.md「サンプルと、hozoc 自身の仕様」の 12〜（下の「穴 12」などは、その番号）:
-//   穴 12: 決まった値を持つ項目（印 kind: "core" など）と、印で見分ける union。項目ごと、コメントにした
-//   穴 13: 決まった値の集まり（列挙）を、型として書けない。scalar と @valid.pattern で、通す値を言った
+// 決まった値を持つ項目（印 kind: "core" など）と、決まった値の集まり（列挙）は、リテラルの型で書いてある
+// （docs/decisions.md「決めたこと」482。前は、書けなかった所の 12 と 13 で、コメントと、scalar と @valid.pattern だった）。
+// 列挙は、リテラルの型をアームに持つ、名前の付いた union。印で見分ける union は、アームの model が、kind の項目を持つ。
+// 書けなかった所の持ち主は docs/open.md「サンプルと、hozoc 自身の仕様」（下の「穴 14」などは、その番号）:
 //   穴 14: 「項目は、いつもあり、値が null」（Op.returns、Op.body）と、「項目がない」を、分けて書けない。コメントにした
 //   穴 15: 形の決まっていない値（設定のオプション: unknown）を、書けない。コメントにした
 //   穴 16: 決まった長さの組（[始まり, 終わり]）を、書けない
@@ -15,66 +16,69 @@
 
 /** IR（docs/ir.md）。プラグインが受け取る、仕様の、ただ一つの形 */
 namespace hozo.ir {
-  // ---- 名前と、決まった値の集まり（穴 13: 列挙を、型として書けない） ----
+  // ---- 名前と、決まった値の集まり（リテラルの型をアームに持つ union） ----
 
   /** 宣言などの、完全な名前（"server.admin.login"） */
   scalar Fqn extends string;
 
   /** 核の型の名前 */
-  @valid.pattern("^(string|boolean|int|float|datetime|date|time|duration)$")
-  scalar CoreName extends string;
+  @adr.decided(hozo.decisions.Decision.D482)
+  union CoreName {
+    String: "string"; Boolean: "boolean"; Int: "int"; Float: "float"; Datetime: "datetime"; Date: "date";
+    Time: "time"; Duration: "duration";
+  }
 
   /** union の種類。arms: model のバリアント。set: 例外か効果の集合 */
-  @valid.pattern("^(arms|set)$")
-  scalar UnionVariant extends string;
+  union UnionVariant { Arms: "arms"; Set: "set"; }
 
   /** 状態の形 */
-  @valid.pattern("^(list|nullable|single)$")
-  scalar StateShape extends string;
+  union StateShape { List: "list"; Nullable: "nullable"; Single: "single"; }
 
   /** 基底の状態への操作 */
-  @valid.pattern("^(post|put|delete)$")
-  scalar Operation extends string;
+  union Operation { Post: "post"; Put: "put"; Delete: "delete"; }
 
   /** ケースが、何で決まるか */
-  @valid.pattern("^(type|predicate|none)$")
-  scalar DecidedBy extends string;
+  union DecidedBy { Type: "type"; Predicate: "predicate"; None: "none"; }
 
   /** 絞り込みの種類 */
-  @valid.pattern("^(presence|variant|literal|predicate|else|none)$")
-  scalar NarrowBy extends string;
+  union NarrowBy {
+    Presence: "presence"; Variant: "variant"; Literal: "literal"; Predicate: "predicate"; Else: "else"; None: "none";
+  }
 
   /** デコレータを付けられる宣言の種類 */
-  @valid.pattern("^(op|field|state|exception|scalar|model|union|effect|read|classify|decorator|case)$")
-  scalar DecoratorTarget extends string;
+  union DecoratorTarget {
+    Op: "op"; Field: "field"; State: "state"; Exception: "exception"; Scalar: "scalar"; Model: "model";
+    Union: "union"; Effect: "effect"; Read: "read"; Classify: "classify"; Decorator: "decorator"; Case: "case";
+  }
 
   /** `any <種類>` の種類（case を除く） */
-  @valid.pattern("^(exception|effect|state|op|model|variant)$")
-  scalar AnyOf extends string;
+  union AnyOf {
+    Exception: "exception"; Effect: "effect"; State: "state"; Op: "op"; Model: "model"; Variant: "variant";
+  }
 
   /** 例外と効果の関係の種類 */
-  @valid.pattern("^(prevents|keeps)$")
-  scalar RelationKind extends string;
+  union RelationKind { Prevents: "prevents"; Keeps: "keeps"; }
 
   /** 例外の受け方 */
-  @valid.pattern("^(recovers|halts|ignores)$")
-  scalar CatchMode extends string;
+  union CatchMode { Recovers: "recovers"; Halts: "halts"; Ignores: "ignores"; }
 
   /** 効果の状態 */
-  @valid.pattern("^(prevented|kept|unknown)$")
-  scalar EffectState extends string;
+  union EffectState { Prevented: "prevented"; Kept: "kept"; Unknown: "unknown"; }
 
   /** 例外の出どころの種類 */
-  @valid.pattern("^(leaf|effect|external|boundary|decorator|arm|never|unknown)$")
-  scalar EntrySourceKind extends string;
+  union EntrySourceKind {
+    Leaf: "leaf"; Effect: "effect"; External: "external"; Boundary: "boundary"; Decorator: "decorator"; Arm: "arm";
+    Never: "never"; Unknown: "unknown";
+  }
 
   /** 差し替えに言うことの、動詞 */
-  @valid.pattern("^(throws|none|is)$")
-  scalar EntryStepVerb extends string;
+  union EntryStepVerb { Throws: "throws"; None: "none"; Is: "is"; }
 
   /** 差し替えの相手の種類 */
-  @valid.pattern("^(leaf|effect|read|state|op|decorator|classify)$")
-  scalar EntryTargetKind extends string;
+  union EntryTargetKind {
+    Leaf: "leaf"; Effect: "effect"; Read: "read"; State: "state"; Op: "op"; Decorator: "decorator";
+    Classify: "classify";
+  }
 
   // ---- Program ----
 
@@ -91,7 +95,7 @@ namespace hozo.ir {
     decls: Decl[];
   }
 
-  /** 宣言。JSON では、印 kind で見分ける（穴 12: 今の言語の union は、印を持たず、構造で見分ける） */
+  /** 宣言。JSON では、印 kind で見分ける（アームの model が、kind の項目を、決まった値で持つ） */
   union Decl {
     Model: Model;
     Scalar: Scalar;
@@ -106,7 +110,7 @@ namespace hozo.ir {
   }
 
   model DeclBase {
-    // kind: "model" | "scalar" | "union" | "state" | "exception" | "effect" | "read" | "classify" | "decorator" | "op";   （穴 12）
+    // 印 kind（"model"、"scalar"、…）は、宣言の種類ごとの model が、決まった値の項目として持つ
     name: Fqn;
     description: Doc?;
     decorators: Application[];
@@ -130,7 +134,8 @@ namespace hozo.ir {
 
   // ---- 型 ----
 
-  /** 型。JSON では、印 kind（"core"、"ref"、"optional"、"array"、"case"、"literal"、"never"）で見分ける（穴 12） */
+  /** 型。JSON では、印 kind（"core"、"ref"、"optional"、"array"、"case"、"literal"、"never"）で見分ける */
+  @adr.decided(hozo.decisions.Decision.D482)
   union Type {
     Core: CoreType;
     Ref: RefType;
@@ -140,20 +145,20 @@ namespace hozo.ir {
     Literal: LiteralType;
     Never: NeverType;
   }
-  model CoreType { /* kind: "core"; */ name: CoreName; }
-  model RefType { /* kind: "ref"; */ target: Fqn; }
-  model OptionalType { /* kind: "optional"; */ of: Type; }
-  model ArrayType { /* kind: "array"; */ of: Type; }
-  model CaseType { /* kind: "case"; */ classify: Fqn; cases: string[]; of: Type; }
+  model CoreType { kind: "core"; name: CoreName; }
+  model RefType { kind: "ref"; target: Fqn; }
+  model OptionalType { kind: "optional"; of: Type; }
+  model ArrayType { kind: "array"; of: Type; }
+  model CaseType { kind: "case"; classify: Fqn; cases: string[]; of: Type; }
   /** リテラルの型。literal は、文字列、整数、小数、真偽のどれか */
-  model LiteralType { /* kind: "literal"; */ literal: Literal; }
-  /** 項目は、印だけ（穴 12: 印を書けないので、項目のない model になり、ほかのアームと、構造では見分けられない） */
-  model NeverType { /* kind: "never"; */ }
+  model LiteralType { kind: "literal"; literal: Literal; }
+  /** 項目は、印だけ */
+  model NeverType { kind: "never"; }
 
   // ---- model / scalar / union ----
 
   model Model extends DeclBase {
-    // kind: "model";
+    kind: "model";
     fields: Field[];
     index: ModelIndex?;
     extends: ModelExtends?;
@@ -164,12 +169,12 @@ namespace hozo.ir {
   model Field { name: string; description: Doc?; type: Type; decorators: Application[]; span: Span; }
 
   model Scalar extends DeclBase {
-    // kind: "scalar";
+    kind: "scalar";
     base: Type;
   }
 
   model Union extends DeclBase {
-    // kind: "union";
+    kind: "union";
     variant: UnionVariant;
     arms: UnionArm[];
     members: UnionMember[];
@@ -180,19 +185,19 @@ namespace hozo.ir {
   // ---- state / exception / effect / read ----
 
   model State extends DeclBase {
-    // kind: "state";
+    kind: "state";
     type: Type;
     shape: StateShape;
     element: Type;
   }
 
   model Exception extends DeclBase {
-    // kind: "exception";
+    kind: "exception";
     params: OpParam[];
   }
 
   model Effect extends DeclBase {
-    // kind: "effect";
+    kind: "effect";
     params: OpParam[];
     throws: Fqn[];
     target: EffectTarget;
@@ -200,23 +205,25 @@ namespace hozo.ir {
     row: RowTransition?;
   }
 
-  /** 効果の宛先。JSON では、印 kind（"builtin"、"transition"）で見分ける（穴 12） */
+  /** 効果の宛先。JSON では、印 kind（"builtin"、"transition"）で見分ける */
   union EffectTarget {
     Builtin: BuiltinTarget;
     Transition: TransitionTarget;
   }
-  model BuiltinTarget { /* kind: "builtin"; */ state: Fqn; operation: Operation; }
+  model BuiltinTarget { kind: "builtin"; state: Fqn; operation: Operation; }
   model TransitionTarget {
-    // kind: "transition";
+    kind: "transition";
     of: Fqn;
-    // from: CaseSet;   CaseSet は "any" | string[]: 決まった値 "any" か、ケース名の列（穴 12）
-    // to: CaseSet;
+    from: CaseSet;
+    to: CaseSet;
   }
+  /** 遷移の前か、後の、ケースの集まり。決まった値 "any"（どのケースでも）か、ケース名の列 */
+  union CaseSet { Any: "any"; Cases: string[]; }
 
   model RowTransition { param: string; classify: Fqn?; to: string?; }
 
   model Read extends DeclBase {
-    // kind: "read";
+    kind: "read";
     params: OpParam[];
     returns: Type;
     state: Fqn;
@@ -225,24 +232,24 @@ namespace hozo.ir {
   // ---- classify ----
 
   model Classify extends DeclBase {
-    // kind: "classify";
+    kind: "classify";
     subject: ClassifySubject;
     cases: ClassifyCase[];
     decidedBy: DecidedBy;
     absent: string?;
   }
 
-  /** 分類の対象。JSON では、印 kind（"type"、"op"、"states"、"exception"）で見分ける（穴 12） */
+  /** 分類の対象。JSON では、印 kind（"type"、"op"、"states"、"exception"）で見分ける */
   union ClassifySubject {
     Type: TypeSubject;
     Op: OpSubject;
     States: StatesSubject;
     Exception: ExceptionSubject;
   }
-  model TypeSubject { /* kind: "type"; */ type: Type; }
-  model OpSubject { /* kind: "op"; */ op: Fqn; type: Type; }
-  model StatesSubject { /* kind: "states"; */ states: Fqn[]; }
-  model ExceptionSubject { /* kind: "exception"; */ }
+  model TypeSubject { kind: "type"; type: Type; }
+  model OpSubject { kind: "op"; op: Fqn; type: Type; }
+  model StatesSubject { kind: "states"; states: Fqn[]; }
+  model ExceptionSubject { kind: "exception"; }
 
   model ClassifyCase {
     name: string;
@@ -258,7 +265,7 @@ namespace hozo.ir {
   // ---- decorator ----
 
   model Decorator extends DeclBase {
-    // kind: "decorator";
+    kind: "decorator";
     params: Param[];
     fn: boolean;
     targets: DecoratorTarget[];
@@ -280,16 +287,16 @@ namespace hozo.ir {
 
   /**
    * デコレータの引数の型。JSON では、印 kind（"type"、"any"）で見分け、"any" は、さらに、of が "case" かどうかで、
-   * 持つ項目が変わる（穴 12）
+   * 持つ項目が変わる（AnyParam の of は、case のほかの種類。AnyCaseParam の of は、決まった値 "case"）
    */
   union ParamType {
     Type: TypeParam;
     Any: AnyParam;
     AnyCase: AnyCaseParam;
   }
-  model TypeParam { /* kind: "type"; */ types: Type[]; }
-  model AnyParam { /* kind: "any"; */ of: AnyOf; on: EffectOn?; }
-  model AnyCaseParam { /* kind: "any"; of: "case"; */ case: CaseKind; }
+  model TypeParam { kind: "type"; types: Type[]; }
+  model AnyParam { kind: "any"; of: AnyOf; on: EffectOn?; }
+  model AnyCaseParam { kind: "any"; of: "case"; case: CaseKind; }
   model EffectOn { state: Fqn; operation: Operation; }
 
   model ThrowsClause { exceptions: string[]; relations: Relation[]; }
@@ -299,7 +306,7 @@ namespace hozo.ir {
   // ---- op ----
 
   model Op extends DeclBase {
-    // kind: "op";
+    kind: "op";
     exported: boolean;
     params: OpParam[];
     // returns: Type | null;   null は void（穴 14: 項目は、いつもあり、値が null）
@@ -313,21 +320,21 @@ namespace hozo.ir {
   model OpParam { name: string; type: Type; span: Span; }
   model Carried { reads: ReadRef[]; effects: EffectRef[]; }
 
-  /** JSON では、印 kind（"named"、"direct"）で見分ける（穴 12） */
+  /** JSON では、印 kind（"named"、"direct"）で見分ける */
   union ReadRef {
     Named: NamedRead;
     Direct: DirectRead;
   }
-  model NamedRead { /* kind: "named"; */ read: Fqn; }
-  model DirectRead { /* kind: "direct"; */ state: Fqn; }
+  model NamedRead { kind: "named"; read: Fqn; }
+  model DirectRead { kind: "direct"; state: Fqn; }
 
-  /** JSON では、印 kind（"named"、"direct"）で見分ける（穴 12） */
+  /** JSON では、印 kind（"named"、"direct"）で見分ける */
   union EffectRef {
     Named: NamedEffect;
     Direct: DirectEffect;
   }
-  model NamedEffect { /* kind: "named"; */ effect: Fqn; }
-  model DirectEffect { /* kind: "direct"; */ state: Fqn; operation: Operation; }
+  model NamedEffect { kind: "named"; effect: Fqn; }
+  model DirectEffect { kind: "direct"; state: Fqn; operation: Operation; }
 
   model Signature {
     exceptions: Fqn[];
@@ -344,7 +351,7 @@ namespace hozo.ir {
 
   model Wiring { statements: Statement[]; }
 
-  /** 配線の文。JSON では、印 kind で見分ける（穴 12） */
+  /** 配線の文。JSON では、印 kind で見分ける */
   union Statement {
     Val: ValStmt;
     Assign: AssignStmt;
@@ -357,48 +364,48 @@ namespace hozo.ir {
     Try: TryStmt;
     Throw: ThrowStmt;
   }
-  model ValStmt { /* kind: "val"; */ name: string; type: Type?; expr: Expr?; collected: boolean; span: Span; }
-  model AssignStmt { /* kind: "assign"; */ name: string; expr: Expr; span: Span; }
-  model CollectStmt { /* kind: "collect"; */ name: string; expr: Expr; span: Span; }
-  model ReturnStmt { /* kind: "return"; */ expr: Expr; span: Span; }
-  model CallStmt { /* kind: "call"; */ call: Call; span: Span; }
-  model MatchStmt { /* kind: "match"; */ match: Match; span: Span; }
-  model DisjointStmt { /* kind: "disjoint"; */ arms: Arm[]; span: Span; }
-  model ForStmt { /* kind: "for"; */ var: string; varType: Type; of: Atom; body: Statement[]; disjoint: boolean; span: Span; }
-  model TryStmt { /* kind: "try"; */ body: Statement[]; catch: Catch; span: Span; }
-  model ThrowStmt { /* kind: "throw"; */ throw: Throw; span: Span; }
+  model ValStmt { kind: "val"; name: string; type: Type?; expr: Expr?; collected: boolean; span: Span; }
+  model AssignStmt { kind: "assign"; name: string; expr: Expr; span: Span; }
+  model CollectStmt { kind: "collect"; name: string; expr: Expr; span: Span; }
+  model ReturnStmt { kind: "return"; expr: Expr; span: Span; }
+  model CallStmt { kind: "call"; call: Call; span: Span; }
+  model MatchStmt { kind: "match"; match: Match; span: Span; }
+  model DisjointStmt { kind: "disjoint"; arms: Arm[]; span: Span; }
+  model ForStmt { kind: "for"; var: string; varType: Type; of: Atom; body: Statement[]; disjoint: boolean; span: Span; }
+  model TryStmt { kind: "try"; body: Statement[]; catch: Catch; span: Span; }
+  model ThrowStmt { kind: "throw"; throw: Throw; span: Span; }
 
   model Catch { name: string; body: Statement[]; never: boolean; span: Span; }
-  model Throw { /* kind: "throw"; */ exception: string; args: CallArg[]; caught: string?; span: Span; }
+  model Throw { kind: "throw"; exception: string; args: CallArg[]; caught: string?; span: Span; }
   model Arm { block: boolean; statements: Statement[]; span: Span; }
 
-  /** 式。JSON では、印 kind（"call"、"match"、"atom"）で見分ける（穴 12） */
+  /** 式。JSON では、印 kind（"call"、"match"、"atom"）で見分ける */
   union Expr {
     Call: CallExpr;
     Match: MatchExpr;
     Atom: AtomExpr;
   }
-  model CallExpr { /* kind: "call"; */ call: Call; }
-  model MatchExpr { /* kind: "match"; */ match: Match; }
-  model AtomExpr { /* kind: "atom"; */ atom: Atom; }
+  model CallExpr { kind: "call"; call: Call; }
+  model MatchExpr { kind: "match"; match: Match; }
+  model AtomExpr { kind: "atom"; atom: Atom; }
 
   model Call { callee: Callee; args: CallArg[]; bound: BoundPosition[]; span: Span; }
   model CallArg { param: string; value: Atom; }
   model BoundPosition { path: string[]; state: Fqn; }
 
-  /** 呼び出し先。JSON では、印 kind（"op"、"read"、"effect"、"proceed"）で見分ける（穴 12） */
+  /** 呼び出し先。JSON では、印 kind（"op"、"read"、"effect"、"proceed"）で見分ける */
   union Callee {
     Op: OpCallee;
     Read: ReadCallee;
     Effect: EffectCallee;
     Proceed: ProceedCallee;
   }
-  model OpCallee { /* kind: "op"; */ op: Fqn; }
-  model ReadCallee { /* kind: "read"; */ read: Fqn; }
-  model EffectCallee { /* kind: "effect"; */ effect: EffectRef; }
-  model ProceedCallee { /* kind: "proceed"; */ }
+  model OpCallee { kind: "op"; op: Fqn; }
+  model ReadCallee { kind: "read"; read: Fqn; }
+  model EffectCallee { kind: "effect"; effect: EffectRef; }
+  model ProceedCallee { kind: "proceed"; }
 
-  /** 値。JSON では、印 kind（"name"、"state"、"literal"、"none"、"record"）で見分ける（穴 12） */
+  /** 値。JSON では、印 kind（"name"、"state"、"literal"、"none"、"record"）で見分ける */
   union Atom {
     Name: NameAtom;
     State: StateAtom;
@@ -406,38 +413,38 @@ namespace hozo.ir {
     None: NoneAtom;
     Record: RecordAtom;
   }
-  model NameAtom { /* kind: "name"; */ path: string[]; span: Span; }
-  model StateAtom { /* kind: "state"; */ state: Fqn; path: string[]; span: Span; }
-  model LiteralAtom { /* kind: "literal"; */ literal: Literal; span: Span; }
-  model NoneAtom { /* kind: "none"; */ span: Span; }
-  model RecordAtom { /* kind: "record"; */ fields: RecordField[]; span: Span; }
+  model NameAtom { kind: "name"; path: string[]; span: Span; }
+  model StateAtom { kind: "state"; state: Fqn; path: string[]; span: Span; }
+  model LiteralAtom { kind: "literal"; literal: Literal; span: Span; }
+  model NoneAtom { kind: "none"; span: Span; }
+  model RecordAtom { kind: "record"; fields: RecordField[]; span: Span; }
   model RecordField { name: string; value: Atom; }
 
   model Match { subject: MatchSubject; classify: string; arms: MatchArm[]; span: Span; }
 
-  /** match の対象。JSON では、印 kind（"value"、"classify"、"caught"）で見分ける（穴 12） */
+  /** match の対象。JSON では、印 kind（"value"、"classify"、"caught"）で見分ける */
   union MatchSubject {
     Value: ValueSubject;
     Classify: ClassifyOwnedSubject;
     Caught: CaughtSubject;
   }
-  model ValueSubject { /* kind: "value"; */ atom: Atom; }
-  model ClassifyOwnedSubject { /* kind: "classify"; */ }
-  model CaughtSubject { /* kind: "caught"; */ name: string; }
+  model ValueSubject { kind: "value"; atom: Atom; }
+  model ClassifyOwnedSubject { kind: "classify"; }
+  model CaughtSubject { kind: "caught"; name: string; }
 
   model MatchArm { cases: string[]; else: boolean; body: ArmBody; narrowed: Narrowing[]; span: Span; }
 
-  /** アームの本体。JSON では、印 kind（"call"、"atom"、"none"、"throw"）で見分ける（穴 12） */
+  /** アームの本体。JSON では、印 kind（"call"、"atom"、"none"、"throw"）で見分ける */
   union ArmBody {
     Call: CallExpr;
     Atom: AtomExpr;
     None: NoneBody;
     Throw: Throw;
   }
-  model NoneBody { /* kind: "none"; */ }
+  model NoneBody { kind: "none"; }
   model Narrowing { state: Fqn?; type: Type; }
 
-  /** リテラル。JSON では、印 kind（"string"、"int"、"float"、"boolean"、"duration"）で見分ける（穴 12） */
+  /** リテラル。JSON では、印 kind（"string"、"int"、"float"、"boolean"、"duration"）で見分ける */
   union Literal {
     String: StringLiteral;
     Int: IntLiteral;
@@ -445,19 +452,19 @@ namespace hozo.ir {
     Boolean: BooleanLiteral;
     Duration: DurationLiteral;
   }
-  model StringLiteral { /* kind: "string"; */ value: string; }
-  model IntLiteral { /* kind: "int"; */ value: int; }
-  model FloatLiteral { /* kind: "float"; */ value: float; }
-  model BooleanLiteral { /* kind: "boolean"; */ value: boolean; }
+  model StringLiteral { kind: "string"; value: string; }
+  model IntLiteral { kind: "int"; value: int; }
+  model FloatLiteral { kind: "float"; value: float; }
+  model BooleanLiteral { kind: "boolean"; value: boolean; }
   /** value は、ナノ秒 */
-  model DurationLiteral { /* kind: "duration"; */ value: int; }
+  model DurationLiteral { kind: "duration"; value: int; }
 
   // ---- デコレータの適用、bind ----
 
   model Application { decorator: Fqn; via: Fqn?; args: Arg[]; span: Span; }
   model Arg { param: string; value: ArgValue; }
 
-  /** デコレータの引数の値。JSON では、印 kind で見分ける（穴 12） */
+  /** デコレータの引数の値。JSON では、印 kind で見分ける */
   union ArgValue {
     Literal: LiteralValue;
     Ref: RefValue;
@@ -466,12 +473,12 @@ namespace hozo.ir {
     Case: CaseValue;
     List: ListValue;
   }
-  model LiteralValue { /* kind: "literal"; */ literal: Literal; }
-  model RefValue { /* kind: "ref"; */ target: string; }
-  model RefsValue { /* kind: "refs"; */ targets: Fqn[]; }
-  model VariantValue { /* kind: "variant"; */ union: Fqn; arm: string; }
-  model CaseValue { /* kind: "case"; */ classify: Fqn; case: string; }
-  model ListValue { /* kind: "list"; */ items: ArgValue[]; }
+  model LiteralValue { kind: "literal"; literal: Literal; }
+  model RefValue { kind: "ref"; target: string; }
+  model RefsValue { kind: "refs"; targets: Fqn[]; }
+  model VariantValue { kind: "variant"; union: Fqn; arm: string; }
+  model CaseValue { kind: "case"; classify: Fqn; case: string; }
+  model ListValue { kind: "list"; items: ArgValue[]; }
 
   model Bind { namespace: Fqn; state: Fqn; target: BindTarget; span: Span; }
   model BindTarget { namespace: Fqn; deep: boolean; }

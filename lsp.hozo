@@ -15,9 +15,10 @@
 // 書けなかった所の持ち主は docs/open.md「サンプルと、hozoc 自身の仕様」（下の「穴 21」などは、その番号）:
 //   穴 21: 要求 SharedDiagnostics（CLI と、言語サーバーが、同じ診断を出す）を、構造で言えない
 //   穴 22: 裏で走る処理と、その取り消し、時間の決まり（150 ミリ秒まとめる、5 秒で待つのをやめる）を、書けない
-//   前の穴に、ここでも当たったもの: 6（真偽の値で、道を分ける）、9（空の並び）、12（決まった値の項目: MarkupContent の kind、capabilities）、
-//   13（列挙: 重さ、シンボルの種類、位置の数え方）、14（null の結果）、15（形の決まっていない値: LSP の data）、18（運び方: 標準入出力の
-//   JSON-RPC）
+//   前の穴に、ここでも当たったもの: 6（真偽の値で、道を分ける）、9（空の並び）、14（null の結果）、15（形の決まっていない値: LSP の data）、
+//   18（運び方: 標準入出力の JSON-RPC）
+//   決まった値の項目（MarkupContent の kind、capabilities）と、列挙（重さ、シンボルの種類、位置の数え方）は、リテラルの型で書いてある
+//   （docs/decisions.md「決めたこと」482。前は、穴 12 と 13）
 
 /** 入口から入る操作。言語サーバー、IDE、MCP サーバーは、同じ操作への、別々の口（docs/tools.md「操作」） */
 namespace hozo.operation {
@@ -120,10 +121,13 @@ namespace hozo.operation {
   export fn describe(in: Workspace, at: Cursor): Description?;
 
   /**
-   * シンボルの種類（docs/lsp.md「ドキュメントのシンボル」の表の左の列）。穴 13: 列挙を、型として書けないので、scalar と pattern
+   * シンボルの種類（docs/lsp.md「ドキュメントのシンボル」の表の左の列）
    */
-  @valid.pattern("^(namespace|model|field|scalar|union|arm|state|op|exception|effect|read|classify|case|decorator|bind)$")
-  scalar SymbolKind extends string;
+  union SymbolKind {
+    Namespace: "namespace"; Model: "model"; Field: "field"; Scalar: "scalar"; Union: "union"; Arm: "arm";
+    State: "state"; Op: "op"; Exception: "exception"; Effect: "effect"; Read: "read"; Classify: "classify";
+    Case: "case"; Decorator: "decorator"; Bind: "bind";
+  }
 
   /** ファイルの中の宣言。名前空間の中に宣言、model の中にフィールド、union の中にアーム、classify の中にケース */
   model Symbol {
@@ -186,9 +190,8 @@ namespace hozo.lsp {
   model Range { start: Position; end: Position; }
   model Location { uri: Uri; range: Range; }
 
-  /** 位置の数え方。utf-8 がクライアントの一覧にあれば utf-8、なければ utf-16（穴 13: scalar と pattern） */
-  @valid.pattern("^(utf-8|utf-16)$")
-  scalar PositionEncoding extends string;
+  /** 位置の数え方。utf-8 がクライアントの一覧にあれば utf-8、なければ utf-16 */
+  union PositionEncoding { Utf8: "utf-8"; Utf16: "utf-16"; }
 
   model TextDocumentIdentifier { uri: Uri; }
   model VersionedTextDocumentIdentifier { uri: Uri; version: int; }
@@ -207,17 +210,16 @@ namespace hozo.lsp {
     capabilities: ClientCapabilities;
   }
 
-  /** save: { includeText: false }（穴 12: 決まった値を、書けない） */
-  model SaveOptions { includeText: boolean; }
-  /** openClose は true、change は Full（1）（穴 12） */
-  model TextDocumentSyncOptions { openClose: boolean; change: int; save: SaveOptions; }
-  /** definitionProvider、hoverProvider、documentSymbolProvider は true（穴 12） */
+  /** 保存の通知に、文書の中身を、含めない */
+  model SaveOptions { includeText: false; }
+  /** change の 1 は、Full（変更は、文書の全体） */
+  model TextDocumentSyncOptions { openClose: true; change: 1; save: SaveOptions; }
   model ServerCapabilities {
     positionEncoding: PositionEncoding;
     textDocumentSync: TextDocumentSyncOptions;
-    definitionProvider: boolean;
-    hoverProvider: boolean;
-    documentSymbolProvider: boolean;
+    definitionProvider: true;
+    hoverProvider: true;
+    documentSymbolProvider: true;
   }
   model InitializeResult { capabilities: ServerCapabilities; }
 
@@ -235,15 +237,15 @@ namespace hozo.lsp {
   model Settings { hozo: HozoSettings?; }
   model DidChangeConfigurationParams { settings: Settings?; }
 
-  /** 重さ。Error は 1、Warning は 2（穴 13: 数の列挙を、型として書けない。int のまま） */
-  scalar DiagnosticSeverity extends int;
+  /** 重さ（docs/lsp.md「診断」の表: hozoc の Error は 1、Warning は 2） */
+  union DiagnosticSeverity { Error: 1; Warning: 2; }
   model DiagnosticRelatedInformation { location: Location; message: string; }
-  /** hozoc の Diagnostic（docs/diagnostics.md）を写したもの（docs/lsp.md「診断」の表）。source は、いつも "hozoc"（穴 12） */
+  /** hozoc の Diagnostic（docs/diagnostics.md）を写したもの（docs/lsp.md「診断」の表）。source は、いつも "hozoc" */
   model Diagnostic {
     range: Range;
     severity: DiagnosticSeverity;
     code: string;
-    source: string;
+    source: "hozoc";
     message: string;
     relatedInformation: DiagnosticRelatedInformation[]?;
     /** コードアクションが使う。hozoc の Data（穴 15: LSP では、形の決まっていない値） */
@@ -251,12 +253,17 @@ namespace hozo.lsp {
   }
   model PublishDiagnosticsParams { uri: Uri; diagnostics: Diagnostic[]; }
 
-  /** kind は、いつも "markdown"（穴 12） */
-  model MarkupContent { /* kind: "markdown"; */ value: string; }
+  /** 中身は、いつも Markdown */
+  model MarkupContent { kind: "markdown"; value: string; }
   model Hover { contents: MarkupContent; }
 
-  /** シンボルの種類。LSP の SymbolKind の数（Namespace、Struct、Field、… docs/lsp.md「ドキュメントのシンボル」の表）（穴 13） */
-  scalar SymbolKind extends int;
+  /**
+   * シンボルの種類。LSP の SymbolKind の数（docs/lsp.md「ドキュメントのシンボル」の表。数は internal/lsp/protocol の定数）
+   */
+  union SymbolKind {
+    Namespace: 3; Class: 5; Property: 7; Field: 8; Enum: 10; Interface: 11; Function: 12; Variable: 13;
+    Key: 20; EnumMember: 22; Struct: 23; Event: 24; TypeParameter: 26;
+  }
   model DocumentSymbol {
     name: string;
     kind: SymbolKind;
