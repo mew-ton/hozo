@@ -1,0 +1,419 @@
+// Hozo 自身の仕様（docs/decisions.md「決めたこと」468）。IDE と、MCP サーバー: 画面（入口）の名前空間 hozo.ide、AI の道具（入口）の
+// 名前空間 hozo.mcp、二つの入口から入る操作（hozo.operation の続き。はじめの分は lsp.hozo）。
+// **写し。持ち主は、文書（docs/tools.md、docs/ide-screens.md）。** 食い違えば、文書が正しい。どの単位の対象でもない: コードには、ならない。
+// IDE も、MCP サーバーも、実装は、まだ、ない。文書も、設計の案の段階（docs/tools.md「IDE の設計の段階」）: 文書が決めていない所は、
+// 書かずに、「決めていない」とコメントにしてある。
+//
+// 分け方（同 472〜474）:
+//   hozo.operation  操作（docs/tools.md「操作」: 道具は、同じ操作への、別々の口）。担い手（設計する人、AI）は、ここに結ぶ
+//   hozo.ide        入口。IDE の画面と、画面の上の操作（語彙 browser.page）
+//   hozo.mcp        入口。AI が呼ぶ道具と、資料
+//
+// 書けなかった所の持ち主は docs/open.md「サンプルと、hozoc 自身の仕様」（下の「穴 24」などは、その番号）:
+//   穴 24: 一つの画面に、いくつもの場が、同時に並ぶこと（いつも出ている場と、呼び出す場）を、語彙 browser.page で言えない
+//   穴 25: 画面の中身（自由なキャンバス、図形、線、選んでいるもの、重ね）を、語彙 browser.page で言えない
+//   穴 26: 形が、まだ決まっていない値（見せるデータ）を、「決まっていない」と言う書き方が、ない（空の model で、代えた）
+//   穴 27: 経路（URL）が、決まっていないページを、ページとして宣言できない（@browser.page.route は、path を要る）
+//   穴 28: 入口の名前空間から、仕様のファイルを書き換える効果を、書けない（効果は、状態の持ち主の名前空間に宣言する）
+//   前の穴に、ここでも当たったもの: 13（列挙: 差の種類）、17（op の名前に read）、18（運び方: 画面と hozoc の間の、WebSocket の JSON。MCP）、
+//   22（裏で走る処理: ファイルの変化を見張って、画面を追従させる）
+
+/** 入口から入る操作（docs/tools.md「操作」）。IDE と、MCP サーバーの分。言語サーバーの分は lsp.hozo */
+namespace hozo.operation {
+  // 形を、文書が、まだ決めていない値（docs/tools.md「IDE の設計の段階」の段 6: hozoc との口の設計は、まだ、ない）。
+  // 項目は、書かない（穴 26）。何を持つかは、説明に書く。
+
+  /** アプリの全体: どんな概念（名前空間）と、担い手があり、何が、外から起きるか（入口の一覧） */
+  model Overview {}
+  /** 一つの入口から、何が、どの順に起き、何が変わり、どんな例外が出て、例外が出たとき、何が変わっているか */
+  model Trace {}
+  /** 一つのものが取りうる状態（ケース）と、許した移り変わりと、それを起こす入口 */
+  model Lifecycle {}
+  /** 誰に、何を約束していて、どの op が、それを守る役か */
+  model Promise {}
+  /** 要素への操作（名前、説明、ケース、移り変わり、手順の一行を、直す）。形は、決めていない */
+  model ElementEdit {}
+
+  /** 仕様の要素を指す名前（宣言の FQN） */
+  scalar Element extends string;
+
+  /** 文面の書き換え: この範囲を、この文面に */
+  model TextEdit {
+    place: Place;
+    text: string;
+  }
+
+  /**
+   * 見せるデータを導く: 全体（docs/tools.md「ユースケース」の「全体をつかむ」）。IR から導く。
+   *
+   * @param in プロジェクト
+   */
+  @prd.usecase.of(hozo.compiler.Actor.Designer, hozo.compiler.Actor.Agent)
+  export fn overview(in: Workspace): Overview;
+
+  /**
+   * 見せるデータを導く: 一つの入口の、手順（「入口を追う」）。
+   *
+   * @param in プロジェクト
+   * @param entry 入口（人の操作、外からの通知、時計）の op
+   */
+  @prd.usecase.of(hozo.compiler.Actor.Designer, hozo.compiler.Actor.Agent)
+  export fn trace(in: Workspace, entry: Element): Trace;
+
+  /**
+   * 見せるデータを導く: ものの一生（「ものの一生を確かめる」）。
+   *
+   * @param in プロジェクト
+   * @param thing 状態の分類か、行の進み具合の分類
+   */
+  @prd.usecase.of(hozo.compiler.Actor.Designer, hozo.compiler.Actor.Agent)
+  export fn lifecycle(in: Workspace, thing: Element): Lifecycle;
+
+  /**
+   * 見せるデータを導く: 約束（「約束を確かめる」）。
+   *
+   * @param in プロジェクト
+   */
+  @prd.usecase.of(hozo.compiler.Actor.Designer, hozo.compiler.Actor.Agent)
+  export fn promises(in: Workspace): Promise[];
+
+  /**
+   * 差の種類（docs/tools.md「変更を読む」の表）。穴 13: 列挙を、型として書けないので、scalar と pattern
+   */
+  @valid.pattern("^(entry|procedure|exceptions|lifecycle|promise|declaration|description)$")
+  scalar ChangeKind extends string;
+
+  /** 二つの版の仕様の差の一つ。設計の言葉で言う（行の足し引きでは、ない） */
+  model Change {
+    kind: ChangeKind;
+    /** 変わった要素 */
+    element: Element;
+    /** 何が変わったかの文 */
+    summary: string;
+  }
+
+  /**
+   * 変更を比べる: 二つの版の IR の差を、設計の言葉で言う（docs/tools.md「変更を読む」）。
+   * 基準の版（何と比べるか）は、決めていない（git の版か、IDE が覚えている「最後に受け入れた版」）: 引数に、書いていない。
+   *
+   * @param in プロジェクト（今の版）
+   */
+  @prd.usecase.of(hozo.compiler.Actor.Designer, hozo.compiler.Actor.Agent)
+  export fn compare(in: Workspace): Change[];
+
+  /**
+   * 足りない宣言を足す: 検査が名指しした、足りない宣言を、診断の Data から、足す文面にする（docs/tools.md「操作」）。
+   * 設計する人のボタン、AI の道具、エンジニアのコードアクションが、同じ文面を足す。
+   *
+   * @param in プロジェクト
+   * @param diagnostic 足りない宣言を、名指しした診断
+   */
+  @prd.usecase.of(hozo.compiler.Actor.Designer, hozo.compiler.Actor.Agent, hozo.compiler.Actor.Engineer)
+  export fn fill(in: Workspace, diagnostic: hozo.compiler.Diagnostic): TextEdit[];
+
+  /**
+   * 要素を直す: 要素への操作を、文面の書き換えにする（docs/requirements.md「UI での手直し」、docs/tools.md「ユースケース」の「画面で直す」）。
+   * AI は、使わない（文面を、直に書く）。
+   *
+   * @param in プロジェクト
+   * @param edit 要素への操作
+   */
+  @prd.usecase.of(hozo.compiler.Actor.Designer)
+  export fn amend(in: Workspace, edit: ElementEdit): TextEdit[];
+
+  /**
+   * 文面を見る: 画面の要素に当たる、.hozo の文面の場所（docs/tools.md「操作」の「位置を引く」の、要素から文面へ）。
+   *
+   * @param in プロジェクト
+   * @param element 要素
+   */
+  @prd.usecase.of(hozo.compiler.Actor.Designer, hozo.compiler.Actor.Agent)
+  export fn sourceOf(in: Workspace, element: Element): Place?;
+
+  /**
+   * ハーネスの状況（docs/tools.md「ハーネスの状況」）: 設計する人が、「中身が、仕様どおりか」を、コードを読まずに知るためのもの
+   */
+  model HarnessStatus {
+    /** 検査: 仕様の中の、error の数 */
+    errors: int;
+    /** 検査: 仕様の中の、warning の数 */
+    warnings: int;
+    /** 枠の遅れ: 生成したコードの枠が、今の仕様から、遅れているか（書く予定と、ディスクの比較） */
+    stale: boolean;
+    // 中身の欠け: 仕様が求める中身のうち、まだ書かれていないもの。出どころは、決めていない（今は、コンパイルエラーとして出る）
+    /** テスト: 仕様が求めるテストのうち、走ったと確かめられないものの名前。カバレッジのファイルを、どこから得るかは、決めていない */
+    notRun: string[];
+  }
+
+  /**
+   * ハーネスの状況を得る（「ハーネスを見る」）。
+   *
+   * @param in プロジェクト
+   */
+  @prd.usecase.of(hozo.compiler.Actor.Designer, hozo.compiler.Actor.Agent)
+  export fn harness(in: Workspace): HarnessStatus;
+
+  /**
+   * 言語の手引きを引く: 文法、検査の規則、書き方の指針（AI の「言語を知る」）。持ち主は docs/ の文書で、配るだけ。
+   *
+   * @param topic 引くもの
+   */
+  @prd.usecase.of(hozo.compiler.Actor.Agent)
+  export fn guide(topic: string): string?;
+}
+
+/** hozoc の外: チャットの AI。IDE が AI を持つか、利用者が持っているエージェントをつなぐかは、決めていない（docs/tools.md「IDE の形」） */
+namespace hozo.assistant {
+  /**
+   * 作ること、直すことを、言葉で頼む。選んでいる要素を、添えられる。AI は、MCP サーバー（hozo.mcp）を通して、仕様を扱い、文面を書く。
+   *
+   * @param prompt 頼むこと
+   * @param about 添える要素
+   */
+  export fn ask(prompt: string, about: hozo.operation.Element[]);
+}
+
+/**
+ * MCP サーバーの入口（docs/tools.md「AI（MCP サーバー）」）。AI の側（IDE のチャット、外のエージェント）が起動する。道具の呼び出しごとに、
+ * 今のファイルで答える。道具の名前と、引数の形は、決めていない（まだ、ない: docs/requirements.md「作るもの」）
+ */
+namespace hozo.mcp {
+  /** AI が呼ぶ道具（tool）の入口 */
+  @entry
+  decorator fn tool();
+
+  /** AI が読む資料（resource）の入口 */
+  @entry
+  decorator fn resource();
+
+  /** 言語を知る: Hozo の書き方と、書き方の指針を、その場で引く */
+  @resource
+  export fn language(topic: string): string? {
+    return hozo.operation.guide(topic);
+  }
+
+  /** 仕様を読む: プロジェクトの宣言と、その関係を、文面を全部読まずに引く（宣言を引く）。op の名前を read にできない（穴 17: 予約語） */
+  @tool
+  export fn readSpec(in: hozo.operation.Workspace, at: hozo.operation.Cursor): hozo.operation.Description? {
+    return hozo.operation.describe(in, at);
+  }
+
+  /** 検査する: 書いた文面の誤りと、直し方に要る名前を、構造のある形で受け取る */
+  @tool
+  export fn check(in: hozo.operation.Workspace): hozo.compiler.Diagnostic[] {
+    return hozo.operation.diagnose(in);
+  }
+
+  /** 足りない宣言を足す: 検査が名指しした、足りない宣言を、自分で文面を組み立てずに足す */
+  @tool
+  export fn fill(in: hozo.operation.Workspace, diagnostic: hozo.compiler.Diagnostic): hozo.operation.TextEdit[] {
+    return hozo.operation.fill(in, diagnostic);
+  }
+
+  /** 人が見るものを確かめる: 設計する人の画面に出るもの（入口、手順、ものの一生、欠け）を、渡す前に読む。入口の手順の分 */
+  @tool
+  export fn trace(in: hozo.operation.Workspace, entry: hozo.operation.Element): hozo.operation.Trace {
+    return hozo.operation.trace(in, entry);
+  }
+
+  /** 変更を確かめる: 自分の書き換えが、設計として、何を変えたかを読む */
+  @tool
+  export fn changes(in: hozo.operation.Workspace): hozo.operation.Change[] {
+    return hozo.operation.compare(in);
+  }
+
+  /** 枠を出す: 仕様から、コードの枠を出す */
+  @tool
+  export fn build(in: hozo.compiler.EmitInput): hozo.compiler.BuildResult {
+    return hozo.compiler.write(in);
+  }
+
+  /** ハーネスを見る: 中身が、仕様どおりかの結果を受け取る */
+  @tool
+  export fn harness(in: hozo.operation.Workspace): hozo.operation.HarnessStatus {
+    return hozo.operation.harness(in);
+  }
+}
+
+/**
+ * IDE の入口（docs/tools.md「設計する人（IDE）」「IDE の画面」「IDE の形」、docs/ide-screens.md）。設計する人の、ただ一つの場所。
+ * 画面は、hozoc が、手元のポートで配る（hozoc ide <フォルダ>。案）。殻（Tauri 2）は、フォルダを選び、hozoc を起動し、画面を出すだけ。
+ *
+ * 場の一覧（docs/ide-screens.md「ノート」「ノートのほかの場」）。いつも出ている場と、選んでいる間だけの場は、ページとして、書けていない（穴 24）:
+ *   ノート（設計の場。自由なキャンバス）、ノートの一覧（いつも）、詳しく見るところ（選んでいるものがあれば）、AI とのやり取り（いつも）、
+ *   状況（いつも）、アウトライン（いつも）、変更、欠けと決めごと、仕様の図、中身の状況、文面（この五つは、呼び出したとき）
+ * 経路（URL）は、文書が、決めていない: 下の path は、場の名前から、こちらが付けた、仮のもの（穴 27）。
+ */
+namespace hozo.ide {
+  // ---- 状態 ----
+
+  /** 今の場所（経路）。場を移ると、変わる */
+  @browser.page.path
+  state location: single<browser.page.Route>;
+
+  /** URL のクエリ */
+  @browser.page.query
+  state query: single<browser.page.Query>;
+
+  /** 選んでいるもの。場を移っても、変わらない（docs/ide-screens.md「移り方」）。置き場（URL か、画面の中か）は、決めていない */
+  state selection: nullable<hozo.operation.Element>;
+
+  /** 開いているプロジェクト。hozoc ide <フォルダ> が、決める */
+  state project: single<hozo.operation.Workspace>;
+
+  /** ノート。一つにつき、一つのファイルで、プロジェクトのルートの .hozo/ の下（docs/ide-screens.md「ノートのファイル」）。ファイルの形は、決めていない */
+  model Note {
+    name: string;
+    // 結ばれた図形の配置（どの要素を、どの図形で、どこに置いたか）と、自由な図形の中身。形は、決めていない（穴 25、穴 26）
+  }
+  @fs.files(".hozo/**")
+  state notes: list<Note>;
+
+  read fn currentProject(): hozo.operation.Workspace reads project;
+  read fn noteNamed(name: string): Note? reads notes;
+  effect fn select(element: hozo.operation.Element): effects selection.put;
+  effect fn saveNote(note: Note): effects notes.put;
+  effect fn moveTo(place: browser.page.Route): effects location.put;
+
+  // ---- ノート（代表の一つ目。操作と、状態の移り変わりまで） ----
+
+  /** ノートの場のクエリ: どのノートか */
+  model NoteQuery { name: string; }
+
+  /** ノートの場に出すもの */
+  union NotePage {
+    Ready: { note: Note; overview: hozo.operation.Overview; };
+    Missing: { name: string; };
+  }
+
+  fn notePageVm(note: Note?, overview: hozo.operation.Overview): NotePage;
+
+  /** ノートを開く。設計する人の「全体をつかむ」（全体のノート）と、詳細の設計（コンテキストのノート） */
+  @browser.page.route("/note", from: query)
+  export fn openNote(query: NoteQuery): NotePage {
+    val in = currentProject();
+    val note = noteNamed(query.name);
+    val overview = hozo.operation.overview(in);
+    return notePageVm(note, overview);
+  }
+
+  /** 図形を、選ぶ。「詳しく見るところ」に、選んでいるものの、すべてが出る */
+  @browser.page.interaction(page: openNote, when: NotePage.Ready)
+  fn onSelect(element: hozo.operation.Element):
+    effects select
+  {
+    select(element);
+  }
+
+  /**
+   * アウトラインから、要素を、ノートへ引いて、図形として置く（docs/ide-screens.md「アウトライン」）。仕様は、変わらない: 変わるのは、ノート。
+   * 置いた位置と、図形の種類は、Note の、まだ決めていない中身（穴 25）。
+   */
+  @browser.page.interaction(page: openNote, when: NotePage.Ready)
+  fn onPlace(note: Note, element: hozo.operation.Element):
+    effects saveNote
+  {
+    saveNote(note);
+  }
+
+  /**
+   * 画面で直す: 図形の欄を直すと、文面が書き換わる（docs/tools.md「ユースケース」の「画面で直す」）。
+   * 書き換えを、ファイルに書く効果は、書けていない: 仕様のファイル（hozo.compiler の状態 sources）は、別の名前空間の状態で、
+   * hozo.compiler に、書く op が、ない（穴 28）。返すのは、書き換えの案まで。
+   */
+  @browser.page.interaction(page: openNote, when: NotePage.Ready)
+  fn onAmend(edit: hozo.operation.ElementEdit): hozo.operation.TextEdit[] {
+    val in = currentProject();
+    return hozo.operation.amend(in, edit);
+  }
+
+  /** AI に頼む: 選んでいるものを添えて、言葉で頼む */
+  @browser.page.interaction(page: openNote, when: NotePage.Ready)
+  fn onAsk(prompt: string, about: hozo.operation.Element[]) {
+    hozo.assistant.ask(prompt, about);
+  }
+
+  // ---- 変更（代表の二つ目） ----
+
+  /** 変更の場に出すもの */
+  union ChangesPage {
+    Changed: { changes: hozo.operation.Change[]; };
+    Unchanged: {};
+  }
+
+  fn changesPageVm(changes: hozo.operation.Change[]): ChangesPage;
+
+  /** 変更を読む: AI が書き換えた後、設計として、何が変わったかを知る */
+  @browser.page.route("/changes")
+  export fn openChanges(): ChangesPage {
+    val in = currentProject();
+    val changes = hozo.operation.compare(in);
+    return changesPageVm(changes);
+  }
+
+  /** 変更を選ぶ: その要素のあるノートを、差の重ねを出して、開く（重ねは、穴 25） */
+  @browser.page.interaction(page: openChanges, when: ChangesPage.Changed)
+  fn onOpenChange(change: hozo.operation.Change, note: browser.page.Route):
+    effects select, moveTo
+  {
+    select(change.element);
+    moveTo(note);
+  }
+
+  // 受け入れる、戻す、一部だけ戻す: 基準の版が、決まっていない（docs/tools.md「変更を読む」）ので、op に、していない
+
+  // ---- 欠けと決めごと（代表の三つ目） ----
+
+  /** 欠けと決めごとの場に出すもの。目を通すところ、ラベルの付いた付箋、目を通していない範囲は、仕様の外で、形を、決めていない */
+  union GapsPage {
+    Found: { diagnostics: hozo.compiler.Diagnostic[]; };
+    Clean: {};
+  }
+
+  fn gapsPageVm(diagnostics: hozo.compiler.Diagnostic[]): GapsPage;
+
+  /** 欠けを知る: 検査の error と、目を通すべきところを、知る */
+  @browser.page.route("/gaps")
+  export fn openGaps(): GapsPage {
+    val in = currentProject();
+    val diagnostics = hozo.operation.diagnose(in);
+    return gapsPageVm(diagnostics);
+  }
+
+  /** 欠けの横のボタン: 足りない宣言を足す。足す文面は、エンジニアのコードアクション、AI の道具と、同じ（書く効果は、穴 28） */
+  @browser.page.interaction(page: openGaps, when: GapsPage.Found)
+  fn onFill(diagnostic: hozo.compiler.Diagnostic): hozo.operation.TextEdit[] {
+    val in = currentProject();
+    return hozo.operation.fill(in, diagnostic);
+  }
+
+  // ---- ほかの、呼び出す場（ページの宣言だけ） ----
+
+  /** 仕様の図: 仕様の全体を、op と、その依存の図として、漏れなく出す。節ごとの、二つの強度。中身の形は、決めていない */
+  model SpecDiagramPage {}
+  @browser.page.route("/spec")
+  export fn openSpecDiagram(): SpecDiagramPage;
+
+  /** 入口と手順: 入口を選ぶと、そこから辿れる、末端までの経路と節が、浮き上がる（「入口を追う」）。仕様の図の上 */
+  model EntryQuery { entry: hozo.operation.Element; }
+  @browser.page.route("/spec/entry", from: query)
+  export fn openEntry(query: EntryQuery): hozo.operation.Trace {
+    val in = currentProject();
+    return hozo.operation.trace(in, query.entry);
+  }
+
+  /** 中身の状況: コードの枠が、今の仕様のものか。まだない中身。確かめた結果の集計（「ハーネスを見る」） */
+  @browser.page.route("/harness")
+  export fn openHarness(): hozo.operation.HarnessStatus {
+    val in = currentProject();
+    return hozo.operation.harness(in);
+  }
+
+  /** 文面: .hozo と hozo.toml のファイルと、文面。直に直せる（「文面を見る」）。この部分は、言語サーバーのクライアント（lsp.hozo の入口を使う） */
+  model SourceQuery { element: hozo.operation.Element; }
+  @browser.page.route("/source", from: query)
+  export fn openSource(query: SourceQuery): hozo.operation.Place? {
+    val in = currentProject();
+    return hozo.operation.sourceOf(in, query.element);
+  }
+}

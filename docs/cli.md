@@ -14,6 +14,8 @@ hozoc 自身の仕様は、リポジトリ直下の `cli.hozo`。下のコード
 
 言語サーバー（`lsp.hozo`）も、同じに、写してある（同 468）: 入口（LSP の要求と通知）の `hozo.lsp`、入口から入る操作の `hozo.operation`、相手（文面のエディタ）の `hozo.editor`。**写しで、持ち主は、文書**（`docs/lsp.md`、`docs/editors.md`、`docs/tools.md`「操作」）。単位の対象ではなく、コードには、ならない。ユースケース `serve`（下の `hozo.compiler`。葉）は、その入口と操作の全体を、一つの op にしたもので、重なっている（`docs/open.md`「サンプルと、hozoc 自身の仕様」）。
 
+IDE と、MCP サーバー（`ide.hozo`）も、同じに、写してある（同 468）: 画面の入口 `hozo.ide`（語彙 `browser.page`）、AI の道具の入口 `hozo.mcp`、チャットの AI（外）の `hozo.assistant`、操作の続きの `hozo.operation`。**写しで、持ち主は、文書**（`docs/tools.md`、`docs/ide-screens.md`）。IDE も、MCP サーバーも、実装は、まだ、ない。単位の対象ではなく、コードには、ならない。担い手「設計する人」（下の `Actor.Designer`）は、この写しと一緒に、足した（同 474）。
+
 設計書の `examples/hozoc.hozo` を元に、次を変えたもの。変えた理由はそれぞれの項目に書く（決定の一覧での番号は `docs/decisions.md` の 20 と 36）。
 
 `examples/hozoc.hozo` が「書けなかったもの」として挙げた三つは、次のように解く。
@@ -54,7 +56,7 @@ namespace hozo.compiler {
    * 担い手: hozoc を使うもの。どの担い手が、どのユースケースを使うかは、ユースケースの op の @prd.usecase.of が言う
    * （docs/tools.md「担い手」、docs/requirements.md「書く人と、読む人」、docs/cli.md「tests」、docs/testing.md「CI」）。
    * 担い手は、していることで分ける。道具（エディタ、CLI、MCP サーバー、IDE）は、入口で、担い手ではない。
-   * 設計する人（IDE を使う）は、IDE を、Hozo に書くときに足す
+   * 設計する人が使う操作と、画面は、ide.hozo
    */
   classify Actor of never {
     /** 仕様（.hozo）の文面を書く AI。文面を書くのは、主に AI */
@@ -63,6 +65,8 @@ namespace hozo.compiler {
     @prd.actor.human Engineer;
     /** CI。検査を走らせる。プロジェクトのやり方でテストを走らせ、カバレッジのファイルを渡す */
     @prd.actor.bot Ci;
+    /** 設計する人。作りたいものを、仕様として決める。AI に書かせ、読み、直し、中身が仕様どおりかを見る。エンジニアでない人を含む。道具は、IDE（ide.hozo） */
+    @prd.actor.human Designer;
   }
 
   /**
@@ -564,7 +568,7 @@ namespace hozo.cli {
 
 ```toml
 [hozo]
-sources     = ["cli.hozo", "flows.hozo", "ir.hozo", "lsp.hozo", "plugin.hozo"]   # vocab/ と tests/ の .hozo を読まないため
+sources     = ["cli.hozo", "flows.hozo", "ide.hozo", "ir.hozo", "lsp.hozo", "plugin.hozo"]   # vocab/ と tests/ の .hozo を読まないため
 plugin_dirs = ["plugins"]
 
 # Go のモジュールの名前（go.mod の module と同じもの。docs/plugin-go.md「マニフェスト」）。プロジェクト全体のオプション

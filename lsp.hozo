@@ -58,7 +58,8 @@ namespace hozo.operation {
   }
 
   /**
-   * 文面を書く、設定する（docs/tools.md「エンジニア（言語サーバー、VS Code 拡張、CLI）」）: プロジェクトの全体を解析して、hozoc 自身の診断を返す。
+   * 検査する（docs/tools.md「操作」）: プロジェクトの全体を解析して、hozoc 自身の診断を返す。エンジニアの「文面を書く」「設定する」、
+   * 設計する人の「欠けを知る」、AI の「検査する」（入口は、言語サーバー、IDE、MCP サーバー: ide.hozo）。
    * 仕様の誤りと、hozo.toml の誤り（位置のないものは、hozo.toml の 1 行 1 列）、hozo.toml がないときの LSP-1。プラグインは、起動しない。
    *
    * hozo.compiler の検査（check）と、同じ実装（internal/check）の呼び出しで、同じ入力に、同じ診断が出る（docs/lsp.md「診断」）。
@@ -67,7 +68,7 @@ namespace hozo.operation {
    * @param in プロジェクト
    * @returns 診断（error と warning）
    */
-  @prd.usecase.of(hozo.compiler.Actor.Engineer)
+  @prd.usecase.of(hozo.compiler.Actor.Engineer, hozo.compiler.Actor.Designer, hozo.compiler.Actor.Agent)
   @prd.ref(hozo.compiler.Requirement.SharedDiagnostics, hozo.compiler.Requirement.NamedOmission)
   export fn diagnose(in: Workspace): hozo.compiler.Diagnostic[];
 
@@ -115,7 +116,7 @@ namespace hozo.operation {
    * @param in プロジェクト
    * @param at カーソル
    */
-  @prd.usecase.of(hozo.compiler.Actor.Engineer)
+  @prd.usecase.of(hozo.compiler.Actor.Engineer, hozo.compiler.Actor.Agent)
   export fn describe(in: Workspace, at: Cursor): Description?;
 
   /**

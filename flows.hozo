@@ -94,37 +94,90 @@ namespace hozo.flows {
     return { found: found, place: place, description: description, checked: checked, written: written };
   }
 
-  /** 設計する人の、仕事の流れの結果（今、ユースケースがある段の分だけ） */
-  model Designed {
-    /** 検査の結果 */
-    checked: hozo.compiler.BuildResult;
+  /** 設計する人の、仕事の流れの、前半（開く、書かせる、読む、直す）の結果 */
+  model Shaped {
+    /** 開いたときに出る、全体 */
+    overview: hozo.operation.Overview;
+    /** 読んだ、入口の手順 */
+    traced: hozo.operation.Trace;
+    /** 読んだ、変わったところ */
+    changes: hozo.operation.Change[];
+    /** 画面で直した、文面の書き換え */
+    amended: hozo.operation.TextEdit[];
+  }
+
+  /** 設計する人の、仕事の流れの、後半（整える、中身を作らせる、確かめる）の結果 */
+  model Realized {
+    /** 検査の欠け */
+    gaps: hozo.compiler.Diagnostic[];
     /** 枠を出した結果 */
     written: hozo.compiler.BuildResult;
-    /** 求めるテストが、走ったかの結果 */
-    ran: hozo.compiler.TestsResult;
+    /** ハーネスの状況 */
+    harness: hozo.operation.HarnessStatus;
+  }
+
+  /** 設計する人の、仕事の流れの結果 */
+  model Designed {
+    shaped: Shaped;
+    realized: Realized;
   }
 
   /**
-   * 設計する人の、仕事の流れ（docs/tools.md「仕事の流れ」）。どの段も、IDE の中で起きる。
-   * IDE は、まだ、ない: ユースケースのない段は、コメントにしてある。IDE を、Hozo に書くときに、op にする。
+   * 設計する人の、仕事の流れの、段 1〜4（docs/tools.md「仕事の流れ」）。
    *
-   * @param in 検査して、書き出す対象
-   * @returns 今、ユースケースがある段の結果
+   * @param project 開くプロジェクト
+   * @param prompt AI に言うこと
+   * @param about AI に言うときに、添える要素
+   * @param entry 読む入口
+   * @param edit 画面の上での直し
+   */
+  fn shape(project: hozo.operation.Workspace, prompt: string, about: hozo.operation.Element[], entry: hozo.operation.Element, edit: hozo.operation.ElementEdit): Shaped {
+    // 1. 開く: プロジェクトのルートを、IDE で開く。仕様のファイルと、設計の全体が出る
+    val overview = hozo.operation.overview(project);
+    // 2. 書かせる: チャットで、作りたいものを AI に言う。AI が、仕様の文面を書く
+    hozo.assistant.ask(prompt, about);
+    // 3. 読む: 書かれた仕様を、設計の手法ごとの画面で読む（ここでは、入口の手順）。二度目からは、変わったところを読む
+    val traced = hozo.operation.trace(project, entry);
+    val changes = hozo.operation.compare(project);
+    // 4. 直す: 画面の上で直す。大きな直しは、画面の要素を指して、AI に言う（2 と同じ op）
+    val amended = hozo.operation.amend(project, edit);
+    return { overview: overview, traced: traced, changes: changes, amended: amended };
+  }
+
+  /**
+   * 設計する人の、仕事の流れの、段 5〜7。
+   *
+   * @param project 開いているプロジェクト
+   * @param in 枠を出す対象
+   */
+  fn realize(project: hozo.operation.Workspace, in: hozo.compiler.EmitInput): Realized {
+    // 5. 整える: 検査の欠け（足りない宣言）を、AI か、ボタンで埋める（埋めるのは、欠けごとの hozo.operation.fill）
+    val gaps = hozo.operation.diagnose(project);
+    // 6. 中身を作らせる: 仕様からコードの枠を出し、AI に中身を書かせる（書かせるのは、段 2 と同じ op）
+    val written = hozo.compiler.write(in);
+    // 7. 確かめる: ハーネスの状況（検査、枠の遅れ、中身の欠け、テスト）を見る
+    val harness = hozo.operation.harness(project);
+    return { gaps: gaps, written: written, harness: harness };
+  }
+
+  /**
+   * 設計する人の、仕事の流れ（docs/tools.md「仕事の流れ」）。どの段も、IDE の中で起きる。IDE は、まだ、ない: 呼んでいるのは、
+   * ide.hozo に、設計として書いた操作（hozo.operation）と、チャットの AI（hozo.assistant。hozoc の外）。
+   * 二つに分けてあるのは、一つの op の val の数の上限（WIRE-6）のため。
+   *
+   * @param project 開くプロジェクト
+   * @param prompt AI に言うこと
+   * @param about AI に言うときに、添える要素
+   * @param entry 読む入口
+   * @param edit 画面の上での直し
+   * @param in 枠を出す対象
+   * @returns 段ごとの結果
    */
   @prd.business.flow
-  export fn design(in: hozo.compiler.EmitInput): Designed {
-    // 1. 開く: プロジェクトのルートを、IDE で開く（ユースケースは、まだ、ない）
-    // 2. 書かせる: チャットで、作りたいものを AI に言う。AI が、仕様の文面を書く（まだ、ない）
-    // 3. 読む: 書かれた仕様を、設計の手法ごとの画面で読む。二度目からは、変わったところを読む（まだ、ない）
-    // 4. 直す: 画面の上で直す。大きな直しは、画面の要素を指して、AI に言う（まだ、ない）
-    // 5. 整える: 検査の欠けを、AI か、ボタンで埋める（検査は、ある。埋めるユースケースは、まだ、ない）
-    val checked = hozo.compiler.verify(in);
-    // 6. 中身を作らせる: 仕様からコードの枠を出し、AI に中身を書かせる（枠を出すのは、ある）
-    val written = hozo.compiler.write(in);
-    // 7. 確かめる: ハーネスの状況（検査、枠の遅れ、中身の欠け、テスト）を見る（テストが走ったかの確かめは、ある）
-    val coverage = hozo.toolchain.runTests();
-    val ran = hozo.compiler.confirmTests({ config: in.config, coverage: coverage, pluginPath: in.pluginPath, cacheDir: in.cacheDir });
-    // 8. 2 に戻る
-    return { checked: checked, written: written, ran: ran };
+  export fn design(project: hozo.operation.Workspace, prompt: string, about: hozo.operation.Element[], entry: hozo.operation.Element, edit: hozo.operation.ElementEdit, in: hozo.compiler.EmitInput): Designed {
+    val shaped = shape(project, prompt, about, entry, edit);
+    val realized = realize(project, in);
+    // 8. 段 2 に戻る（決まった回数でない、繰り返しは、書けない: 配線の繰り返しは、並びの要素ごと）
+    return { shaped: shaped, realized: realized };
   }
 }
