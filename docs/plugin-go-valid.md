@@ -13,7 +13,7 @@
 ```toml
 name     = "go-valid"
 wasm     = "plugin.wasm"
-protocol = "1.0"
+protocol = "0.24"
 
 [[transpiler]]
 name     = "go-valid"

@@ -2,7 +2,7 @@
 # View.config.seams だけで、このプラグインは起動しない（wasm のファイルは、置いていない）。
 name     = "tracer"
 wasm     = "plugin.wasm"
-protocol = "1.0"
+protocol = "0.24"
 
 [[transpiler]]
 name     = "go-trace"

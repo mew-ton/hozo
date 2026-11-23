@@ -2,7 +2,7 @@
 # a.wrap は、解釈する。起動しない
 name     = "goplug"
 wasm     = "plugin.wasm"
-protocol = "1.0"
+protocol = "0.24"
 
 [[transpiler]]
 name        = "goplug"

@@ -2,7 +2,7 @@
 # 受け取った View をそのまま <view.config.dir>/view.json に書き出す。
 name     = "view-dump"
 wasm     = "plugin.wasm"
-protocol = "1.0"
+protocol = "0.24"
 
 [[transpiler]]
 name     = "view-dump"

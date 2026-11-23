@@ -1,7 +1,7 @@
 # CFG-20 のための fixture: 互いを requires に書いた二つのトランスパイラ（依存の輪）
 name     = "loop"
 wasm     = "plugin.wasm"
-protocol = "1.0"
+protocol = "0.24"
 
 [[transpiler]]
 name     = "loop-a"

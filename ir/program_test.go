@@ -77,7 +77,7 @@ func TestViewSignature(t *testing.T) {
 }
 
 func TestVersion(t *testing.T) {
-	if Version != "1.0" {
+	if Version != "0.24" {
 		t.Errorf("Version = %q", Version)
 	}
 }
@@ -98,6 +98,12 @@ func TestVersionAccepts(t *testing.T) {
 		{"2.0", "1.0", false}, // 大きい版が違う
 		{"1.0", "2.0", false},
 		{"1.0", "0.23", false},
+		// 大きい版が 0 の間は、ぴったり同じ版だけ
+		{"0.24", "0.24", true},
+		{"0.24", "0.23", false},
+		{"0.25", "0.24", false},
+		{"0.24", "0.25", false},
+		{"0.24", "1.0", false},
 		{"1.0", "", false},
 		{"1.0", "1", false},
 		{"1.0", "1.", false},
