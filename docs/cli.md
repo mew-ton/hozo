@@ -19,6 +19,7 @@ hozoc 自身の仕様は、リポジトリ直下の `cli.hozo`。下のコード
 ほかに変えたこと:
 
 - 名前空間は `hozo.compiler`（出典は `hozoc`）。Hozo 自身の仕様は、`hozo` の下の、入れ子の名前空間に書く（`docs/decisions.md`「決めたこと」468）。生成物の置き場は `internal/gen/hozo/compiler` で、Go のパッケージ名は `compiler`。例外の名前の表示（`--format json` の `"error"`）は、`hozo.compiler.CheckFailed` のように、名前空間から書く。コマンドの名前（`hozoc`）と、バイナリの置き場（`cmd/hozoc`）は、変えていない。
+- 担い手（分類 `Actor`）と、要求（分類 `Requirement`）を足し、コマンドの op に、行う担い手（`@prd.usecase.of`）と、要求（`@prd.ref`）を結んだ（`docs/vocab.md`「設計の図の語彙」。`docs/decisions.md`「決めたこと」468）。中身は、文書から写した: 担い手は `docs/requirements.md`「書く人と、読む人」「言語サーバー」、この文書の「tests」、`docs/testing.md`「CI」。要求は `docs/requirements.md`「ただ一つの正」「もとの考えと、Hozo が守るもの」（決定 373）「言語サーバー」「品質の要件」。四つのデコレータは `@hint` で、今の単位のトランスパイラは読まない: 生成物は、変わらない。業務フロー（`@prd.business.flow`）は、書いていない（`docs/open.md`「サンプルと、hozoc 自身の仕様」）。
 - `fs` の語彙は標準の語彙（`docs/vocab.md`「同梱する語彙」）に、`cli` の語彙は go-cli プラグインが提供する語彙（同「同梱しない語彙」）になったので、どちらも `cli.hozo` では宣言しない。出典の語彙 `proc` の二つの例外（`Crashed`、`MalformedOutput`）は、名前空間 `hozoc` の例外として、`cli.hozo` に宣言する（同 434）。
 - `lsp` を足す。言語サーバーを別のバイナリにしない（`docs/requirements.md`「言語サーバー」）ので、hozoc のサブコマンドとして境界に書く。
 - 書き出しの三つの変化（追加・書き換え・削除）は、`outputs` を対象にした分類 `OutputsSync` の遷移 `syncOutputs` 一つにする（一つの効果が変えるのは、一つの状態の一つの変化。`docs/check.md`「効果の宛先」）。ケースは `UpToDate` と `OutOfDate` の二つで、どちらも述語を持つ（`docs/check.md`「ケースの判定」）。述語 `UpToDate` は「生成し直して差分がない」で、`docs/testing.md`「生成物の一致」の検査と同じ中身。述語 `OutOfDate` は、その否定。
@@ -38,6 +39,40 @@ hozoc 自身の仕様は、リポジトリ直下の `cli.hozo`。下のコード
 ```ts
 /** hozo の仕様を検査し、各言語のコードに展開する CLI */
 namespace hozo.compiler {
+  /**
+   * 担い手: hozoc を呼ぶもの。どの担い手が、どのコマンドを呼ぶかは、コマンドの op の @prd.usecase.of が言う
+   * （docs/requirements.md「書く人と、読む人」「言語サーバー」、docs/cli.md「tests」、docs/testing.md「CI」）
+   */
+  classify Actor of never {
+    /** 仕様（.hozo）の文面を書く AI。文面を書くのは、主に AI */
+    @prd.actor.ai Agent;
+    /** 仕様の文面を書くエンジニア */
+    @prd.actor.human Engineer;
+    /** CI。検査を走らせる。プロジェクトのやり方でテストを走らせ、カバレッジのファイルを渡す */
+    @prd.actor.bot Ci;
+    /** 文面のエディタ（言語サーバーのクライアント）。hozoc lsp を起動して、接続する */
+    @prd.actor.bot Editor;
+  }
+
+  /**
+   * 要求: hozoc が満たすこと。どの宣言が、どの要求のためのものかは、@prd.ref が言う
+   * （docs/requirements.md「ただ一つの正」「もとの考えと、Hozo が守るもの」「言語サーバー」「品質の要件」）
+   */
+  classify Requirement of never {
+    /** ただ一つの正: 設計を言うものは、仕様（.hozo）だけ。生成するコードの枠と、テストは、仕様から作る */
+    SingleSource;
+    /** 共有: 検査だけの実行（build --no-emit）と、言語サーバーの診断は、同じ検査器の、同じ呼び出しで作る。同じ入力に対する診断が、二つの入口で食い違わない */
+    SharedDiagnostics;
+    /** 決定性: 同じ入力から、同じバイトの出力を作る。出力の並びは、宣言の並びに従い、ハッシュの順序に依存しない */
+    Deterministic;
+    /** 診断: 漏れを指摘するときは、何が漏れているかを、名指しする */
+    NamedOmission;
+    /** 配布: OS ごとの、単一のバイナリ。実行環境を要求しない。言語サーバーも、別のバイナリにしない */
+    SingleBinary;
+    /** ハーネス: 必要なテストケースが、用意されていて、それが、通っていること */
+    RequiredTestsRan;
+  }
+
   /** ファイルのパス。相対パスの基準は使う場所が決める（docs/config.md「置き場と探し方」など） */
   scalar Path extends string;
 
@@ -260,6 +295,7 @@ namespace hozo.compiler {
    * @throws Crashed プラグインが異常終了した
    * @see build
    */
+  @prd.ref(Requirement.SharedDiagnostics, Requirement.NamedOmission)
   fn check(in: CheckInput): CheckResult
     throws CheckFailed, ConfigInvalid, LanguageMismatch
     throws Crashed, MalformedOutput;
@@ -301,6 +337,8 @@ namespace hozo.compiler {
    * @param in コマンドの入力
    * @see tests
    */
+  @prd.usecase.of(Actor.Agent, Actor.Engineer, Actor.Ci)
+  @prd.ref(Requirement.SingleSource, Requirement.SharedDiagnostics, Requirement.Deterministic)
   @cli.command("build")
   export fn build(in: BuildInput): BuildResult
     throws CheckFailed, ConfigInvalid, LanguageMismatch, OutputConflict, UnknownNamespace prevents effects
@@ -331,6 +369,8 @@ namespace hozo.compiler {
    * @param in コマンドの入力
    * @see build
    */
+  @prd.usecase.of(Actor.Agent, Actor.Engineer, Actor.Ci)
+  @prd.ref(Requirement.RequiredTestsRan)
   @cli.command("tests")
   export fn tests(in: TestsInput): TestsResult {
     val checked = check({ config: in.config, format: in.format, pluginPath: in.pluginPath, cacheDir: in.cacheDir });
@@ -342,6 +382,8 @@ namespace hozo.compiler {
    *
    * @param in コマンドの入力
    */
+  @prd.usecase.of(Actor.Editor)
+  @prd.ref(Requirement.SharedDiagnostics, Requirement.SingleBinary)
   @cli.command("lsp")
   export fn lsp(in: LspInput);
 

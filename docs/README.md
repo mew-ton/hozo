@@ -105,6 +105,7 @@ Hozo の言語と、その実装（このリポジトリ）の設計。言語の
 | 状態の単位（生成した Go の中の、状態ごとのインターフェース。設定の単位とは別） | `plugin-go.md`「状態の単位」 |
 | 語彙の名前空間 | `vocab.md`「語彙の名前空間」 |
 | `cli.hozo`（リポジトリ直下の、hozoc 自身の仕様）と `plugins/go-cli/cli.hozo`（go-cli の語彙） | `cli.md`「cli.hozo」 |
+| hozoc の担い手（`Actor`）と、hozoc の要求（`Requirement`） | `cli.hozo` の、その名前の分類（写しは `cli.md`「cli.hozo」） |
 
 ## 書き方
 
