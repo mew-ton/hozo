@@ -45,7 +45,7 @@ namespace hozo.ir {
   scalar NarrowBy extends string;
 
   /** デコレータを付けられる宣言の種類 */
-  @valid.pattern("^(op|field|state|exception|scalar|model|effect|read|case)$")
+  @valid.pattern("^(op|field|state|exception|scalar|model|union|effect|read|classify|decorator|case)$")
   scalar DecoratorTarget extends string;
 
   /** `any <種類>` の種類（case を除く） */
@@ -79,7 +79,7 @@ namespace hozo.ir {
   // ---- Program ----
 
   model Program {
-    /** この文書の版（今は "0.24"） */
+    /** この文書の版（今は "0.25"） */
     version: string;
     namespaces: Namespace[];
     binds: Bind[];

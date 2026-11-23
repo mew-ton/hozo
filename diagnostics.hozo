@@ -49,14 +49,15 @@ namespace hozo.diagnostics {
   decorator origin(...decisions: int) for case of never;
 
   /**
-   * 持ち主の文書と、その見出し（条件と、重さを決めている所）。
+   * 持ち主の文書と、その見出し（条件と、重さを決めている所）。分類の宣言に付ければ、その分類のケースのすべての持ち主
+   * （プラグインごとの分類は、こう書く。分類の宣言に、印を付けられるようにしたのは docs/decisions.md「決めたこと」476）。
    *
    * @param doc 文書の場所（リポジトリのルートから）
    * @param heading 見出し
    */
   @hint
   @repeatable
-  decorator owner(doc: string, heading: string) for case of never;
+  decorator owner(doc: string, heading: string) for classify, case of never;
 
   /**
    * 欠番。なくした ID で、別の意味に、使い回さない（CLAUDE.md「番号は使い回さない」）。
@@ -208,64 +209,64 @@ namespace hozo.diagnostics {
   }
 
   /** 語彙のプラグイン http が返す診断（docs/plugin-http.md） */
+  @owner("docs/plugin-http.md", "診断")
   classify Http of never {
     /** HTTP-1: @http.get か @http.post の付いた op に、export がない */
     @severity(Severity.Error)
     @origin(410)
-    @owner("docs/plugin-http.md", "診断")
     HTTP_1;
   }
 
   /** 語彙のプラグイン valid が返す診断（docs/plugin-valid.md） */
+  @owner("docs/plugin-valid.md", "診断")
   classify Valid of never {
     /** VALID-1: 制約が、付けた先に合わない */
     @severity(Severity.Error)
     @origin(410)
-    @owner("docs/plugin-valid.md", "診断")
     VALID_1;
   }
 
   /** 語彙のプラグイン db が返す診断（docs/plugin-db.md） */
+  @owner("docs/plugin-db.md", "診断")
   classify Db of never {
     /** DB-1: @db.table の付いた状態の要素の型が、model でないか、インデックスの model */
     @severity(Severity.Error)
     @origin(410)
-    @owner("docs/plugin-db.md", "診断")
     DB_1;
   }
 
   /** Go の基底のトランスパイラ go が返す診断（docs/plugin-go.md） */
+  @owner("docs/plugin-go.md", "診断")
   classify Go of never {
     /** GO-8: オプション module が、書かれていない、文字列でない、空 */
     @severity(Severity.Error)
     @origin(425)
-    @owner("docs/plugin-go.md", "診断")
     GO_8;
   }
 
   /** トランスパイラ go-http が返す診断（docs/plugin-go-http.md） */
+  @owner("docs/plugin-go-http.md", "診断")
   classify GoHttp of never {
     /** GOHTTP-16: 経路の op の結果の型が、省略可能な配列か、省略可能な、インデックスの model */
     @severity(Severity.Error)
-    @owner("docs/plugin-go-http.md", "診断")
     GOHTTP_16;
   }
 
   /** トランスパイラ go-valid が返す診断（docs/plugin-go-valid.md） */
+  @owner("docs/plugin-go-valid.md", "診断")
   classify GoValid of never {
     /** GOVALID-5: 標準でない valid の制約が、付いている */
     @severity(Severity.Error)
     @origin(463)
-    @owner("docs/plugin-go-valid.md", "診断")
     GOVALID_5;
   }
 
   /** トランスパイラ go-sqlite が返す診断（docs/plugin-go-sqlite.md） */
+  @owner("docs/plugin-go-sqlite.md", "診断")
   classify GoSqlite of never {
     /** GOSQL-1: 欠番。語彙のプラグイン db の DB-1 に、移した */
     @retired(Db.DB_1)
     @origin(410)
-    @owner("docs/plugin-go-sqlite.md", "診断")
     GOSQL_1;
   }
 }

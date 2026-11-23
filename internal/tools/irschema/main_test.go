@@ -264,11 +264,11 @@ func TestNegative(t *testing.T) {
 		{"emit batch response no results", "EmitBatchResponse", `{"outputs":[{}]}`, false},
 		{"emit batch response bad result", "EmitBatchResponse", `{"outputs":[{"results":[{"files":[]}]}]}`, false},
 		{"emit output no view", "EmitOutput", `{"transpilers":["go"]}`, false},
-		{"emit batch wrong protocol", "EmitBatch", `{"protocol":"0.2","direction":"emit","spec":{"version":"0.24","namespaces":{},"program":{"version":"0.24","namespaces":[],"binds":[]}},"outputs":[]}`, false},
-		{"emit batch", "EmitBatch", `{"protocol":"0.24","direction":"emit","spec":{"version":"0.24","namespaces":{},"program":{"version":"0.24","namespaces":[],"binds":[]}},"outputs":[]}`, true},
-		{"emit batch wrong direction", "EmitBatch", `{"protocol":"0.24","direction":"check","spec":{"version":"0.24","namespaces":{},"program":{"version":"0.24","namespaces":[],"binds":[]}},"outputs":[]}`, false},
-		{"import request", "ImportRequest", `{"protocol":"0.24","direction":"import","format":"openapi","files":[{"path":"openapi.yaml","content":""}]}`, true},
-		{"import request wrong direction", "ImportRequest", `{"protocol":"0.24","direction":"emit","format":"openapi","files":[]}`, false},
+		{"emit batch wrong protocol", "EmitBatch", `{"protocol":"0.2","direction":"emit","spec":{"version":"0.25","namespaces":{},"program":{"version":"0.25","namespaces":[],"binds":[]}},"outputs":[]}`, false},
+		{"emit batch", "EmitBatch", `{"protocol":"0.25","direction":"emit","spec":{"version":"0.25","namespaces":{},"program":{"version":"0.25","namespaces":[],"binds":[]}},"outputs":[]}`, true},
+		{"emit batch wrong direction", "EmitBatch", `{"protocol":"0.25","direction":"check","spec":{"version":"0.25","namespaces":{},"program":{"version":"0.25","namespaces":[],"binds":[]}},"outputs":[]}`, false},
+		{"import request", "ImportRequest", `{"protocol":"0.25","direction":"import","format":"openapi","files":[{"path":"openapi.yaml","content":""}]}`, true},
+		{"import request wrong direction", "ImportRequest", `{"protocol":"0.25","direction":"emit","format":"openapi","files":[]}`, false},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -345,7 +345,7 @@ func TestNegativeMutations(t *testing.T) {
 		{"state bad shape", func() any { p := program(); firstDecl(p, "state")["shape"] = "map"; return p }},
 		{"decorator bad target", func() any {
 			p := program()
-			firstDecl(p, "decorator")["targets"] = []any{"op", "union"}
+			firstDecl(p, "decorator")["targets"] = []any{"op", "namespace"} // namespace には、付けられない（union は、付ける先: 決定 476）
 			return p
 		}},
 		{"view without ops", func() any { w := view(); delete(w, "ops"); return w }},
@@ -487,7 +487,7 @@ func TestEnumsMatchGo(t *testing.T) {
 		typeOf[ir.UnionVariant]():    {string(ir.UnionArms), string(ir.UnionSet)},
 		typeOf[ir.StateShape]():      {string(ir.StateList), string(ir.StateNullable), string(ir.StateSingle)},
 		typeOf[ir.Operation]():       {string(ir.OpPost), string(ir.OpPut), string(ir.OpDelete)},
-		typeOf[ir.DecoratorTarget](): {string(ir.TargetOp), string(ir.TargetField), string(ir.TargetState), string(ir.TargetException), string(ir.TargetScalar), string(ir.TargetModel), string(ir.TargetEffect), string(ir.TargetRead)},
+		typeOf[ir.DecoratorTarget](): {string(ir.TargetOp), string(ir.TargetField), string(ir.TargetState), string(ir.TargetException), string(ir.TargetScalar), string(ir.TargetModel), string(ir.TargetUnion), string(ir.TargetEffect), string(ir.TargetRead), string(ir.TargetClassify), string(ir.TargetDecorator), string(ir.TargetCase)},
 		typeOf[ir.AnyOf]():           {string(ir.AnyException), string(ir.AnyEffect), string(ir.AnyState), string(ir.AnyOp), string(ir.AnyModel), string(ir.AnyVariant)},
 		typeOf[ir.RelationKind]():    {string(ir.Prevents), string(ir.Keeps)},
 		typeOf[ir.CatchMode]():       {string(ir.Recovers), string(ir.Halts), string(ir.Ignores)},

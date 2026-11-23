@@ -1796,6 +1796,53 @@ func TestCoreMarkHover(t *testing.T) {
 	c.shutdown()
 }
 
+// TestDeclarationTargets は、union、classify（分類そのもの）、デコレータの宣言に付けたデコレータ（docs/grammar.md「decorator の宣言」、
+// docs/decisions.md「決めたこと」476）の、ホバーと、定義への移動: ほかの宣言に付けたときと、同じ。
+func TestDeclarationTargets(t *testing.T) {
+	root := t.TempDir()
+	text := `namespace notes {
+  model M { id: string; }
+  model N { name: string; }
+  classify Decision of never { D1; }
+  /** この宣言の形を決めた決定 */
+  @hint @repeatable
+  decorator decided(...decisions: any case of never) for union, classify, decorator;
+  @decided(Decision.D1)
+  union U { First: M; Second: N; }
+  @decided(Decision.D1)
+  classify Kind of U { First: U as M; Second: U as N; }
+  @decided(Decision.D1) @hint
+  decorator marked for model;
+}
+`
+	path := filepath.Join(root, "a.hozo")
+	writeFile(t, path, text)
+	c := startServer(t, Options{})
+	_, byURI := c.initialize(root, protocol.ClientCapabilities{})
+	uri, enc := fileURI(path), encUTF16
+	for _, d := range byURI[uri] {
+		if d.Code != codeNoConfig {
+			t.Errorf("診断がある: %s %s", d.Code, d.Message)
+		}
+	}
+	decl := positionOf(t, enc, text, "decorator decided", 0)
+	for n, what := range []string{"union", "classify", "decorator"} {
+		at := shift(positionOf(t, enc, text, "@decided(Decision.D1)", n), 1)
+		var hov *protocol.Hover
+		c.result(protocol.MethodHover, protocol.TextDocumentPositionParams{TextDocument: textDoc(uri), Position: at}, &hov)
+		const want = "@repeatable @hint decorator decided(...decisions: any case of never) for union, classify, decorator"
+		if hov == nil || !strings.Contains(hov.Contents.Value, want) || !strings.Contains(hov.Contents.Value, "この宣言の形を決めた決定") {
+			t.Errorf("hover(%s の宣言に付けた適用) に %q がない: %+v", what, want, hov)
+		}
+		var loc *protocol.Location
+		c.result(protocol.MethodDefinition, protocol.TextDocumentPositionParams{TextDocument: textDoc(uri), Position: at}, &loc)
+		if loc == nil || loc.URI != uri || loc.Range.Start.Line != decl.Line {
+			t.Errorf("definition(%s の宣言に付けた適用) = %+v, want 行 %d", what, loc, decl.Line)
+		}
+	}
+	c.shutdown()
+}
+
 // TestTryHover は、例外を受ける文の中の、ホバーと、定義への移動（docs/lsp.md「定義へジャンプ」「ホバー」）: try と catch のブロックの中の
 // 呼び出しと val、受けた例外の名前（match (e by …) の対象、throw e）、catch (e by C) の分類とケース、例外の分類の見出し。
 func TestTryHover(t *testing.T) {

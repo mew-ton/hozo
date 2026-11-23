@@ -1,7 +1,7 @@
 # テストの fixture: 語彙のファイルで、標準の語彙の名前空間 valid に、制約を足すプラグイン。起動しない
 name       = "morevalid"
 wasm       = "plugin.wasm"
-protocol   = "0.24"
+protocol   = "0.25"
 vocabulary = ["valid.hozo"]
 
 [[transpiler]]

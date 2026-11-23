@@ -1,0 +1,46 @@
+// DEC-1（docs/check.md「デコレータ」、docs/decisions.md「決めたこと」476）: union / classify / decorator の宣言に付けられるのは、
+// 付ける先に、その種類を書いたデコレータだけ。関数に付けるデコレータ（decorator fn）は、付けられない。
+// 付ける先が union / classify / decorator だけのデコレータは、ほかの宣言と、分類のケースには、付けられない
+namespace a {
+  model M { id: string; }
+  model N { name: string; }
+  @hint
+  decorator onUnion for union;
+  @hint
+  decorator onClassify for classify;
+  @hint
+  decorator onDecorator for decorator;
+  @hint
+  decorator onModel for model;
+  @hint
+  decorator onCase for case;
+  @hint
+  decorator fn onFn();
+
+  @onClassify                          // ERROR: DEC-1
+  @onDecorator                         // ERROR: DEC-1
+  @onModel                             // ERROR: DEC-1
+  @onFn                                // ERROR: DEC-1
+  union U { First: M; Second: N; }
+
+  @onUnion                             // ERROR: DEC-1
+  @onDecorator                         // ERROR: DEC-1
+  @onCase                              // ERROR: DEC-1
+  @onFn                                // ERROR: DEC-1
+  classify Kind of U {
+    @onClassify                        // ERROR: DEC-1
+    First: U as M;
+    Second: U as N;
+  }
+
+  @onUnion                             // ERROR: DEC-1
+  @onClassify                          // ERROR: DEC-1
+  @onFn                                // ERROR: DEC-1
+  @hint
+  decorator marked for model;
+
+  @onUnion                             // ERROR: DEC-1
+  @onClassify                          // ERROR: DEC-1
+  @onDecorator                         // ERROR: DEC-1
+  model O { @onDecorator id: string; }   // ERROR: DEC-1
+}

@@ -744,6 +744,12 @@ const (
 	TargetRead
 	// TargetCase は、分類のケース（case、case of never、case of Actor）。
 	TargetCase
+	// TargetUnion は union の宣言。
+	TargetUnion
+	// TargetClassify は classify の宣言（分類そのもの）。
+	TargetClassify
+	// TargetDecorator は decorator の宣言。
+	TargetDecorator
 )
 
 // String は対象の語。
@@ -767,6 +773,12 @@ func (k TargetKind) String() string {
 		return "read"
 	case TargetCase:
 		return "case"
+	case TargetUnion:
+		return "union"
+	case TargetClassify:
+		return "classify"
+	case TargetDecorator:
+		return "decorator"
 	}
 	return "?"
 }

@@ -327,7 +327,8 @@ ParamType = AnyType [ "?" ] | Type { "|" Type } ;      (* 省略可能は型の 
 RestType  = AnyType | Type { "|" Type } ;              (* 渡す値一つの型。? も [] も付けない *)
 AnyType   = "any" AnyKind [ "on" QualifiedName "." StateOp ] ;
 AnyKind   = "exception" | "effect" | "state" | "op" | "model" | "variant" | CaseKind ;   (* variant は文脈キーワード *)
-Target    = "op" | "field" | "state" | "exception" | "scalar" | "model" | "effect" | "read" | CaseKind ;   (* field は文脈キーワード *)
+Target    = "op" | "field" | "state" | "exception" | "scalar" | "model" | "union" | "effect" | "read"
+          | "classify" | "decorator" | CaseKind ;   (* field は文脈キーワード *)
 CaseKind  = "case" [ "of" ( "any" | "never" | Type ) ] ;   (* 分類のケース。Type は、型か、分類の名前 *)
 
 DecoratorClause = ThrowsClause | CatchesClause | DecoReadsClause | DecoEffectsClause ;
@@ -381,7 +382,10 @@ DecoEffectsClause = "effects" EffectElem { "," EffectElem } ;
   - ここの `any` は、型ではなく、「どの型でも」を言う語（遷移の `as any`、`-> any` と、同じ役）。ほかの型の位置（フィールド、引数、戻り値）に、`any` は書けない。
   - **引数の種類の、いちばん後ろの `?` は、引数を省ける印**（`ParamType` の `?`。`docs/decisions.md`「決めたこと」354）: `any case?`、`any case of any?`、`any case of never?`、`any case of Order?` は、どれも、省ける引数。`any case of Order?` の `?` は、対象の型の一部ではない（対象は `Order`）: 引数の型の全体を、`nullable` で包んだ形の、省略（`docs/types.md`「形の書き方」）。内側の `?`（`any case of Order?[]`）は、型の一部。
   - **型で絞る形の対象に、省略可能な型は、書けない**（いちばん外が `?` か、`nullable<…>` の型。SYNTAX）: 付ける先の `for case of Order?`、`for case of nullable<Order>`、引数の種類の `any case of nullable<Order>`、`any case of Order??`。省略可能な型を対象にする分類（`classify Known of User?`）のケースは、名前で絞る（`case of Known`）。メッセージは、その書き方を示す。
-- 分類そのものを、付ける先や、引数の種類にする形（`for classify`、`any classify`）は、まだ、書けない。パーサーは、`Target` か `AnyKind` の位置に `classify` が来たら、SYNTAX にする: メッセージは、分類そのものは、まだ、書けないことと、なくした書き方（`classify case`、`classify of never case`、`classify Actor case`）の、新しい書き方（`case of any`、`case of never`、`case of Actor`）を、示す。
+- **`union`、`classify`、`decorator` の宣言にも、付けられる**（`docs/decisions.md`「決めたこと」476）: 付ける先に `union`、`classify`、`decorator` を書いたデコレータは、それぞれ、`union` の宣言、`classify` の宣言（分類そのもの。ケースは `case of …`）、デコレータの宣言（三つの形の、どれにも）の前に書ける（`decorator decided(...decisions: any case of never) for union, classify, decorator;`）。`namespace` と `bind` には、今も、付けられない（「ファイルと宣言」）。
+  - デコレータの宣言に付けた印は、その宣言に付くだけ: そのデコレータを付けた先には、移らない。デコレータを、自分の宣言に付けること、二つのデコレータを、互いの宣言に付けることも、書ける（印を、宣言に残すだけで、たどる計算が、ない）。
+  - 核の印（`CoreMark`）は、言語の印で、`for decorator` のデコレータとは、別。核の印は、今までどおり、`decorator` の直前に置くので、`for decorator` のデコレータは、核の印より前に書く（`@decided(Decision.D1) @hint decorator marked for model;`）。
+- 分類そのものを、引数の種類にする形（`any classify`）は、まだ、書けない。パーサーは、`AnyKind` の位置に `classify` が来たら、SYNTAX にする。`Target` の位置の `classify` は、付ける先（上の項）。ただし、後ろが `case`、`of`、名前なら、なくした書き方（`classify case`、`classify of never case`、`classify Actor case`）として、新しい書き方（`case of any`、`case of never`、`case of Actor`）を、メッセージで示して SYNTAX。
 - `DecoReadsClause` と `DecoEffectsClause` は、そのデコレータの処理が読むものと、持つ効果を言う節（`decorator fn limit(counter: any state, by: any effect): reads counter effects by;`）。要素は op の節と同じもの（`ReadElem`、`EffectElem`）か、デコレータの引数の名前（`any state` の引数は読む状態、`any effect` の引数は効果）。何度でも書ける。意味は `docs/check.md`「デコレータが運ぶ reads と effects」。
 - `Relation` の `effects` は、直前の `prevents` / `keeps` の目的語。`DecoEffectsClause` の頭の `effects` と字句は同じだが、`prevents` / `keeps` の直後かどうかで分かれる（`throws X prevents effects effects e` は、`Relation` の後ろに `DecoEffectsClause`）。
 - `RestParam` は**残りの引数**: 適用が、ほかの引数の後ろに位置で渡した 0 個以上の値を、まとめて受け取る（`decorator fn effects(...targets: any effect): effects targets;`）。型は、渡す値一つの型を書く。引数の並びの最後に一つだけ書け、省略可能にはできない（文法で閉じる）。節の中で名前を書けば、渡した値のすべてを指す。
@@ -666,7 +670,7 @@ DocComment の中身 = { 本文の行 } { タグの行 } ;
 | 繰り返しは、TS 風の `for (val x of xs)`。数を増やしながら回す形は、持たない。集めるのは、`並びの val collect 値;`（同 308、314、318） | 図の繰り返しは、「並びの一つずつに、同じ流れを行う」だけを言う。集める文は、入れる先を、先に書く（`=` と同じ順） |
 | `val`、`disjoint`、`collect`、`case` は、予約語。`const` は、予約語から外す（同 341） | どれも、構文の骨（文の頭、節の語）。`const` は、どの生成規則も使わず、書かれていた位置（文の頭）は、`Ident` が、単独では文にならない位置なので、予約を外しても、なくした書き方として、見分けられる |
 | 対象のない分類は、`of` を省かず、`of never` と書く（同 328、329） | 当たる値のない型（`never`）を、分類している、と捉える。対象の種類を、増やさない。`of` を省く形にすると、書き忘れと、区別できない |
-| デコレータの宣言で、分類のケースは、`case of …` と書き、`of` の後ろに、`any`、型、分類の名前を書く。`case` は、`case of any` の省略（同 331、346、349）。分類そのもの（`for classify`）は、まだ、書けない（同 341） | 絞りが、いつも、`of` の後ろに来る。`for model` と `for field`、`any variant` と、同じ並び: 部分を言う語（`case`）と、全体を言う語（`classify`）が、別なので、後で、分類そのものを足しても、綴りが、ぶつからない。`any` を型にしないのは、仕様に、型のない値を、持ち込まないため |
+| デコレータの宣言で、分類のケースは、`case of …` と書き、`of` の後ろに、`any`、型、分類の名前を書く。`case` は、`case of any` の省略（同 331、346、349）。分類そのものを、付ける先にする形（`for classify`）は、後で、足した（同 476）。引数の種類にする形（`any classify`）は、まだ、書けない（同 341） | 絞りが、いつも、`of` の後ろに来る。`for model` と `for field`、`any variant` と、同じ並び: 部分を言う語（`case`）と、全体を言う語（`classify`）が、別なので、後で、分類そのものを足しても、綴りが、ぶつからない。`any` を型にしないのは、仕様に、型のない値を、持ち込まないため |
 | 関数の宣言の頭は、`fn`。種類（`read`、`effect`）は、その前に書き、書かなければ、op（同 347）。`fn` は、予約語。`op`、`read`、`effect` は、予約語のまま | op、`read`、効果は、どれも、基底は関数。頭が一つなら、新しい種類が生まれても、文法の規則は、一つで済み、種類の語を、`fn` の前の、文脈キーワードにできる。状態に触れる末端だけに、印が付く。今ある三つの語を、文脈キーワードに変えないのは、`for op`、`any effect` の位置で、今のまま読むため |
 | 関数の戻り値は、どの種類も、`: 型` で、省けば `void`（同 348） | 効果は `void` のほかを返せず、省いた形が、ふつうになる。`read` と効果に、戻り値の、別の文法を持たない |
 | `)` の後ろに、戻り値か節を書くなら、`:` で始める。何も書かなければ、`:` も書かない（同 351） | `:` の後ろが、関数の型: 戻り値と、投げるもの、読むもの、変えるもの。`(引数): 戻り値` の形と、後ろに並ぶ節の、継ぎ目がなくなる。`:` の意味は、引数や `val` と同じ、「〜の型は」のまま。効果だけ `: void` を省く、という種類ごとの別扱いが、要らない |

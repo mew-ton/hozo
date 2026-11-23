@@ -1,7 +1,7 @@
 # テストの fixture: トランスパイラ dup を提供するプラグイン（one と two の両方が同じ名前を提供する）。起動しない
 name     = "one"
 wasm     = "plugin.wasm"
-protocol = "0.24"
+protocol = "0.25"
 
 [[transpiler]]
 name     = "dup"

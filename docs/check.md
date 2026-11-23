@@ -1069,7 +1069,7 @@ REL-3 と REL-6 は欠番。`relations` の目的語に効果の名前を個別�
 
 | ID | 重さ | 手続き |
 |---|---|---|
-| DEC-1 | error | `Application` が付いた先の種類が、D の `targets` にない。分類のケースに付けたときは、D の `targets` に、そのケースを含む、分類のケース（`docs/grammar.md`「decorator の宣言」の `CaseKind`: 分類の名前か、対象の型で、絞る）がなければ DEC-1。`union` / `classify`（分類そのもの）/ `decorator` に付けたら常に DEC-1（`namespace` と `bind` は文法で閉じる。`docs/grammar.md`「ファイルと宣言」） |
+| DEC-1 | error | `Application` が付いた先の種類が、D の `targets` にない。分類のケースに付けたときは、D の `targets` に、そのケースを含む、分類のケース（`docs/grammar.md`「decorator の宣言」の `CaseKind`: 分類の名前か、対象の型で、絞る）がなければ DEC-1。`union` / `classify`（分類そのもの）/ `decorator` の宣言に付けたときも、同じ: D の `targets` に、その種類がなければ DEC-1（付けられるようにしたのは `docs/decisions.md`「決めたこと」476。関数に付けるデコレータ `decorator fn` の `targets` は `op` だけなので、この三つには、付かない）。`namespace` と `bind` は文法で閉じる（`docs/grammar.md`「ファイルと宣言」） |
 | DEC-2 | — | 文法で閉じる（節を持てるのは、`decorator fn` だけ。`docs/grammar.md`「decorator の宣言」） |
 | DEC-3 | — | 文法で閉じる |
 | DEC-4 | error | `catches ... ignores` を持つデコレータが、`returns` が `null` でない op に付いている |

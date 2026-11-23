@@ -2598,8 +2598,8 @@ func TestClassifyNeverAndCaseKind(t *testing.T) {
 		{"removed: classify case", "decorator d for classify case;", removed},
 		{"removed: classify of never case", "decorator d for classify of never case;", removed},
 		{"removed: any classify Actor case", "decorator fn d(x: any classify Actor case);", removed},
-		{"classify itself", "decorator d for classify;", "分類そのもの（classify）は、まだ、書けない"},
-		{"any classify itself", "decorator fn d(x: any classify);", "分類そのもの（classify）は、まだ、書けない"},
+		{"removed: classify Actor case", "decorator d for classify Actor case;", removed},
+		{"any classify itself", "decorator fn d(x: any classify);", "分類そのもの（classify）を、引数の種類（any classify）には、まだ、書けない"},
 		{"name without case", "decorator d for Actor;", "for の対象"},
 		{"any name without case", "decorator fn d(x: any Actor);", "any の種類"},
 	}
@@ -2614,6 +2614,18 @@ func TestDecoratorTargets(t *testing.T) {
 	d := firstDecl[*ast.DecoratorDecl](t, "decorator context(name: string) for model, state, op;")
 	if len(d.For) != 3 || d.For[0].Kind != ast.TargetModel || d.For[1].Kind != ast.TargetState || d.For[2].Kind != ast.TargetOp || d.Fn {
 		t.Errorf("For = %+v, Fn = %v", d.For, d.Fn)
+	}
+	// union、classify（分類そのもの）、decorator の宣言も、付ける先（docs/decisions.md「決めたこと」476）
+	d = firstDecl[*ast.DecoratorDecl](t, "decorator decided for union, classify, decorator, case of never;")
+	if len(d.For) != 4 || d.For[0].Kind != ast.TargetUnion || d.For[1].Kind != ast.TargetClassify || d.For[2].Kind != ast.TargetDecorator || d.For[3].Kind != ast.TargetCase {
+		t.Errorf("For = %+v", d.For)
+	}
+	if d = firstDecl[*ast.DecoratorDecl](t, "decorator onlyClassify for classify;"); len(d.For) != 1 || d.For[0].Kind != ast.TargetClassify {
+		t.Errorf("For = %+v", d.For)
+	}
+	// デコレータの宣言の前の、ふつうのデコレータ。核の印は、decorator の直前
+	if d = firstDecl[*ast.DecoratorDecl](t, "@decided(D.A) @hint decorator marked for model;"); len(d.Decorators) != 1 || !d.Hint {
+		t.Errorf("Decorators = %+v, Hint = %v", d.Decorators, d.Hint)
 	}
 	file, diags := parseSrc(t, "decorator d for model | state;")
 	if len(diags) != 1 || len(file.Decls) != 1 || len(file.Decls[0].(*ast.DecoratorDecl).For) != 2 {

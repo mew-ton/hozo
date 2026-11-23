@@ -1,6 +1,6 @@
 name     = "go-valid"
 wasm     = "plugin.wasm"
-protocol = "0.24"
+protocol = "0.25"
 
 # 提供するトランスパイラは一つ。Go の基底 go に相乗りする（docs/plugin-go-valid.md「マニフェスト」）
 [[transpiler]]

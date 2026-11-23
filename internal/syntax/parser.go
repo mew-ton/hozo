@@ -1511,7 +1511,8 @@ func (p *parser) parseAnyType() *ast.AnyType {
 	return a
 }
 
-// parseTarget は Target = "op" | "field" | "state" | "exception" | "scalar" | "model" | "effect" | "read" | CaseKind を読む。
+// parseTarget は Target = "op" | "field" | "state" | "exception" | "scalar" | "model" | "union" | "effect" | "read" |
+// "classify" | "decorator" | CaseKind を読む。
 // field は文脈キーワード。
 func (p *parser) parseTarget() *ast.Target {
 	t := &ast.Target{Span: p.tok().Span}
@@ -1536,10 +1537,18 @@ func (p *parser) parseTarget() *ast.Target {
 		t.Kind = ast.TargetEffect
 	case p.at(token.Read):
 		t.Kind = ast.TargetRead
+	case p.at(token.Union):
+		t.Kind = ast.TargetUnion
+	case p.at(token.Decorator):
+		t.Kind = ast.TargetDecorator
 	case p.at(token.Classify):
-		p.failClassifyKind()
+		// 分類そのもの（classify の宣言）。後ろが case / of / 名前なら、なくした書き方（classify … case）
+		if next := p.peek(1).Kind; next == token.Case || next == token.Of || next == token.Ident {
+			p.failClassifyKind()
+		}
+		t.Kind = ast.TargetClassify
 	default:
-		p.failExpected("for の対象（op / field / state / exception / scalar / model / effect / read / case）")
+		p.failExpected("for の対象（op / field / state / exception / scalar / model / union / effect / read / classify / decorator / case）")
 	}
 	p.advance()
 	return t
@@ -1593,10 +1602,11 @@ func optionalAtTop(t ast.Type) bool {
 	return false
 }
 
-// failClassifyKind は、for か any の後ろの classify: 分類そのものは、まだ、書けない。なくした書き方（classify … case）の、
-// 新しい書き方も、示す（docs/grammar.md「decorator の宣言」）。
+// failClassifyKind は、any の後ろの classify（引数の種類としての、分類そのものは、まだ、書けない）と、for の後ろの、
+// なくした書き方（classify … case）: 新しい書き方を、示す（docs/grammar.md「decorator の宣言」）。for の後ろの classify は、
+// 後ろが case / of / 名前でなければ、付ける先（parseTarget）。
 func (p *parser) failClassifyKind() {
-	p.fail(p.tok().Span, "分類そのもの（classify）は、まだ、書けない。分類のケースは、case of any（省略して case）、case of never、case of 分類の名前 と書く（classify … case は、なくした書き方。docs/grammar.md「decorator の宣言」）")
+	p.fail(p.tok().Span, "分類そのもの（classify）を、引数の種類（any classify）には、まだ、書けない。分類のケースは、case of any（省略して case）、case of never、case of 分類の名前 と書く（classify … case は、なくした書き方。docs/grammar.md「decorator の宣言」）")
 }
 
 // parseThrowsClause は ThrowsClause = "throws" ExcRef { "," ExcRef } { Relation } を読む。

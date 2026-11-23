@@ -2,7 +2,7 @@
 # トランスパイラも、語彙の宣言も、持たない（宣言は、hozoc に同梱の vocab/valid.hozo）
 name     = "valid"
 wasm     = "plugin.wasm"
-protocol = "0.24"
+protocol = "0.25"
 
 [read]
 namespaces = ["valid"]

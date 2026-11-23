@@ -1,9 +1,11 @@
 // CFG-26（docs/config.md「解釈するトランスパイラ」）: 本体のない、@hint でないデコレータが、単位の対象の宣言に付いているが、
-// 設定のどのトランスパイラも解釈しない（warning。付いた位置）。宣言、model のフィールド、分類のケースを見る
+// 設定のどのトランスパイラも解釈しない（warning。付いた位置）。宣言（union、classify、デコレータの宣言を含む: docs/decisions.md
+// 「決めたこと」476）、model のフィールド、分類のケースを見る
 namespace a {
   decorator fn wrap();
   decorator mark for field, state;
   decorator tag for case of never;
+  decorator structural for union, classify, decorator;
   /** 本体のあるデコレータには、出さない */
   decorator fn logged(next: fn) { next(); }
   /** @hint のデコレータには、出さない */
@@ -16,6 +18,14 @@ namespace a {
     id: string;
   }
 
+  @structural                          // WARN: CFG-26
+  union Either { One: M; }
+
+  @structural                          // WARN: CFG-26
+  @hint
+  decorator stamped for model;
+
+  @structural                          // WARN: CFG-26
   classify Role of never {
     @tag                               // WARN: CFG-26
     Admin;

@@ -47,10 +47,16 @@ func (k siteKind) target() (ir.DecoratorTarget, bool) {
 		return ir.TargetScalar, true
 	case siteModel:
 		return ir.TargetModel, true
+	case siteUnion:
+		return ir.TargetUnion, true
 	case siteEffect:
 		return ir.TargetEffect, true
 	case siteRead:
 		return ir.TargetRead, true
+	case siteClassify:
+		return ir.TargetClassify, true
+	case siteDecorator:
+		return ir.TargetDecorator, true
 	case siteCase:
 		return ir.TargetCase, true
 	}
@@ -280,7 +286,7 @@ func (a *analyzer) aliasTarget(dec *ir.Decorator) (*ir.Decorator, bool) {
 }
 
 // checkDEC1 は DEC-1（docs/check.md「デコレータ」）: 付けた先の種類が targets にない。
-// union / classify / decorator に付けたら常に DEC-1（namespace / bind は文法で閉じる）。
+// union / classify / decorator の宣言も、targets に、その種類があれば、付けられる（namespace / bind は文法で閉じる）。
 // 分類のケースに付けたときは、targets に、そのケースを含む、分類のケース（CaseKind）がなければ DEC-1。
 func (a *analyzer) checkDEC1(dec *ir.Decorator, site *appSite, d *ast.Decorator) {
 	kind := site.kind

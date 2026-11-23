@@ -812,7 +812,7 @@
           "type": "array"
         },
         "protocol": {
-          "const": "0.24"
+          "const": "0.25"
         }
       },
       "required": [
@@ -1049,8 +1049,12 @@
         "exception",
         "scalar",
         "model",
+        "union",
         "effect",
-        "read"
+        "read",
+        "classify",
+        "decorator",
+        "case"
       ],
       "type": "string"
     },
@@ -1364,7 +1368,7 @@
           "type": "array"
         },
         "protocol": {
-          "const": "0.24"
+          "const": "0.25"
         },
         "spec": {
           "$ref": "#/$defs/Spec"
@@ -1790,7 +1794,7 @@
           "type": "string"
         },
         "protocol": {
-          "const": "0.24"
+          "const": "0.25"
         }
       },
       "required": [
@@ -2671,7 +2675,7 @@
           "type": "array"
         },
         "version": {
-          "const": "0.24"
+          "const": "0.25"
         }
       },
       "required": [
@@ -3657,7 +3661,7 @@
           "$ref": "#/$defs/Program"
         },
         "version": {
-          "const": "0.24"
+          "const": "0.25"
         },
         "viewer": {
           "type": "string"

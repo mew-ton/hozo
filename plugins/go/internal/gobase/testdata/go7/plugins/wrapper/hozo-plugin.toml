@@ -2,7 +2,7 @@
 # 基底 go の単体テストが読むのは View.config.seams だけで、このプラグインは起動しない。
 name     = "wrapper"
 wasm     = "plugin.wasm"
-protocol = "0.24"
+protocol = "0.25"
 
 [[transpiler]]
 name     = "go-wrap"

@@ -769,6 +769,19 @@ test('包んだ関数の引数（docs/grammar.md「デコレータの本体」�
   assert.deepEqual(scopesAt(t, 'next();', '  next();'), scopesAt(t, 'record();', '  record();'));
 });
 
+test('付ける先の union / classify / decorator（docs/grammar.md「decorator の宣言」）', () => {
+  // union、classify（分類そのもの）、デコレータの宣言も、付ける先。for の後ろでは、宣言の頭と同じ予約語
+  const decl = 'decorator decided(...decisions: any case of never) for union, classify, decorator;';
+  const t = tokensOf(decl);
+  assertScope(t, decl, 'for', 'keyword.control.hozo');
+  assertScope(t, 'for union', 'union', 'keyword.declaration.hozo');
+  assertScope(t, 'union, classify', 'classify', 'keyword.declaration.hozo');
+  // 宣言の頭の decorator と、付ける先の decorator は、同じ scope
+  const last = t[0].tokens.filter((x) => x.text === 'decorator');
+  assert.equal(last.length, 2);
+  assert.ok(last.every((x) => x.scopes.includes('keyword.declaration.hozo')));
+});
+
 test('コメントとドキュメンテーションコメント', () => {
   const s = linesOf(files.server);
   assertScope(s, '// ---- §6.1 exception ----', '// ---- §6.1 exception ----', 'comment.line.double-slash.hozo');

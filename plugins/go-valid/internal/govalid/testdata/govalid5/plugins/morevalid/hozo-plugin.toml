@@ -3,7 +3,7 @@
 # （wasm のファイルは、置いていない）。
 name       = "morevalid"
 wasm       = "plugin.wasm"
-protocol   = "0.24"
+protocol   = "0.25"
 vocabulary = ["valid.hozo"]
 
 [[transpiler]]

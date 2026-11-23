@@ -1,7 +1,7 @@
 # テストの fixture: 語彙を提供する、もう一つのプラグイン（vocplug に相乗りする）。起動しない
 name       = "vocplug2"
 wasm       = "plugin.wasm"
-protocol = "0.24"
+protocol = "0.25"
 vocabulary = ["v.hozo"]
 
 [[transpiler]]

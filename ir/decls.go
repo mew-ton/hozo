@@ -606,8 +606,14 @@ const (
 	TargetException DecoratorTarget = "exception"
 	TargetScalar    DecoratorTarget = "scalar"
 	TargetModel     DecoratorTarget = "model"
-	TargetEffect    DecoratorTarget = "effect"
-	TargetRead      DecoratorTarget = "read"
+	// TargetUnion は union の宣言。
+	TargetUnion  DecoratorTarget = "union"
+	TargetEffect DecoratorTarget = "effect"
+	TargetRead   DecoratorTarget = "read"
+	// TargetClassify は classify の宣言（分類そのもの。ケースは TargetCase）。
+	TargetClassify DecoratorTarget = "classify"
+	// TargetDecorator は decorator の宣言。
+	TargetDecorator DecoratorTarget = "decorator"
 	// TargetCase は、分類のケース（`case`、`case of never`、`case of Actor`）。絞りは Decorator.CaseTargets。
 	TargetCase DecoratorTarget = "case"
 )

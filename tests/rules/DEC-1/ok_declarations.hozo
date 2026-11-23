@@ -1,0 +1,50 @@
+// DEC-1 に当たらない（docs/check.md「デコレータ」、docs/grammar.md「decorator の宣言」、docs/decisions.md「決めたこと」476）:
+// 付ける先に union / classify / decorator を書いたデコレータは、それぞれの宣言に付けられる。
+// デコレータの宣言に付けた印は、その宣言に付くだけ。自分の宣言に付ける、互いの宣言に付ける、も書ける。
+namespace a {
+  model M { id: string; }
+  model N { name: string; }
+
+  /** 決めたこと */
+  classify Decision of never { D1; D2; }
+
+  /** この宣言の形を決めた決定 */
+  @hint @repeatable
+  decorator decided(...decisions: any case of never) for model, union, classify, decorator, op;
+
+  @hint
+  decorator onUnion for union;
+  @hint
+  decorator onClassify for classify;
+  @hint
+  decorator onDecorator for decorator;
+
+  @decided(Decision.D1) @onUnion
+  union U { First: M; Second: N; }
+
+  @decided(Decision.D1) @decided(Decision.D2) @onClassify
+  classify Kind of U {
+    First: U as M;
+    Second: U as N;
+  }
+
+  // デコレータの宣言の、三つの形の、どれにも付く。核の印は、decorator の直前なので、デコレータは、核の印より前に書く
+  @decided(Decision.D2) @onDecorator
+  decorator fn wrapped(next: fn) { next(); }
+  @onDecorator @hint
+  decorator plain(name: string) for model;
+  @onDecorator
+  decorator named = plain("x");
+
+  // 自分の宣言に付ける
+  @self @hint
+  decorator self for decorator;
+  // 互いの宣言に付ける
+  @right @hint
+  decorator left for decorator;
+  @left @hint
+  decorator right for decorator;
+
+  @wrapped @decided(Decision.D1)
+  fn f();
+}

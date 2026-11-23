@@ -52,12 +52,13 @@ namespace removedWiring {
   }
 }
 
-// デコレータの宣言の classify … case と、分類そのもの（docs/grammar.md「decorator の宣言」）
+// デコレータの宣言の classify … case と、引数の種類の、分類そのもの（docs/grammar.md「decorator の宣言」）。
+// 付ける先の、分類そのもの（for classify）は、書ける（tests/rules/DEC-1/ok_declarations.hozo）
 namespace removedCaseKind {
   decorator a for classify case;                     // ERROR: SYNTAX
   decorator b for classify of never case;            // ERROR: SYNTAX
   decorator fn c(x: any classify Actor case);    // ERROR: SYNTAX
-  decorator d for classify;                          // ERROR: SYNTAX
+  decorator fn d(x: any classify);               // ERROR: SYNTAX
 }
 
 // 頭に fn のない関数の宣言と、op fn（docs/grammar.md「関数の宣言」）
