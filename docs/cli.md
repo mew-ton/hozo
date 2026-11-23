@@ -46,17 +46,17 @@ hozoc 自身の仕様は、リポジトリ直下の `cli.hozo`。下のコード
 namespace hozo.compiler {
   /**
    * 担い手: hozoc を使うもの。どの担い手が、どのユースケースを使うかは、ユースケースの op の @prd.usecase.of が言う
-   * （docs/requirements.md「書く人と、読む人」「言語サーバー」、docs/cli.md「tests」、docs/testing.md「CI」）
+   * （docs/tools.md「担い手」、docs/requirements.md「書く人と、読む人」、docs/cli.md「tests」、docs/testing.md「CI」）。
+   * 担い手は、していることで分ける。道具（エディタ、CLI、MCP サーバー、IDE）は、入口で、担い手ではない。
+   * 設計する人（IDE を使う）は、IDE を、Hozo に書くときに足す
    */
   classify Actor of never {
     /** 仕様（.hozo）の文面を書く AI。文面を書くのは、主に AI */
     @prd.actor.ai Agent;
-    /** 仕様の文面を書くエンジニア */
+    /** 仕様の文面と、中身のコードを、自分のエディタで、直に書くエンジニア。エディタと言語サーバー、CLI は、道具（入口）で、担い手ではない */
     @prd.actor.human Engineer;
     /** CI。検査を走らせる。プロジェクトのやり方でテストを走らせ、カバレッジのファイルを渡す */
     @prd.actor.bot Ci;
-    /** 文面のエディタ（言語サーバーのクライアント）。hozoc lsp を起動して、接続する */
-    @prd.actor.bot Editor;
   }
 
   /**
@@ -403,7 +403,7 @@ namespace hozo.compiler {
    *
    * @param in ユースケースの入力
    */
-  @prd.usecase.of(Actor.Editor)
+  @prd.usecase.of(Actor.Engineer)
   @prd.ref(Requirement.SharedDiagnostics)
   export fn serve(in: ServeInput);
 
