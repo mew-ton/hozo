@@ -59,6 +59,12 @@ namespace hozo.flows {
 
   /** エンジニアが、文面を書く流れの結果 */
   model Written {
+    /** 打っている間に得た、診断 */
+    found: hozo.compiler.Diagnostic[];
+    /** 名前から移った先の、宣言の位置 */
+    place: hozo.operation.Place?;
+    /** 名前の説明 */
+    description: hozo.operation.Description?;
     /** 手元の検査の結果 */
     checked: hozo.compiler.BuildResult;
     /** 枠を出し直した結果 */
@@ -67,20 +73,25 @@ namespace hozo.flows {
 
   /**
    * エンジニアが、文面を書く（docs/tools.md「エンジニア（言語サーバー、VS Code 拡張、CLI）」）。
+   * 1 と 2 は、言語サーバーという入口（lsp.hozo の hozo.lsp）から入る操作。3 と 4 は、CLI から入るユースケース。
    *
-   * @param editor 言語サーバーの入力
+   * @param workspace エディタで開いているプロジェクト
+   * @param at 文面の中の、カーソルの位置
    * @param in 検査して、書き出す対象
-   * @returns 手元の検査と、枠を出し直した結果
+   * @returns 得た診断、移った先、説明、手元の検査と、枠を出し直した結果
    */
   @prd.business.flow
-  export fn writeSpec(editor: hozo.compiler.ServeInput, in: hozo.compiler.EmitInput): Written {
-    // 1. 文面を書く。打っている間に、誤りと、名前の候補と、機械的な直しを得る。名前から、宣言、参照、説明へ移る（言語サーバー）
-    hozo.compiler.serve(editor);
-    // 2. 手元で、検査する
+  export fn writeSpec(workspace: hozo.operation.Workspace, at: hozo.operation.Cursor, in: hozo.compiler.EmitInput): Written {
+    // 1. 文面を書く。打っている間に、誤りを得る（名前の候補と、機械的な直しは、まだ、ない: docs/lsp.md「段階 4 の後」）
+    val found = hozo.operation.diagnose(workspace);
+    // 2. 文面の中を移る。名前から、宣言、説明へ（参照へ移るのは、まだ、ない）
+    val place = hozo.operation.locate(workspace, at);
+    val description = hozo.operation.describe(workspace, at);
+    // 3. 手元で、検査する
     val checked = hozo.compiler.verify(in);
-    // 3. 枠を出し直す
+    // 4. 枠を出し直す
     val written = hozo.compiler.write(in);
-    return { checked: checked, written: written };
+    return { found: found, place: place, description: description, checked: checked, written: written };
   }
 
   /** 設計する人の、仕事の流れの結果（今、ユースケースがある段の分だけ） */

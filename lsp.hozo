@@ -1,0 +1,506 @@
+// Hozo 自身の仕様（docs/decisions.md「決めたこと」468）。言語サーバー: 入口の名前空間 hozo.lsp、その相手（文面のエディタ）の
+// 名前空間 hozo.editor、入口から入る操作の名前空間 hozo.operation。
+// **写し。持ち主は、文書（docs/lsp.md、docs/editors.md、docs/tools.md「ユースケース」「操作」）と、Go の型（internal/lsp/protocol）。
+// 生成に使うようになるまで。** 食い違えば、文書が正しい。どの単位の対象でもない: コードには、ならない。
+//
+// 分け方（同 472、473 の線: 入口と、ユースケースを分ける。フラグや、やり取りの形を知っているのは、入口だけ）:
+//   hozo.lsp        入口。LSP の要求と通知。位置の数え方、URI、Markdown など、LSP の形を知っているのは、ここだけ
+//   hozo.operation  入口から入る操作（docs/tools.md「操作」: 道具は、同じ操作への、別々の口）。担い手は、ここに結ぶ
+//   hozo.editor     hozoc の外: 言語サーバーのクライアント（文面のエディタ）。サーバーから送る通知を、op として言う（flows.hozo の
+//                   hozo.toolchain と同じ形）。担い手ではなく、入口の相手（同 474）
+// 操作は、本来は、ユースケースの名前空間 hozo.compiler に置くもの（同 473）。hozo.compiler は、単位の対象で、op を足すと、生成物が変わる
+// ので、この一切れでは、別の名前空間に書いた。cli.hozo の hozo.compiler.serve（葉。「言語サーバーとして動く」）は、ここに書いた入口と操作の
+// 全体を、一つの op にしたもの: 重なっている（どちらに寄せるかは、決めていない: docs/open.md）。
+//
+// 書けなかった所の持ち主は docs/open.md「サンプルと、hozoc 自身の仕様」（下の「穴 21」などは、その番号）:
+//   穴 21: 要求 SharedDiagnostics（CLI と、言語サーバーが、同じ診断を出す）を、構造で言えない
+//   穴 22: 裏で走る処理と、その取り消し、時間の決まり（150 ミリ秒まとめる、5 秒で待つのをやめる）を、書けない
+//   前の穴に、ここでも当たったもの: 6（真偽の値で、道を分ける）、9（空の並び）、12（決まった値の項目: MarkupContent の kind、capabilities）、
+//   13（列挙: 重さ、シンボルの種類、位置の数え方）、14（null の結果）、15（形の決まっていない値: LSP の data）、18（運び方: 標準入出力の
+//   JSON-RPC）
+
+/** 入口から入る操作。言語サーバー、IDE、MCP サーバーは、同じ操作への、別々の口（docs/tools.md「操作」） */
+namespace hozo.operation {
+  /** 開いている文書の、最新の内容。保存していなくても、ディスクより優先する（docs/lsp.md「プロジェクト」の Overlay） */
+  model OpenDocument {
+    file: hozo.compiler.Path;
+    text: string;
+  }
+
+  /**
+   * 操作の対象のプロジェクト。ルートは、ワークスペースのディレクトリから、親へ向かって hozo.toml を探して決める。
+   * 見つからなければ、ワークスペースのディレクトリをルートにして、設定なしで動く（docs/lsp.md「プロジェクト」）
+   */
+  model Workspace {
+    /** ワークスペースのディレクトリ */
+    dir: hozo.compiler.Path;
+    /** 設定ファイルの場所（--config） */
+    config: hozo.compiler.Path?;
+    /** プラグインを探すディレクトリ */
+    pluginPath: string?;
+    /** プラグインの WASM を、機械の言葉に直したものを、覚える置き場 */
+    cacheDir: hozo.compiler.Path?;
+    /** 開いている文書 */
+    open: OpenDocument[];
+  }
+
+  /** ファイルの中の範囲。end は、含まない */
+  model Place {
+    file: hozo.compiler.Path;
+    start: hozo.compiler.Position;
+    end: hozo.compiler.Position;
+  }
+
+  /** ファイルの中の位置（カーソル） */
+  model Cursor {
+    file: hozo.compiler.Path;
+    at: hozo.compiler.Position;
+  }
+
+  /**
+   * 文面を書く、設定する（docs/tools.md「エンジニア（言語サーバー、VS Code 拡張、CLI）」）: プロジェクトの全体を解析して、hozoc 自身の診断を返す。
+   * 仕様の誤りと、hozo.toml の誤り（位置のないものは、hozo.toml の 1 行 1 列）、hozo.toml がないときの LSP-1。プラグインは、起動しない。
+   *
+   * hozo.compiler の検査（check）と、同じ実装（internal/check）の呼び出しで、同じ入力に、同じ診断が出る（docs/lsp.md「診断」）。
+   * それを、同じ op を呼ぶ配線としては、書けていない（穴 21）: 葉にしてある。
+   *
+   * @param in プロジェクト
+   * @returns 診断（error と warning）
+   */
+  @prd.usecase.of(hozo.compiler.Actor.Engineer)
+  @prd.ref(hozo.compiler.Requirement.SharedDiagnostics, hozo.compiler.Requirement.NamedOmission)
+  export fn diagnose(in: Workspace): hozo.compiler.Diagnostic[];
+
+  /**
+   * プラグインの check（docs/lsp.md「プラグインの診断」）: プラグインを起動して、hozoc 自身の診断に、プラグインの診断を足したものを返す
+   * （hozoc build --no-emit と同じ診断）。最後まで走らなければ、そこまでの診断と LSP-2。
+   * hozo.compiler.verify（検査する）と同じ頼みごとをするが、その op を呼ぶ配線としては、書けていない（穴 21）: 葉にしてある。
+   *
+   * @param in プロジェクト
+   * @returns 診断（error と warning）
+   */
+  @prd.usecase.of(hozo.compiler.Actor.Engineer)
+  @prd.ref(hozo.compiler.Requirement.SharedDiagnostics)
+  export fn diagnoseWithPlugins(in: Workspace): hozo.compiler.Diagnostic[];
+
+  /**
+   * 文面の中を移る: 名前から、宣言へ（docs/lsp.md「定義へジャンプ」）。カーソルの位置のトークンが名前なら、その宣言の、名前の位置。
+   * 宣言を持たない語（post / put / delete、else、none など）と、解決できない名前は、ない。
+   *
+   * @param in プロジェクト
+   * @param at カーソル
+   */
+  @prd.usecase.of(hozo.compiler.Actor.Engineer)
+  export fn locate(in: Workspace, at: Cursor): Place?;
+
+  /** 説明（docs/lsp.md「ホバー」の 1〜3）。op のほかでは、throws、effects、reads は空で、pure は偽 */
+  model Description {
+    /** Hozo の構文で書いた、宣言の見出し（fn login(in: LoginInput): LoginOk など） */
+    heading: string;
+    /** 宣言の説明 */
+    body: string?;
+    /** op の例外。例外ごとの、効果の状態を添える */
+    throws: string[];
+    /** op の効果 */
+    effects: string[];
+    /** op が読む、基底の状態 */
+    reads: string[];
+    /** op が純粋か */
+    pure: boolean;
+  }
+
+  /**
+   * 文面の中を移る: 名前から、説明へ（docs/lsp.md「ホバー」）。デコレータの適用なら、デコレータの宣言の説明と、固定した引数。
+   *
+   * @param in プロジェクト
+   * @param at カーソル
+   */
+  @prd.usecase.of(hozo.compiler.Actor.Engineer)
+  export fn describe(in: Workspace, at: Cursor): Description?;
+
+  /**
+   * シンボルの種類（docs/lsp.md「ドキュメントのシンボル」の表の左の列）。穴 13: 列挙を、型として書けないので、scalar と pattern
+   */
+  @valid.pattern("^(namespace|model|field|scalar|union|arm|state|op|exception|effect|read|classify|case|decorator|bind)$")
+  scalar SymbolKind extends string;
+
+  /** ファイルの中の宣言。名前空間の中に宣言、model の中にフィールド、union の中にアーム、classify の中にケース */
+  model Symbol {
+    name: string;
+    kind: SymbolKind;
+    /** 宣言の全体 */
+    place: Place;
+    /** 宣言の名前 */
+    name_place: Place;
+    children: Symbol[];
+  }
+
+  /**
+   * 文面の中を移る: ファイルの中の宣言の木（docs/lsp.md「ドキュメントのシンボル」）。構文木から引く。
+   *
+   * @param in プロジェクト
+   * @param file ファイル
+   */
+  @prd.usecase.of(hozo.compiler.Actor.Engineer)
+  export fn outline(in: Workspace, file: hozo.compiler.Path): Symbol[];
+
+  /**
+   * 語彙のファイル（hozoc に同梱したものと、プラグインが持ってくるもの。場所は hozo: の形）の内容を引く
+   * （docs/lsp.md「プロジェクト」の hozo/vocabulary）。定義へ移った先が、語彙の宣言のとき、エディタが、これで開く。
+   *
+   * @param in プロジェクト
+   * @param file 語彙のファイルの場所（hozo: の形）
+   */
+  @prd.usecase.of(hozo.compiler.Actor.Engineer)
+  export fn vocabularyText(in: Workspace, file: hozo.compiler.Path): string?;
+}
+
+/** hozoc の外: 言語サーバーのクライアント（文面のエディタ）。サーバーから送る通知を、op として言う。hozoc の実装は、ない */
+namespace hozo.editor {
+  /**
+   * ファイルの診断を、置き換える（LSP の textDocument/publishDiagnostics）。
+   *
+   * @param params ファイルと、その診断のすべて
+   */
+  export fn publishDiagnostics(params: hozo.lsp.PublishDiagnosticsParams);
+}
+
+/** 言語サーバーの入口（docs/lsp.md）。LSP 3.17 の、使う分だけ。標準入出力の、Content-Length ヘッダ付きの JSON-RPC 2.0（穴 18: 運び方を言う語彙は、ない） */
+namespace hozo.lsp {
+  /** LSP の要求（応答を返す）の入口。method は、JSON-RPC の method */
+  @entry
+  decorator fn request(method: string);
+
+  /** LSP の通知（応答を返さない）の入口。method は、JSON-RPC の method */
+  @entry
+  decorator fn notification(method: string);
+
+  // ---- LSP の形（internal/lsp/protocol が、手で定義している分） ----
+
+  /** ファイルの URI。語彙のファイルは hozo: の形（docs/ir.md「Program」の Span.file） */
+  scalar Uri extends string;
+
+  /** 位置。行と、行の中の位置は、0 から。行の中の位置の数え方は、initialize で決めた PositionEncoding */
+  model Position { line: int; character: int; }
+  model Range { start: Position; end: Position; }
+  model Location { uri: Uri; range: Range; }
+
+  /** 位置の数え方。utf-8 がクライアントの一覧にあれば utf-8、なければ utf-16（穴 13: scalar と pattern） */
+  @valid.pattern("^(utf-8|utf-16)$")
+  scalar PositionEncoding extends string;
+
+  model TextDocumentIdentifier { uri: Uri; }
+  model VersionedTextDocumentIdentifier { uri: Uri; version: int; }
+  model TextDocumentItem { uri: Uri; languageId: string; version: int; text: string; }
+  model TextDocumentPositionParams { textDocument: TextDocumentIdentifier; position: Position; }
+
+  /** 許し（docs/lsp.md「プラグインの診断」の「許し」）。ない、真偽値でない、は、許していない、と読む */
+  model InitializationOptions { pluginChecks: boolean?; }
+  model WorkspaceFolder { uri: Uri; name: string; }
+  model GeneralClientCapabilities { positionEncodings: PositionEncoding[]?; }
+  model ClientCapabilities { general: GeneralClientCapabilities?; }
+  model InitializeParams {
+    rootUri: Uri?;
+    workspaceFolders: WorkspaceFolder[]?;
+    initializationOptions: InitializationOptions?;
+    capabilities: ClientCapabilities;
+  }
+
+  /** save: { includeText: false }（穴 12: 決まった値を、書けない） */
+  model SaveOptions { includeText: boolean; }
+  /** openClose は true、change は Full（1）（穴 12） */
+  model TextDocumentSyncOptions { openClose: boolean; change: int; save: SaveOptions; }
+  /** definitionProvider、hoverProvider、documentSymbolProvider は true（穴 12） */
+  model ServerCapabilities {
+    positionEncoding: PositionEncoding;
+    textDocumentSync: TextDocumentSyncOptions;
+    definitionProvider: boolean;
+    hoverProvider: boolean;
+    documentSymbolProvider: boolean;
+  }
+  model InitializeResult { capabilities: ServerCapabilities; }
+
+  model DidOpenTextDocumentParams { textDocument: TextDocumentItem; }
+  /** 同期は Full: 変更は、文書の全体 */
+  model TextDocumentContentChangeEvent { text: string; }
+  model DidChangeTextDocumentParams { textDocument: VersionedTextDocumentIdentifier; contentChanges: TextDocumentContentChangeEvent[]; }
+  model DidCloseTextDocumentParams { textDocument: TextDocumentIdentifier; }
+  model DidSaveTextDocumentParams { textDocument: TextDocumentIdentifier; }
+  model FileEvent { uri: Uri; type: int; }
+  model DidChangeWatchedFilesParams { changes: FileEvent[]; }
+
+  /** settings.hozo.pluginChecks が、真偽値のときだけ、許しを、その値に変える。ほかの項目は、読まない */
+  model HozoSettings { pluginChecks: boolean?; }
+  model Settings { hozo: HozoSettings?; }
+  model DidChangeConfigurationParams { settings: Settings?; }
+
+  /** 重さ。Error は 1、Warning は 2（穴 13: 数の列挙を、型として書けない。int のまま） */
+  scalar DiagnosticSeverity extends int;
+  model DiagnosticRelatedInformation { location: Location; message: string; }
+  /** hozoc の Diagnostic（docs/diagnostics.md）を写したもの（docs/lsp.md「診断」の表）。source は、いつも "hozoc"（穴 12） */
+  model Diagnostic {
+    range: Range;
+    severity: DiagnosticSeverity;
+    code: string;
+    source: string;
+    message: string;
+    relatedInformation: DiagnosticRelatedInformation[]?;
+    /** コードアクションが使う。hozoc の Data（穴 15: LSP では、形の決まっていない値） */
+    data: hozo.compiler.DiagnosticData?;
+  }
+  model PublishDiagnosticsParams { uri: Uri; diagnostics: Diagnostic[]; }
+
+  /** kind は、いつも "markdown"（穴 12） */
+  model MarkupContent { /* kind: "markdown"; */ value: string; }
+  model Hover { contents: MarkupContent; }
+
+  /** シンボルの種類。LSP の SymbolKind の数（Namespace、Struct、Field、… docs/lsp.md「ドキュメントのシンボル」の表）（穴 13） */
+  scalar SymbolKind extends int;
+  model DocumentSymbol {
+    name: string;
+    kind: SymbolKind;
+    range: Range;
+    selectionRange: Range;
+    children: DocumentSymbol[]?;
+  }
+  model DocumentSymbolParams { textDocument: TextDocumentIdentifier; }
+
+  /** 要求 hozo/vocabulary（docs/lsp.md「プロジェクト」） */
+  model VocabularyParams { uri: Uri; }
+  model VocabularyResult { content: string; }
+
+  // ---- 状態 ----
+
+  /** 開いている文書。didOpen で足し、didChange で置き換え、didClose で外す。解析は、ディスクより、これを優先する */
+  state documents: list<hozo.operation.OpenDocument>;
+
+  /** initialize で決めた、ワークスペースと、位置の数え方 */
+  model Session {
+    dir: hozo.compiler.Path;
+    encoding: PositionEncoding;
+  }
+  state session: nullable<Session>;
+
+  /** プラグインを起動してよいか（docs/lsp.md「プラグインの診断」の「許し」）。既定は、許していない */
+  state pluginChecks: single<boolean>;
+
+  /** 許しの場合 */
+  classify Permission of pluginChecks {
+    /** クライアントが、許している */
+    Allowed;
+    /** 許していない（既定） */
+    Denied;
+  }
+
+  effect fn openDocument(doc: hozo.operation.OpenDocument): effects documents.post;
+  effect fn replaceDocument(doc: hozo.operation.OpenDocument): effects documents.put;
+  effect fn closeDocument(file: hozo.compiler.Path): effects documents.delete;
+  effect fn startSession(session: Session): effects session.put;
+  /** 許す */
+  effect fn allow(): effects Permission as any -> Allowed;
+  /** 許しを、なくす */
+  effect fn deny(): effects Permission as any -> Denied;
+
+  /** 今のプロジェクト: 始めたセッションと、開いている文書から */
+  read fn openDocuments(): hozo.operation.OpenDocument[] reads documents;
+
+  // ---- LSP の形と、操作の形の、写し（葉） ----
+
+  /** URI を、ファイルの場所に */
+  fn fileOf(uri: Uri): hozo.compiler.Path;
+  /** initialize の入力から、ワークスペース（rootUri。なければ workspaceFolders の先頭）と、位置の数え方を決める */
+  fn sessionOf(params: InitializeParams): Session;
+  /** 返す capabilities */
+  fn capabilitiesOf(session: Session): InitializeResult;
+  /** 開いた文書を、操作の形に */
+  fn opened(item: TextDocumentItem): hozo.operation.OpenDocument;
+  /** 変えた文書を、操作の形に（同期は Full: 最後の変更の text が、全体） */
+  fn changed(params: DidChangeTextDocumentParams): hozo.operation.OpenDocument;
+  /** 今のプロジェクト（始めたセッション、hozoc lsp の入力、開いている文書）を、操作の形に */
+  fn workspaceOf(open: hozo.operation.OpenDocument[]): hozo.operation.Workspace;
+  /** LSP の位置を、操作のカーソルに（位置の数え方を、コードポイントに直す） */
+  fn cursorOf(params: TextDocumentPositionParams): hozo.operation.Cursor;
+  /** 操作の範囲を、LSP の Location に */
+  fn locationOf(place: hozo.operation.Place?): Location?;
+  /** 説明を、Markdown の Hover に（docs/lsp.md「ホバー」の順） */
+  fn hoverOf(description: hozo.operation.Description?): Hover?;
+  /** 宣言の木を、DocumentSymbol の木に（種類は docs/lsp.md「ドキュメントのシンボル」の表） */
+  fn symbolsOf(symbols: hozo.operation.Symbol[]): DocumentSymbol[];
+  /** 診断を、ファイルごとの publishDiagnostics の並びに（docs/lsp.md「診断」の表）。どのファイルに送るか（前回と同じ内容なら、送らない。一度も送っていないファイルには、空を送らない）は、この葉の中 */
+  fn publications(diagnostics: hozo.compiler.Diagnostic[]): PublishDiagnosticsParams[];
+  /** 語彙のファイルの内容を、応答の形に */
+  fn vocabularyResultOf(content: string?): VocabularyResult?;
+
+  // ---- 診断を出す ----
+
+  /**
+   * 解析し直して、hozoc 自身の診断を、エディタに送る（docs/lsp.md「プロジェクト」）。プラグインは、起動しない。
+   * 前回と同じ内容なら送らない、などの、送るファイルの決め方は、葉 publications の中（条件は、流れではなく、中身）。
+   */
+  fn publish() {
+    val open = openDocuments();
+    val workspace = workspaceOf(open);
+    val found = hozo.operation.diagnose(workspace);
+    val each = publications(found);
+    for (val one of each) {
+      hozo.editor.publishDiagnostics(one);
+    }
+  }
+
+  /**
+   * プラグインの check（docs/lsp.md「プラグインの診断」）: 許されているときだけ、プラグインを起動して、診断を出し直す。
+   * 裏で走らせること、一度に一つ、やめさせること、古い答えを出さないこと、走らせない条件（hozo.toml がない、error がある、相手がいない）は、
+   * 書けていない（穴 22）。
+   */
+  fn publishWithPlugins() {
+    match (by Permission) {
+      Allowed => publishAllowed();
+      Denied => none;
+    }
+  }
+
+  fn publishAllowed() {
+    val open = openDocuments();
+    val workspace = workspaceOf(open);
+    val found = hozo.operation.diagnoseWithPlugins(workspace);
+    val each = publications(found);
+    for (val one of each) {
+      hozo.editor.publishDiagnostics(one);
+    }
+  }
+
+  // ---- ライフサイクル ----
+
+  /** ワークスペースを決め、許しを読み、capabilities を返す（docs/lsp.md「ライフサイクル」） */
+  @request("initialize")
+  export fn initialize(params: InitializeParams): InitializeResult {
+    val session = sessionOf(params);
+    startSession(session);
+    // initializationOptions.pluginChecks が真なら、許す（穴 6: 真偽の値で、道を分ける書き方が、ない。葉の述語になる）
+    match (params by Requested) {
+      Granted => allow();
+      Withheld => deny();
+    }
+    return capabilitiesOf(session);
+  }
+
+  /** initialize の許し: initializationOptions.pluginChecks が、真か（穴 6: 述語は、人が書く） */
+  classify Requested of InitializeParams { Granted; Withheld; }
+
+  /** 開いているファイルがなくても、プロジェクト全体の診断を、一度、発行する */
+  @notification("initialized")
+  export fn initialized() {
+    publish();
+  }
+
+  /** 終了の用意。走っている、プラグインの check を、やめさせる（穴 22） */
+  @request("shutdown")
+  export fn shutdown();
+
+  /** 終了。終了コードは、いつも 0 */
+  @notification("exit")
+  export fn exit();
+
+  // ---- 文書の同期 ----
+
+  @notification("textDocument/didOpen")
+  export fn didOpen(params: DidOpenTextDocumentParams) {
+    val doc = opened(params.textDocument);
+    openDocument(doc);
+    publish();
+    publishWithPlugins();
+  }
+
+  /** 最後の変更から 150 ミリ秒待って、まとめる（穴 22）。打鍵では、プラグインの check を、走らせない */
+  @notification("textDocument/didChange")
+  export fn didChange(params: DidChangeTextDocumentParams) {
+    val doc = changed(params);
+    replaceDocument(doc);
+    publish();
+  }
+
+  @notification("textDocument/didClose")
+  export fn didClose(params: DidCloseTextDocumentParams) {
+    val file = fileOf(params.textDocument.uri);
+    closeDocument(file);
+    publish();
+  }
+
+  /** 保存: 解析し直し、プラグインの check を、いつも、走らせる */
+  @notification("textDocument/didSave")
+  export fn didSave(params: DidSaveTextDocumentParams) {
+    publish();
+    publishWithPlugins();
+  }
+
+  /** hozo.toml と .hozo の、ディスクの上の変更 */
+  @notification("workspace/didChangeWatchedFiles")
+  export fn didChangeWatchedFiles(params: DidChangeWatchedFilesParams) {
+    publish();
+    publishWithPlugins();
+  }
+
+  /** 動いている間に、許しが変わった（settings.hozo.pluginChecks が、真偽値のときだけ） */
+  @notification("workspace/didChangeConfiguration")
+  export fn didChangeConfiguration(params: DidChangeConfigurationParams) {
+    match (params by Reconfigured) {
+      Granted => grant();
+      Revoked => revoke();
+      Untouched => none;
+    }
+  }
+
+  /** 設定の変更が、許しを、どう変えるか（穴 6: 述語は、人が書く） */
+  classify Reconfigured of DidChangeConfigurationParams { Granted; Revoked; Untouched; }
+
+  /** 許しが、与えられた: 今の中身について、プラグインの check を求める */
+  fn grant() {
+    allow();
+    publishWithPlugins();
+  }
+
+  /** 許しが、なくなった: 診断を、hozoc 自身のものだけで、出し直す。走っている check を、やめさせる（穴 22） */
+  fn revoke() {
+    deny();
+    publish();
+  }
+
+  // ---- 文面の中を移る ----
+
+  @request("textDocument/definition")
+  export fn definition(params: TextDocumentPositionParams): Location? {
+    val open = openDocuments();
+    val workspace = workspaceOf(open);
+    val at = cursorOf(params);
+    val place = hozo.operation.locate(workspace, at);
+    return locationOf(place);
+  }
+
+  @request("textDocument/hover")
+  export fn hover(params: TextDocumentPositionParams): Hover? {
+    val open = openDocuments();
+    val workspace = workspaceOf(open);
+    val at = cursorOf(params);
+    val description = hozo.operation.describe(workspace, at);
+    return hoverOf(description);
+  }
+
+  @request("textDocument/documentSymbol")
+  export fn documentSymbol(params: DocumentSymbolParams): DocumentSymbol[] {
+    val open = openDocuments();
+    val workspace = workspaceOf(open);
+    val file = fileOf(params.textDocument.uri);
+    val symbols = hozo.operation.outline(workspace, file);
+    return symbolsOf(symbols);
+  }
+
+  /** 語彙のファイルの内容（hozo: の URI を、クライアントが開けるように） */
+  @request("hozo/vocabulary")
+  export fn vocabulary(params: VocabularyParams): VocabularyResult? {
+    val open = openDocuments();
+    val workspace = workspaceOf(open);
+    val file = fileOf(params.uri);
+    val content = hozo.operation.vocabularyText(workspace, file);
+    return vocabularyResultOf(content);
+  }
+}
