@@ -383,7 +383,7 @@ namespace hozo.compiler {
    * @param in コマンドの入力
    */
   @prd.usecase.of(Actor.Editor)
-  @prd.ref(Requirement.SharedDiagnostics, Requirement.SingleBinary)
+  @prd.ref(Requirement.SharedDiagnostics)
   @cli.command("lsp")
   export fn lsp(in: LspInput);
 
