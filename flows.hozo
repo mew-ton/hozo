@@ -1,0 +1,119 @@
+// Hozo 自身の仕様（docs/decisions.md「決めたこと」468、475）。業務の流れの名前空間 hozo.flows と、hozoc の外の道具 hozo.toolchain。
+// 流れは、ユースケースの op（cli.hozo の hozo.compiler の、@prd.usecase.of を付けた op）を、順に呼ぶ配線。
+// 出どころは、docs/tools.md「仕事の流れ」「ユースケース」と、docs/cli.md「tests」。文書が言っている流れだけを、写してある。
+// どちらの名前空間も、hozo.toml の単位の対象ではない: コードには、ならない。
+
+/** hozoc の外にある、利用者の道具。hozoc は、これを呼ばない: 流れの中で、人か CI が行う手順を、op として言う */
+namespace hozo.toolchain {
+  /**
+   * 生成されたテストを、プロジェクトのやり方で、カバレッジを取りながら走らせる（go test -coverprofile など）。
+   * hozoc は、テストを走らせない（docs/cli.md「tests」）。
+   *
+   * @returns カバレッジのファイルの場所
+   */
+  export fn runTests(): hozo.compiler.Path;
+}
+
+/** 業務の流れ。ユースケースを、順に行う */
+namespace hozo.flows {
+  /** 生成したテストが、走ったことを確かめる流れの結果 */
+  model Harnessed {
+    /** 書き出した結果 */
+    written: hozo.compiler.BuildResult;
+    /** 求めるテストが、走ったかの結果 */
+    ran: hozo.compiler.TestsResult;
+  }
+
+  /**
+   * 生成したテストが、走ったことを確かめる（docs/cli.md「tests」、docs/requirements.md「もとの考えと、Hozo が守るもの」）。
+   * 担い手は、枠を出して、テストと中身を書くのが、AI か、エンジニア。テストを走らせて、確かめるのが、利用者か、CI。
+   *
+   * @param in 書き出す対象
+   * @returns 書き出した結果と、求めるテストが、走ったかの結果
+   */
+  @prd.business.flow
+  export fn confirmHarness(in: hozo.compiler.EmitInput): Harnessed {
+    // 1. 枠を出す。テストの口と、求めるテストの一覧も、一緒に出る
+    val written = hozo.compiler.write(in);
+    // 2. 口を満たすテストと、中身を書く（AI か、エンジニア。hozoc の外で、op は、ない）
+    // 3. カバレッジを取りながら、テストを走らせる（hozoc の外）
+    val coverage = hozo.toolchain.runTests();
+    // 4. 求めるテストが、走ったかを、確かめる
+    val ran = hozo.compiler.confirmTests({ config: in.config, coverage: coverage, pluginPath: in.pluginPath, cacheDir: in.cacheDir });
+    return { written: written, ran: ran };
+  }
+
+  /**
+   * 入った変更を、自動で検査する（docs/tools.md「自動の検査（CLI）」）。担い手は、CI。
+   *
+   * @param in 検査する対象
+   * @returns 検査の結果
+   */
+  @prd.business.flow
+  export fn checkChange(in: hozo.compiler.EmitInput): hozo.compiler.BuildResult {
+    // 1. 検査する
+    return hozo.compiler.verify(in);
+    // 2. 生成物が、仕様から遅れていないことを確かめる（専用のユースケースは、まだ、ない）
+    // 3. プルリクエストに、設計として何が変わったかを出す（ユースケースは、まだ、ない）
+  }
+
+  /** エンジニアが、文面を書く流れの結果 */
+  model Written {
+    /** 手元の検査の結果 */
+    checked: hozo.compiler.BuildResult;
+    /** 枠を出し直した結果 */
+    written: hozo.compiler.BuildResult;
+  }
+
+  /**
+   * エンジニアが、文面を書く（docs/tools.md「エンジニア（言語サーバー、VS Code 拡張、CLI）」）。
+   *
+   * @param editor 言語サーバーの入力
+   * @param in 検査して、書き出す対象
+   * @returns 手元の検査と、枠を出し直した結果
+   */
+  @prd.business.flow
+  export fn writeSpec(editor: hozo.compiler.ServeInput, in: hozo.compiler.EmitInput): Written {
+    // 1. 文面を書く。打っている間に、誤りと、名前の候補と、機械的な直しを得る。名前から、宣言、参照、説明へ移る（言語サーバー）
+    hozo.compiler.serve(editor);
+    // 2. 手元で、検査する
+    val checked = hozo.compiler.verify(in);
+    // 3. 枠を出し直す
+    val written = hozo.compiler.write(in);
+    return { checked: checked, written: written };
+  }
+
+  /** 設計する人の、仕事の流れの結果（今、ユースケースがある段の分だけ） */
+  model Designed {
+    /** 検査の結果 */
+    checked: hozo.compiler.BuildResult;
+    /** 枠を出した結果 */
+    written: hozo.compiler.BuildResult;
+    /** 求めるテストが、走ったかの結果 */
+    ran: hozo.compiler.TestsResult;
+  }
+
+  /**
+   * 設計する人の、仕事の流れ（docs/tools.md「仕事の流れ」）。どの段も、IDE の中で起きる。
+   * IDE は、まだ、ない: ユースケースのない段は、コメントにしてある。IDE を、Hozo に書くときに、op にする。
+   *
+   * @param in 検査して、書き出す対象
+   * @returns 今、ユースケースがある段の結果
+   */
+  @prd.business.flow
+  export fn design(in: hozo.compiler.EmitInput): Designed {
+    // 1. 開く: プロジェクトのルートを、IDE で開く（ユースケースは、まだ、ない）
+    // 2. 書かせる: チャットで、作りたいものを AI に言う。AI が、仕様の文面を書く（まだ、ない）
+    // 3. 読む: 書かれた仕様を、設計の手法ごとの画面で読む。二度目からは、変わったところを読む（まだ、ない）
+    // 4. 直す: 画面の上で直す。大きな直しは、画面の要素を指して、AI に言う（まだ、ない）
+    // 5. 整える: 検査の欠けを、AI か、ボタンで埋める（検査は、ある。埋めるユースケースは、まだ、ない）
+    val checked = hozo.compiler.verify(in);
+    // 6. 中身を作らせる: 仕様からコードの枠を出し、AI に中身を書かせる（枠を出すのは、ある）
+    val written = hozo.compiler.write(in);
+    // 7. 確かめる: ハーネスの状況（検査、枠の遅れ、中身の欠け、テスト）を見る（テストが走ったかの確かめは、ある）
+    val coverage = hozo.toolchain.runTests();
+    val ran = hozo.compiler.confirmTests({ config: in.config, coverage: coverage, pluginPath: in.pluginPath, cacheDir: in.cacheDir });
+    // 8. 2 に戻る
+    return { checked: checked, written: written, ran: ran };
+  }
+}
