@@ -1,4 +1,4 @@
-// DEC-29（docs/check.md「コメントの中のタグ」）: 説明のコメントの中に、タグとして書けるのは、文字列を一つ取るデコレータだけ
+// DEC-29（docs/check.md「コメントの中のタグ」）: 説明のコメントの中に、タグとして書けるのは、@hint の付いた、文字列を一つ取るデコレータだけ
 namespace note {
   /** 引数がない */
   @hint
@@ -32,4 +32,18 @@ namespace a {
    * @note.fixed 文章
    */
   model M { id: string; } // ERROR(-7): DEC-29 // ERROR(-6): DEC-29 // ERROR(-5): DEC-29 // ERROR(-4): DEC-29 // ERROR(-3): DEC-29 // ERROR(-2): DEC-29
+}
+
+// @hint のないデコレータ（振る舞いを決めるもの）は、文字列を一つ取っても、コメントの中には、書けない
+namespace route {
+  /** 経路。@hint ではない */
+  decorator path(value: string) for model;
+}
+
+namespace b {
+  /**
+   * 説明の文章が、たまたま、デコレータの名前で始まっている
+   * @route.path を付けた model
+   */
+  model N { id: string; } // ERROR(-2): DEC-29
 }

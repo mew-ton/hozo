@@ -253,6 +253,10 @@ func (a *analyzer) lowerApplication(d *ast.Decorator, site *appSite) (ir.Applica
 	if !ok {
 		return ir.Application{}, false
 	}
+	if d.FromDoc && !dec.Hint {
+		a.errorf("DEC-29", d.Name.Span, "説明のコメントの中に、タグとして書けるのは、@hint の付いたデコレータ（解釈されなくてよい、注記）だけ。%s は、宣言の前に @%s(…) と書く", dec.Name, d.Name.String())
+		return ir.Application{}, false
+	}
 	if d.FromDoc && !takesOneString(dec) {
 		a.errorf("DEC-29", d.Name.Span, "説明のコメントの中に、タグとして書けるのは、文章を一つ取るデコレータ（引数が string の一つ）だけ。%s は、宣言の前に @%s(…) と書く", dec.Name, d.Name.String())
 		return ir.Application{}, false
