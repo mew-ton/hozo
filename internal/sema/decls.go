@@ -225,6 +225,15 @@ func (a *analyzer) lowerArms(s *symbol, d *ast.UnionDecl, sc *scope) []ir.UnionA
 			arm.Type = ir.Ref(a.synthesize(s, m.Arm.Name, m.Type.Body, sc))
 		} else if t, ok := a.lowerType(m.Type.Type, sc); ok {
 			arm.Type = t
+			// UNION-2: 同じ値の、リテラルの型のアームが、二つある（値で、アームを見分けられない）
+			if _, isLiteral := t.(ir.LiteralType); isLiteral {
+				for _, prev := range arms {
+					if prev.Type != nil && ir.TypeEqual(prev.Type, t) {
+						a.errorf("UNION-2", m.Type.Type.NodeSpan(), "union %s のアーム %s と %s が、同じ値のリテラルの型 %s を持つ（値から、どちらのアームかを、決められない）", s.fqn, prev.Name, m.Arm.Name, typeName(t))
+						break
+					}
+				}
+			}
 		}
 		arms = append(arms, arm)
 	}
@@ -1037,6 +1046,18 @@ func (a *analyzer) lowerElseCase(s *symbol, c *ir.Classify, rest *restCases) {
 	}
 	// 残りのケースでの対象の型（docs/types.md「残りのケースでの対象の型」）
 	typ := e.subjectType
+	absent := by == ir.NarrowByPresence
+	if by == ir.NarrowByLiteral {
+		// literal: true と false の両方を書いていれば、残りは「値がない」だけ（対象が T? のとき）。T? でなければ、残りがない
+		_, optional := e.subjectType.(ir.OptionalType)
+		if len(types) == 2 {
+			if !optional {
+				fail("ほかのケースが true と false の両方を書いていて、残りがない")
+				return
+			}
+			absent = true
+		}
+	}
 	if by == ir.NarrowByVariant {
 		remaining := a.remainingArms(e.subjectType, types)
 		if len(remaining) == 0 {
@@ -1049,8 +1070,9 @@ func (a *analyzer) lowerElseCase(s *symbol, c *ir.Classify, rest *restCases) {
 	}
 	if cc := c.Case(e.name); cc != nil {
 		cc.As = append(cc.As, ir.CaseTyping{State: e.state, Type: typ, By: ir.NarrowByElse, Span: a.irSpan(e.span)})
-		if by == ir.NarrowByPresence {
-			// 対象の状態が一つの状態の分類の、値がない側（docs/check.md「ない側のケース」の表の二行目）
+		if absent {
+			// 対象の状態が一つの状態の分類の、値がない側（docs/check.md「ない側のケース」の表の二行目）。literal で、true と false の
+			// 両方を書いた分類の残りも、値がない側
 			c.Absent = e.name
 		}
 	}
@@ -1155,9 +1177,22 @@ func (a *analyzer) lowerCaseTypings(s *symbol, c *ir.Classify, cs *ast.ClassifyC
 			rest.broken = true
 			continue
 		}
+		if lt, isLiteral := t.(ir.LiteralType); isLiteral && !a.literalNarrowing(subjectType, lt) && !a.armOf(stripOptional(subjectType), t) {
+			a.errorf("CLS-11", ct.Type.NodeSpan(), "classify %s のケース %s: 対象の型 %s は、リテラルの型 %s では、分けられない（リテラルの型で分類できるのは、対象が boolean か、リテラルの型をアームに持つ union のときだけ。docs/check.md「ケースの型」）", s.fqn, cs.Name.Name, typeName(subjectType), typeName(t))
+			rest.broken = true
+			continue
+		}
 		out = append(out, ir.CaseTyping{State: state, Type: t, By: a.narrowBy(subjectType, t), Span: a.irSpan(ct.Span)})
 	}
 	return out
+}
+
+// literalNarrowing は docs/types.md「型で決まる絞り込み」の literal: S から optional を外した型が boolean で、T が、真偽の
+// リテラルの型。
+func (a *analyzer) literalNarrowing(s ir.Type, t ir.LiteralType) bool {
+	c, isCore := stripOptional(s).(ir.CoreType)
+	_, isBool := t.Literal.(ir.BooleanLiteral)
+	return isCore && c.Name == ir.CoreBoolean && isBool
 }
 
 // caseTypingSubject は `X as T` の X を、その分類の対象と照らす。状態の分類ならその状態の FQN と型、値の分類と
@@ -1275,6 +1310,14 @@ func (a *analyzer) narrowBy(s, t ir.Type) ir.NarrowBy {
 	}
 	if a.armOf(s, t) {
 		return ir.NarrowByVariant
+	}
+	if lt, ok := t.(ir.LiteralType); ok {
+		if a.literalNarrowing(s, lt) {
+			return ir.NarrowByLiteral
+		}
+		if a.armOf(stripOptional(s), t) {
+			return ir.NarrowByVariant // 省略可能な union の対象で、リテラルの型のアーム（CLS-11 を通ったもの）
+		}
 	}
 	return ir.NarrowByPredicate
 }

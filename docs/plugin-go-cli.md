@@ -11,7 +11,7 @@
 ```toml
 name     = "go-cli"
 wasm     = "plugin.wasm"
-protocol = "0.25"
+protocol = "0.26"
 
 vocabulary = ["cli.hozo"]
 

@@ -3,7 +3,7 @@
 # （internal/fakeplugin）の WASM で、テストが、wasm の場所に置く（docs/testing.md「環境からの独立」）。
 name     = "none"
 wasm     = "plugin.wasm"
-protocol = "0.25"
+protocol = "0.26"
 
 [[transpiler]]
 name     = "none"

@@ -38,6 +38,17 @@
 - この型の値が作られるのは、`match (x by C)` のアームの中の対象（「絞り込み」の「アームの中の対象の型」）。引数、`val`、`for` の変数、戻り値、フィールドに、この型を書けば、その先へ運べる。
 - 診断のメッセージと、ホバーは、この型を、仕様の綴りで出す（`Order on Stage.Draft | Stage.Accepted`。診断は、分類を FQN で）。`optional` と `array` の中にあるときは、`nullable<T on C.K>`、`list<T on C.K>`（`on` の後ろに `?` と `[]` を続けられないため。`docs/grammar.md`「型」）。
 
+### リテラルの型
+
+リテラルの型は、値が、そのリテラル一つだけの型（`docs/ir.md`「型」の `literal`。`docs/decisions.md`「決めたこと」482）。リテラルの式の型（「式の型」）と、型の位置に書いたリテラル（`docs/grammar.md`「型」の `LiteralType`）は、同じ型。
+
+- **種類は四つ**: 文字列（`"error"`）、整数（`0`、`-1`）、小数（`1.5`）、真偽（`true`、`false`）。`duration` のリテラル（`5m`）の型は、式にだけあり、型の位置には書けない（`docs/grammar.md`「決めたこと」）。
+- **対応する核の型**: 文字列は `string`、整数は `int`、小数は `float`、真偽は `boolean`、`duration` のリテラルは `duration`。
+- **書ける所**: `Type` を書けるどの位置にも（フィールド、引数、戻り値、union のアーム、`T?` と `T[]` の中）。`scalar X extends "a"` は書けない（TYPE-9: `scalar` の元は、核の型か `scalar`）。
+- **値の集まり**は、リテラルの型をアームに持つ union（`arms`）で書く（`union Severity { Error: "error"; Warning: "warning"; }`）。一つの union の、二つのアームが、等しいリテラルの型を持てば UNION-2: 値から、どちらのアームかを、決められない。
+- **閉じた型**: `boolean`（値は `true` と `false` の二つ）と、union（`arms`）は、値の種類が、宣言で尽きる。リテラルの型で分類できるのは、閉じた型だけ（`docs/check.md`「ケースの型」の CLS-11）。
+- 値が、そのリテラルであることを、どこで確かめるかは、出力する側が決める（Go は `docs/plugin-go.md`「型」）。
+
 ## 形の書き方
 
 型の、もとの形は、形の語（`docs/grammar.md`「型」）で書いた `single<T>`、`nullable<T>`、`list<T>`。`T`、`T?`、`T[]` は、その省略形（`docs/decisions.md`「決めたこと」355、361）。どの `Type` の位置にも、どちらでも書け、同じ型になり、IR には一つの形だけが残る（`docs/ir.md`「正規化」）。
@@ -57,7 +68,7 @@
 
 ## 等しい
 
-二つの `Type` は、構造が等しければ等しい。`ref` は FQN が等しいとき。`case` は `classify` と `cases` の集合と `of` が等しいとき。
+二つの `Type` は、構造が等しければ等しい。`ref` は FQN が等しいとき。`case` は `classify` と `cases` の集合と `of` が等しいとき。`literal` は、リテラルの種類と値が等しいとき（整数の `1` と、小数の `1.0` は、等しくない）。
 
 ## 互換
 
@@ -72,9 +83,10 @@ S の値を T の位置に渡せるのは、次のどれかを満たすとき。
 7. （欠番。`Record<K, V>` どうしの規則だった。なくした: キーが決まっていない構造は、インデックスの model で、ほかの model と同じに、名前で比べる。「インデックスの model」）
 8. （欠番。model から model への射影の規則だった。なくした。下の「渡せないもの」）
 9. S がレコードリテラルで、T が model への `ref`（または model の `optional`）で、リテラルが T に**当てはまる**（下）。
-10. S がリテラルの型で、T が対応する核の型（`string`→`string`、`int`→`int` または `float`、`float`→`float`、`boolean`→`boolean`、`duration`→`duration`）。`datetime`、`date`、`time` には、リテラルがない（`docs/grammar.md`「決めたこと」）。
+10. S がリテラルの型（「リテラルの型」）で、T が対応する核の型（`string`→`string`、`int`→`int` または `float`、`float`→`float`、`boolean`→`boolean`、`duration`→`duration`）。リテラルの式を渡すときも、リテラルの型の値（`severity: "error"` のフィールドの値）を渡すときも、同じ。`datetime`、`date`、`time` には、リテラルがない（`docs/grammar.md`「決めたこと」）。
 11. S が `scalar` への `ref` で、S の `base` が T に渡せる（`Email` を `string` に。値の型は元の型の部分集合）。
 12. S が `optional(S')`、T が `optional(T')` で、S' が T' に渡せる（6 と同じことを、`optional` に。`nullable<Order on Stage.Draft>` を `Order?` に: 型を書いたケースのアームと `none` のアームを持つ `match` の値を、`T?` の位置に渡せる。「match の型」の 7）。
+13. S が整数のリテラルの型で、T が、同じ値の、小数のリテラルの型（`1` を `1.0` の位置に。10 の `int`→`float` と同じ向き）。種類も値も同じリテラルの型は、等しい（1）ので、リテラルの式 `"error"` は、型 `"error"` の位置に渡せる。
 
 規則の番号は使い回さない（ほかの文書とコードが番号で引くため）。
 
@@ -82,6 +94,8 @@ S の値を T の位置に渡せるのは、次のどれかを満たすとき。
 
 - model の値を、別の model の位置に渡す。フィールドが同じでも、一方がもう一方を継承していても（「継承した model」）、別の型で、どちらの向きにも渡せない（引数なら TYPE-4、`return` なら TYPE-3）。設計書 §7.1「出力は宣言した型に自動で射影される」はやめた（`docs/decisions.md`「設計書から離れた決定」S22）。別の model の値が要るところでは、写す op を呼ぶ: 仕様の上では普通の葉の op（`fn toPublicUser(user: User): PublicUser;`）で、人が中身を書く。
 - 核の型の値を `scalar` の位置に渡す（TYPE-1。§6.5「元の型の値を値の型の位置に渡すには、検証を通す必要がある」）。配線でその手段になるのは、述語の要る絞り込み（「絞り込み」。`string` の対象を `Email` にするケース）だけで、それ以外の位置では常にエラー。
+- 核の型の値を、リテラルの型の位置に渡す（`string` の値を `"error"` の位置に）。値が違うリテラルの型どうしも、渡せない（`"warning"` を `"error"` の位置に）。引数なら TYPE-4、`return` なら TYPE-3。
+- リテラルの型の値を `scalar` の位置に渡す（TYPE-1。核の型の値と同じ）。
 - `scalar` の値を別の `scalar` の位置に渡す（`Token` を `UserId` に）。元の型が同じでも別の型。
 - `union`（`arms`）に、アームの型の値を直接渡す。配線にユニオンの値を作る手段はなく、ユニオンを返すのは葉の op（§11.2 の VM 関数）。
 - `union`（`set`）は値の型ではない。型の位置に書いたら RES-4。
@@ -190,14 +204,17 @@ D のフィールド（`Model.fields`）は、次の順に作る。IR には作�
 1. T が S に渡せる（「互換」）。
 2. S から `optional` を外した型が union（`arms`）への `ref` で、T がそのアームのどれかの型と等しい。アームの型は union の位置に渡せない（「互換」の「渡せないもの」）ので、絞り込みに限って認める。
 
+T がリテラルの型のときは、加えて、S が、その型で分けられる型でなければならない（CLS-11。`docs/check.md`「ケースの型」）。
+
 ### 型で決まる絞り込み
 
-S を T に絞り込むとき、当たっているかを値の型だけで判定できるものを**型で決まる絞り込み**と呼ぶ。次の二つ。
+S を T に絞り込むとき、当たっているかを値の型だけで判定できるものを**型で決まる絞り込み**と呼ぶ。次の三つ。
 
 | 名前（`CaseTyping.by`） | 条件 | 当たるとき |
 |---|---|---|
 | `presence` | S が `optional(T)` | 値がある |
-| `variant` | S が union（`arms`）への `ref` で、T がそのアームのどれかの型と等しい | 値が、型 T のアーム |
+| `variant` | S が union（`arms`）への `ref` で、T がそのアームのどれかの型と等しい（T が、リテラルの型のアームでも、同じ） | 値が、型 T のアーム |
+| `literal` | S から `optional` を外した型が `boolean` で、T が `true` か `false`（「リテラルの型」） | 値が、そのリテラル |
 
 それ以外（`string` を `Email` に、`string?` を `Email` に、`Item` を `Item on Kind.Yamada` に、対象と同じ型に、など）は**述語の要る絞り込み**（`by` は `predicate`）: 型からは判定できず、そのケースの述語が真であることが根拠になる。
 
@@ -214,6 +231,7 @@ S を T に絞り込むとき、当たっているかを値の型だけで判定
 | `presence`（`as none` のケースは、いつもこの行） | S のまま。値がないことを表す型はない（標準の分類 `nullable` の `None` と同じ） |
 | `variant` で、残りのアームがちょうど一つ | そのアームの型 |
 | `variant` で、残りのアームが二つ以上 | S のまま。union の一部のアームだけを表す型はない |
+| `literal` | S のまま（残りが、もう一方の真偽の値だけでも） |
 
 残りのアームは、型が、ほかのケースが `as` に書いた型のどれとも等しくないアーム（`docs/check.md`「残りのケース」）。
 
@@ -357,7 +375,7 @@ S を T に絞り込むとき、当たっているかを値の型だけで判定
 | TYPE-6 | error | レコードリテラルに同じフィールドが二度ある |
 | TYPE-7 | error | レコードリテラルの当てはめる先が決まらない |
 | TYPE-8 | error | `match` のアームの型がそろわない（「match の型」の 4〜6） |
-| TYPE-9 | error | `scalar X extends B` の `B` が核の型でも `scalar` でもない。または `scalar` の継承が循環している |
+| TYPE-9 | error | `scalar X extends B` の `B` が核の型でも `scalar` でもない（リテラルの型も、書けない）。または `scalar` の継承が循環している |
 | TYPE-10 | error | `override f` の `f` が元の model のフィールドにない（元の model を持たない model に書いた `override` を含む）。または model の `extends` が循環している（「継承した model」）。または、`extends` の元が、インデックスの model（「インデックスの model」）。（`model P is U omit f` をなくす前は、`omit` の名前が元にないことと `is` の循環だった。同じ規則の、今の書き方での形） |
 | TYPE-11 | error | model のインデックス（`[名前: K]: V;`）のキーの型 `K` が、`string` でも、元が `string` の `scalar` でもない（「インデックスの model」）。位置は、キーの型 |
 | TYPE-12 | error | 絞り込んだ型 `T on C.Ks` が合わない（「型の種類」の「絞り込んだ型」）: `T` が `C` の対象の型（値の分類は `subject` の型、op の分類はその op の `returns`）に渡せない。並べたケースが、一つの分類のものでない。同じケースが、二度ある |

@@ -1,6 +1,6 @@
 name     = "go-http"
 wasm     = "plugin.wasm"
-protocol = "0.25"
+protocol = "0.26"
 
 # 提供するトランスパイラは一つ。Go の基底 go と、検証の go-valid に相乗りする（docs/plugin-go-http.md「マニフェスト」）
 [[transpiler]]

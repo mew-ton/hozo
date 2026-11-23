@@ -1,0 +1,24 @@
+// TYPE-4（docs/types.md「互換」の 10、13 と「渡せないもの」）: リテラルの型の位置に渡せるのは、同じ値のリテラルだけ。
+// 核の型の値も、値の違うリテラルも、渡せない
+namespace a {
+  model Report { severity: "error"; }
+  fn takeError(s: "error"): void;
+  fn takeThree(n: 3): void;
+  fn takeHalf(x: 0.5): void;
+  fn takeTrue(b: true): void;
+  fn text(): string;
+  fn f(): void {
+    takeError("warning");              // ERROR: TYPE-4
+    takeThree(4);                      // ERROR: TYPE-4
+    takeThree("3");                    // ERROR: TYPE-4
+    takeHalf(1);                       // ERROR: TYPE-4
+    takeTrue(false);                   // ERROR: TYPE-4
+  }
+  fn g(): void {
+    val s = text();
+    takeError(s);                      // ERROR: TYPE-4
+  }
+  fn h(): Report {
+    return { severity: "warning" };    // ERROR: TYPE-4
+  }
+}

@@ -34,6 +34,8 @@ type exprType struct {
 	kind exprKind
 	typ  ir.Type
 	rec  *recordVal
+	// lit は etLiteral のときの、リテラルの値（リテラルの型の位置に渡せるかを、値で比べる。docs/types.md「互換」の 13）。
+	lit ir.Literal
 }
 
 func unknownType() exprType { return exprType{kind: etUnknown} }
@@ -60,9 +62,9 @@ func callType(returns ir.Type) exprType {
 	return valueType(returns)
 }
 
-// literalType はリテラルの型（核の型）。
-func literalType(k ast.LiteralKind) exprType {
-	return exprType{kind: etLiteral, typ: literalCore(k)}
+// literalType はリテラルの式の型。typ は、対応する核の型で、lit は、その値。
+func literalType(k ast.LiteralKind, lit ir.Literal) exprType {
+	return exprType{kind: etLiteral, typ: literalCore(k), lit: lit}
 }
 
 func literalCore(k ast.LiteralKind) ir.Type {
@@ -145,6 +147,12 @@ func (a *analyzer) lowerType(t ast.Type, sc *scope) (ir.Type, bool) {
 		return nil, false
 	case *ast.CoreType:
 		return ir.CoreType{Name: ir.CoreName(t.Name)}, true
+	case *ast.LiteralType:
+		lit := a.lowerLiteral(t.Lit)
+		if lit == nil {
+			return nil, false
+		}
+		return ir.LiteralOf(lit), true
 	case *ast.ArrayType:
 		elem, ok := a.lowerType(t.Elem, sc)
 		if !ok {

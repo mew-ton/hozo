@@ -952,7 +952,7 @@ type ReturnType struct {
 // NodeSpan は Node の実装。
 func (n *ReturnType) NodeSpan() source.Span { return n.Span }
 
-// Type は型（docs/grammar.md「型」）。*CoreType、*ShapeType、*NamedType、*ArrayType、*OptionalType が実装する。
+// Type は型（docs/grammar.md「型」）。*CoreType、*LiteralType、*ShapeType、*NamedType、*ArrayType、*OptionalType、*OnType が実装する。
 type Type interface {
 	Node
 	typeNode()
@@ -967,6 +967,16 @@ type CoreType struct {
 // NodeSpan は Node の実装。
 func (n *CoreType) NodeSpan() source.Span { return n.Span }
 func (n *CoreType) typeNode()             {}
+
+// LiteralType はリテラルの型（docs/grammar.md「型」の LiteralType）: 型の位置に書いた、文字列、整数、小数、真偽のリテラル。
+type LiteralType struct {
+	Span source.Span
+	Lit  *Literal
+}
+
+// NodeSpan は Node の実装。
+func (n *LiteralType) NodeSpan() source.Span { return n.Span }
+func (n *LiteralType) typeNode()             {}
 
 // ShapeType は形の語で書いた型（list<T> / nullable<T> / single<T>。docs/grammar.md「型」）。
 // T[] / T? / T の別の書き方で、IR では同じ型になる。

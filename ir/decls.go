@@ -370,12 +370,13 @@ func (c *Classify) IsSubjectless() bool { return c.DecidedBy == DecidedByNone }
 // NarrowBy は絞り込みの種類（docs/ir.md「classify」の CaseTyping の by。docs/types.md「型で決まる絞り込み」）。
 type NarrowBy string
 
-// 絞り込みの種類。presence と variant は型で決まる絞り込み、predicate は述語の要る絞り込み。else は、型を書かない
+// 絞り込みの種類。presence と variant と literal は型で決まる絞り込み、predicate は述語の要る絞り込み。else は、型を書かない
 // `対象 as else`（残りのケース。docs/check.md「残りのケース」）、none は、型を書かない `対象 as none`（ない側のケース。
 // 同「ない側のケース」）。
 const (
 	NarrowByPresence  NarrowBy = "presence"
 	NarrowByVariant   NarrowBy = "variant"
+	NarrowByLiteral   NarrowBy = "literal"
 	NarrowByPredicate NarrowBy = "predicate"
 	NarrowByElse      NarrowBy = "else"
 	NarrowByNone      NarrowBy = "none"

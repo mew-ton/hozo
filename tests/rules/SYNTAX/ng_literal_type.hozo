@@ -1,0 +1,5 @@
+// SYNTAX（docs/grammar.md「型」の LiteralType）: 期間のリテラルは、型にならない。行の中の、名前のない union は、書けない
+namespace a {
+  model Wait { timeout: 5m; }                          // ERROR: SYNTAX
+  model Report { severity: "error" | "warning"; }      // ERROR: SYNTAX
+}

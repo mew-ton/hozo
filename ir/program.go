@@ -1,7 +1,7 @@
 package ir
 
 // Version は IR の構造の版（docs/ir.md「Program」の version）。構造が変わったら上げる。
-const Version = "0.25"
+const Version = "0.26"
 
 // VersionAccepts は、版 host の hozoc が、版 plugin を話すプラグインを動かせるか（docs/plugin-protocol.md「版の合わせ方」）:
 // 大きい版が 0 の間（1.0 を名乗る前。docs/ir.md「版」の「今は、0.x」）は、二つの版が、ぴったり同じ。1.0 からは、

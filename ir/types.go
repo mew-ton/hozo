@@ -3,15 +3,16 @@ package ir
 import (
 	"fmt"
 	"sort"
+	"strconv"
 	"strings"
 )
 
-// Type は型（docs/ir.md「型」）。具体型は値型の [CoreType]、[RefType]、[OptionalType]、
+// Type は型（docs/ir.md「型」）。具体型は値型の [CoreType]、[LiteralType]、[RefType]、[OptionalType]、
 // [ArrayType]、[CaseType]、[NeverType]。void は型ではなく Op.Returns が nil であること。
 // never は値の型ではなく、Op.Returns にだけ現れる。
 // 等しさは [TypeEqual]（docs/types.md「等しい」）、表示は String（Hozo の構文）。
 type Type interface {
-	// Kind は JSON の判別子（"core"、"ref"、"optional"、"array"、"case"、"never"）。
+	// Kind は JSON の判別子（"core"、"literal"、"ref"、"optional"、"array"、"case"、"never"）。
 	Kind() string
 	// String は Hozo の構文で型を書く（docs/grammar.md「型」）。
 	String() string
@@ -36,6 +37,12 @@ const (
 // CoreType は核の型（docs/ir.md「型」の kind "core"）。
 type CoreType struct {
 	Name CoreName `json:"name"`
+}
+
+// LiteralType はリテラルの型（docs/ir.md「型」の kind "literal"。docs/types.md「型の種類」の「リテラルの型」）:
+// その値だけを持つ型。Literal は、文字列、整数、小数、真偽のどれか（期間は、型の位置には書けない）。
+type LiteralType struct {
+	Literal Literal `json:"literal"`
 }
 
 // RefType は model / scalar / union への参照（docs/ir.md「型」の kind "ref"）。
@@ -71,6 +78,7 @@ type NeverType struct{}
 var (
 	_ Type = NeverType{}
 	_ Type = CoreType{}
+	_ Type = LiteralType{}
 	_ Type = RefType{}
 	_ Type = OptionalType{}
 	_ Type = ArrayType{}
@@ -79,6 +87,9 @@ var (
 
 // Kind は "core"。
 func (CoreType) Kind() string { return "core" }
+
+// Kind は "literal"。
+func (LiteralType) Kind() string { return "literal" }
 
 // Kind は "ref"。
 func (RefType) Kind() string { return "ref" }
@@ -97,6 +108,7 @@ func (NeverType) Kind() string { return "never" }
 
 func (NeverType) isType()    {}
 func (CoreType) isType()     {}
+func (LiteralType) isType()  {}
 func (RefType) isType()      {}
 func (OptionalType) isType() {}
 func (ArrayType) isType()    {}
@@ -110,6 +122,55 @@ func (NeverType) MarshalJSON() ([]byte, error) { return []byte(`{"kind":"never"}
 
 // String は核の型の名前。
 func (t CoreType) String() string { return string(t.Name) }
+
+// String は、リテラルの、仕様での綴り（"core"、0、1.5、true）。
+func (t LiteralType) String() string { return LiteralString(t.Literal) }
+
+// LiteralString は、リテラルの、仕様での綴り（docs/grammar.md「リテラル」）。文字列は、二重引用符で囲み、\\ と \" と改行などを
+// エスケープする。小数は、いつも、小数点を持つ。期間は、ナノ秒の数（仕様の綴りには、戻さない）。
+func LiteralString(l Literal) string {
+	switch v := l.(type) {
+	case StringLiteral:
+		return strconv.Quote(v.Value)
+	case IntLiteral:
+		return strconv.FormatInt(v.Value, 10)
+	case FloatLiteral:
+		s := strconv.FormatFloat(v.Value, 'f', -1, 64)
+		if !strings.ContainsAny(s, ".eEnN") {
+			s += ".0"
+		}
+		return s
+	case BooleanLiteral:
+		return strconv.FormatBool(v.Value)
+	case DurationLiteral:
+		return strconv.FormatInt(int64(v.Value), 10) + "ns"
+	}
+	return ""
+}
+
+// LiteralCore は、リテラルの型が、対応する核の型（docs/types.md「互換」の 10）: 文字列は string、整数は int、小数は float、
+// 真偽は boolean、期間は duration。
+func LiteralCore(l Literal) CoreType {
+	switch l.(type) {
+	case StringLiteral:
+		return CoreType{Name: CoreString}
+	case IntLiteral:
+		return CoreType{Name: CoreInt}
+	case FloatLiteral:
+		return CoreType{Name: CoreFloat}
+	case BooleanLiteral:
+		return CoreType{Name: CoreBoolean}
+	}
+	return CoreType{Name: CoreDuration}
+}
+
+// LiteralEqual は、二つのリテラルが、同じ種類で、同じ値か。
+func LiteralEqual(a, b Literal) bool {
+	if a == nil || b == nil {
+		return a == nil && b == nil
+	}
+	return a.Kind() == b.Kind() && a == b
+}
 
 // String は参照先の FQN。
 func (t RefType) String() string { return t.Target }
@@ -153,6 +214,15 @@ func (t CoreType) MarshalJSON() ([]byte, error) {
 }
 
 // MarshalJSON は kind を付けて書く。
+func (t LiteralType) MarshalJSON() ([]byte, error) {
+	type alias LiteralType
+	return marshalKind("literal", alias(t))
+}
+
+// UnmarshalJSON は docs/ir.md「JSON」の形を読む。
+func (t *LiteralType) UnmarshalJSON(data []byte) error { return unmarshalStruct(data, t) }
+
+// MarshalJSON は kind を付けて書く。
 func (t RefType) MarshalJSON() ([]byte, error) {
 	type alias RefType
 	return marshalKind("ref", alias(t))
@@ -187,6 +257,7 @@ func (t *CaseType) UnmarshalJSON(data []byte) error { return unmarshalStruct(dat
 
 var typeTable = map[string]func([]byte) (Type, error){
 	"core":     asValue[Type, CoreType],
+	"literal":  asValue[Type, LiteralType],
 	"ref":      asValue[Type, RefType],
 	"optional": asValue[Type, OptionalType],
 	"array":    asValue[Type, ArrayType],
@@ -223,6 +294,9 @@ func Time() Type { return CoreType{Name: CoreTime} }
 // Duration は核の型 duration を作る（docs/ir.md「型」の kind "core"）。
 func Duration() Type { return CoreType{Name: CoreDuration} }
 
+// LiteralOf はリテラルの型を作る（docs/ir.md「型」の kind "literal"）。
+func LiteralOf(l Literal) Type { return LiteralType{Literal: l} }
+
 // Ref は宣言の FQN への参照を作る（docs/ir.md「型」の kind "ref"）。
 func Ref(fqn string) Type { return RefType{Target: fqn} }
 
@@ -251,7 +325,7 @@ func Case(classify string, cases []string, of Type) Type {
 	return CaseType{Classify: classify, Cases: cases, Of: of}
 }
 
-// TypeEqual は docs/types.md「等しい」。構造が等しければ等しい。ref は FQN が等しいとき。
+// TypeEqual は docs/types.md「等しい」。構造が等しければ等しい。ref は FQN が等しいとき。literal は、種類と値が等しいとき。
 // case は classify と cases の集合と of が等しいとき。nil 同士（void）は等しい。
 func TypeEqual(a, b Type) bool {
 	if a == nil || b == nil {
@@ -261,6 +335,9 @@ func TypeEqual(a, b Type) bool {
 	case CoreType:
 		y, ok := b.(CoreType)
 		return ok && x.Name == y.Name
+	case LiteralType:
+		y, ok := b.(LiteralType)
+		return ok && LiteralEqual(x.Literal, y.Literal)
 	case RefType:
 		y, ok := b.(RefType)
 		return ok && x.Target == y.Target

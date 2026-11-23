@@ -1,0 +1,33 @@
+// CLS-11（docs/check.md「ケースの型」）: リテラルの型で分類できるのは、対象が boolean か、その型のアームを持つ union のときだけ。
+// 開いた型（string、int、float）と、その型のアームを持たない union は、分けられない
+namespace a {
+  model M { id: string; }
+  union Severity { Error: "error"; Warning: "warning"; }
+  union Page { Ready: M; Fixed: "fixed"; }
+  classify ByString of string {
+    Abc: string as "abc";              // ERROR: CLS-11
+    Other: string as else;
+  }
+  classify ByInt of int {
+    Zero: int as 0;                    // ERROR: CLS-11
+    Other: int as else;
+  }
+  classify ByFloat of float {
+    Half: float as 0.5;                // ERROR: CLS-11
+    Other: float as else;
+  }
+  classify ByOptionalString of string? {
+    Abc: string? as "abc";             // ERROR: CLS-11
+    Other: string? as else;
+  }
+  // boolean の対象に書けるのは、true と false だけ（1 は、boolean に渡せないので、CLS-6）
+  classify NotBoolean of boolean {
+    One: boolean as 1;                 // ERROR: CLS-6
+    Other: boolean as else;
+  }
+  // union が、その値のアームを持たない（"info" は、Severity に渡せないので、CLS-6）
+  classify NoArm of Severity {
+    Info: Severity as "info";          // ERROR: CLS-6
+    Other: Severity as else;
+  }
+}

@@ -1239,7 +1239,7 @@ func fakeTranspiler(t *testing.T, dir, name, lang, extra, transpilerExtra, stdou
 	write(t, filepath.Join(pluginDir, "response.json"), stdout)
 	write(t, filepath.Join(pluginDir, "exit"), string(rune('0'+exit)))
 	// にせもののトランスパイラは、設計書のコーパスのデコレータを、解釈する、と名乗る（fakeplugin.DesignDecorators: CFG-26 を出さない）
-	manifest := "name = \"" + name + "\"\nwasm = " + fakeplugin.WasmTOML + "\nprotocol = \"0.25\"\n" + extra +
+	manifest := "name = \"" + name + "\"\nwasm = " + fakeplugin.WasmTOML + "\nprotocol = \"0.26\"\n" + extra +
 		"\n[[transpiler]]\nname = \"" + name + "\"\nlanguage = \"" + lang + "\"\n" + transpilerExtra +
 		fakeplugin.Interprets(fakeplugin.DesignDecorators...)
 	write(t, filepath.Join(pluginDir, "hozo-plugin.toml"), manifest)
@@ -1451,7 +1451,7 @@ func TestEmitUnits(t *testing.T) {
 			}
 			r := reqs[0]
 			cfg := r.View.Config
-			if r.Protocol != "0.25" || r.Direction != "emit" || r.Transpiler != c.name || r.View.Viewer != c.viewer || cfg.Dir != c.dir || cfg.Out != c.out ||
+			if r.Protocol != "0.26" || r.Direction != "emit" || r.Transpiler != c.name || r.View.Viewer != c.viewer || cfg.Dir != c.dir || cfg.Out != c.out ||
 				cfg.Index != c.index || cfg.Language != "go" || cfg.Base != c.base || strings.Join(cfg.Transpilers, ",") != c.transpilers ||
 				userFiles(r.View.Files) != c.files || !containsStr(r.View.Files, "hozo:vocab/http.hozo") {
 				t.Errorf("%s: 要求 = %+v", c.name, r)
@@ -1646,7 +1646,7 @@ func TestRunEmit(t *testing.T) {
 	write(t, filepath.Join(dir, "exit"), "0")
 	plugin := compiler.Plugin{Name: "echo", Wasm: compiler.Path(filepath.Join(dir, fakeplugin.WasmFile))}
 	// 出力が二つ: 一つ目は、トランスパイラを二つ、二つ目は、一つ
-	req := compiler.EmitRequest{Protocol: "0.25", Direction: "emit", Outputs: []compiler.EmitOutput{
+	req := compiler.EmitRequest{Protocol: "0.26", Direction: "emit", Outputs: []compiler.EmitOutput{
 		{Transpilers: []string{"echo", "echo2"}}, {Transpilers: []string{"echo"}}}}
 	ctx := context.Background()
 	a := &App{Stderr: &bytes.Buffer{}}
@@ -1674,7 +1674,7 @@ func TestRunEmit(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := strings.TrimSpace(string(sent)); got != `{"protocol":"0.25","direction":"emit","spec":{},"outputs":[{"transpilers":["echo","echo2"],"view":{}},{"transpilers":["echo"],"view":{}}]}` {
+	if got := strings.TrimSpace(string(sent)); got != `{"protocol":"0.26","direction":"emit","spec":{},"outputs":[{"transpilers":["echo","echo2"],"view":{}},{"transpilers":["echo"],"view":{}}]}` {
 		t.Errorf("送った要求 = %s", got)
 	}
 
@@ -1845,7 +1845,7 @@ func TestEmitAsksEachPluginOnce(t *testing.T) {
 	}
 	var spec map[string]json.RawMessage
 	_ = json.Unmarshal(req["spec"], &spec)
-	if spec["program"] == nil || spec["namespaces"] == nil || string(spec["version"]) != `"0.25"` {
+	if spec["program"] == nil || spec["namespaces"] == nil || string(spec["version"]) != `"0.26"` {
 		t.Errorf("spec の項目が足りない: %v", len(spec))
 	}
 	for i, o := range outputs {

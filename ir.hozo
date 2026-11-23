@@ -41,7 +41,7 @@ namespace hozo.ir {
   scalar DecidedBy extends string;
 
   /** 絞り込みの種類 */
-  @valid.pattern("^(presence|variant|predicate|else|none)$")
+  @valid.pattern("^(presence|variant|literal|predicate|else|none)$")
   scalar NarrowBy extends string;
 
   /** デコレータを付けられる宣言の種類 */
@@ -79,7 +79,7 @@ namespace hozo.ir {
   // ---- Program ----
 
   model Program {
-    /** この文書の版（今は "0.25"） */
+    /** この文書の版（今は "0.26"） */
     version: string;
     namespaces: Namespace[];
     binds: Bind[];
@@ -130,13 +130,14 @@ namespace hozo.ir {
 
   // ---- 型 ----
 
-  /** 型。JSON では、印 kind（"core"、"ref"、"optional"、"array"、"case"、"never"）で見分ける（穴 12） */
+  /** 型。JSON では、印 kind（"core"、"ref"、"optional"、"array"、"case"、"literal"、"never"）で見分ける（穴 12） */
   union Type {
     Core: CoreType;
     Ref: RefType;
     Optional: OptionalType;
     Array: ArrayType;
     Case: CaseType;
+    Literal: LiteralType;
     Never: NeverType;
   }
   model CoreType { /* kind: "core"; */ name: CoreName; }
@@ -144,6 +145,8 @@ namespace hozo.ir {
   model OptionalType { /* kind: "optional"; */ of: Type; }
   model ArrayType { /* kind: "array"; */ of: Type; }
   model CaseType { /* kind: "case"; */ classify: Fqn; cases: string[]; of: Type; }
+  /** リテラルの型。literal は、文字列、整数、小数、真偽のどれか */
+  model LiteralType { /* kind: "literal"; */ literal: Literal; }
   /** 項目は、印だけ（穴 12: 印を書けないので、項目のない model になり、ほかのアームと、構造では見分けられない） */
   model NeverType { /* kind: "never"; */ }
 

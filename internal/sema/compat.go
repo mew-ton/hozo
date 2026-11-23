@@ -36,15 +36,15 @@ func (a *analyzer) assign(s exprType, t ir.Type) assignFailure {
 		}
 		return failType
 	case etLiteral:
-		return a.assignLiteral(s.typ, t)
+		return a.assignLiteral(s, t)
 	case etRecord:
 		return a.assignRecord(s.rec, t)
 	}
 	if s.typ == nil || t == nil {
 		return assignOK
 	}
-	if isCore(s.typ) && a.isScalarRef(stripOptional(t)) {
-		return failScalar // 明示: 核の型の値を scalar の位置に渡す（TYPE-1）
+	if (isCore(s.typ) || isLiteralType(s.typ)) && a.isScalarRef(stripOptional(t)) {
+		return failScalar // 明示: 核の型（とリテラルの型）の値を scalar の位置に渡す（TYPE-1）
 	}
 	if a.assignType(s.typ, t) {
 		return assignOK
@@ -52,20 +52,35 @@ func (a *analyzer) assign(s exprType, t ir.Type) assignFailure {
 	return failType
 }
 
-// assignLiteral は規則 10（リテラルの型を対応する核の型に）と、規則 2 を通した optional。scalar の位置は TYPE-1。
-func (a *analyzer) assignLiteral(lit ir.Type, t ir.Type) assignFailure {
+// assignLiteral は、リテラルの式を渡す規則: 規則 10（対応する核の型に）、規則 13（同じ値の、リテラルの型に）と、規則 2 を通した
+// optional。scalar の位置は TYPE-1。
+func (a *analyzer) assignLiteral(s exprType, t ir.Type) assignFailure {
 	target := stripOptional(t)
 	if a.isScalarRef(target) {
 		return failScalar
 	}
-	c, ok := target.(ir.CoreType)
-	if !ok {
-		return failType
-	}
-	if literalAssignable(lit, c) {
-		return assignOK
+	switch c := target.(type) {
+	case ir.CoreType:
+		if literalAssignable(s.typ, c) {
+			return assignOK
+		}
+	case ir.LiteralType:
+		if s.lit != nil && literalFits(s.lit, c.Literal) {
+			return assignOK
+		}
 	}
 	return failType
+}
+
+// literalFits は、リテラルの値 v を、リテラルの型 want の位置に渡せるか（docs/types.md「互換」の 13）: 種類と値が同じ。
+// 整数のリテラルは、同じ値の、小数のリテラルの型にも渡せる（規則 10 の int → float と、同じ向き）。
+func literalFits(v, want ir.Literal) bool {
+	if ir.LiteralEqual(v, want) {
+		return true
+	}
+	i, isInt := v.(ir.IntLiteral)
+	f, isFloat := want.(ir.FloatLiteral)
+	return isInt && isFloat && float64(i.Value) == f.Value
 }
 
 // literalAssignable は規則 10: string→string、int→int か float、float→float、boolean→boolean、duration→Duration。
@@ -104,6 +119,15 @@ func (a *analyzer) assignType(s, t ir.Type) bool {
 		return true
 	}
 	switch sv := s.(type) {
+	case ir.LiteralType:
+		// 10. リテラルの型は、対応する核の型に。13. 整数のリテラルの型は、同じ値の、小数のリテラルの型に
+		switch tv := t.(type) {
+		case ir.CoreType:
+			return literalAssignable(ir.LiteralCore(sv.Literal), tv)
+		case ir.LiteralType:
+			return literalFits(sv.Literal, tv.Literal)
+		}
+		return false
 	case ir.CaseType:
 		// 5. 同じ classify の絞り込みで、ケースが部分集合
 		if tv, ok := t.(ir.CaseType); ok && tv.Classify == sv.Classify && ir.TypeEqual(sv.Of, tv.Of) && subset(sv.Cases, tv.Cases) {
@@ -183,6 +207,11 @@ func stripOptional(t ir.Type) ir.Type {
 
 func isCore(t ir.Type) bool {
 	_, ok := t.(ir.CoreType)
+	return ok
+}
+
+func isLiteralType(t ir.Type) bool {
+	_, ok := t.(ir.LiteralType)
 	return ok
 }
 

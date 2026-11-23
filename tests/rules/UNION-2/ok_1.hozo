@@ -1,0 +1,9 @@
+// UNION-2（docs/types.md「リテラルの型」）: 値か、種類が違えば、別のリテラルの型（整数の 1 と、小数の 1.0 も、別）。
+// model のアームは、同じ型を二つ持てる（UNION-2 が見るのは、リテラルの型だけ）
+namespace a {
+  model M { id: string; }
+  union Severity { Error: "error"; Warning: "warning"; }
+  union Mixed { One: 1; OneAndZero: 1.0; Text: "1"; Yes: true; No: false; }
+  union Page { Ready: M; Stale: M; }
+  fn f(s: Severity, m: Mixed, p: Page): void;
+}

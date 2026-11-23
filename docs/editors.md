@@ -53,6 +53,7 @@ editors/vscode/
 | 型の位置の名前 | `entity.name.type.hozo` | `:` の後、`extends` / `of` / `as` の後、`<` の中、`throws` / `catches` / `throw` の後、`by` の後（`match x by store.Registration`）、型の後ろの `on` の後（`Order on Stage.Draft | Stage.Accepted` の二つ。`|` は記号で、scope を付けない）の `QualifiedName` のうち、最後の要素が大文字で始まるもの（`as` の後ろの型の位置は、`;` か `{` まで続く: 行の遷移のケース（`as Stage.Cancelled`）と、状態の遷移のケース（`as HasItems -> Empty` の二つ）は、どれも、この規則で、型の位置の名前として塗る。状態の分類のケースの、`,` で続く次の `対象 as T` も、同じ位置の中で読む。§3.3 の命名規則。`:` は値の位置（名前で渡す引数、レコードリテラル）にも現れるので、小文字で始まる名前は型にしない。関数の `)` の後ろの `:`（`docs/grammar.md`「関数の宣言」）の、型の位置は、節の頭（`throws` / `reads` / `effects`）の手前で終わる。`of` の後ろの op や状態の名前、`as` の前の op や状態の名前、`reads` の後ろの `read` や状態の名前は小文字で始まるので、scope を付けない。`throws` / `catches` の並びの `,` は記号で、scope を付けない。`throw` の後ろの型の位置は、引数の `(` の手前で終わり、引数（`throw Invalid("weak")`）は値の位置として塗る） |
 | 文字列 | `string.quoted.double.hozo` | エスケープは `constant.character.escape.hozo` |
 | 数値 | `constant.numeric.hozo` | `Int` / `Float` / `Duration`（単位も含む） |
+| リテラルの型（`docs/grammar.md`「型」の `LiteralType`: `severity: "error";`、`boolean as true`） | 上の、文字列、数値、`true` / `false` の scope のまま | リテラルのパターンが、型の位置の名前のパターンより先に拾う。型の名前（`entity.name.type.hozo`）としては、塗らない |
 | コメント | `comment.line.double-slash.hozo`、`comment.block.hozo` | |
 | ドキュメンテーションコメント | `comment.block.documentation.hozo` | 中の `@param` / `@throws` / `@see` は `storage.type.class.jsdoc`、続く名前は `variable.other.jsdoc`。行の頭の、デコレータのタグ（`@adr.context`。`docs/grammar.md`「ドキュメンテーションコメント」）は、`@` と名前を、宣言の前のデコレータと同じ scope（`entity.name.function.decorator.hozo`） |
 

@@ -1,0 +1,6 @@
+// TYPE-9（docs/types.md「リテラルの型」）: scalar の元に、リテラルの型は書けない
+namespace a {
+  scalar Fixed extends "fixed";        // ERROR: TYPE-9
+  scalar Zero extends 0;               // ERROR: TYPE-9
+  scalar Yes extends true;             // ERROR: TYPE-9
+}

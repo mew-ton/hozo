@@ -133,9 +133,10 @@ var diagnosticFixtures = []struct{ name, code string }{
 	{"go5", codeOption},      // [emit.options.go] に、知らないキーがある
 	{"go6", codeVariant},     // variant の絞り込みの型と等しい型のアームが、union に二つ以上ある
 	{"go7", codeSeamOnBody},  // 単位のトランスパイラが、本体のあるデコレータに、継ぎ目を宣言している
+	{"go9", codeLiteralType}, // 宣言が、リテラルの型か、literal の絞り込みを使う
 }
 
-// TestDiagnostics は docs/plugin-go.md「診断」の GO-2〜GO-7: 診断のコード・位置・メッセージがゴールデンと同じで、
+// TestDiagnostics は docs/plugin-go.md「診断」の GO-2〜GO-7、GO-9: 診断のコード・位置・メッセージがゴールデンと同じで、
 // 診断を返した出力がファイルを返さないこと（emitViews が確かめる）。
 func TestDiagnostics(t *testing.T) {
 	for _, fx := range diagnosticFixtures {

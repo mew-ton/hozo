@@ -1,0 +1,25 @@
+// TYPE-4（docs/types.md「互換」の 10、13）: リテラルの式は、同じ値のリテラルの型に渡せる。リテラルの型の値は、対応する核の型に渡せる。
+// 整数のリテラルは、同じ値の、小数のリテラルの型にも
+namespace a {
+  model Report { severity: "error"; code: -1; ratio: 1.0; done: true; note: "n"?; }
+  fn takeError(s: "error"): void;
+  fn takeString(s: string): void;
+  fn takeInt(n: int): void;
+  fn takeFloat(x: float): void;
+  fn takeBoolean(b: boolean): void;
+  fn takeOne(x: 1.0): void;
+  fn f(r: Report): void {
+    takeError("error");
+    takeError(r.severity);
+    takeString(r.severity);
+    takeInt(r.code);
+    takeFloat(r.code);
+    takeFloat(r.ratio);
+    takeBoolean(r.done);
+    takeOne(1);
+    takeOne(1.0);
+  }
+  fn g(): Report {
+    return { severity: "error", code: -1, ratio: 1, done: true, note: none };
+  }
+}

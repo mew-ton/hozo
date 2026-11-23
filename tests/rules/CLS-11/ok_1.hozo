@@ -1,0 +1,40 @@
+// CLS-11（docs/check.md「ケースの型」）: 閉じた型は、リテラルの型で分類できる: boolean（true と false）、
+// リテラルの型をアームに持つ union。どちらも、型で決まる分類で、match のアームに、名前で書く
+namespace a {
+  model M { id: string; }
+  model Report { severity: Severity; done: boolean; flag: boolean?; shape: Shape; }
+  union Severity { Error: "error"; Warning: "warning"; Info: "info"; }
+  union Shape { Ready: M; Fixed: "fixed"; Count: 0; Ratio: -1.5; }
+  classify Done of boolean {
+    Yes: boolean as true;
+    No: boolean as false;
+  }
+  classify OnlyTrue of boolean {
+    On: boolean as true;
+    Off: boolean as else;
+  }
+  // boolean? の、値がない側は、true と false の後ろの as else
+  classify Flag of boolean? {
+    On: boolean? as true;
+    Off: boolean? as false;
+    Unset: boolean? as else;
+  }
+  classify Level of Severity {
+    Fatal: Severity as "error";
+    Loud: Severity as "warning";
+    Quiet: Severity as else;
+  }
+  classify Kind of Shape {
+    Page: Shape as M;
+    Fixed: Shape as "fixed";
+    Number: Shape as else;
+  }
+  fn stop(): void;
+  fn go(): void;
+  fn f(r: Report): void {
+    match (r.done by Done) { Yes => stop(); No => go(); };
+    match (r.flag by Flag) { On => stop(); Off, Unset => go(); };
+    match (r.severity by Level) { Fatal => stop(); else => go(); };
+    match (r.shape by Kind) { Page, Fixed => stop(); Number => go(); };
+  }
+}

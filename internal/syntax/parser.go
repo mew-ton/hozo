@@ -1822,6 +1822,12 @@ func (p *parser) parseType() ast.Type {
 		}
 		n.Span = p.spanFrom(start)
 		t = n
+	case p.at(token.String), p.at(token.Int), p.at(token.Float), p.at(token.True), p.at(token.False):
+		// リテラルの型（docs/grammar.md「型」の LiteralType）: その値だけを持つ型
+		lit := p.parseLiteral()
+		t = &ast.LiteralType{Span: lit.Span, Lit: lit}
+	case p.at(token.Duration):
+		p.fail(p.tok().Span, "期間のリテラルは、型の位置には書けない（リテラルの型は、文字列、整数、小数、真偽だけ。docs/grammar.md「型」）")
 	case p.at(token.LBrace):
 		p.fail(p.tok().Span, "その場で書く model はユニオンのアームと例外の値にだけ置ける（docs/grammar.md「決めたこと」）")
 	case p.at(token.Fn):

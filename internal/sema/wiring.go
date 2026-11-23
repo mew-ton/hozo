@@ -1251,7 +1251,8 @@ func (a *analyzer) evalAtomKey(w *wiring, at ast.Atom) (exprType, ir.Atom, strin
 		}
 		return v.typ, ir.NameAtom{Path: segmentsOf(at.Name), Span: span}, key
 	case *ast.Literal:
-		return literalType(at.Kind), ir.LiteralAtom{Literal: a.lowerLiteral(at), Span: a.irSpan(at.Span)}, ""
+		value := a.lowerLiteral(at)
+		return literalType(at.Kind, value), ir.LiteralAtom{Literal: value, Span: a.irSpan(at.Span)}, ""
 	case *ast.NoneAtom:
 		return noneType(), ir.NoneAtom{Span: a.irSpan(at.Span)}, ""
 	case *ast.RecordLit:

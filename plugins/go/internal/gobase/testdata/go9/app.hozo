@@ -1,0 +1,18 @@
+// GO-9（docs/plugin-go.md「診断」）: リテラルの型（フィールド、union のアーム、引数）と、リテラルの型で決まる分類（literal）を
+// 使う宣言ごとに、一つ。リテラルの型を使わない宣言（Plain、plain）には、出ない。位置は、その宣言。
+
+namespace a {
+  model Plain { id: string; }
+  model Report { severity: "error"; }
+  union Severity {
+    Error: "error";
+    Warning: "warning";
+  }
+  /** 型で決まる分類（literal） */
+  classify Done of boolean {
+    Yes: boolean as true;
+    No: boolean as false;
+  }
+  export fn plain(p: Plain): int;
+  export fn retry(times: 3): int;
+}

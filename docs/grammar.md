@@ -172,6 +172,15 @@ ArmType     = Type | ModelBody ;
 
 `Ready: { userName: string; }`（アームと型）、`Unavailable: OrdersUnavailable;`（アームと宣言済みの model）、`server.Unauthorized;`（例外や効果の集合。§6.4）の三つの書き方。
 
+決まった値の集まり（列挙）は、アームの型に、リテラルの型（「型」の `LiteralType`）を書く。アームの名前が、値の名前になる。同じ値のリテラルの型を、二つのアームに書けば UNION-2（`docs/types.md`「リテラルの型」）。
+
+```
+union Severity {
+  Error:   "error";
+  Warning: "warning";
+}
+```
+
 ### state
 
 ```
@@ -457,8 +466,10 @@ BindDecl = "bind" Ident "to" QualifiedName "." ( "*" | "**" ) ";" ;
 ```
 Type        = TypePrefix { "[" "]" | "?" } [ OnType ] ;
 TypePrefix  = CoreType
+            | LiteralType
             | ( "list" | "nullable" | "single" ) "<" Type ">"
             | QualifiedName ;
+LiteralType = String | Int | Float | Bool ;                 (* リテラルの型。値が、そのリテラル一つだけの型: "error"、0、-1、1.5、true *)
 OnType      = "on" CaseRef { "|" CaseRef } ;               (* 絞り込み。ケースは、どれも、同じ分類のもの *)
 CaseRef     = QualifiedName ;                              (* 分類の名前 "." ケースの名前: Stage.Accepted *)
 CoreType    = "string" | "boolean" | "int" | "float" | "datetime" | "date" | "time" | "duration" ;
@@ -478,12 +489,13 @@ CoreType    = "string" | "boolean" | "int" | "float" | "datetime" | "date" | "ti
 
   その言語の型、通信の上の形、保存の形に写すのは、基底とプラグイン（Go は `docs/plugin-go.md`「型」、`docs/plugin-go-http.md`、`docs/plugin-go-sqlite.md`「しまい方」）。
 - `Time` と `Duration` は、核の型の名前ではなくなった。ふつうの名前として読み、宣言がなければ、RES-1 が、今の語を示す（`docs/resolve.md`「手続き」の 1.7）。
+- **リテラルの型**（`LiteralType`）は、値が、そのリテラル一つだけの型（`severity: "error";`、`fn retry(times: 3): void;`）。書けるのは、文字列、整数、小数、真偽のリテラル（「リテラル」）で、`Type` を書けるどの位置にも書ける。`Duration` のリテラルは、型にならない（SYNTAX。理由は「決めたこと」）。意味と、渡し方は `docs/types.md`「リテラルの型」「互換」。値の集まり（`"error"` か `"warning"`）は、リテラルの型をアームに持つ `union` で書く（「union」）。
 - 形の語で書いた `single<T>`、`nullable<T>`、`list<T>` が、もとの形で、`T`、`T?`、`T[]` は、その省略形（`docs/decisions.md`「決めたこと」355、361）。`Type` を書けるどの位置にも、どちらでも書け、IR では同じ型になる（`docs/types.md`「形の書き方」）。
 - 型の中に、その場で書ける、構造を持つ型は、形の語だけ。キーが決まっていない構造は、インデックスの model を宣言して、その名前を書く（「model」）。
 
 - `T on C.K` は、分類のケースで**絞り込んだ型**: 「`T` で、分類 `C` の、ケース `K` にあるもの」（`fn capture(payment: Payment on Standing.Held)`。`docs/decisions.md`「決めたこと」368）。いくつかのケースは、`|` で並べる（`Payment on Standing.Held | Standing.Prepaid`: 「`Held` か `Prepaid`」）。意味と、渡し方は `docs/types.md`「型の種類」「互換」。
 - `on` は、型の後ろ（`[]` と `?` の後ろ）に、一度だけ書ける。`on` の後ろには、`[]` も `?` も続けない: 絞り込んだ型の並びは、`list<Order on Stage.Draft>` と書く。`CaseRef` は、分類の名前と、ケースの名前を `.` でつないだもの（要素が一つだけの名前は、構文エラー）。
-- `on` の後ろの `|` は、「A か B」（「decorator の宣言」の `|` と、同じ読み方）。型そのものの union（`x: A | B`）は、書けない: `T on K1 | K2` は、型は `T` のままで、出力する言語では、ただの `T` になる。
+- `on` の後ろの `|` は、「A か B」（「decorator の宣言」の `|` と、同じ読み方）。型そのものの union（`x: A | B`、`x: "a" | "b"`）は、書けない（SYNTAX）: `T on K1 | K2` は、型は `T` のままで、出力する言語では、ただの `T` になる。型の集まりは、名前を付けた `union` で書く（「union」）。
 - `T on C.K` は書けない（なくした書き方。「決めたこと」）。パーサーは、型の位置に、名前と、その直後の `<` が来たら、`T on C.K` と書くことをメッセージで示して SYNTAX にする。`<>` は、形の語（`list<T>`、`nullable<T>`、`single<T>`）だけのもの。
 - その場で書く model（`ModelBody`）は `Type` ではなく、`ArmType`（ユニオンのアーム）にだけ置ける。
 - `void` は `ReturnType` にだけ書ける。
@@ -638,6 +650,9 @@ DocComment の中身 = { 本文の行 } { タグの行 } ;
 | 識別子は ASCII | §3.3 の命名規則が ASCII の大文字小文字で書かれている |
 | `duration` のリテラルの単位は `ms` `s` `m` `h` `d` | 例にあるのは `m` と `s`。秒未満と日は使う場面が見えるので足す。週以上は月と年が一定でないので持たない |
 | `datetime`、`date`、`time` のリテラルはない | 例にない。日時を仕様に直接書く場面がない |
+| リテラルの型を、型の位置に書ける。書けるのは、文字列、整数、小数、真偽（`docs/decisions.md`「決めたこと」482） | 決まった値を持つ項目と、決まった値の集まりを、型として書けなかった（`docs/open.md`「サンプルと、hozoc 自身の仕様」の穴 6、12、13）。式の型としては、前からあった（`docs/types.md`「式の型」）ので、新しい概念を足さずに、型の位置に書けるようにした |
+| `Duration` のリテラルは、型にならない | 決定 482 が挙げるのは、文字列、数、真偽。長さが、ちょうど `5m` の値だけ、という型を使う場面が見えない |
+| リテラルの型の集まりは、名前を付けた `union` で書く。行の中の `"a" \| "b"` は、足さない（同 482） | 名前のない union を足すと、型の union（`A \| B`）も書けるように見える。集まりに名前があれば、アームの名前が、値の名前になり、分類のケースと、出力する言語の名前に使える |
 | 付く先のない `DocComment` はエラー | 説明が IR から落ちることに気づけるようにする（§2「書き忘れ・曖昧さは構文や検査器で検出し」） |
 | `model A is B omit f;` をなくし、`model A extends B { override f: never; }` と書く。`is` と `omit` は予約語から外す | 継承した型でできること（足す、なくす、型を変える）を一つの書き方にまとめた（`docs/decisions.md`「設計書から離れた決定」S22）。どの生成規則も使わない語を予約したままにすると、名前に使える語を減らすだけになる |
 | 本体が空の `model A extends B { }` は書ける | 継承した model は元の model とは別の型（`docs/types.md`「継承した model」）で、別名ではない。以前の「`omit` のない `is` は書けない」の理由（別名にしかならない）が当たらない |

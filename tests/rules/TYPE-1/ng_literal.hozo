@@ -1,0 +1,9 @@
+// TYPE-1（docs/types.md「互換」の「渡せないもの」）: リテラルの型の値を、scalar の位置に渡す（核の型の値と同じ）
+namespace a {
+  scalar Code extends string;
+  model Report { severity: "error"; }
+  fn takeCode(c: Code): void;
+  fn f(r: Report): void {
+    takeCode(r.severity);              // ERROR: TYPE-1
+  }
+}

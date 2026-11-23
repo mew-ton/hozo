@@ -1,0 +1,15 @@
+// SYNTAX（docs/grammar.md「型」の LiteralType）: リテラルの型は、Type を書けるどの位置にも書ける
+namespace a {
+  model Report {
+    kind: "report";
+    version: 1;
+    offset: -1;
+    ratio: 0.5;
+    final: true;
+    tags: "a"[];
+    note: "n"?;
+    level: nullable<"error">;
+  }
+  union Severity { Error: "error"; Warning: "warning"; }
+  fn retry(times: 3, loud: false): "done";
+}

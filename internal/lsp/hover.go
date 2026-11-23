@@ -577,6 +577,9 @@ func (r *renderer) typ(t ir.Type) string {
 			cases[i] = r.rel(t.Classify) + "." + c
 		}
 		return r.typ(t.Of) + " on " + strings.Join(cases, " | ")
+	case ir.LiteralType:
+		// リテラルの型は、仕様の綴りで（docs/grammar.md「型」の LiteralType）: "error"、3、0.5、true
+		return ir.LiteralString(t.Literal)
 	case ir.NeverType:
 		return "never"
 	}

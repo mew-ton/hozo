@@ -1796,6 +1796,56 @@ func TestCoreMarkHover(t *testing.T) {
 	c.shutdown()
 }
 
+// TestLiteralTypeHover は、リテラルの型が、ホバーの見出しに、仕様の綴りで出ること（docs/lsp.md「ホバー」）: 引数と戻り値の型、
+// リテラルの型で決まる分類のケース。
+func TestLiteralTypeHover(t *testing.T) {
+	root := t.TempDir()
+	text := `namespace gate {
+  union Severity { Error: "error"; Warning: "warning"; }
+  classify Done of boolean {
+    Yes: boolean as true;
+    No: boolean as false;
+  }
+  classify Level of Severity {
+    Fatal: Severity as "error";
+    Other: Severity as else;
+  }
+  fn retry(times: 3, ratio: -0.5, loud: false, s: Severity): void;
+  fn label(): "done";
+  fn stop(): void;
+  fn run(b: boolean, s: Severity): string {
+    retry(3, -0.5, false, s);
+    match (b by Done) { Yes => stop(); No => stop(); };
+    match (s by Level) { Fatal => stop(); Other => stop(); };
+    return label();
+  }
+}
+`
+	path := filepath.Join(root, "a.hozo")
+	writeFile(t, path, text)
+	c := startServer(t, Options{})
+	_, byURI := c.initialize(root, protocol.ClientCapabilities{})
+	uri, enc := fileURI(path), encUTF16
+	for _, d := range byURI[uri] {
+		if d.Code != codeNoConfig {
+			t.Errorf("診断 %s: %s", d.Code, d.Message)
+		}
+	}
+	for _, tt := range []struct{ what, needle, want string }{
+		{"引数の型", "retry(3", `fn retry(times: 3, ratio: -0.5, loud: false, s: Severity)`},
+		{"戻り値の型", "label();", `fn label(): "done"`},
+		{"真偽のケース", "Yes =>", "Yes: boolean as true"},
+		{"union のケース", "Fatal =>", `Fatal: Severity as "error"`},
+	} {
+		var hov *protocol.Hover
+		c.result(protocol.MethodHover, protocol.TextDocumentPositionParams{TextDocument: textDoc(uri), Position: shift(positionOf(t, enc, text, tt.needle, 0), 1)}, &hov)
+		if hov == nil || !strings.Contains(hov.Contents.Value, tt.want) {
+			t.Errorf("hover(%s) に %q がない: %+v", tt.what, tt.want, hov)
+		}
+	}
+	c.shutdown()
+}
+
 // TestDeclarationTargets は、union、classify（分類そのもの）、デコレータの宣言に付けたデコレータ（docs/grammar.md「decorator の宣言」、
 // docs/decisions.md「決めたこと」476）の、ホバーと、定義への移動: ほかの宣言に付けたときと、同じ。
 func TestDeclarationTargets(t *testing.T) {

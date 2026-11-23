@@ -812,7 +812,7 @@
           "type": "array"
         },
         "protocol": {
-          "const": "0.25"
+          "const": "0.26"
         }
       },
       "required": [
@@ -1368,7 +1368,7 @@
           "type": "array"
         },
         "protocol": {
-          "const": "0.25"
+          "const": "0.26"
         },
         "spec": {
           "$ref": "#/$defs/Spec"
@@ -1794,7 +1794,7 @@
           "type": "string"
         },
         "protocol": {
-          "const": "0.25"
+          "const": "0.26"
         }
       },
       "required": [
@@ -1897,6 +1897,23 @@
         "kind",
         "literal",
         "span"
+      ],
+      "type": "object"
+    },
+    "LiteralType": {
+      "additionalProperties": false,
+      "description": "リテラルの型（docs/ir.md「型」の literal）。その値だけを持つ型。literal は、文字列、整数、小数、真偽のどれか。",
+      "properties": {
+        "kind": {
+          "const": "literal"
+        },
+        "literal": {
+          "$ref": "#/$defs/Literal"
+        }
+      },
+      "required": [
+        "kind",
+        "literal"
       ],
       "type": "object"
     },
@@ -2262,6 +2279,7 @@
       "enum": [
         "presence",
         "variant",
+        "literal",
         "predicate",
         "else",
         "none"
@@ -2675,7 +2693,7 @@
           "type": "array"
         },
         "version": {
-          "const": "0.25"
+          "const": "0.26"
         }
       },
       "required": [
@@ -3403,6 +3421,9 @@
           "$ref": "#/$defs/CoreType"
         },
         {
+          "$ref": "#/$defs/LiteralType"
+        },
+        {
           "$ref": "#/$defs/RefType"
         },
         {
@@ -3661,7 +3682,7 @@
           "$ref": "#/$defs/Program"
         },
         "version": {
-          "const": "0.25"
+          "const": "0.26"
         },
         "viewer": {
           "type": "string"

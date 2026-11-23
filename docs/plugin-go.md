@@ -13,7 +13,7 @@ Go の**基底**のトランスパイラ `go`（`docs/config.md`「基底と相�
 ```toml
 name     = "go"
 wasm     = "plugin.wasm"
-protocol = "0.25"
+protocol = "0.26"
 
 [[transpiler]]
 name     = "go"
@@ -1622,6 +1622,7 @@ func (f *FakeVoid[A]) Call(args A, impl func() error) error
 | GO-6 | error | `variant` の絞り込みの `as` の型と等しい型のアームが、union に二つ以上ある（「match」）。位置は分類 |
 | GO-7 | error | 単位のトランスパイラが、本体のあるデコレータに、継ぎ目を宣言している（「本体のあるデコレータ」）。位置は、デコレータの宣言。メッセージに、宣言したトランスパイラの名前 |
 | GO-8 | error | オプション `module` が、書かれていない、文字列でない、空（「パッケージと import パス」「マニフェスト」）。位置なし。メッセージは、`hozo.toml` の `[options.go]` に、`go.mod` の `module` と同じ名前を書くことを、示す |
+| GO-9 | error | 名前空間 N の宣言が、リテラルの型（`docs/types.md`「リテラルの型」）か、`literal` の絞り込み（同「型で決まる絞り込み」）を使う。基底は、まだ、その Go の形を持たない（`docs/open.md`「語彙とプラグイン」）ので、形を当て推量せずに、断る。相乗りのプラグインも、同じ単位では、何も書き出さない（`docs/plugin-protocol.md`「emit」: `errors` が一つでもあれば、書き出さない）。位置は、その宣言。宣言ごとに一つ |
 | GO-INTERNAL | error | 生成器の不具合（利用者の仕様の誤りではない）: 生成したコードを `go/format` で整形できない、検査を通った IR には来ないはずの形、`View` が欠けている、型の置き場がない（CFG-22 が通したはずのもの） |
 
 - warning は返さない。`catches` を持つデコレータが配線の op に付いているときの warning は、やめた（基底はデコレータの節を見ない。「デコレータ」）。

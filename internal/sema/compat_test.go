@@ -256,7 +256,7 @@ func TestNarrowable(t *testing.T) {
 func TestCompatRule9RecordLiteral(t *testing.T) {
 	a := compatAnalyzer(t)
 	rec := &recordVal{fields: []recordFieldVal{
-		{name: "id", typ: literalType(0)},
+		{name: "id", typ: literalType(0, ir.StringLiteral{Value: "x"})},
 	}}
 	// 当てはめの違反は fitRecord が TYPE-5 / TYPE-6 として報告し、呼び手には渡せた扱いで返す（二重に報告しないため）。
 	a.assign(exprType{kind: etRecord, rec: rec}, ir.Optional(other))

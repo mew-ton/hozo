@@ -83,7 +83,7 @@ var unions = []struct {
 	variants []reflect.Type
 }{
 	{typeOf[ir.Type](), []reflect.Type{
-		typeOf[ir.CoreType](), typeOf[ir.RefType](), typeOf[ir.OptionalType](),
+		typeOf[ir.CoreType](), typeOf[ir.LiteralType](), typeOf[ir.RefType](), typeOf[ir.OptionalType](),
 		typeOf[ir.ArrayType](), typeOf[ir.CaseType](), typeOf[ir.NeverType](),
 	}},
 	{typeOf[ir.Decl](), []reflect.Type{
@@ -133,7 +133,7 @@ var enums = map[reflect.Type][]string{
 	typeOf[ir.CatchMode]():       {"recovers", "halts", "ignores"},
 	typeOf[ir.EffectState]():     {"prevented", "kept", "unknown"},
 	typeOf[ir.DecidedBy]():       {"type", "predicate"},
-	typeOf[ir.NarrowBy]():        {"presence", "variant", "predicate", "else", "none"},
+	typeOf[ir.NarrowBy]():        {"presence", "variant", "literal", "predicate", "else", "none"},
 	typeOf[ir.EntrySourceKind](): {"leaf", "effect", "external", "boundary", "decorator", "arm", "never", "unknown"},
 	typeOf[ir.EntryStepVerb]():   {"throws", "none", "is"},
 	typeOf[ir.EntryTargetKind](): {"leaf", "effect", "read", "state", "op", "decorator", "classify"},
@@ -179,6 +179,7 @@ var descriptions = map[string]string{
 	"Type":                 "型（docs/ir.md「型」）。void は型ではなく Op.returns が null であること。never は Op.returns にだけ現れる。",
 	"NeverType":            "決して値を返さない（docs/ir.md「型」の never）。Op.returns にだけ現れる。",
 	"CoreType":             "核の型（docs/ir.md「型」の core）。",
+	"LiteralType":          "リテラルの型（docs/ir.md「型」の literal）。その値だけを持つ型。literal は、文字列、整数、小数、真偽のどれか。",
 	"RefType":              "model / scalar / union への参照（docs/ir.md「型」の ref）。",
 	"OptionalType":         "T?（docs/ir.md「型」の optional）。入れ子にはしない。",
 	"ArrayType":            "T[]（docs/ir.md「型」の array）。",

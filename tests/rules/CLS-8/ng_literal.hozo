@@ -1,0 +1,9 @@
+// CLS-8（docs/check.md「ない側のケース」）: boolean? の、値がない側は、as none では書けない（ほかのケースが T? as T でない）。
+// true と false の後ろの as else で書く
+namespace a {
+  classify Flag of boolean? {
+    On: boolean? as true;
+    Off: boolean? as false;
+    Unset: boolean? as none;           // ERROR: CLS-8
+  }
+}

@@ -1,0 +1,8 @@
+// CLS-7（docs/check.md「残りのケース」）: 対象が boolean で、true と false の両方を書いた分類には、残りがない
+namespace a {
+  classify Done of boolean {
+    Yes: boolean as true;
+    No: boolean as false;
+    Rest: boolean as else;             // ERROR: CLS-7
+  }
+}

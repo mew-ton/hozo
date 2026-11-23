@@ -1,0 +1,8 @@
+[options.go]
+module = "example.com/app"
+
+# plugins/go の単体テストの入力（docs/testing.md「単体テスト」）: GO-9（宣言が、リテラルの型か、literal の絞り込みを使う）。
+[[emit]]
+namespace   = "a"
+transpilers = ["go"]
+out         = "gen/a"

@@ -1551,7 +1551,9 @@ func TestType(t *testing.T) {
 		{"Order on Stage.Draft?", "on の後ろに [] と ? は続けられない"},
 		{"Order on Stage.Draft[]", "on の後ろに [] と ? は続けられない"},
 		{"Order on Stage.Draft on Urgency.Rush", "on は、一つの型に、一度だけ書ける"},
-		{"5", "型が必要"},
+		{"=", "型が必要"},
+		// リテラルの型（文字列、整数、小数、真偽）は、型（docs/grammar.md「型」の LiteralType）。期間のリテラルは、型にならない
+		{"5m", "期間のリテラルは、型の位置には書けない"},
 	}
 	for _, tt := range rejects {
 		mustFail(t, "scalar X extends "+tt.src+";", tt.want)

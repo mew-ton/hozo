@@ -15,7 +15,7 @@
 ```toml
 name     = "go-http"            # プラグインの名前
 wasm     = "plugin.wasm"        # プラグインの本体（WASM）。マニフェストのディレクトリからの相対パス
-protocol = "0.25"               # このプラグインが話す docs/ir.md の version。0.x の間は、hozoc の版と、ぴったり同じ（「版の合わせ方」）
+protocol = "0.26"               # このプラグインが話す docs/ir.md の version。0.x の間は、hozoc の版と、ぴったり同じ（「版の合わせ方」）
 
 vocabulary = []                 # このプラグインが提供する語彙。マニフェストからの相対パス。省略時は []
 
@@ -211,7 +211,7 @@ enabled = false                 # true なら hozoc tests で direction "coverag
 
 **今は、0.x で、ぴったり合わせる**（`docs/decisions.md`「決めたこと」467）: マニフェストの `protocol` が、hozoc の版と、同じでなければ MAN-2。要求の `protocol` が、プラグインの話す版と、同じでなければ、`code: "protocol"` の `error`。下の表の合わせ方（小さい版の大小）は、1.0（最初に、外へ出す版）から効く: 大きい版が 0 の間は、hozoc も SDK も、同じ版だけを、合う、とする。
 
-版は「大きい版.小さい版」（`0.25`）で、hozoc の版は `docs/ir.md`「版」が持つ。足すだけの変更は、小さい版を上げ、壊す変更は、大きい版を上げる（上げ方の持ち主は、同じ見出し。`docs/decisions.md`「決めたこと」421）。
+版は「大きい版.小さい版」（`0.26`）で、hozoc の版は `docs/ir.md`「版」が持つ。足すだけの変更は、小さい版を上げ、壊す変更は、大きい版を上げる（上げ方の持ち主は、同じ見出し。`docs/decisions.md`「決めたこと」421）。
 
 | 比べる所 | 合う | 合わなければ |
 |---|---|---|
@@ -248,9 +248,9 @@ enabled = false                 # true なら hozoc tests で direction "coverag
 
 ```jsonc
 // 要求
-{ "protocol": "0.25", "direction": "read",
+{ "protocol": "0.26", "direction": "read",
   "spec": {                               // 仕様: emit の spec と同じ形（docs/ir.md「まとめた形」の Spec）
-    "version": "0.25",
+    "version": "0.26",
     "namespaces": { /* 名前空間の FQN → その名前空間を出力する単位ごとの設定。単位がなければ {} */ },
     "program": { /* docs/ir.md の Program */ } } }
 
@@ -269,9 +269,9 @@ enabled = false                 # true なら hozoc tests で direction "coverag
 
 ```jsonc
 // 要求
-{ "protocol": "0.25", "direction": "emit",
+{ "protocol": "0.26", "direction": "emit",
   "spec": {                               // 仕様: 出力に依らない部分（docs/ir.md「まとめた形」の Spec）。一度だけ
-    "version": "0.25",
+    "version": "0.26",
     "namespaces": { /* 名前空間の FQN → その名前空間を出力する単位ごとの設定 */ },
     "program": { /* docs/ir.md の Program */ } },
   "outputs": [                            // このプラグインが受け持つ出力（「起動」）。単位の設定の順、名前空間の IR の順
@@ -306,7 +306,7 @@ enabled = false                 # true なら hozoc tests で direction "coverag
 
 ```jsonc
 // 要求
-{ "protocol": "0.25", "direction": "coverage",
+{ "protocol": "0.26", "direction": "coverage",
   "coverage": { "path": "/home/me/shop/cover.out", "content": "mode: set\n..." },   // hozoc tests に渡された、カバレッジのファイル
   "files": [ "gen/server/servertest/http.go", "gen/server/servertest/leaves.go" ],  // 実行された行を知りたいファイル
   "outputs": [ { "index": 5, "base": "go", "dir": "gen/server", "options": { "go": { "module": "example.com/shop-server" } }, /* … */ } ] } // files を出した出力の設定
@@ -330,7 +330,7 @@ enabled = false                 # true なら hozoc tests で direction "coverag
 ### import
 
 ```jsonc
-{ "protocol": "0.25", "direction": "import", "format": "openapi", "files": [ { "path": "openapi.yaml", "content": "..." } ] }
+{ "protocol": "0.26", "direction": "import", "format": "openapi", "files": [ { "path": "openapi.yaml", "content": "..." } ] }
 
 { "ir": { /* docs/ir.md の Program */ }, "warnings": [ /* 同上 */ ] }
 ```

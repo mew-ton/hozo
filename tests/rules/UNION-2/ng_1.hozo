@@ -1,0 +1,16 @@
+// UNION-2（docs/types.md「リテラルの型」）: 一つの union の、二つのアームが、等しいリテラルの型を持つ
+namespace a {
+  union Severity {
+    Error: "error";
+    Fatal: "error";                    // ERROR: UNION-2
+  }
+  union Count {
+    Zero: 0;
+    None: 0;                           // ERROR: UNION-2
+  }
+  union Flag {
+    On: true;
+    Yes: true;                         // ERROR: UNION-2
+  }
+  fn f(s: Severity, c: Count, g: Flag): void;
+}

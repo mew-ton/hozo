@@ -340,7 +340,7 @@ func fakePlugin(t *testing.T, dir, name, lang, extra, result string, exit int, t
 	fakeplugin.Install(t, pluginDir)
 	write(t, filepath.Join(pluginDir, "response.json"), result)
 	write(t, filepath.Join(pluginDir, "exit"), string(rune('0'+exit)))
-	manifest := "name = \"" + name + "\"\nwasm = " + fakeplugin.WasmTOML + "\nprotocol = \"0.25\"\n" + extra
+	manifest := "name = \"" + name + "\"\nwasm = " + fakeplugin.WasmTOML + "\nprotocol = \"0.26\"\n" + extra
 	for _, tr := range transpilers {
 		manifest += "\n[[transpiler]]\nname = \"" + tr + "\"\nlanguage = \"" + lang + "\"\n"
 	}
@@ -523,7 +523,7 @@ func TestPluginAnswersPerOutput(t *testing.T) {
 	dir := t.TempDir()
 	write(t, filepath.Join(dir, "a.hozo"), "namespace a {\n  fn f();\n}\nnamespace b {\n  fn g();\n}\n")
 	fakePlugin(t, dir, "chk", "go", "", `{"files":[{"path":"@DIR@/@T@.txt","content":"@NS@"}],"warnings":[]}`, 0)
-	m := "name = \"chk\"\nwasm = " + fakeplugin.WasmTOML + "\nprotocol = \"0.25\"\n" +
+	m := "name = \"chk\"\nwasm = " + fakeplugin.WasmTOML + "\nprotocol = \"0.26\"\n" +
 		"\n[[transpiler]]\nname = \"chk\"\nlanguage = \"go\"\n\n[[transpiler]]\nname = \"chk2\"\nlanguage = \"go\"\nrequires = [\"chk\"]\n"
 	write(t, filepath.Join(dir, "plugins", "chk", "hozo-plugin.toml"), m)
 
@@ -623,7 +623,7 @@ func (c *cancelAfterFirst) Err() error {
 // （name と language のほかの行: requires、seams など）を、トランスパイラの名前 → 行で。
 func manifest(t *testing.T, dir, name string, transpilers ...[2]string) {
 	t.Helper()
-	m := "name = \"" + name + "\"\nwasm = \"plugin.wasm\"\nprotocol = \"0.25\"\n"
+	m := "name = \"" + name + "\"\nwasm = \"plugin.wasm\"\nprotocol = \"0.26\"\n"
 	for _, tr := range transpilers {
 		lang := "go"
 		if strings.HasPrefix(tr[0], "ts") {
@@ -859,7 +859,7 @@ func TestDiscoveryEnvironmentComesFromCaller(t *testing.T) {
 	envDir, home := t.TempDir(), t.TempDir()
 	// env-t と home-t は、基底 t に相乗りする（一つの単位は、基底をちょうど一つ持つ）
 	manifest := func(name, transpiler string) string {
-		return "name = \"" + name + "\"\nwasm = \"plugin.wasm\"\nprotocol = \"0.25\"\n\n[[transpiler]]\nname = \"" + transpiler + "\"\nlanguage = \"go\"\nrequires = [\"t\"]\n"
+		return "name = \"" + name + "\"\nwasm = \"plugin.wasm\"\nprotocol = \"0.26\"\n\n[[transpiler]]\nname = \"" + transpiler + "\"\nlanguage = \"go\"\nrequires = [\"t\"]\n"
 	}
 	write(t, filepath.Join(envDir, "from-env", "hozo-plugin.toml"), manifest("from-env", "env-t"))
 	write(t, filepath.Join(envDir, "t", "hozo-plugin.toml"), "name = \n") // plugin_dirs の t が先なので読まない
@@ -908,13 +908,13 @@ func TestManifestDiagnosticsOfInstalledPlugins(t *testing.T) {
 	// 読めないマニフェストと name の違うマニフェストは、使っていなくても報告する
 	write(t, filepath.Join(dir, "hozo.toml"), pluginDirs+unit("a", "gen/a"))
 	write(t, filepath.Join(dir, "plugins", "broken", "hozo-plugin.toml"), "name = \n")
-	write(t, filepath.Join(dir, "plugins", "renamed", "hozo-plugin.toml"), "name = \"other\"\nwasm = \"plugin.wasm\"\nprotocol = \"0.25\"\n")
+	write(t, filepath.Join(dir, "plugins", "renamed", "hozo-plugin.toml"), "name = \"other\"\nwasm = \"plugin.wasm\"\nprotocol = \"0.26\"\n")
 	p = Load(dir, "", nil)
 	if got := strings.Join(codes(p.Diags), ","); got != "MAN-4,MAN-3" {
 		t.Fatalf("codes = %v, want [MAN-4 MAN-3]\n%s", got, text(p))
 	}
 	// なくした書き方 command のマニフェスト（MAN-6）も、使っていなくても報告する。メッセージは、新しい書き方（wasm）を示す
-	write(t, filepath.Join(dir, "plugins", "legacy", "hozo-plugin.toml"), "name = \"legacy\"\ncommand = [\"go\", \"run\", \"example.com/legacy\"]\nwasm = \"plugin.wasm\"\nprotocol = \"0.25\"\n")
+	write(t, filepath.Join(dir, "plugins", "legacy", "hozo-plugin.toml"), "name = \"legacy\"\ncommand = [\"go\", \"run\", \"example.com/legacy\"]\nwasm = \"plugin.wasm\"\nprotocol = \"0.26\"\n")
 	p = Load(dir, "", nil)
 	if got := strings.Join(codes(p.Diags), ","); got != "MAN-4,MAN-6,MAN-3" {
 		t.Fatalf("codes = %v, want [MAN-4 MAN-6 MAN-3]\n%s", got, text(p))
@@ -1041,7 +1041,7 @@ func TestUninterpreted(t *testing.T) {
 func TestUnsupported(t *testing.T) {
 	dir := t.TempDir()
 	write(t, filepath.Join(dir, "plugins", "t", "hozo-plugin.toml"),
-		"name = \"t\"\nwasm = \"plugin.wasm\"\nprotocol = \"0.25\"\n\n[[transpiler]]\nname = \"t\"\nlanguage = \"go\"\nunsupported = [\"a.legacy\"]\n\n[[transpiler]]\nname = \"u\"\nlanguage = \"go\"\n")
+		"name = \"t\"\nwasm = \"plugin.wasm\"\nprotocol = \"0.26\"\n\n[[transpiler]]\nname = \"t\"\nlanguage = \"go\"\nunsupported = [\"a.legacy\"]\n\n[[transpiler]]\nname = \"u\"\nlanguage = \"go\"\n")
 	// legacy は @hint: どのトランスパイラも解釈しないが、CFG-26 は出ない（このテストが見るのは CFG-6 だけ）
 	write(t, filepath.Join(dir, "a.hozo"), "namespace a {\n  @hint decorator fn legacy();\n  @legacy fn f();\n}\n")
 	write(t, filepath.Join(dir, "b.hozo"), "namespace a {\n  @legacy fn g();\n}\n")

@@ -11,7 +11,7 @@
 ```toml
 name     = "valid"
 wasm     = "plugin.wasm"
-protocol = "0.25"
+protocol = "0.26"
 
 [read]
 namespaces = ["valid"]

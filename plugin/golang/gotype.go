@@ -21,6 +21,8 @@ const RuntimePath = "github.com/mew-ton/hozo/runtime"
 //	array(T)                         → []T
 //	ref                              → 型の名前（model は構造体、インデックスの model は名前付きのマップ、scalar は名前付きの型、union はインターフェース）
 //	case(C, cases, of)               → of の型（絞り込みは Go の型にしない）
+//	literal                          → 対応する核の型の Go の型。表には、まだない: 基底が GO-9 で断るので、書き出されない
+//	                                   （docs/plugin-go.md「診断」）。相乗りのプラグインが、同じ View で、止まらないための形
 //
 // ref の修飾は imports が決める: 見る側の名前空間 N の型は修飾なし（定義のパッケージでも、入口のパッケージでも。入口は別名を持つ）、
 // 別の名前空間 M の型は、M の型の置き場（docs/config.md「型の置き場」）の入口のパッケージを import して、その名前で修飾する。
@@ -62,6 +64,8 @@ func GoType(t ir.Type, imports *Imports) string {
 		return "[]" + GoType(x.Of, imports)
 	case ir.CaseType:
 		return GoType(x.Of, imports)
+	case ir.LiteralType:
+		return GoType(ir.LiteralCore(x.Literal), imports)
 	}
 	panic(fmt.Sprintf("golang: unknown ir.Type %T", t))
 }
@@ -103,6 +107,9 @@ func Zero(t ir.Type, imports *Imports) string {
 		return Zero(x.Of, imports)
 	case ir.CoreType:
 		return coreZero(x, GoType(x, imports))
+	case ir.LiteralType:
+		core := ir.LiteralCore(x.Literal)
+		return coreZero(core, GoType(core, imports))
 	case ir.RefType:
 		switch d := imports.program().Lookup(x.Target).(type) {
 		case *ir.Union:
@@ -180,7 +187,7 @@ func NarrowedParamsDisplay(e *ir.Effect) string {
 }
 
 // TypeDisplay は、コメントの中の型の書き方（docs/plugin-go.md「コメント」の「型の表示」）: 核の型は名前、ref は FQN、
-// optional(T) は `T?`、array(T) は `T[]`、case はその of。
+// optional(T) は `T?`、array(T) は `T[]`、case はその of、リテラルの型は、仕様の綴り（`"error"`、`3`、`true`）。
 func TypeDisplay(t ir.Type) string {
 	switch x := t.(type) {
 	case nil:
@@ -195,6 +202,8 @@ func TypeDisplay(t ir.Type) string {
 		return TypeDisplay(x.Of) + "[]"
 	case ir.CaseType:
 		return TypeDisplay(x.Of)
+	case ir.LiteralType:
+		return ir.LiteralString(x.Literal)
 	case ir.NeverType:
 		return "never"
 	}

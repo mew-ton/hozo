@@ -693,12 +693,13 @@ func (a *analyzer) lowerLiteralArg(l *ast.Literal, p ir.Param, pt ir.TypeParam) 
 	if len(pt.Types) == 0 {
 		return nil, false // 引数の型が解決できていない（報告済み）
 	}
-	lit := literalType(l.Kind)
+	value := a.lowerLiteral(l)
+	lit := literalType(l.Kind, value)
 	fail := failType
 	for _, t := range pt.Types {
 		f := a.assign(lit, t)
 		if f == assignOK {
-			return ir.LiteralValue{Literal: a.lowerLiteral(l)}, true
+			return ir.LiteralValue{Literal: value}, true
 		}
 		if f == failScalar {
 			fail = failScalar

@@ -21,7 +21,7 @@ TypeScript 風の記法で書く。`?` は省略可（JSON での扱いは「JSO
 
 ```ts
 interface Program {
-  version: "0.25";                  // この文書の版。Program か View の構造が変わったら上げる（「版」）
+  version: "0.26";                  // この文書の版。Program か View の構造が変わったら上げる（「版」）
   namespaces: Namespace[];        // グローバルは name "" の Namespace として先頭に置く
   binds: Bind[];
 }
@@ -70,6 +70,8 @@ type Type =
   | { kind: "array"; of: Type }
   | { kind: "case"; classify: string; cases: string[]; of: Type }    // 絞り込んだ型 `of on classify.cases`（docs/types.md「型の種類」の「絞り込んだ型」）。
                                                                     // cases は昇順ではなく、書かれた順（アームの中の対象なら、アームが受ける順）
+  | { kind: "literal"; literal: Literal }                            // リテラルの型（docs/types.md「リテラルの型」）。literal は、文字列、整数、小数、真偽のどれか
+                                                                     // （duration のリテラルは、型にならない）。Literal は「配線」
   | { kind: "never" };                                               // 値が一つもない型。Op.returns（決して値を返さない）、対象のない分類の
                                                                      // Classify.subject.type、CaseKind.subject（`case of never`）にだけ現れる
 ```
@@ -204,7 +206,7 @@ interface Classify extends DeclBase {
 interface CaseTyping {            // ケースの `対象 as T`、`対象 as else`、`対象 as none`（docs/check.md「ケースの型」「残りのケース」「ない側のケース」）
   state?: string;                 // 状態の分類のとき、その対象の状態の FQN。値の分類と op の分類では持たない（対象は一つ）
   type: Type;                     // そのケースでの対象の型。`as else` と `as none` なら、書いた型がないので、docs/types.md「残りのケースでの対象の型」
-  by: "presence" | "variant" | "predicate" | "else" | "none";   // 絞り込みの種類（docs/types.md「型で決まる絞り込み」）。else は `as else`、none は `as none`
+  by: "presence" | "variant" | "literal" | "predicate" | "else" | "none";   // 絞り込みの種類（docs/types.md「型で決まる絞り込み」）。else は `as else`、none は `as none`
   span: Span;
 }
 ```
@@ -520,7 +522,7 @@ interface Bind {
 
 ```ts
 interface View {
-  version: "0.25"; 
+  version: "0.26"; 
   viewer: string;                 // 見る側の名前空間の FQN
   config: NamespaceConfig;        // この View の単位での viewer の設定
   files: string[];                // この View の単位の in に合ったユーザーのファイルと、読み込んだすべての語彙のファイル
@@ -608,7 +610,7 @@ interface ViewedSignature extends Signature {   // Signature は Sig(O, viewer)
 
 ```ts
 interface Spec {                  // 出力に依らない部分。要求に、一度だけ
-  version: "0.25";                 // View.version
+  version: "0.26";                 // View.version
   namespaces: Record<string, NamespaceConfig[]>;   // View.namespaces
   program: Program;               // 全体そのまま。合成した model（ViewedSignature.params）は、含まない
 }
@@ -637,7 +639,7 @@ interface OutputView {            // 出力（単位と名前空間の組）ご�
 
 ## 版
 
-`Program.version` と `View.version` は同じ値で、どちらかの構造か、プラグインとのやり取りの形（`docs/plugin-protocol.md`「要求と応答」）が変わったら上げる。IR が決めている名前のうち、プラグインが、その値で出力を分けるもの（核の型の名前、標準の分類のケースの名前）が変わったときも、上げる。今の版は `"0.25"`。構造もやり取りの形も同じで、値の意味だけが変わる決定では、上げない: 配線の op の `Op.carried` が空でないことがあり、その `Signature` が運ばれたものを含むこと（`docs/decisions.md`「決めたこと」149）は、0.6 の中にある。
+`Program.version` と `View.version` は同じ値で、どちらかの構造か、プラグインとのやり取りの形（`docs/plugin-protocol.md`「要求と応答」）が変わったら上げる。IR が決めている名前のうち、プラグインが、その値で出力を分けるもの（核の型の名前、標準の分類のケースの名前）が変わったときも、上げる。今の版は `"0.26"`。構造もやり取りの形も同じで、値の意味だけが変わる決定では、上げない: 配線の op の `Op.carried` が空でないことがあり、その `Signature` が運ばれたものを含むこと（`docs/decisions.md`「決めたこと」149）は、0.6 の中にある。
 
 **版が覆うもの**（`docs/decisions.md`「決めたこと」435）: IR の構造と、やり取りの形のほかに、マニフェストの鍵（`docs/plugin-protocol.md`「マニフェスト」）と、同梱の語彙の宣言（`vocab/*.hozo`。`docs/vocab.md`）。鍵や宣言を足せば、小さい版を、なくすか、意味を変えれば、大きい版を上げる。この決まりが効くのは、1.0 から（下の「今は、0.x」）。
 
@@ -647,6 +649,7 @@ interface OutputView {            // 出力（単位と名前空間の組）ご�
 
 | 版 | 変わったこと |
 |---|---|
+| 0.26 | `Type` に、リテラルの型（`kind: "literal"`）を足した。`CaseTyping.by` に、`literal` を足した（`docs/types.md`「リテラルの型」「型で決まる絞り込み」、`docs/decisions.md`「決めたこと」482、483）。`View` と、やり取りの形は、0.25 と同じ |
 | 0.25 | `Decorator.targets` に、`union`、`classify`、`decorator` を足した: `union` の宣言、`classify` の宣言、デコレータの宣言の `decorators` が、空でなくなりうる（`docs/grammar.md`「decorator の宣言」、`docs/decisions.md`「決めたこと」476）。構造は、0.24 と同じ（宣言の `decorators` は、どの種類の宣言も、前から持っている）。`View` とやり取りの形も、同じ |
 | 0.24 | 版の数字を、1.0 から戻した（`docs/decisions.md`「決めたこと」467）。合わせ方は、ぴったり、に戻した。1.0 と名乗っていた間に、版を上げずに入れた変更を含む: 同梱の語彙 `proc` をなくした（同 434）。語彙の名前空間を、付け直した（`page` を `browser.page` に、`localStorage` を `browser.localStorage` に、`actor`、`usecase`、`business` を `prd` の下に。同 455、462）。語彙の名前空間を、閉じた（RES-8。同 456、463）。IR の構造と、要求と応答の形は、1.0 と名乗っていた版と同じ |
 | 1.0 | （未公開のまま、名乗った版。0.24 が、置き換えた）プラグインの作り直し（`docs/requirements.md`「作り直しの段」）が済んだ版。マニフェストの `[[transpiler]]` に `interprets`（解釈するデコレータ。`docs/plugin-protocol.md`「マニフェスト」）を足した。hozoc が、設定のどのトランスパイラも解釈しないデコレータに、warning を出す（CFG-26。`docs/config.md`「解釈するトランスパイラ」、`docs/decisions.md`「決めたこと」420、432）。版の合わせ方を、ぴったりから、「大きい版が同じで、プラグインの小さい版が、hozoc 以下」に変えた（同 421）。IR の構造と、要求と応答の形は、0.23 と同じ |

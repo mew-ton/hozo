@@ -264,11 +264,11 @@ func TestNegative(t *testing.T) {
 		{"emit batch response no results", "EmitBatchResponse", `{"outputs":[{}]}`, false},
 		{"emit batch response bad result", "EmitBatchResponse", `{"outputs":[{"results":[{"files":[]}]}]}`, false},
 		{"emit output no view", "EmitOutput", `{"transpilers":["go"]}`, false},
-		{"emit batch wrong protocol", "EmitBatch", `{"protocol":"0.2","direction":"emit","spec":{"version":"0.25","namespaces":{},"program":{"version":"0.25","namespaces":[],"binds":[]}},"outputs":[]}`, false},
-		{"emit batch", "EmitBatch", `{"protocol":"0.25","direction":"emit","spec":{"version":"0.25","namespaces":{},"program":{"version":"0.25","namespaces":[],"binds":[]}},"outputs":[]}`, true},
-		{"emit batch wrong direction", "EmitBatch", `{"protocol":"0.25","direction":"check","spec":{"version":"0.25","namespaces":{},"program":{"version":"0.25","namespaces":[],"binds":[]}},"outputs":[]}`, false},
-		{"import request", "ImportRequest", `{"protocol":"0.25","direction":"import","format":"openapi","files":[{"path":"openapi.yaml","content":""}]}`, true},
-		{"import request wrong direction", "ImportRequest", `{"protocol":"0.25","direction":"emit","format":"openapi","files":[]}`, false},
+		{"emit batch wrong protocol", "EmitBatch", `{"protocol":"0.2","direction":"emit","spec":{"version":"0.26","namespaces":{},"program":{"version":"0.26","namespaces":[],"binds":[]}},"outputs":[]}`, false},
+		{"emit batch", "EmitBatch", `{"protocol":"0.26","direction":"emit","spec":{"version":"0.26","namespaces":{},"program":{"version":"0.26","namespaces":[],"binds":[]}},"outputs":[]}`, true},
+		{"emit batch wrong direction", "EmitBatch", `{"protocol":"0.26","direction":"check","spec":{"version":"0.26","namespaces":{},"program":{"version":"0.26","namespaces":[],"binds":[]}},"outputs":[]}`, false},
+		{"import request", "ImportRequest", `{"protocol":"0.26","direction":"import","format":"openapi","files":[{"path":"openapi.yaml","content":""}]}`, true},
+		{"import request wrong direction", "ImportRequest", `{"protocol":"0.26","direction":"emit","format":"openapi","files":[]}`, false},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -493,7 +493,7 @@ func TestEnumsMatchGo(t *testing.T) {
 		typeOf[ir.CatchMode]():       {string(ir.Recovers), string(ir.Halts), string(ir.Ignores)},
 		typeOf[ir.EffectState]():     {string(ir.Prevented), string(ir.Kept), string(ir.Unknown)},
 		typeOf[ir.DecidedBy]():       {string(ir.DecidedByType), string(ir.DecidedByPredicate)},
-		typeOf[ir.NarrowBy]():        {string(ir.NarrowByPresence), string(ir.NarrowByVariant), string(ir.NarrowByPredicate), string(ir.NarrowByElse), string(ir.NarrowByNone)},
+		typeOf[ir.NarrowBy]():        {string(ir.NarrowByPresence), string(ir.NarrowByVariant), string(ir.NarrowByLiteral), string(ir.NarrowByPredicate), string(ir.NarrowByElse), string(ir.NarrowByNone)},
 		typeOf[ir.EntrySourceKind](): {string(ir.SourceLeaf), string(ir.SourceEffect), string(ir.SourceExternal), string(ir.SourceBoundary), string(ir.SourceDecorator), string(ir.SourceArm), string(ir.SourceNever), string(ir.SourceUnknown)},
 		typeOf[ir.EntryStepVerb]():   {string(ir.StepThrows), string(ir.StepNone), string(ir.StepIs)},
 		typeOf[ir.EntryTargetKind](): {string(ir.StepLeaf), string(ir.StepEffect), string(ir.StepRead), string(ir.StepState), string(ir.StepOp), string(ir.StepDecorator), string(ir.StepClassify)},

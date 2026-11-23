@@ -866,3 +866,29 @@ test('例外を投げる効果（docs/grammar.md「関数の宣言」）', () =>
   assertScope(t, 'effect fn', 'effects', 'keyword.control.hozo');
   assertScope(t, 'effect fn', 'post', 'keyword.other.hozo');
 });
+
+test('リテラルの型は、型の位置でも、リテラルとして塗る（docs/grammar.md「型」の LiteralType）', () => {
+  const lines = tokensOf([
+    'model Report { severity: "error"; code: -1; ratio: 0.5; final: true; note: "memo"?; tags: "tag"[]; }',
+    'union Severity { Error: "error"; Off: false; }',
+    'fn retry(times: 3, loud: false): "done";',
+    '  Fatal: Severity as "error";',
+    '  Yes: boolean as true;',
+  ].join('\n'));
+  assertScope(lines, 'model Report', 'error', 'string.quoted.double.hozo', 0);
+  assertScope(lines, 'model Report', '-1', 'constant.numeric.hozo', 0);
+  assertScope(lines, 'model Report', '0.5', 'constant.numeric.hozo', 0);
+  assertScope(lines, 'model Report', 'true', 'constant.language.hozo', 0);
+  assertScope(lines, 'model Report', 'memo', 'string.quoted.double.hozo', 0);
+  assertScope(lines, 'model Report', 'tag', 'string.quoted.double.hozo', 0);
+  assertScope(lines, 'union Severity', 'error', 'string.quoted.double.hozo', 0);
+  assertScope(lines, 'union Severity', 'false', 'constant.language.hozo', 0);
+  assertScope(lines, 'fn retry', '3', 'constant.numeric.hozo', 0);
+  assertScope(lines, 'fn retry', 'false', 'constant.language.hozo', 0);
+  assertScope(lines, 'fn retry', 'done', 'string.quoted.double.hozo', 0);
+  assertScope(lines, 'Fatal:', 'error', 'string.quoted.double.hozo', 0);
+  assertScope(lines, 'Yes:', 'true', 'constant.language.hozo', 0);
+  // リテラルの型は、型の名前としては、塗らない
+  assertNoScope(lines, 'fn retry', 'done', 'entity.name.type.hozo');
+  assertNoScope(lines, 'Yes:', 'true', 'entity.name.type.hozo');
+});
