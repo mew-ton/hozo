@@ -1,8 +1,11 @@
 package sema
 
 import (
+	"fmt"
 	"testing"
 
+	"github.com/mew-ton/hozo/internal/source"
+	"github.com/mew-ton/hozo/internal/syntax/ast"
 	"github.com/mew-ton/hozo/ir"
 )
 
@@ -158,9 +161,110 @@ func TestCompatRule8Gone(t *testing.T) {
 			t.Errorf("%s → %s は TYPE-4 / TYPE-3", p[0], p[1])
 		}
 	}
-	// union（arms）に、アームの型の値を直接渡せない
+	// union（arms）に、アームの型の値が入るのは、規則 14 だけ（TestCompatRule14Union）。規則 1〜13（assignType）では、渡せない
 	if a.assignType(user, ir.Ref("a.Page")) {
-		t.Error("アームの型の値は union の位置に渡せない")
+		t.Error("規則 1〜13 では、アームの型の値は union の位置に渡せない")
+	}
+}
+
+// 規則 14（docs/types.md「union に入れる」）: アームの、ちょうど一つの型に渡せる値は、union の位置に入り、どのアームかが返る。
+func TestCompatRule14Union(t *testing.T) {
+	fs, files := parseProject(t, project{"a.hozo": `
+namespace a {
+  scalar Tag extends string;
+  model Dog { name: string; }
+  model Cat { lives: int; }
+  model Twin { name: string; }
+  union Pet { D: Dog; C: Cat; }
+  union Twins { D: Dog; T: Twin; }
+  union Severity { Error: "error"; Warning: "warning"; }
+  union Word { Any: string; Fixed: "x"; }
+  union Mixed { T: Tag; Count: int; Items: string[]; }
+  union Outer { P: Pet; N: int; }
+  model Home { pet: Pet; level: Severity; }
+  union Place { H: Home; }
+}`}, false)
+	a := analyze(fs, files)
+	if n := len(a.diags); n > 0 {
+		t.Fatalf("診断がある: %+v", a.diags)
+	}
+	ref := func(name string) ir.Type { return ir.Ref("a." + name) }
+	str := func(v string) exprType { return literalType(ast.StringLit, ir.StringLiteral{Value: v}) }
+	rec := func(name string, typ exprType) (exprType, *ir.RecordAtom) {
+		atom := &ir.RecordAtom{Fields: []ir.RecordField{{Name: name}}}
+		return exprType{kind: etRecord, rec: &recordVal{fields: []recordFieldVal{{name: name, typ: typ, out: &atom.Fields[0]}}}}, atom
+	}
+	dogRec, _ := rec("name", str("pochi"))
+	catRec, _ := rec("lives", literalType(ast.IntLit, ir.IntLiteral{Value: 9}))
+	wingRec, _ := rec("wings", literalType(ast.IntLit, ir.IntLiteral{Value: 2}))
+	cases := []struct {
+		name string
+		s    exprType
+		t    ir.Type
+		want assignFailure
+		arm  string // "" なら、アームに入らない
+	}{
+		{"model の値", valueType(ref("Dog")), ref("Pet"), assignOK, "D"},
+		{"optional(union) の位置", valueType(ref("Cat")), ir.Optional(ref("Pet")), assignOK, "C"},
+		{"union の値そのもの（規則 1）", valueType(ref("Pet")), ref("Pet"), assignOK, ""},
+		{"none（規則 3）", exprType{kind: etNone}, ir.Optional(ref("Pet")), assignOK, ""},
+		{"リテラルの式", str("warning"), ref("Severity"), assignOK, "Warning"},
+		{"リテラルの型の値", valueType(ir.LiteralType{Literal: ir.StringLiteral{Value: "error"}}), ref("Severity"), assignOK, "Error"},
+		{"アームにない値のリテラル", str("fatal"), ref("Severity"), failType, ""},
+		{"核の型の値は、リテラルの型のアームに渡せない", valueType(ir.String()), ref("Severity"), failType, ""},
+		{"scalar のアーム", valueType(ref("Tag")), ref("Mixed"), assignOK, "T"},
+		{"核の型のアーム", literalType(ast.IntLit, ir.IntLiteral{Value: 2}), ref("Mixed"), assignOK, "Count"},
+		{"array のアーム", valueType(ir.Array(ir.String())), ref("Mixed"), assignOK, "Items"},
+		{"レコードリテラル", catRec, ref("Pet"), assignOK, "C"},
+		{"どのアームにも当てはまらないレコードリテラル", wingRec, ref("Pet"), failType, ""},
+		{"二つのアームに当てはまるレコードリテラル", dogRec, ref("Twins"), failAmbiguous, ""},
+		{"二つのアームに渡せるリテラル", str("x"), ref("Word"), failAmbiguous, ""},
+		{"アームが union（規則 1 で、そのアームに）", valueType(ref("Pet")), ref("Outer"), assignOK, "P"},
+		{"重ねない: アームの union の、中のアームまでは辿らない", valueType(ref("Dog")), ref("Outer"), failType, ""},
+		{"重ねない: array の要素", valueType(ir.Array(ref("Dog"))), ir.Array(ref("Pet")), failType, ""},
+		{"重ねない: optional どうし", valueType(ir.Optional(ref("Dog"))), ir.Optional(ref("Pet")), failType, ""},
+	}
+	for _, c := range cases {
+		a.diags = nil
+		got, arm := a.assignInto(c.s, c.t, source.Span{}, false)
+		name := ""
+		if arm != nil {
+			name = arm.Arm
+			if arm.Union != stripOptional(c.t).(ir.RefType).Target {
+				t.Errorf("%s: union %q", c.name, arm.Union)
+			}
+		}
+		if got != c.want || name != c.arm {
+			t.Errorf("%s: %q アーム %q, want %q アーム %q", c.name, got, name, c.want, c.arm)
+		}
+		wantDiags := 0
+		if c.want == failAmbiguous {
+			wantDiags = 1 // TYPE-20 は、assignInto が出す
+		}
+		if len(a.diags) != wantDiags || (wantDiags == 1 && a.diags[0].Code != "TYPE-20") {
+			t.Errorf("%s: 診断 %+v", c.name, a.diags)
+		}
+	}
+	// レコードリテラルの中のフィールドも、規則 14 の位置: 入ったアームを、IR のフィールドに書く。試し（dry）は、書かない
+	a.diags = nil
+	inner, innerAtom := rec("name", str("pochi"))
+	home := &ir.RecordAtom{Fields: []ir.RecordField{{Name: "pet"}, {Name: "level"}}}
+	homeRec := exprType{kind: etRecord, rec: &recordVal{fields: []recordFieldVal{
+		{name: "pet", typ: inner, out: &home.Fields[0]},
+		{name: "level", typ: str("error"), out: &home.Fields[1]},
+	}}}
+	if got, _ := a.assignInto(homeRec, ref("Home"), source.Span{}, true); got != assignOK || home.Fields[0].Arm != nil {
+		t.Errorf("試しは、IR に書かない: %q %+v", got, home.Fields[0].Arm)
+	}
+	got, arm := a.assignInto(homeRec, ref("Place"), source.Span{}, false)
+	if got != assignOK || arm == nil || arm.Arm != "H" || len(a.diags) != 0 {
+		t.Fatalf("Home のレコードリテラルは、Place の H に入る: %q %+v %+v", got, arm, a.diags)
+	}
+	if p, l := home.Fields[0].Arm, home.Fields[1].Arm; p == nil || p.Arm != "D" || p.Union != "a.Pet" || l == nil || l.Arm != "Error" || l.Union != "a.Severity" {
+		t.Errorf("フィールドのアーム: pet %+v level %+v", p, l)
+	}
+	if innerAtom.Fields[0].Arm != nil {
+		t.Errorf("union でない位置（Dog.name）は、アームを持たない: %+v", innerAtom.Fields[0].Arm)
 	}
 }
 
@@ -310,5 +414,138 @@ func TestCompatRule11ScalarBase(t *testing.T) {
 	}
 	if a.assign(valueType(ir.String()), email) != failScalar {
 		t.Error("核の型の値を scalar に渡すのは TYPE-1")
+	}
+}
+
+// 規則 14 の位置ごとに、IR が、入ったアームを持つ（docs/ir.md「配線」の ArmRef。docs/types.md「union に入れる」の「入れられる位置」）:
+// val、assign、collect、return の文、呼び出しと throw の引数、レコードリテラルのフィールド。union に入れない位置は、持たない。
+func TestUnionArmInIR(t *testing.T) {
+	res, fs := analyzeProject(t, project{"a.hozo": `
+namespace a {
+  model Dog { name: string; }
+  model Cat { lives: int; }
+  union Pet { D: Dog; C: Cat; }
+  union Severity { Error: "error"; Warning: "warning"; }
+  model Report { level: Severity; pet: Pet?; note: string; }
+  exception Bad(level: Severity);
+  fn findDog(): Dog;
+  fn adopt(pet: Pet, name: string);
+  fn file(report: Report);
+  fn names(): string[];
+  fn risky(): throws Bad;
+  fn all(): Pet[] {
+    val d = findDog();
+    val p: Pet = d;
+    val q: Pet;
+    q = { lives: 3 };
+    val pets: Pet[];
+    val ns = names();
+    for (val n of ns) {
+      pets collect findDog();
+    }
+    adopt(d, "pochi");
+    adopt(p, "same");
+    adopt(q, "same");
+    file({ level: "error", pet: { name: "pochi" }, note: "x" });
+    return pets;
+  }
+  fn one(): Pet? {
+    return findDog();
+  }
+  fn h(): throws Bad {
+    try { risky(); } catch (e) { throw Bad("warning"); }
+  }
+}`}, false)
+	noErrors(t, res, fs)
+	got := map[string]string{}
+	note := func(where string, arm *ir.ArmRef) {
+		if arm == nil {
+			got[where] = ""
+			return
+		}
+		got[where] = arm.Union + "." + arm.Arm
+	}
+	args := func(where string, list []ir.CallArg) {
+		for _, a := range list {
+			note(where+"."+a.Param, a.Arm)
+			if rec, ok := a.Value.(ir.RecordAtom); ok {
+				for _, f := range rec.Fields {
+					note(where+"."+a.Param+"."+f.Name, f.Arm)
+					if sub, ok := f.Value.(ir.RecordAtom); ok {
+						for _, sf := range sub.Fields {
+							note(where+"."+a.Param+"."+f.Name+"."+sf.Name, sf.Arm)
+						}
+					}
+				}
+			}
+		}
+	}
+	var walk func(op string, stmts []ir.Statement)
+	calls := 0
+	walk = func(op string, stmts []ir.Statement) {
+		for _, st := range stmts {
+			switch s := st.(type) {
+			case ir.ValStmt:
+				note(op+" val "+s.Name, s.Arm)
+			case ir.AssignStmt:
+				note(op+" assign "+s.Name, s.Arm)
+			case ir.CollectStmt:
+				note(op+" collect "+s.Name, s.Arm)
+			case ir.ReturnStmt:
+				note(op+" return", s.Arm)
+			case ir.CallStmt:
+				calls++
+				args(fmt.Sprintf("%s call%d", op, calls), s.Call.Args)
+			case ir.ForStmt:
+				walk(op, s.Body)
+			case ir.TryStmt:
+				walk(op, s.Body)
+				walk(op, s.Catch.Body)
+			case ir.ThrowStmt:
+				args(op+" throw", s.Throw.Args)
+			}
+		}
+	}
+	for _, ns := range res.Program.Namespaces {
+		for _, d := range ns.Decls {
+			if op, ok := d.(*ir.Op); ok && op.Body != nil {
+				walk(op.Name, op.Body.Statements)
+			}
+		}
+	}
+	want := map[string]string{
+		"a.all val d":                 "",
+		"a.all val p":                 "a.Pet.D",
+		"a.all val q":                 "",
+		"a.all assign q":              "a.Pet.C",
+		"a.all val pets":              "",
+		"a.all val ns":                "",
+		"a.all collect pets":          "a.Pet.D",
+		"a.all call1.pet":             "a.Pet.D",
+		"a.all call1.name":            "",
+		"a.all call2.pet":             "",
+		"a.all call2.name":            "",
+		"a.all call3.pet":             "",
+		"a.all call3.name":            "",
+		"a.all call4.report":          "",
+		"a.all call4.report.level":    "a.Severity.Error",
+		"a.all call4.report.pet":      "a.Pet.D",
+		"a.all call4.report.pet.name": "",
+		"a.all call4.report.note":     "",
+		"a.all return":                "",
+		"a.one return":                "a.Pet.D",
+		"a.h call5":                   "",
+		"a.h throw.level":             "a.Severity.Warning",
+	}
+	delete(want, "a.h call5") // risky() は、引数を持たない
+	for k, w := range want {
+		if g, ok := got[k]; !ok || g != w {
+			t.Errorf("%s: アーム %q（あるか %v）, want %q", k, g, ok, w)
+		}
+	}
+	for k := range got {
+		if _, ok := want[k]; !ok {
+			t.Errorf("期待にない位置: %s = %q", k, got[k])
+		}
 	}
 }

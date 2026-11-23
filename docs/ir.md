@@ -21,7 +21,7 @@ TypeScript 風の記法で書く。`?` は省略可（JSON での扱いは「JSO
 
 ```ts
 interface Program {
-  version: "0.26";                  // この文書の版。Program か View の構造が変わったら上げる（「版」）
+  version: "0.27";                  // この文書の版。Program か View の構造が変わったら上げる（「版」）
   namespaces: Namespace[];        // グローバルは name "" の Namespace として先頭に置く
   binds: Bind[];
 }
@@ -323,14 +323,14 @@ interface Signature {                   // docs/check.md「計算」の Sig(O, v
 interface Wiring { statements: Statement[]; }
 
 type Statement =
-  | { kind: "val"; name: string; type?: Type; expr?: Expr; collected: boolean; span: Span }
+  | { kind: "val"; name: string; type?: Type; expr?: Expr; arm?: ArmRef; collected: boolean; span: Span }
                                   // 値の入れ物の宣言（docs/check.md「値の入れ物」）。名前を並べた宣言（`val a, b;`）は、名前ごとの文に分ける。
                                   // type は、解決した型（書いた型か、入れる式から導いた型。docs/types.md「val の型」）。プラグインは、型を導かない。
                                   // 型が決まらない val（`val x = none;`）だけ、持たない。
                                   // expr は、値と一緒に宣言したときだけ。collected は、集める文で値が入る val か（expr があれば false）
-  | { kind: "assign"; name: string; expr: Expr; span: Span }      // 値を入れる文 `x = 式;`
-  | { kind: "collect"; name: string; expr: Expr; span: Span }     // 集める文 `xs collect 式;`（docs/check.md「繰り返し」の「集める」）
-  | { kind: "return"; expr: Expr; span: Span }
+  | { kind: "assign"; name: string; expr: Expr; arm?: ArmRef; span: Span }      // 値を入れる文 `x = 式;`
+  | { kind: "collect"; name: string; expr: Expr; arm?: ArmRef; span: Span }     // 集める文 `xs collect 式;`（docs/check.md「繰り返し」の「集める」）
+  | { kind: "return"; expr: Expr; arm?: ArmRef; span: Span }
   | { kind: "call"; call: Call; span: Span }
   | { kind: "match"; match: Match; span: Span }
   | { kind: "disjoint"; arms: Arm[]; span: Span }                 // 互いに触れないアームの並び（docs/check.md「disjoint」）。書かれた順。二つ以上
@@ -350,7 +350,7 @@ interface Catch {
 interface Throw {                 // `throw E`、`throw E(値, …)`、`throw e`。アームの本体（MatchArm.body）と、同じ形
   kind: "throw";
   exception: string;              // 例外の FQN。`throw e`（受けた例外を、そのまま投げ直す）なら ""
-  args: { param: string; value: Atom }[];   // 位置で書いた値を、例外の params の名前に対応付けたもの（なければ []）
+  args: { param: string; value: Atom; arm?: ArmRef }[];   // 位置で書いた値を、例外の params の名前に対応付けたもの（なければ []）
   caught?: string;                // `throw e` のとき、受けた例外の名前（Catch.name）。ほかは、持たない
   span: Span;
 }
@@ -365,7 +365,7 @@ type Expr = { kind: "call"; call: Call } | { kind: "match"; match: Match } | { k
 
 interface Call {
   callee: Callee;                 // 呼び出し先（docs/check.md「配線からの呼び出し」）
-  args: { param: string; value: Atom }[];   // 位置で書いた引数を、呼び出し先の引数名に対応付けたもの（docs/types.md「呼び出しの引数」）。
+  args: { param: string; value: Atom; arm?: ArmRef }[];   // 位置で書いた引数を、呼び出し先の引数名に対応付けたもの（docs/types.md「呼び出しの引数」）。
                                   // 直に呼ぶ組み込みの効果の、値を取る操作の引数名は "value"
   bound: BoundPosition[];         // bind で埋まる位置（docs/check.md「bind」）。callee が op でなければ []
   span: Span;
@@ -388,7 +388,15 @@ type Atom =
                                                                     // path はその値のフィールドのパス（状態そのものなら []）
   | { kind: "literal"; literal: Literal; span: Span }
   | { kind: "none"; span: Span }
-  | { kind: "record"; fields: { name: string; value: Atom }[]; span: Span };   // { item } は { item: item } に展開済み
+  | { kind: "record"; fields: { name: string; value: Atom; arm?: ArmRef }[]; span: Span };   // { item } は { item: item } に展開済み
+
+// union（arms）の位置に、アームの型の値を入れた所（docs/types.md「互換」の規則 14、「union に入れる」。docs/decisions.md「決めたこと」484）。
+// 値を置く位置（val、assign、collect、return、Call.args と throw の args の要素、record の fields の要素）が、arm で持つ。
+// 入れていなければ、arm は、ない。プラグインは、どのアームに入るかを、型から計算し直さない。
+interface ArmRef {
+  union: string;                  // 入れる先の union の FQN（位置の型が optional(union) でも、union そのもの）
+  arm: string;                    // アームの名前（Union.arms の name）
+}
 
 interface Match {
   subject: { kind: "value"; atom: Atom }            // 値を対象にした match（値の分類、op の分類、標準の分類）。
@@ -522,7 +530,7 @@ interface Bind {
 
 ```ts
 interface View {
-  version: "0.26"; 
+  version: "0.27"; 
   viewer: string;                 // 見る側の名前空間の FQN
   config: NamespaceConfig;        // この View の単位での viewer の設定
   files: string[];                // この View の単位の in に合ったユーザーのファイルと、読み込んだすべての語彙のファイル
@@ -610,7 +618,7 @@ interface ViewedSignature extends Signature {   // Signature は Sig(O, viewer)
 
 ```ts
 interface Spec {                  // 出力に依らない部分。要求に、一度だけ
-  version: "0.26";                 // View.version
+  version: "0.27";                 // View.version
   namespaces: Record<string, NamespaceConfig[]>;   // View.namespaces
   program: Program;               // 全体そのまま。合成した model（ViewedSignature.params）は、含まない
 }
@@ -639,7 +647,7 @@ interface OutputView {            // 出力（単位と名前空間の組）ご�
 
 ## 版
 
-`Program.version` と `View.version` は同じ値で、どちらかの構造か、プラグインとのやり取りの形（`docs/plugin-protocol.md`「要求と応答」）が変わったら上げる。IR が決めている名前のうち、プラグインが、その値で出力を分けるもの（核の型の名前、標準の分類のケースの名前）が変わったときも、上げる。今の版は `"0.26"`。構造もやり取りの形も同じで、値の意味だけが変わる決定では、上げない: 配線の op の `Op.carried` が空でないことがあり、その `Signature` が運ばれたものを含むこと（`docs/decisions.md`「決めたこと」149）は、0.6 の中にある。
+`Program.version` と `View.version` は同じ値で、どちらかの構造か、プラグインとのやり取りの形（`docs/plugin-protocol.md`「要求と応答」）が変わったら上げる。IR が決めている名前のうち、プラグインが、その値で出力を分けるもの（核の型の名前、標準の分類のケースの名前）が変わったときも、上げる。今の版は `"0.27"`。構造もやり取りの形も同じで、値の意味だけが変わる決定では、上げない: 配線の op の `Op.carried` が空でないことがあり、その `Signature` が運ばれたものを含むこと（`docs/decisions.md`「決めたこと」149）は、0.6 の中にある。
 
 **版が覆うもの**（`docs/decisions.md`「決めたこと」435）: IR の構造と、やり取りの形のほかに、マニフェストの鍵（`docs/plugin-protocol.md`「マニフェスト」）と、同梱の語彙の宣言（`vocab/*.hozo`。`docs/vocab.md`）。鍵や宣言を足せば、小さい版を、なくすか、意味を変えれば、大きい版を上げる。この決まりが効くのは、1.0 から（下の「今は、0.x」）。
 
@@ -649,6 +657,7 @@ interface OutputView {            // 出力（単位と名前空間の組）ご�
 
 | 版 | 変わったこと |
 |---|---|
+| 0.27 | 値を置く位置に、`arm`（`ArmRef`）を足した: `val`、`assign`、`collect`、`return` の文、`Call.args` と `throw` の `args` の要素、`record` の `fields` の要素。union（`arms`）の位置に、アームの型の値を入れた所が、どのアームに入るかを持つ（`docs/types.md`「union に入れる」、`docs/decisions.md`「決めたこと」484）。`View` と、やり取りの形は、0.26 と同じ |
 | 0.26 | `Type` に、リテラルの型（`kind: "literal"`）を足した。`CaseTyping.by` に、`literal` を足した（`docs/types.md`「リテラルの型」「型で決まる絞り込み」、`docs/decisions.md`「決めたこと」482、483）。`View` と、やり取りの形は、0.25 と同じ |
 | 0.25 | `Decorator.targets` に、`union`、`classify`、`decorator` を足した: `union` の宣言、`classify` の宣言、デコレータの宣言の `decorators` が、空でなくなりうる（`docs/grammar.md`「decorator の宣言」、`docs/decisions.md`「決めたこと」476）。構造は、0.24 と同じ（宣言の `decorators` は、どの種類の宣言も、前から持っている）。`View` とやり取りの形も、同じ |
 | 0.24 | 版の数字を、1.0 から戻した（`docs/decisions.md`「決めたこと」467）。合わせ方は、ぴったり、に戻した。1.0 と名乗っていた間に、版を上げずに入れた変更を含む: 同梱の語彙 `proc` をなくした（同 434）。語彙の名前空間を、付け直した（`page` を `browser.page` に、`localStorage` を `browser.localStorage` に、`actor`、`usecase`、`business` を `prd` の下に。同 455、462）。語彙の名前空間を、閉じた（RES-8。同 456、463）。IR の構造と、要求と応答の形は、1.0 と名乗っていた版と同じ |

@@ -488,6 +488,23 @@ func TestFiniteTypeDiagnostic(t *testing.T) {
 	c.shutdown()
 }
 
+// TestUnionArmDiagnostic は、union の位置に渡した値のアームが決まらない診断（TYPE-20。docs/types.md「union に入れる」）が、
+// ほかの規則と同じ道で、エディタに出ること: 位置は、渡した値。アームが一つに決まる行（adopt(c)）には、出ない。
+func TestUnionArmDiagnostic(t *testing.T) {
+	root := t.TempDir()
+	writeFile(t, filepath.Join(root, "hozo.toml"), "[hozo]\nsources = [\"**/*.hozo\"]\n")
+	writeFile(t, filepath.Join(root, "a.hozo"), "namespace a {\n  model Dog { name: string; }\n  model Twin { name: string; }\n  model Cat { lives: int; }\n"+
+		"  union Pet { D: Dog; T: Twin; C: Cat; }\n  fn adopt(pet: Pet);\n  fn f(c: Cat) {\n    adopt(c);\n    adopt({ name: \"pochi\" });\n  }\n}\n")
+	uri := fileURI(filepath.Join(root, "a.hozo"))
+	c := startServer(t, Options{})
+	_, byURI := c.initialize(root, protocol.ClientCapabilities{})
+	diags := byURI[uri]
+	if len(diags) != 1 || diags[0].Code != "TYPE-20" || diags[0].Range.Start.Line != 8 || diags[0].Range.Start.Character != 10 {
+		t.Fatalf("a.hozo の診断 = %+v（期待は、9 行目の、渡した値の位置の TYPE-20 が一つ）", diags)
+	}
+	c.shutdown()
+}
+
 // TestPositionEncoding はサロゲートペア（UTF-16 で 2 単位、UTF-8 で 4 バイト）を含む行で、診断の列が
 // 交渉したエンコーディングの単位になること（docs/lsp.md「通信」）。
 func TestPositionEncoding(t *testing.T) {

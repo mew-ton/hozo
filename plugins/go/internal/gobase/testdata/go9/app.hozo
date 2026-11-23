@@ -1,5 +1,6 @@
 // GO-9（docs/plugin-go.md「診断」）: リテラルの型を、型の位置（フィールド、union のアーム、引数）に使う宣言と、対象の型が boolean? の、
 // literal の分類ごとに、一つ。リテラルの型を使わない宣言（Plain、plain）と、対象の型が boolean の literal の分類（Done）には、出ない。
+// 配線が、union の位置に、アームの型の値を入れる op（adopt。docs/types.md「union に入れる」）にも、一つ。入れない op（keep）には、出ない。
 // 位置は、その宣言。
 
 namespace a {
@@ -22,4 +23,11 @@ namespace a {
   }
   export fn plain(p: Plain): int;
   export fn retry(times: 3): int;
+  model Dog { name: string; }
+  model Cat { lives: int; }
+  union Pet { D: Dog; C: Cat; }
+  export fn keep(pet: Pet): int;
+  export fn adopt(dog: Dog): int {
+    return keep(dog);
+  }
 }

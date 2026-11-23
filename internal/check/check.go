@@ -308,6 +308,24 @@ func (ix *index) modelOf(t ir.Type) *ir.Model {
 	return nil
 }
 
+// placedModel は、型 t の位置に置いたレコードリテラルを、当てはめる model: 値が union のアームに入っていれば（arm。
+// docs/types.md「union に入れる」）、そのアームの型の model。そうでなければ、t の model。
+func (ix *index) placedModel(t ir.Type, arm *ir.ArmRef) *ir.Model {
+	if arm == nil {
+		return ix.modelOf(t)
+	}
+	u, _ := ix.decls[arm.Union].(*ir.Union)
+	if u == nil {
+		return nil
+	}
+	for _, a := range u.Arms {
+		if a.Name == arm.Arm {
+			return ix.modelOf(a.Type)
+		}
+	}
+	return nil
+}
+
 func isOptional(t ir.Type) bool {
 	_, ok := t.(ir.OptionalType)
 	return ok

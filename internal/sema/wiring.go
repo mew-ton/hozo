@@ -637,7 +637,7 @@ func (w *wiring) markAssigned(b *binding) {
 
 // valueOf は、val に入れる式（値と一緒の宣言、値を入れる文）を評価する。b の型を書いていれば、そこへ渡せること（TYPE-17）。
 // 書いていなければ、式の型を、b の型にする（docs/types.md「val の型」）。
-func (a *analyzer) valueOf(w *wiring, b *binding, name string, value ast.Expr) (ir.Expr, bool) {
+func (a *analyzer) valueOf(w *wiring, b *binding, name string, value ast.Expr) (ir.Expr, *ir.ArmRef, bool) {
 	var ctx *returnContext
 	if b.declType != nil {
 		ctx = &returnContext{returns: b.declType}
@@ -656,15 +656,20 @@ func (a *analyzer) valueOf(w *wiring, b *binding, name string, value ast.Expr) (
 			t = unknownType()
 		}
 	}
+	var into *ir.ArmRef
 	if b.declType != nil {
-		if t.kind != etUnknown && a.assign(t, b.declType) != assignOK {
-			a.errorf("TYPE-17", value.NodeSpan(), "式の型 %s は、val %s の型 %s に渡せない", exprName(t), name, typeName(b.declType))
+		if t.kind != etUnknown {
+			fail, arm := a.assignInto(t, b.declType, value.NodeSpan(), false)
+			if fail != assignOK && fail != failAmbiguous {
+				a.errorf("TYPE-17", value.NodeSpan(), "式の型 %s は、val %s の型 %s に渡せない", exprName(t), name, typeName(b.declType))
+			}
+			into = arm
 		}
 		b.typ = valueType(b.declType)
 	} else {
 		b.typ = t
 	}
-	return expr, ok
+	return expr, into, ok
 }
 
 // lowerVal は val の宣言一つ（docs/check.md「値の入れ物」）。WIRE-4、WIRE-2、TYPE-7、TYPE-17。
@@ -687,14 +692,14 @@ func (a *analyzer) lowerVal(w *wiring, s *ast.ValStmt) (ir.Statement, bool) {
 		return ir.ValStmt{Name: name, Span: span}, true
 	}
 	// 式を先に読む: 式の中から、宣言している名前は、見えない
-	expr, ok := a.valueOf(w, b, name, s.Value)
+	expr, into, ok := a.valueOf(w, b, name, s.Value)
 	if a.declareVal(w, b, "val の宣言") {
 		w.vals[span] = b
 	}
 	if !ok {
 		return nil, false
 	}
-	return ir.ValStmt{Name: name, Expr: expr, Span: span}, true
+	return ir.ValStmt{Name: name, Expr: expr, Arm: into, Span: span}, true
 }
 
 // lowerAssign は値を入れる文 `x = 式;`（docs/check.md「値の入れ物」の「値を入れる文」）。WIRE-11、WIRE-2、TYPE-17。
@@ -737,7 +742,7 @@ func (a *analyzer) lowerAssign(w *wiring, s *ast.AssignStmt) (ir.Statement, bool
 		a.evalExpr(w, s.Value, nil)
 		return nil, false
 	}
-	expr, ok := a.valueOf(w, b, name, s.Value)
+	expr, into, ok := a.valueOf(w, b, name, s.Value)
 	b.filled = true
 	for _, f := range w.arms {
 		f.by[b] = f.arm
@@ -746,7 +751,7 @@ func (a *analyzer) lowerAssign(w *wiring, s *ast.AssignStmt) (ir.Statement, bool
 	if !ok {
 		return nil, false
 	}
-	return ir.AssignStmt{Name: name, Expr: expr, Span: a.irSpan(s.Span)}, true
+	return ir.AssignStmt{Name: name, Expr: expr, Arm: into, Span: a.irSpan(s.Span)}, true
 }
 
 // lowerCollect は集める文 `xs collect 式;`（docs/check.md「繰り返し」の「集める」）。WIRE-14、WIRE-2、TYPE-7、TYPE-17。
@@ -802,9 +807,14 @@ func (a *analyzer) lowerCollect(w *wiring, s *ast.CollectStmt) (ir.Statement, bo
 			t = unknownType()
 		}
 	}
+	var into *ir.ArmRef
 	if elem != nil {
-		if t.kind != etUnknown && a.assign(t, elem) != assignOK {
-			a.errorf("TYPE-17", s.Value.NodeSpan(), "式の型 %s は、%s の要素の型 %s に渡せない", exprName(t), name, typeName(elem))
+		if t.kind != etUnknown {
+			fail, arm := a.assignInto(t, elem, s.Value.NodeSpan(), false)
+			if fail != assignOK && fail != failAmbiguous {
+				a.errorf("TYPE-17", s.Value.NodeSpan(), "式の型 %s は、%s の要素の型 %s に渡せない", exprName(t), name, typeName(elem))
+			}
+			into = arm
 		}
 	} else if b.declType == nil {
 		b.collectTypes = append(b.collectTypes, collectedType{typ: t, span: s.Value.NodeSpan()})
@@ -817,7 +827,7 @@ func (a *analyzer) lowerCollect(w *wiring, s *ast.CollectStmt) (ir.Statement, bo
 	if !ok {
 		return nil, false
 	}
-	return ir.CollectStmt{Name: name, Expr: expr, Span: a.irSpan(s.Span)}, true
+	return ir.CollectStmt{Name: name, Expr: expr, Arm: into, Span: a.irSpan(s.Span)}, true
 }
 
 // finishCollect は、型を書かない、集める先の val の型を、集めた式の型から導く（docs/types.md「val の型」の 2）:
@@ -939,12 +949,17 @@ func (a *analyzer) lowerReturn(w *wiring, s *ast.ReturnStmt, last bool) (ir.Stat
 	if !ok {
 		return nil, false
 	}
+	var into *ir.ArmRef
 	if t.kind == etNoValue {
 		a.errorf("WIRE-2", s.Value.NodeSpan(), "return の式は値を持たない")
-	} else if op.Returns != nil && a.assign(t, op.Returns) != assignOK {
-		a.errorf("TYPE-3", s.Value.NodeSpan(), "return の値の型 %s は op %s の戻り値の型 %s に渡せない", exprName(t), op.Name, typeName(op.Returns))
+	} else if op.Returns != nil {
+		fail, arm := a.assignInto(t, op.Returns, s.Value.NodeSpan(), false)
+		if fail != assignOK && fail != failAmbiguous {
+			a.errorf("TYPE-3", s.Value.NodeSpan(), "return の値の型 %s は op %s の戻り値の型 %s に渡せない", exprName(t), op.Name, typeName(op.Returns))
+		}
+		into = arm
 	}
-	return ir.ReturnStmt{Expr: expr, Span: a.irSpan(s.Span)}, true
+	return ir.ReturnStmt{Expr: expr, Arm: into, Span: a.irSpan(s.Span)}, true
 }
 
 // returnContext は `return` の式であること。match のアームがレコードリテラルと none だけのとき、当てはめる先を
@@ -1099,8 +1114,7 @@ func (a *analyzer) bindArgs(target callTarget, args []evaluatedArg, arm *armCont
 			break
 		}
 		p := target.params[i]
-		out = append(out, ir.CallArg{Param: p.Name, Value: arg.atom})
-		a.checkArg(target.what, p, arg, arm)
+		out = append(out, ir.CallArg{Param: p.Name, Value: arg.atom, Arm: a.checkArg(target.what, p, arg, arm)})
 	}
 	return out
 }
@@ -1196,20 +1210,22 @@ func (a *analyzer) evalArgs(w *wiring, atoms []ast.Atom) []evaluatedArg {
 }
 
 // checkArg は引数の型の照合（TYPE-4 / TYPE-1）。アームの中の対象は、絞り込まれた型で評価されている。
-// 対象と同じ Atom をそのまま渡していて渡せなければ MATCH-4。
-func (a *analyzer) checkArg(what string, p ir.OpParam, arg evaluatedArg, arm *armContext) {
+// 対象と同じ Atom をそのまま渡していて渡せなければ MATCH-4。引数の型が union で、値がアームに入るなら、そのアームを返す
+// （docs/types.md「union に入れる」）。
+func (a *analyzer) checkArg(what string, p ir.OpParam, arg evaluatedArg, arm *armContext) *ir.ArmRef {
 	if p.Type == nil {
-		return
+		return nil
 	}
-	fail := a.assign(arg.typ, p.Type)
-	if fail == assignOK {
-		return
+	fail, into := a.assignInto(arg.typ, p.Type, arg.span, false)
+	if fail == assignOK || fail == failAmbiguous {
+		return into
 	}
 	if arm != nil && arm.subject != "" && arg.key == arm.subject {
 		a.errorf("MATCH-4", arg.span, "アーム %s の中で %s の型は %s で、%s の引数 %s の型 %s に渡せない", arm.cases, arg.text, exprName(arg.typ), what, p.Name, typeName(p.Type))
-		return
+		return nil
 	}
 	a.errorf(string(fail), arg.span, "%s", failMessage(fail, fmt.Sprintf("%s の引数 %s", what, p.Name), arg.typ, p.Type))
+	return nil
 }
 
 // evalAtom は Atom の型と IR。
@@ -1278,6 +1294,9 @@ func (a *analyzer) evalRecord(w *wiring, r *ast.RecordLit) (exprType, ir.Atom) {
 		t, va := a.evalAtom(w, value)
 		rv.fields = append(rv.fields, recordFieldVal{name: f.Name.Name, span: f.Name.Span, valueSpan: value.NodeSpan(), typ: t})
 		atom.Fields = append(atom.Fields, ir.RecordField{Name: f.Name.Name, Value: va})
+	}
+	for i := range rv.fields {
+		rv.fields[i].out = &atom.Fields[i] // 当てはめが、入ったアームを書く先（docs/types.md「union に入れる」）
 	}
 	return exprType{kind: etRecord, rec: rv}, atom
 }

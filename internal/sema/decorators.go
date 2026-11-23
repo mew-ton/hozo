@@ -659,9 +659,15 @@ func (a *analyzer) lowerTypeArg(v *ast.ArgValue, p ir.Param, pt ir.TypeParam, sc
 		return nil, false
 	}
 	info := sc.opParams.params[r.name]
-	if info.typ != nil && !a.anyAssignable(valueType(info.typ), pt.Types) {
-		a.errorf("TYPE-4", term.Span, "op の引数 %s の型 %s は、デコレータの引数 %s の型 %s に渡せない", r.name, typeName(info.typ), p.Name, typesString(pt.Types))
-		return nil, false
+	if info.typ != nil {
+		switch a.anyAssignable(valueType(info.typ), pt.Types, term.Span) {
+		case assignOK:
+		case failAmbiguous:
+			return nil, false // TYPE-20 を、報告済み
+		default:
+			a.errorf("TYPE-4", term.Span, "op の引数 %s の型 %s は、デコレータの引数 %s の型 %s に渡せない", r.name, typeName(info.typ), p.Name, typesString(pt.Types))
+			return nil, false
+		}
 	}
 	return ir.RefValue{Target: "$param:" + r.name}, true
 }
@@ -697,9 +703,12 @@ func (a *analyzer) lowerLiteralArg(l *ast.Literal, p ir.Param, pt ir.TypeParam) 
 	lit := literalType(l.Kind, value)
 	fail := failType
 	for _, t := range pt.Types {
-		f := a.assign(lit, t)
+		f, _ := a.assignInto(lit, t, l.Span, false)
 		if f == assignOK {
 			return ir.LiteralValue{Literal: value}, true
+		}
+		if f == failAmbiguous {
+			return nil, false // TYPE-20 を、報告済み
 		}
 		if f == failScalar {
 			fail = failScalar
@@ -709,14 +718,15 @@ func (a *analyzer) lowerLiteralArg(l *ast.Literal, p ir.Param, pt ir.TypeParam) 
 	return nil, false
 }
 
-// anyAssignable は s が types のどれかに渡せるか。
-func (a *analyzer) anyAssignable(s exprType, types []ir.Type) bool {
+// anyAssignable は s が types のどれかに渡せるか（デコレータの引数は、規則 14 の位置: docs/types.md「union に入れる」）。
+// どれかの union で、アームが決まらなければ、span に TYPE-20 を出して、failAmbiguous を返す。
+func (a *analyzer) anyAssignable(s exprType, types []ir.Type, span source.Span) assignFailure {
 	for _, t := range types {
-		if a.assign(s, t) == assignOK {
-			return true
+		if f, _ := a.assignInto(s, t, span, false); f == assignOK || f == failAmbiguous {
+			return f
 		}
 	}
-	return false
+	return failType
 }
 
 func typesString(ts []ir.Type) string {

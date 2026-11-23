@@ -3,7 +3,7 @@
 # a.wrap を seams に書く（seams も、解釈するものに数える。docs/config.md「解釈するトランスパイラ」）
 name     = "interp"
 wasm     = "plugin.wasm"
-protocol = "0.26"
+protocol = "0.27"
 
 [[transpiler]]
 name     = "plain"

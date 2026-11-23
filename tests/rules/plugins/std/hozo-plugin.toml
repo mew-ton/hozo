@@ -3,7 +3,7 @@
 # （docs/testing.md「規則ごとのテスト」）。このテストは、プラグインを起動しない（tests/rules_test.go）
 name     = "std"
 wasm     = "plugin.wasm"
-protocol = "0.26"
+protocol = "0.27"
 
 # go の interprets は、ほかの規則の例が、単位の対象の宣言に付ける、本体のないデコレータ（docs/testing.md「規則ごとのテスト」）。
 # これがないと、どの例にも CFG-26（解釈するトランスパイラがいない）が出る。CFG-26 そのものの例は、自分の fixture を使う

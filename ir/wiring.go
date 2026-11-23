@@ -31,6 +31,8 @@ type ValStmt struct {
 	Type Type `json:"type,omitempty"`
 	// Expr は、値と一緒に宣言したときの式。空の宣言なら nil。
 	Expr Expr `json:"expr,omitempty"`
+	// Arm は、union（arms）の位置に、アームの型の値を入れたとき、そのアーム（docs/ir.md「配線」の ArmRef）。入れていなければ nil。
+	Arm *ArmRef `json:"arm,omitempty"`
 	// Collected は、集める文で値が入る val か（Expr があれば偽）。
 	Collected bool `json:"collected"`
 	Span      Span `json:"span"`
@@ -40,20 +42,36 @@ type ValStmt struct {
 type AssignStmt struct {
 	Name string `json:"name"`
 	Expr Expr   `json:"expr"`
-	Span Span   `json:"span"`
+	// Arm は、union（arms）の位置に、アームの型の値を入れたとき、そのアーム（docs/ir.md「配線」の ArmRef）。入れていなければ nil。
+	Arm  *ArmRef `json:"arm,omitempty"`
+	Span Span    `json:"span"`
 }
 
 // CollectStmt は集める文 `name collect expr;`（docs/ir.md「配線」の Statement kind "collect"）。
 type CollectStmt struct {
 	Name string `json:"name"`
 	Expr Expr   `json:"expr"`
-	Span Span   `json:"span"`
+	// Arm は、union（arms）の位置に、アームの型の値を入れたとき、そのアーム（docs/ir.md「配線」の ArmRef）。入れていなければ nil。
+	Arm  *ArmRef `json:"arm,omitempty"`
+	Span Span    `json:"span"`
 }
 
 // ReturnStmt は `return expr;`（docs/ir.md「配線」の Statement kind "return"）。
 type ReturnStmt struct {
 	Expr Expr `json:"expr"`
-	Span Span `json:"span"`
+	// Arm は、union（arms）の位置に、アームの型の値を入れたとき、そのアーム（docs/ir.md「配線」の ArmRef）。入れていなければ nil。
+	Arm  *ArmRef `json:"arm,omitempty"`
+	Span Span    `json:"span"`
+}
+
+// ArmRef は、union（arms）の位置に、アームの型の値を入れた所が、どのアームに入るか（docs/ir.md「配線」の ArmRef。
+// docs/types.md「互換」の規則 14、「union に入れる」）。値を置く位置（val、assign、collect、return の文、Call.args と throw の args、
+// record の fields）が持つ。プラグインは、型から、アームを計算し直さない。
+type ArmRef struct {
+	// Union は、入れる先の union の FQN（位置の型が optional(union) でも、union そのもの）。
+	Union string `json:"union"`
+	// Arm は、アームの名前（Union.Arms の Name）。
+	Arm string `json:"arm"`
 }
 
 // CallStmt は文としての呼び出し（docs/ir.md「配線」の Statement kind "call"）。
@@ -546,6 +564,8 @@ func UnmarshalCallee(data []byte) (Callee, error) {
 type CallArg struct {
 	Param string `json:"param"`
 	Value Atom   `json:"value"`
+	// Arm は、union（arms）の位置に、アームの型の値を入れたとき、そのアーム（docs/ir.md「配線」の ArmRef）。入れていなければ nil。
+	Arm *ArmRef `json:"arm,omitempty"`
 }
 
 // BoundPosition は bind で埋まる位置（docs/ir.md「配線」の BoundPosition）。
@@ -618,6 +638,8 @@ type RecordAtom struct {
 type RecordField struct {
 	Name  string `json:"name"`
 	Value Atom   `json:"value"`
+	// Arm は、union（arms）の位置に、アームの型の値を入れたとき、そのアーム（docs/ir.md「配線」の ArmRef）。入れていなければ nil。
+	Arm *ArmRef `json:"arm,omitempty"`
 }
 
 var (

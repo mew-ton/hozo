@@ -150,6 +150,26 @@ func TestRoundTripExprsAndStatements(t *testing.T) {
 	unionRoundTrip(t, ArmBody(ThrowBody{Exception: "rate.LimitExceeded", Args: []CallArg{{Param: "wait", Value: NameAtom{Path: []string{"wait"}, Span: sp()}}}, Span: sp()}), UnmarshalArmBody,
 		`{"kind":"throw","exception":"rate.LimitExceeded","args":[{"param":"wait","value":{"kind":"name","path":["wait"],`+spJSON+`}}],`+spJSON+`}`)
 
+	// union に入れる値（docs/ir.md「配線」の ArmRef）: arm は、入れた位置だけが持つ（なければ、キーを出さない）
+	into := &ArmRef{Union: "s.Pet", Arm: "D"}
+	armJSON := `"arm":{"union":"s.Pet","arm":"D"}`
+	atomJSON := `{"kind":"name","path":["d"],` + spJSON + `}`
+	dog := NameAtom{Path: []string{"d"}, Span: sp()}
+	unionRoundTrip(t, Statement(ValStmt{Name: "p", Type: Ref("s.Pet"), Expr: AtomExpr{Atom: dog}, Arm: into, Span: sp()}), UnmarshalStatement,
+		`{"kind":"val","name":"p","type":{"kind":"ref","target":"s.Pet"},"expr":{"kind":"atom","atom":`+atomJSON+`},`+armJSON+`,"collected":false,`+spJSON+`}`)
+	unionRoundTrip(t, Statement(AssignStmt{Name: "p", Expr: AtomExpr{Atom: dog}, Arm: into, Span: sp()}), UnmarshalStatement,
+		`{"kind":"assign","name":"p","expr":{"kind":"atom","atom":`+atomJSON+`},`+armJSON+`,`+spJSON+`}`)
+	unionRoundTrip(t, Statement(CollectStmt{Name: "ps", Expr: AtomExpr{Atom: dog}, Arm: into, Span: sp()}), UnmarshalStatement,
+		`{"kind":"collect","name":"ps","expr":{"kind":"atom","atom":`+atomJSON+`},`+armJSON+`,`+spJSON+`}`)
+	unionRoundTrip(t, Statement(ReturnStmt{Expr: AtomExpr{Atom: dog}, Arm: into, Span: sp()}), UnmarshalStatement,
+		`{"kind":"return","expr":{"kind":"atom","atom":`+atomJSON+`},`+armJSON+`,`+spJSON+`}`)
+	unionRoundTrip(t, Atom(RecordAtom{Fields: []RecordField{{Name: "pet", Value: dog, Arm: into}, {Name: "id", Value: dog}}, Span: sp()}), UnmarshalAtom,
+		`{"kind":"record","fields":[{"name":"pet","value":`+atomJSON+`,`+armJSON+`},{"name":"id","value":`+atomJSON+`}],`+spJSON+`}`)
+	if b := roundTrip(t, Call{Callee: OpCallee{Op: "s.f"}, Args: []CallArg{{Param: "pet", Value: dog, Arm: into}}, Span: sp()}); string(b) !=
+		`{"callee":{"kind":"op","op":"s.f"},"args":[{"param":"pet","value":`+atomJSON+`,`+armJSON+`}],"bound":[],`+spJSON+`}` {
+		t.Errorf("arm を持つ引数: %s", b)
+	}
+
 	// 呼び出し先（docs/ir.md「配線」の Callee）: op、read、効果（宣言と、直に呼ぶ組み込みの効果）
 	unionRoundTrip(t, Callee(OpCallee{Op: "s.f"}), UnmarshalCallee, `{"kind":"op","op":"s.f"}`)
 	unionRoundTrip(t, Callee(ReadCallee{Read: "s.userByEmail"}), UnmarshalCallee, `{"kind":"read","read":"s.userByEmail"}`)
@@ -540,7 +560,7 @@ func TestEmptyProgramJSON(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := `{"version":"0.26","namespaces":[],"binds":[]}`
+	want := `{"version":"0.27","namespaces":[],"binds":[]}`
 	if string(b) != want {
 		t.Errorf("want %s\ngot  %s", want, b)
 	}
@@ -548,7 +568,7 @@ func TestEmptyProgramJSON(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want = `{"version":"0.26","viewer":"","config":{"index":0,"language":"","base":"","out":"","dir":"","transpilers":[],"options":{},"seams":{}},"files":[],"namespaces":{},"program":{"version":"0.26","namespaces":[],"binds":[]},"entries":[],"ops":{}}`
+	want = `{"version":"0.27","viewer":"","config":{"index":0,"language":"","base":"","out":"","dir":"","transpilers":[],"options":{},"seams":{}},"files":[],"namespaces":{},"program":{"version":"0.27","namespaces":[],"binds":[]},"entries":[],"ops":{}}`
 	if string(b) != want {
 		t.Errorf("want %s\ngot  %s", want, b)
 	}

@@ -141,6 +141,23 @@
         }
       ]
     },
+    "ArmRef": {
+      "additionalProperties": false,
+      "description": "union（arms）の位置に入れた値が、どのアームに入るか（docs/ir.md「配線」の ArmRef）。",
+      "properties": {
+        "arm": {
+          "type": "string"
+        },
+        "union": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "union",
+        "arm"
+      ],
+      "type": "object"
+    },
     "ArrayType": {
       "additionalProperties": false,
       "description": "T[]（docs/ir.md「型」の array）。",
@@ -161,6 +178,9 @@
     "AssignStmt": {
       "additionalProperties": false,
       "properties": {
+        "arm": {
+          "$ref": "#/$defs/ArmRef"
+        },
         "expr": {
           "$ref": "#/$defs/Expr"
         },
@@ -352,6 +372,9 @@
       "additionalProperties": false,
       "description": "呼び出しの引数（docs/ir.md「配線」の Call.args）。",
       "properties": {
+        "arm": {
+          "$ref": "#/$defs/ArmRef"
+        },
         "param": {
           "type": "string"
         },
@@ -738,6 +761,9 @@
     "CollectStmt": {
       "additionalProperties": false,
       "properties": {
+        "arm": {
+          "$ref": "#/$defs/ArmRef"
+        },
         "expr": {
           "$ref": "#/$defs/Expr"
         },
@@ -812,7 +838,7 @@
           "type": "array"
         },
         "protocol": {
-          "const": "0.26"
+          "const": "0.27"
         }
       },
       "required": [
@@ -1369,7 +1395,7 @@
           "type": "array"
         },
         "protocol": {
-          "const": "0.26"
+          "const": "0.27"
         },
         "spec": {
           "$ref": "#/$defs/Spec"
@@ -1795,7 +1821,7 @@
           "type": "string"
         },
         "protocol": {
-          "const": "0.26"
+          "const": "0.27"
         }
       },
       "required": [
@@ -2694,7 +2720,7 @@
           "type": "array"
         },
         "version": {
-          "const": "0.26"
+          "const": "0.27"
         }
       },
       "required": [
@@ -2801,6 +2827,9 @@
     "RecordField": {
       "additionalProperties": false,
       "properties": {
+        "arm": {
+          "$ref": "#/$defs/ArmRef"
+        },
         "name": {
           "type": "string"
         },
@@ -2889,6 +2918,9 @@
     "ReturnStmt": {
       "additionalProperties": false,
       "properties": {
+        "arm": {
+          "$ref": "#/$defs/ArmRef"
+        },
         "expr": {
           "$ref": "#/$defs/Expr"
         },
@@ -3581,6 +3613,9 @@
     "ValStmt": {
       "additionalProperties": false,
       "properties": {
+        "arm": {
+          "$ref": "#/$defs/ArmRef"
+        },
         "collected": {
           "type": "boolean"
         },
@@ -3683,7 +3718,7 @@
           "$ref": "#/$defs/Program"
         },
         "version": {
-          "const": "0.26"
+          "const": "0.27"
         },
         "viewer": {
           "type": "string"

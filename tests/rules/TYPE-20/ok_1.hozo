@@ -1,0 +1,66 @@
+// TYPE-20 に当たらない（docs/types.md「互換」の規則 14、「union に入れる」）: 渡した値が、アームの、ちょうど一つの型に渡せる
+namespace a {
+  model Dog { name: string; }
+  model Cat { lives: int; }
+  scalar Tag extends string;
+  union Pet { D: Dog; C: Cat; }
+  union Severity { Error: "error"; Warning: "warning"; }
+  union Word { Any: string; N: int; }
+  union Mixed { T: Tag; Count: int; Items: string[]; }
+  model Report { level: Severity; pet: Pet?; }
+  exception Bad(level: Severity);
+  fn findDog(): Dog;
+  fn tag(): Tag;
+  fn words(): string[];
+  fn adopt(pet: Pet);
+  fn maybe(pet: Pet?);
+  fn report(level: Severity);
+  fn say(word: Word);
+  fn mix(m: Mixed);
+  fn file(r: Report);
+  fn keep(pets: Pet[]);
+  // 呼び出しの引数: model のアーム、リテラルの型のアーム、核の型のアーム、レコードリテラル、optional の中の union
+  fn f() {
+    val d = findDog();
+    adopt(d);
+    adopt({ lives: 9 });
+    maybe(d);
+    report("error");
+    say("x");
+    say(1);
+    val tg = tag();
+    mix(tg);
+    mix(2);
+    val ws = words();
+    mix(ws);
+  }
+  // return、型を書いた val、値を入れる文、集める文、レコードリテラルのフィールド、throw の引数
+  fn pick(): Pet {
+    return findDog();
+  }
+  fn level(): Severity {
+    return "warning";
+  }
+  fn g(): Pet {
+    val p: Pet = findDog();
+    val q: Pet;
+    q = { lives: 3 };
+    adopt(q);
+    val all: Pet[];
+    val ws = words();
+    for (val w of ws) {
+      all collect findDog();
+    }
+    keep(all);
+    file({ level: "error", pet: { name: "pochi" } });
+    return p;
+  }
+  fn risky(): throws Bad;
+  fn h(): throws Bad {
+    try {
+      risky();
+    } catch (e) {
+      throw Bad("warning");
+    }
+  }
+}

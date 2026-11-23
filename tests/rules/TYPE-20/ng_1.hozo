@@ -1,0 +1,25 @@
+// TYPE-20（docs/types.md「互換」の規則 14、「union に入れる」）: union の位置に渡した値が、アームの二つ以上の型に渡せる
+namespace a {
+  model Dog { name: string; }
+  model Cat { name: string; }
+  model Bird { wings: int; }
+  /** 二つのアームが、同じフィールドを持つ model */
+  union Pet { D: Dog; C: Cat; B: Bird; }
+  /** 核の型のアームと、リテラルの型のアーム */
+  union Word { Any: string; Fixed: "x"; }
+  /** 整数と、小数 */
+  union Num { I: int; F: float; }
+  fn adopt(pet: Pet);
+  fn say(word: Word);
+  fn count(n: Num);
+  fn pick(): Pet {
+    return { name: "pochi" };          // ERROR: TYPE-20
+  }
+  fn f() {
+    adopt({ name: "pochi" });          // ERROR: TYPE-20
+    say("x");                          // ERROR: TYPE-20
+    count(1);                          // ERROR: TYPE-20
+    val p: Pet = { name: "tama" };     // ERROR: TYPE-20
+    adopt(p);
+  }
+}

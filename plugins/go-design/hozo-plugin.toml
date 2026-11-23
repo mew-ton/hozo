@@ -1,6 +1,6 @@
 name     = "go-design"
 wasm     = "plugin.wasm"
-protocol = "0.26"
+protocol = "0.27"
 
 # 提供するトランスパイラは一つ。Go の基底 go に相乗りする（docs/plugin-go-design.md「マニフェスト」）
 [[transpiler]]

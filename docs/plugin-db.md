@@ -11,7 +11,7 @@
 ```toml
 name     = "db"
 wasm     = "plugin.wasm"
-protocol = "0.26"
+protocol = "0.27"
 
 [read]
 namespaces = ["db"]

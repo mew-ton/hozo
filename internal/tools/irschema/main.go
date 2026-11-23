@@ -229,6 +229,7 @@ var descriptions = map[string]string{
 	"Expr":                 "式（docs/ir.md「配線」）。kind で分ける。",
 	"Call":                 "op の呼び出し（docs/ir.md「配線」）。args は引数名に対応付け済み。bound は計算結果。",
 	"CallArg":              "呼び出しの引数（docs/ir.md「配線」の Call.args）。",
+	"ArmRef":               "union（arms）の位置に入れた値が、どのアームに入るか（docs/ir.md「配線」の ArmRef）。",
 	"BoundPosition":        "bind で埋まる位置（docs/ir.md「配線」、docs/check.md「bind」）。",
 	"Atom":                 "式の葉（docs/ir.md「配線」）。kind で分ける。",
 	"Match":                "分類による分岐（docs/ir.md「配線」）。classify は FQN。標準の分類なら \"list\" か \"nullable\"。",

@@ -1,0 +1,30 @@
+// TYPE-4（docs/types.md「互換」の「union に入れる」）: union の位置でも、アームの、どの型にも渡せない値は、渡せない。
+// 規則 14 は、重ねない（アームの型が別の union でも、その中までは辿らない。array の要素と、optional どうしにも、広げない）
+namespace a {
+  model Dog { name: string; }
+  model Cat { lives: int; }
+  model Fish { fins: int; }
+  union Animal { D: Dog; C: Cat; }
+  union Pet { A: Animal; F: Fish; }
+  union Severity { Error: "error"; Warning: "warning"; }
+  fn findDog(): Dog;
+  fn dogs(): Dog[];
+  fn maybeDog(): Dog?;
+  fn adopt(pet: Pet);
+  fn keep(animals: Animal[]);
+  fn maybe(animal: Animal?);
+  fn report(level: Severity);
+  fn text(): string;
+  fn g() {
+    val d = findDog();
+    adopt(d);                          // ERROR: TYPE-4
+    val ds = dogs();
+    keep(ds);                          // ERROR: TYPE-4
+    val md = maybeDog();
+    maybe(md);                         // ERROR: TYPE-4
+    report("fatal");                   // ERROR: TYPE-4
+    val t = text();
+    report(t);                         // ERROR: TYPE-4
+    adopt({ wings: 2 });               // ERROR: TYPE-4
+  }
+}

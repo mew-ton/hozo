@@ -83,7 +83,7 @@ namespace hozo.ir {
   // ---- Program ----
 
   model Program {
-    /** この文書の版（今は "0.26"） */
+    /** この文書の版（今は "0.27"） */
     version: string;
     namespaces: Namespace[];
     binds: Bind[];
@@ -364,10 +364,10 @@ namespace hozo.ir {
     Try: TryStmt;
     Throw: ThrowStmt;
   }
-  model ValStmt { kind: "val"; name: string; type: Type?; expr: Expr?; collected: boolean; span: Span; }
-  model AssignStmt { kind: "assign"; name: string; expr: Expr; span: Span; }
-  model CollectStmt { kind: "collect"; name: string; expr: Expr; span: Span; }
-  model ReturnStmt { kind: "return"; expr: Expr; span: Span; }
+  model ValStmt { kind: "val"; name: string; type: Type?; expr: Expr?; arm: ArmRef?; collected: boolean; span: Span; }
+  model AssignStmt { kind: "assign"; name: string; expr: Expr; arm: ArmRef?; span: Span; }
+  model CollectStmt { kind: "collect"; name: string; expr: Expr; arm: ArmRef?; span: Span; }
+  model ReturnStmt { kind: "return"; expr: Expr; arm: ArmRef?; span: Span; }
   model CallStmt { kind: "call"; call: Call; span: Span; }
   model MatchStmt { kind: "match"; match: Match; span: Span; }
   model DisjointStmt { kind: "disjoint"; arms: Arm[]; span: Span; }
@@ -390,7 +390,9 @@ namespace hozo.ir {
   model AtomExpr { kind: "atom"; atom: Atom; }
 
   model Call { callee: Callee; args: CallArg[]; bound: BoundPosition[]; span: Span; }
-  model CallArg { param: string; value: Atom; }
+  model CallArg { param: string; value: Atom; arm: ArmRef?; }
+  /** union（arms）の位置に入れた値が、どのアームに入るか（docs/ir.md「配線」の ArmRef） */
+  model ArmRef { union: string; arm: string; }
   model BoundPosition { path: string[]; state: Fqn; }
 
   /** 呼び出し先。JSON では、印 kind（"op"、"read"、"effect"、"proceed"）で見分ける */
@@ -418,7 +420,7 @@ namespace hozo.ir {
   model LiteralAtom { kind: "literal"; literal: Literal; span: Span; }
   model NoneAtom { kind: "none"; span: Span; }
   model RecordAtom { kind: "record"; fields: RecordField[]; span: Span; }
-  model RecordField { name: string; value: Atom; }
+  model RecordField { name: string; value: Atom; arm: ArmRef?; }
 
   model Match { subject: MatchSubject; classify: string; arms: MatchArm[]; span: Span; }
 

@@ -13,7 +13,7 @@
 ```toml
 name     = "go-http"
 wasm     = "plugin.wasm"
-protocol = "0.26"
+protocol = "0.27"
 
 [[transpiler]]
 name     = "go-http"

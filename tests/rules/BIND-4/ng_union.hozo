@@ -1,0 +1,17 @@
+// BIND-4（docs/check.md「必須の入力」）: union のアームに入ったレコードリテラルは、そのアームの型の model で、必須のフィールドを確かめる
+namespace a {
+  model Dog { name: string; owner: string; }
+  model Cat { lives: int; }
+  union Pet { D: Dog; C: Cat; }
+  model Home { pet: Pet; }
+  fn adopt(pet: Pet);
+  fn move(home: Home);
+  fn f() {
+    adopt({ name: "pochi" });          // ERROR: BIND-4
+    move({ pet: { name: "pochi" } });  // ERROR: BIND-4
+    adopt({ lives: 9 });
+  }
+}
+namespace b {
+  fn h();
+}

@@ -1,6 +1,6 @@
 name     = "go-sqlite"
 wasm     = "plugin.wasm"
-protocol = "0.26"
+protocol = "0.27"
 
 # 提供するトランスパイラは一つ。Go の基底 go に相乗りする（docs/plugin-go-sqlite.md「マニフェスト」）。
 # 読む語彙は db（標準の語彙。docs/vocab.md「同梱する語彙」）で、語彙は提供しない

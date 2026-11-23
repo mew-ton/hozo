@@ -291,10 +291,11 @@ func checkBind4(ix *index, throw string, call *ir.Call, r *reporter) {
 	for _, p := range params {
 		path := []string{p.Name}
 		var given ir.Atom
+		var into *ir.ArmRef
 		found := false
 		for _, a := range call.Args {
 			if a.Param == p.Name {
-				given, found = a.Value, true
+				given, into, found = a.Value, a.Arm, true
 				break
 			}
 		}
@@ -305,7 +306,7 @@ func checkBind4(ix *index, throw string, call *ir.Call, r *reporter) {
 			continue
 		}
 		if rec, ok := given.(ir.RecordAtom); ok {
-			if m := ix.modelOf(p.Type); m != nil {
+			if m := ix.placedModel(p.Type, into); m != nil {
 				missing = checkRecordFits(ix, path, rec, m, call.Bound, map[string]bool{}, missing)
 			}
 		}
@@ -333,10 +334,11 @@ func checkRecordFits(ix *index, path []string, rec ir.RecordAtom, m *ir.Model, b
 	for _, f := range m.Fields {
 		fpath := append(append([]string(nil), path...), f.Name)
 		var given ir.Atom
+		var into *ir.ArmRef
 		found := false
 		for _, rf := range rec.Fields {
 			if rf.Name == f.Name {
-				given, found = rf.Value, true
+				given, into, found = rf.Value, rf.Arm, true
 				break
 			}
 		}
@@ -348,7 +350,7 @@ func checkRecordFits(ix *index, path []string, rec ir.RecordAtom, m *ir.Model, b
 			continue
 		}
 		if sub, ok := given.(ir.RecordAtom); ok {
-			if fm := ix.modelOf(f.Type); fm != nil {
+			if fm := ix.placedModel(f.Type, into); fm != nil {
 				missing = checkRecordFits(ix, fpath, sub, fm, bound, visiting, missing)
 			}
 		}

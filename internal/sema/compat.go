@@ -2,6 +2,7 @@ package sema
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/mew-ton/hozo/internal/source"
 	"github.com/mew-ton/hozo/ir"
@@ -16,7 +17,63 @@ const (
 	failScalar assignFailure = "TYPE-1"
 	// failType はそれ以外（呼び出しの引数なら TYPE-4、return なら TYPE-3）。
 	failType assignFailure = "TYPE-4"
+	// failAmbiguous は、union の位置に渡した値が、アームの二つ以上の型に渡せる（TYPE-20。assignInto が、報告を済ませている）。
+	failAmbiguous assignFailure = "TYPE-20"
 )
+
+// assignInto は、式の型 s の値を、型 t の位置に置けるか（docs/types.md「互換」の規則 1〜14）。値を、型の決まった位置に置く所
+// （同「union に入れる」の「入れられる位置」）が呼ぶ。規則 14 で入るなら、どのアームに入るかを返す（IR の arm）。
+// 二つ以上のアームに当たれば、span に TYPE-20 を出して、failAmbiguous を返す（呼び元は、重ねて報告しない）。
+// dry なら、診断を出さず、IR にも書かない（アームを数えるための、試し）。
+func (a *analyzer) assignInto(s exprType, t ir.Type, span source.Span, dry bool) (assignFailure, *ir.ArmRef) {
+	un := a.unionArms(stripOptional(t))
+	switch s.kind {
+	case etUnknown, etNever, etNoValue, etNone:
+		un = nil
+	}
+	if un == nil {
+		return a.direct(s, t, dry), nil
+	}
+	if s.kind == etValue && (s.typ == nil || a.assignType(s.typ, t)) {
+		return assignOK, nil // 規則 1〜13 で、そのまま渡せる（union の値そのもの、など）
+	}
+	// 規則 14: アームを、宣言の順に見て、規則 1〜13 で渡せる型のアームを数える（重ねない: アームの中では、規則 14 を使わない）
+	var hits []ir.UnionArm
+	for _, arm := range un.Arms {
+		if arm.Type != nil && a.direct(s, arm.Type, true) == assignOK {
+			hits = append(hits, arm)
+		}
+	}
+	switch len(hits) {
+	case 0:
+		return failType, nil
+	case 1:
+		if !dry {
+			a.direct(s, hits[0].Type, false) // レコードリテラルは、決まったアームの model に、当てはめる（中の診断と、中の arm）
+		}
+		return assignOK, &ir.ArmRef{Union: stripOptional(t).(ir.RefType).Target, Arm: hits[0].Name}
+	}
+	if !dry {
+		names := make([]string, len(hits))
+		for i, h := range hits {
+			names[i] = h.Name
+		}
+		a.errorf("TYPE-20", span, "%s は、union %s のアーム %s の、どの型にも渡せて、どのアームに入るかが、決まらない", exprName(s), un.Name, strings.Join(names, "、"))
+	}
+	return failAmbiguous, nil
+}
+
+// direct は、規則 1〜13（assign）。dry なら、レコードリテラルの当てはめの診断を出さず、当てはまらなければ failType を返す。
+func (a *analyzer) direct(s exprType, t ir.Type, dry bool) assignFailure {
+	if !dry || s.kind != etRecord {
+		return a.assign(s, t)
+	}
+	m := a.modelOf(stripOptional(t))
+	if m == nil || !a.fitRecord(s.rec, m, true) {
+		return failType
+	}
+	return assignOK
+}
 
 // assign は式の型 s の値を型 t の位置に渡せるか（docs/types.md「互換」）。レコードリテラルは当てはめ（fitRecord）、
 // その診断（TYPE-5 / TYPE-6 と中の値）はここで出す。
@@ -101,7 +158,7 @@ func (a *analyzer) assignRecord(r *recordVal, t ir.Type) assignFailure {
 	if m == nil {
 		return failType
 	}
-	a.fitRecord(r, m)
+	a.fitRecord(r, m, false)
 	return assignOK
 }
 
@@ -158,25 +215,43 @@ func (a *analyzer) assignType(s, t ir.Type) bool {
 
 // fitRecord は docs/types.md「当てはまる（レコードリテラルを model T に）」。TYPE-5 / TYPE-6 と、各値の互換を確かめる。
 // 必須のフィールドが埋まっているか（BIND-4）は bind を要するので internal/check が行う。
-func (a *analyzer) fitRecord(r *recordVal, m *ir.Model) bool {
+// フィールドの値は、規則 14 の位置で、入ったアームを、IR のフィールド（recordFieldVal.out）に書く。
+// dry は、union のアームを数えるための、試し（docs/types.md「union に入れる」の「アームの決め方」）: 診断を出さず、IR に書かない。
+// 二度あるフィールド（TYPE-6）と、アームの決まらない値（TYPE-20）は、どの model に当てはめても同じなので、試しでは、当てはまる方に数える
+// （アームが決まった後の、本番の当てはめが、報告する）。
+func (a *analyzer) fitRecord(r *recordVal, m *ir.Model, dry bool) bool {
 	ok := true
 	seen := map[string]bool{}
 	for i := range r.fields {
 		f := &r.fields[i]
 		if seen[f.name] {
-			a.errorf("TYPE-6", f.span, "レコードリテラルにフィールド %s が二度ある", f.name)
-			ok = false
+			if !dry {
+				a.errorf("TYPE-6", f.span, "レコードリテラルにフィールド %s が二度ある", f.name)
+				ok = false
+			}
 			continue
 		}
 		seen[f.name] = true
 		mf := findField(m, f.name)
 		if mf == nil {
-			a.errorf("TYPE-5", f.span, "model %s にフィールド %s はない", m.Name, f.name)
+			if !dry {
+				a.errorf("TYPE-5", f.span, "model %s にフィールド %s はない", m.Name, f.name)
+			}
 			ok = false
 			continue
 		}
-		if fail := a.assign(f.typ, mf.Type); fail != assignOK {
-			a.errorf(string(fail), f.valueSpan, "フィールド %s.%s の型 %s に %s は渡せない", m.Name, f.name, typeName(mf.Type), exprName(f.typ))
+		fail, arm := a.assignInto(f.typ, mf.Type, f.valueSpan, dry)
+		if !dry && f.out != nil {
+			f.out.Arm = arm
+		}
+		switch fail {
+		case assignOK:
+		case failAmbiguous:
+			ok = ok && dry
+		default:
+			if !dry {
+				a.errorf(string(fail), f.valueSpan, "フィールド %s.%s の型 %s に %s は渡せない", m.Name, f.name, typeName(mf.Type), exprName(f.typ))
+			}
 			ok = false
 		}
 	}
@@ -194,6 +269,8 @@ type recordFieldVal struct {
 	span      source.Span
 	valueSpan source.Span
 	typ       exprType
+	// out は、IR のフィールド（入ったアームを書く先）。
+	out *ir.RecordField
 }
 
 // --- 型の補助 ---
