@@ -4,20 +4,15 @@
 
 **Hozo は、アプリの設計の、ただ一つの正（SSOT）になる、仕様の言語。**
 
-- 要件や設計を、AI が書いても、人が、レビューして、手直しできる形で、残る。
-- レビューした仕様が、そのまま、コードの枠と、テストのハーネスになる。
-- 人が責任を持つのは、仕様。中身は、AI に任せられ、中身が仕様から外れないことは、ハーネスが確かめる。
+コードの大半を、AI が書くようになっても、人が持ち続けるのは、設計: アプリが、何を、どの順にして、何を、決してしないか。Hozo は、その設計を、人が、レビューして、手直しできる形で持ち、レビューした設計を、そのまま、コードの枠と、テストのハーネスにする。人が責任を持つのは、仕様。中身は、AI に任せられる。
 
-Hozo は、未公開で、版は 0.x。言語も、IR も、プラグインとのやり取りも、互換を保たずに、変わる（[`docs/ir.md`](docs/ir.md)「版」）。
+## 書くものと、得られるもの
 
-## 仕様の見た目
-
-サンプル [`tests/samples/shop-server/server.hozo`](tests/samples/shop-server/server.hozo) からの、抜き書き:
+書くのは、仕様。サンプル [`tests/samples/shop-server/server.hozo`](tests/samples/shop-server/server.hozo) からの、省いた抜き書き:
 
 ```
 /** 注文する。注文と、その通知の記録は、一緒に残す。通知の配送に失敗しても、どちらも残る */
 @http.post("/orders")
-@prd.ref(design.Requirement.PRD_001, design.Requirement.PRD_002)
 export fn placeOrder(in: PlaceOrderInput): type.Order {
   val session = authenticate(in.token);
   val order = newOrder(session, in.lines);
@@ -31,32 +26,65 @@ export fn placeOrder(in: PlaceOrderInput): type.Order {
 fn newOrder(session: type.Session, lines: type.OrderLine[]): type.Order;
 ```
 
-| 仕様に書くもの | `hozoc` が、それをどうするか |
+`hozoc build` が、コードを書き出す。そのサンプルが期待する Go（[`tests/samples/shop-server/gen/server`](tests/samples/shop-server/gen/server)）からの、省いた抜き書き:
+
+```go
+// inner/wiring.go: 中身のある関数は、配線。コードは、生成される。
+func (o *ops) PlaceOrder(ctx context.Context, in PlaceOrderInput) (pkgtype.Order, error) {
+	session, err := o.Authenticate(ctx, in.Token)
+	// …
+	order, err := o.NewOrder(ctx, session, in.Lines)
+	// …
+}
+
+// inner/ops.go: 中身のない関数は、人か AI が書く。
+// メソッドが一つでも足りない値は、渡すところで、コンパイルできない。
+type Leaves interface {
+	NewOrder(ctx context.Context, session pkgtype.Session, lines []pkgtype.OrderLine) (pkgtype.Order, error)
+	// …
+}
+
+// servertest/leaves.go: その関数の、一つ一つに要る、テストのケース。
+// ケースが一つでも足りない値も、コンパイルできない。
+type LeafCases interface {
+	NewOrder() NewOrderCases
+	// …
+}
+
+// http.go: デコレータ @http.post は、プラグインが解釈する。
+func NewHandler(ops Ops) http.Handler
+```
+
+Go の抜き書きの、コメントは、ここで、書き足したもの。
+
+## 誰が、何を担保するか
+
+| 何を | 誰が確かめるか |
 |---|---|
-| 中身のある関数（`placeOrder`） | 中身は、配線: どの関数を、どの順に呼ぶか。コードは、そこから作る。 |
-| 中身のない関数（`newOrder`） | 人か AI が書く。実装が欠けていれば、生成したコードの、コンパイルエラーになる。 |
-| 語彙のデコレータ（`@http.post`） | それを解釈するプラグインが、コードを作る。ここでは、HTTP のハンドラ。 |
-| 要求への結び付け（`@prd.ref`） | 注記: その関数が、どの要求に応えるかを言う。コードは、変えない。要求ごとに、テストの入れ物ができ（[`docs/plugin-go-design.md`](docs/plugin-go-design.md)）、要るテストが走ったことは、`hozoc tests` が確かめる。 |
+| 呼ぶ順と、何を、何に渡すか | Hozo: コードを、仕様から生成する |
+| 中身のない関数の、どれにも、実装があること | 出力先の言語の、コンパイラ（抜き書きの `Leaves`） |
+| 仕様が求めるテストのケースが、すべて、書かれていること | 出力先の言語の、コンパイラ（抜き書きの `LeafCases`） |
+| 求めるテストが、走ったこと | `hozoc tests --coverage` |
+| テストが、通ったこと | 利用者の、テストの実行 |
+| 関数の中身と、テストのケースの中身 | それを書く、人か AI |
 
-文法は [`docs/grammar.md`](docs/grammar.md)。仕様の書き方の勧めは [`docs/requirements.md`](docs/requirements.md)「書き方の指針」。
+Hozo が、わざと、持たないものが、二つある。
 
-## このリポジトリにあるもの
+- **仕様に、条件を書かない。** どの場合に、何をするかは、言う。どうやって、その場合だと分かるかは、言わない。それは、中身。
+- **プラグインは、出力を推論しない。** 書き方や型から、出力を決めない。何を生成するかは、宣言と、デコレータで決まる。
 
-| 場所 | 中身 |
+理由は [`docs/requirements.md`](docs/requirements.md)「価値と位置づけ」「出力を推論しない」。
+
+## 状態
+
+Hozo は、未公開で、版は 0.x。言語も、IR も、プラグインとのやり取りも、互換を保たずに、変わる。
+
+| | |
 |---|---|
-| `cmd/hozoc`、`internal/` | コンパイラ `hozoc`: `build`（検査して、コードを書き出す）、`tests`（要るテストが走ったかを確かめる）、`lsp`（言語サーバー） |
-| `plugins/` | プラグイン。語彙: `http`、`valid`、`db`。Go のトランスパイラ: `go`、`go-valid`、`go-http`、`go-sqlite`、`go-cli`、`go-design` |
-| `plugin/`、`ir/`、`schema/` | プラグインを Go で書くための、見本の SDK。IR。IR の JSON Schema |
-| `runtime/` | 生成したコードが import する、Go のパッケージ |
-| `vocab/` | 同梱の語彙の宣言 |
-| `editors/vscode` | VS Code 拡張 |
-| `*.hozo`、`hozo.toml` | Hozo で書いた、Hozo 自身の仕様。`hozoc` のコマンドラインは、`cli.hozo` から生成している |
-| `tests/` | コーパス、規則ごとのテスト、手で書いた期待する出力を持つサンプル |
-| `docs/` | 仕様と、設計の文書 |
-
-`hozoc` の本体は、どの言語のコードも持たない。生成するコードは、すべて、プラグインが出す。プラグインは、WebAssembly のモジュールで、`hozoc` の中の、サンドボックスで動く。ネットワークにも、ファイルにも、触れない（[`docs/plugin-protocol.md`](docs/plugin-protocol.md)）。
-
-まだ、ないもの: Go のほかの言語への出力。仕様をレビューして、手直しする UI。
+| 今、動くもの | `hozoc build`（検査して、コードを書き出す）、`hozoc tests`（求めるテストが走ったかを確かめる）、`hozoc lsp`（言語サーバー）、VS Code 拡張 |
+| 出力先の言語 | Go だけ: 型と関数、値の制約の確かめ、`net/http` のハンドラ、SQLite、コマンドライン |
+| プラグイン | 生成するコードは、すべて、プラグインが出す。プラグインは、WebAssembly のモジュールで、`hozoc` の中の、サンドボックスで動く。ネットワークにも、ファイルにも、触れない |
+| まだ、ないもの | Go のほかの言語への出力。仕様をレビューして、手直しする UI。ライセンス |
 
 ## 試す
 
@@ -70,27 +98,19 @@ make build
 bin/hozoc build --no-emit
 ```
 
-二つ目は、このリポジトリ自身の仕様を、検査する。ファイルは、書かない。`bin/hozoc build --dry-run` は、書き出す予定のファイルを、並べる。コマンドの説明は [`docs/cli.md`](docs/cli.md)。
+二つ目は、このリポジトリ自身の仕様を、検査して、何も書かない（`hozoc` は、Hozo で仕様を書いている: ルートの `cli.hozo` と、ほかの `*.hozo`）。`bin/hozoc build --dry-run` は、書き出す予定のファイルを、並べる。
 
-## 文書
+仕様と、そのコードの、そろった一組を読むなら、[`tests/samples/shop-server`](tests/samples/shop-server): `*.hozo` が仕様、`gen/` が生成されたコード、`app/` が手で書いたコード。
 
-文書は、今は、日本語。処理系の第一言語は、英語で、コンパイラの出力と、文書は、英語に移す（[`docs/decisions.md`](docs/decisions.md) 442、488）。
+## 次に読むもの
 
-| 知りたいこと | 読む場所 |
+文書は、今は、日本語。処理系の第一言語は、英語で、コンパイラの出力と、文書は、英語に移す。
+
+| したいこと | 読む場所 |
 |---|---|
-| どの文書が、何を決めているか。読む順 | [`docs/README.md`](docs/README.md) |
-| 何のための言語か | [`docs/requirements.md`](docs/requirements.md)「価値と位置づけ」 |
-| 決めたこと | [`docs/decisions.md`](docs/decisions.md) |
-| まだ決めていないこと。次に何をするか | [`docs/open.md`](docs/open.md) |
-
-## 開発
-
-```bash
-make test
-```
-
-```bash
-make generate
-```
-
-`make generate` は、`cli.hozo` から、`internal/gen/hozo/` を、生成し直す。push の前に走らせる確かめと、CI が確かめることは、[`CLAUDE.md`](CLAUDE.md)「確かめ方」と、[`docs/testing.md`](docs/testing.md)。
+| 何のための言語かを知る | [`docs/requirements.md`](docs/requirements.md)「価値と位置づけ」 |
+| 仕様を書く | [`docs/grammar.md`](docs/grammar.md)、[`docs/requirements.md`](docs/requirements.md)「書き方の指針」、[`docs/vocab.md`](docs/vocab.md)、[`docs/config.md`](docs/config.md) |
+| コマンドを使う。エディタを整える | [`docs/cli.md`](docs/cli.md)、[`docs/editors.md`](docs/editors.md) |
+| プラグインを書く | [`docs/plugin-protocol.md`](docs/plugin-protocol.md)、[`docs/ir.md`](docs/ir.md)、[`schema/ir.schema.json`](schema/ir.schema.json) |
+| Hozo 自身を直す | [`CLAUDE.md`](CLAUDE.md)。続けて、どの文書が何を決めているかは [`docs/README.md`](docs/README.md) |
+| 決めたことと、決めていないことを知る | [`docs/decisions.md`](docs/decisions.md)、[`docs/open.md`](docs/open.md) |
