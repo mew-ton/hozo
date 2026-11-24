@@ -12,18 +12,12 @@ Hozo does the same to the design of software. You do not write the insides. You 
 
 **Hozo is the single source of truth for an application's design.**
 
-Parts of this are not built yet. They are marked *(planned)*.
+This is what Hozo provides by its v1 release. Hozo is unreleased, and what exists today is under "Status".
 
-1. **People can review and correct the design, even when an AI wrote it.**
-   - Today: the design is text in one language. A compiler checks it, and a language server and a VS Code extension help to read and write it.
-   - *(Planned)* A UI that shows the design as diagrams, the views in the next section, where people review and correct it.
-2. **The reviewed design becomes the skeleton of the code and its test harness, as it is.**
-   - Today: `hozoc` generates the wiring as code. A function without a body is a slot that a person or an AI fills, and a missing implementation does not compile. The tests that the specification requires are determined from it, and `hozoc` checks that they ran. The target language is Go.
-   - *(Planned)* Tests that are generated from the specification itself. Target languages other than Go.
+1. **People can review and correct the design, even when an AI wrote it.** The design is shown as diagrams, the views in the next section, and people review and correct it there.
+2. **The reviewed design becomes the skeleton of the code and its test harness, as it is.** The order of the calls is generated as code. What a person or an AI has to write is a slot, and a missing implementation does not compile. The tests that the design requires are determined from it, generated where they can be, and checked to have run.
 3. **It is clear what people are responsible for.** People are responsible for the specification. The bodies can be left to an AI, and the harness holds them to the specification.
-4. **You can see how much each design method buys.** A part of a design gives a harness of some strength: generated code, required tests, a type, or nothing but an annotation.
-   - Today: each method in the next section says what you get from it.
-   - *(Planned)* The strength shown as a number for each diagram, so that you can see what a design leaves unguarded.
+4. **You can see how much each design method buys.** A part of a design gives a harness of some strength: generated code, required tests, a type, or nothing but an annotation. The strength is shown for each diagram, so that you can see what a design leaves unguarded.
 
 ## Design methods, written as code
 
@@ -60,8 +54,6 @@ export fn viewOrders();
 ```
 
 **You get**: Each use case becomes a function in the code. The actor is an annotation: it constrains nothing.
-
-Not yet: extend.
 
 </details>
 
@@ -133,8 +125,6 @@ namespace mailer {
 
 **You get**: The calls are generated as code, in this order. A function that is not exported cannot be called from another namespace.
 
-Not yet: combined fragments.
-
 </details>
 
 <details>
@@ -161,9 +151,7 @@ effect fn acceptOrder(order: Order on Standing.AwaitingPayment): effects orders.
 effect fn expireOrder(order: Order on Standing.AwaitingPayment): effects orders.put as Standing.Expired;
 ```
 
-**You get**: An effect can be called only on a row that is known to be in its `on` case: anything else is an error in the specification. *(Planned)* A test that the body moves the row only in the declared direction.
-
-Not yet: guards, nested states, history.
+**You get**: An effect can be called only on a row that is known to be in its `on` case: anything else is an error in the specification. A test checks that the body moves the row only in the declared direction.
 
 </details>
 
@@ -200,8 +188,6 @@ model OrderLine {
 ```
 
 **You get**: The models become types in the code.
-
-Not yet: operations, generalization, the difference between aggregation and composition.
 
 </details>
 
@@ -303,9 +289,7 @@ fn authenticate();
 export fn placeOrder();
 ```
 
-**You get**: Each requirement gets a slot for its tests, and `hozoc` checks that the required tests ran. *(Planned)* The matrix above, drawn from the specification, with the requirements that nothing points at.
-
-Not yet: acceptance criteria as conditions on values.
+**You get**: Each requirement gets a slot for its tests, and `hozoc` checks that the required tests ran. The matrix above is drawn from the specification, and shows the requirements that nothing points at.
 
 </details>
 
@@ -381,8 +365,6 @@ namespace mailer {
 
 **You get**: The calls across namespaces are generated. Calling what a namespace does not export, or reaching into its state, is an error.
 
-Not yet: the boundary between the system and the outside.
-
 </details>
 
 <details>
@@ -407,8 +389,6 @@ export fn signInAndOrder() {
 ```
 
 **You get**: An end-to-end test is required for the flow. The part that calls the steps is generated, and you supply the cases.
-
-Not yet: branches, waits and compensation between the steps.
 
 </details>
 
@@ -436,11 +416,11 @@ A decision is a named case. Its context and its rejected options are tags in the
 D480;
 ```
 
-**You get**: An annotation: it constrains nothing. *(Planned)* The decisions behind a declaration, shown in the UI.
+**You get**: An annotation: it constrains nothing. The decisions behind a declaration are shown with it.
 
 </details>
 
-The diagrams are drawn by hand for this page. *(Planned)* The UI draws them from the specification. The correspondence, part by part, is in [`docs/ide-chain.md`](docs/ide-chain.md), "対応".
+The diagrams are drawn by hand for this page. In Hozo, they are drawn from the specification. The correspondence, part by part, is in [`docs/ide-chain.md`](docs/ide-chain.md), "対応".
 
 ## Status
 
