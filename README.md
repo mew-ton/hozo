@@ -619,6 +619,59 @@ func RunLeaves(t *testing.T, leaves auth.Leaves, c LeafCases)
 
 </details>
 
+<details>
+<summary>An entry → an integration test for each place an exception comes from</summary>
+
+You supply the cases of the interface. The tests for the exceptions are generated: each one makes the place the exception comes from throw it, and checks what the entry answers.
+
+```
+@http.status(401)
+exception Unauthorized;
+
+@http.status(409)
+exception OutOfStock;
+
+@http.post("/orders")
+export fn placeOrder(in: PlaceOrderInput): Order {
+  val session = authenticate(in.token);
+  return reserve(session, in.lines);
+}
+
+fn authenticate(token: string?): Session
+  throws Unauthorized;
+
+fn reserve(session: Session, lines: OrderLine[]): Order
+  throws OutOfStock;
+```
+
+```go
+type PlaceOrderHTTPCases interface {
+	OK() PlaceOrderHTTPCase
+	BadRequest() PlaceOrderHTTPCase
+}
+
+t.Run("Unauthorized", func(t *testing.T) {
+	t.Run("api.authenticate", func(t *testing.T) {
+		k := cases.OK()
+		res, _ := send(t, k, func(f *Fakes) {
+			f.Leaves.Authenticate.Throws(api.Unauthorized{})
+		})
+		httpWantThrown[api.Unauthorized](t, res, 401)
+	})
+})
+t.Run("OutOfStock", func(t *testing.T) {
+	t.Run("api.reserve", func(t *testing.T) {
+		k := cases.OK()
+		res, _ := send(t, k, func(f *Fakes) {
+			f.Leaves.Reserve.Throws(api.OutOfStock{})
+		})
+		httpWantThrown[api.OutOfStock](t, res, 409)
+	})
+})
+```
+
+</details>
+
 ## Status
 
 Hozo is unreleased and at version 0.x. Nothing is compatible from one version to the next yet.

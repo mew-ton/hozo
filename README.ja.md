@@ -619,6 +619,59 @@ func RunLeaves(t *testing.T, leaves auth.Leaves, c LeafCases)
 
 </details>
 
+<details>
+<summary>入口 → 例外の出どころごとの、結合テスト</summary>
+
+人か AI が書くのは、インターフェースのケース。例外のテストは、生成される: 一つ一つが、例外の出どころに、その例外を投げさせて、入口が、何を返すかを確かめる。
+
+```
+@http.status(401)
+exception Unauthorized;
+
+@http.status(409)
+exception OutOfStock;
+
+@http.post("/orders")
+export fn placeOrder(in: PlaceOrderInput): Order {
+  val session = authenticate(in.token);
+  return reserve(session, in.lines);
+}
+
+fn authenticate(token: string?): Session
+  throws Unauthorized;
+
+fn reserve(session: Session, lines: OrderLine[]): Order
+  throws OutOfStock;
+```
+
+```go
+type PlaceOrderHTTPCases interface {
+	OK() PlaceOrderHTTPCase
+	BadRequest() PlaceOrderHTTPCase
+}
+
+t.Run("Unauthorized", func(t *testing.T) {
+	t.Run("api.authenticate", func(t *testing.T) {
+		k := cases.OK()
+		res, _ := send(t, k, func(f *Fakes) {
+			f.Leaves.Authenticate.Throws(api.Unauthorized{})
+		})
+		httpWantThrown[api.Unauthorized](t, res, 401)
+	})
+})
+t.Run("OutOfStock", func(t *testing.T) {
+	t.Run("api.reserve", func(t *testing.T) {
+		k := cases.OK()
+		res, _ := send(t, k, func(f *Fakes) {
+			f.Leaves.Reserve.Throws(api.OutOfStock{})
+		})
+		httpWantThrown[api.OutOfStock](t, res, 409)
+	})
+})
+```
+
+</details>
+
 ## 状態
 
 Hozo は、未公開で、版は 0.x。版から版への互換は、まだ、何もない。
