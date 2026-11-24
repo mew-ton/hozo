@@ -21,7 +21,7 @@ Hozo は、同じことを、ソフトウェアの設計にする。中身は、
 
 ## 設計の手法から、Hozo へ
 
-設計の手法で描くものは、その形の、一つの見え方。Hozo では、どの見え方も、一つの言語で、一つの仕様に書く。手法を開くと、図と、その図が言っていることを書いた Hozo が、出る。
+設計の手法で描くものは、その形の、一つの見え方。Hozo では、どの見え方も、一つの言語で、一つの仕様に書く。手法を開くと、図と、その図が言っていることを書いた Hozo が、出る。載せるのは、図が言っている範囲だけ: それが頼る宣言は、省いている。
 
 **UML**
 
@@ -151,7 +151,7 @@ effect fn acceptOrder(order: Order on Standing.AwaitingPayment): effects orders.
 effect fn expireOrder(order: Order on Standing.AwaitingPayment): effects orders.put as Standing.Expired;
 ```
 
-**得られるもの**: 効果は、`on` のケースにあると分かっている行にしか、呼べない: ほかは、仕様の error。中身が、行を、宣言した向きにだけ動かすことは、テストが確かめる。
+**得られるもの**: 効果は、`on` のケースにあると分かっている行にしか、呼べない: ほかは、仕様の error。動いているときも、効果は、入口で、行が、そのケースにあることを、確かめる。
 
 </details>
 
@@ -164,6 +164,7 @@ effect fn expireOrder(order: Order on Standing.AwaitingPayment): effects orders.
 classDiagram
   class Order {
     string id
+    string userId
     OrderLine[] lines
     datetime placedAt
   }
@@ -177,6 +178,7 @@ classDiagram
 ```
 model Order {
   id: string;
+  userId: string;
   lines: OrderLine[];
   placedAt: datetime;
 }
@@ -224,7 +226,7 @@ model User {
 model Order {
   @db.key       @db.text id: string;
   @db.ref(User) @db.text userId: string;
-  @db.json lines: string[];
+  @db.json lines: OrderLine[];
   @db.datetime placedAt: datetime;
 }
 

@@ -21,7 +21,7 @@ This is what Hozo provides by its v1 release. Hozo is unreleased, and what exist
 
 ## From design methods to Hozo
 
-What you draw with a design method is one view of those shapes. In Hozo, every view is written in one language, in one specification. Open a method to see a diagram, and the Hozo that says what the diagram says.
+What you draw with a design method is one view of those shapes. In Hozo, every view is written in one language, in one specification. Open a method to see a diagram, and the Hozo that says what the diagram says. Each piece shows only what the diagram shows: the declarations it leans on are left out.
 
 **UML**
 
@@ -151,7 +151,7 @@ effect fn acceptOrder(order: Order on Standing.AwaitingPayment): effects orders.
 effect fn expireOrder(order: Order on Standing.AwaitingPayment): effects orders.put as Standing.Expired;
 ```
 
-**You get**: An effect can be called only on a row that is known to be in its `on` case: anything else is an error in the specification. A test checks that the body moves the row only in the declared direction.
+**You get**: An effect can be called only on a row that is known to be in its `on` case: anything else is an error in the specification. When the code runs, the effect checks at its entry that the row is in that case.
 
 </details>
 
@@ -164,6 +164,7 @@ A class is a `model`. An attribute is a field, and an association is the type of
 classDiagram
   class Order {
     string id
+    string userId
     OrderLine[] lines
     datetime placedAt
   }
@@ -177,6 +178,7 @@ classDiagram
 ```
 model Order {
   id: string;
+  userId: string;
   lines: OrderLine[];
   placedAt: datetime;
 }
@@ -224,7 +226,7 @@ model User {
 model Order {
   @db.key       @db.text id: string;
   @db.ref(User) @db.text userId: string;
-  @db.json lines: string[];
+  @db.json lines: OrderLine[];
   @db.datetime placedAt: datetime;
 }
 
