@@ -19,7 +19,7 @@ This is what Hozo provides by its v1 release. Hozo is unreleased, and what exist
 3. **It is clear what people are responsible for.** People are responsible for the specification. The bodies can be left to an AI, and the harness holds them to the specification.
 4. **You can see how much each design method buys.** A part of a design gives a harness of some strength: generated code, required tests, a type, or nothing but an annotation. The strength is shown for each diagram, so that you can see what a design leaves unguarded.
 
-## Design methods, written as code
+## From design methods to Hozo
 
 What you draw with a design method is one view of those shapes. In Hozo, every view is written in one language, in one specification. Open a method to see a diagram, and the Hozo that says what the diagram says.
 
@@ -421,6 +421,201 @@ D480;
 </details>
 
 The diagrams are drawn by hand for this page. In Hozo, they are drawn from the specification.
+
+## From Hozo to code
+
+Open a piece to see the Hozo, and the code that is generated from it. The code is Go, the first target language, abridged.
+
+**Flow**
+
+<details>
+<summary>Wiring → a function</summary>
+
+The order of the calls and the branches are generated as they are written. How a case is told comes from the classification: here, by the type.
+
+```
+classify Credential of Token? {
+  Presented: Token? as Token;
+  Absent:    Token? as else;
+}
+
+export fn authenticate(token: Token?): Session {
+  return match (token by Credential) {
+    Presented => sessionOf(token);
+    Absent    => throw Unauthorized;
+  }
+}
+```
+
+```go
+func (o *ops) Authenticate(ctx context.Context, token *Token) (Session, error) {
+	if token != nil {
+		return o.SessionOf(ctx, *token)
+	}
+	return Session{}, Unauthorized{}
+}
+```
+
+</details>
+
+<details>
+<summary>A function without a body → a slot to fill</summary>
+
+What a person or an AI writes is one method of an interface. A value that lacks a method does not compile where it is passed to `New`.
+
+```
+fn sessionOf(token: Token): Session;
+```
+
+```go
+type Leaves interface {
+	SessionOf(ctx context.Context, token Token) (Session, error)
+}
+
+func New(leaves Leaves) Ops
+```
+
+</details>
+
+**Data**
+
+<details>
+<summary>A model and its constraints → a type and its validation</summary>
+
+A `model` becomes a type. A constraint becomes a check, with the path of the field that broke it.
+
+```
+model OrderLine {
+  item: string;
+  @valid.min(1) quantity: int;
+}
+```
+
+```go
+type OrderLine struct {
+	Item     string `json:"item"`
+	Quantity int64  `json:"quantity"`
+}
+
+func (m OrderLine) Validate() error {
+	var violations []runtime.Violation
+	if int64(m.Quantity) < 1 {
+		violations = append(violations, runtime.Violation{Path: "quantity", Constraint: "min"})
+	}
+	if len(violations) == 0 {
+		return nil
+	}
+	return &runtime.ValidationError{Violations: violations}
+}
+```
+
+</details>
+
+**Edges of the system**
+
+<details>
+<summary>`@http.*` → an HTTP handler</summary>
+
+The route, where each input is read from, and what is required come from the decorators. The function itself stays free of HTTP.
+
+```
+model PlaceOrderInput {
+  @http.header("Authorization") token: string?;
+  @http.required @http.body lines: OrderLine[];
+}
+
+@http.post("/orders")
+export fn placeOrder(in: PlaceOrderInput): Order;
+```
+
+```go
+mux.HandleFunc("POST /orders", func(w http.ResponseWriter, r *http.Request) {
+	var in PlaceOrderInput
+	req := httpRequest{r: r}
+	req.header("Authorization", &in.Token)
+	req.body("lines", &in.Lines, httpRequired)
+	if !req.ok(w) {
+		return
+	}
+	out, err := ops.PlaceOrder(r.Context(), in)
+	if err != nil {
+		httpWriteError(w, err)
+		return
+	}
+	httpWriteResult(w, out)
+})
+```
+
+</details>
+
+<details>
+<summary>`@db.*` → a table, and the statements that read and write it</summary>
+
+The state is a table. The effect is a statement on it. Nothing else in the specification mentions SQL.
+
+```
+model User {
+  @db.key    @db.text id: string;
+  @db.unique @db.text email: string;
+  @db.text name: string;
+}
+
+@db.table
+state users: list<User>;
+
+@db.insert
+effect fn createUser(user: User): effects users.post;
+```
+
+```go
+const Schema = `CREATE TABLE IF NOT EXISTS "users" (
+  "id" TEXT NOT NULL PRIMARY KEY,
+  "email" TEXT NOT NULL UNIQUE,
+  "name" TEXT NOT NULL
+);
+`
+
+func (t UsersTable) CreateUser(ctx context.Context, user User) error {
+	args, err := dbArgsUser(user)
+	if err != nil {
+		return err
+	}
+	return dbExec(ctx, t.db,
+		`INSERT INTO "users" ("id", "email", "name") VALUES (?1, ?2, ?3)`, args...)
+}
+```
+
+</details>
+
+**Tests**
+
+<details>
+<summary>A function without a body → the test cases it needs</summary>
+
+Each function that a person or an AI writes needs its cases. A value that lacks a case does not compile where it is passed to `RunLeaves`.
+
+```
+fn sessionOf(token: Token): Session;
+```
+
+```go
+type SessionOfCases interface {
+	OK() SessionOfCase
+}
+
+type SessionOfCase struct {
+	Token auth.Token
+	Then  func(t *testing.T, got auth.Session, err error)
+}
+
+type LeafCases interface {
+	SessionOf() SessionOfCases
+}
+
+func RunLeaves(t *testing.T, leaves auth.Leaves, c LeafCases)
+```
+
+</details>
 
 ## Status
 

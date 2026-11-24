@@ -19,7 +19,7 @@ Hozo は、同じことを、ソフトウェアの設計にする。中身は、
 3. **人が、何に責任を持つかが、はっきりする。** 人が責任を持つのは、仕様。中身は、AI に任せられ、ハーネスが、中身を、仕様に留める。
 4. **設計の手法ごとに、どれだけ効くかが、見える。** 設計の部品は、それぞれ、ある強さのハーネスになる: 生成されるコード、求められるテスト、型、または、注記だけ。その強さを、図ごとに示すので、設計が、何を縛っていないかが、見える。
 
-## 設計の手法を、コードで書く
+## 設計の手法から、Hozo へ
 
 設計の手法で描くものは、その形の、一つの見え方。Hozo では、どの見え方も、一つの言語で、一つの仕様に書く。手法を開くと、図と、その図が言っていることを書いた Hozo が、出る。
 
@@ -421,6 +421,201 @@ D480;
 </details>
 
 図は、このページのために、手で描いたもの。Hozo では、仕様から、描かれる。
+
+## Hozo から、コードへ
+
+開くと、Hozo と、そこから生成されるコードが、出る。コードは、最初の出力先の言語の、Go。省いて、載せている。
+
+**流れ**
+
+<details>
+<summary>配線 → 関数</summary>
+
+呼ぶ順と、分かれ道は、書いたとおりに、生成される。どうやって、その場合だと分かるかは、分類から来る: ここでは、型。
+
+```
+classify Credential of Token? {
+  Presented: Token? as Token;
+  Absent:    Token? as else;
+}
+
+export fn authenticate(token: Token?): Session {
+  return match (token by Credential) {
+    Presented => sessionOf(token);
+    Absent    => throw Unauthorized;
+  }
+}
+```
+
+```go
+func (o *ops) Authenticate(ctx context.Context, token *Token) (Session, error) {
+	if token != nil {
+		return o.SessionOf(ctx, *token)
+	}
+	return Session{}, Unauthorized{}
+}
+```
+
+</details>
+
+<details>
+<summary>中身のない関数 → 埋める口</summary>
+
+人か AI が書くものは、インターフェースの、メソッド一つ。メソッドが足りない値は、`New` に渡すところで、コンパイルできない。
+
+```
+fn sessionOf(token: Token): Session;
+```
+
+```go
+type Leaves interface {
+	SessionOf(ctx context.Context, token Token) (Session, error)
+}
+
+func New(leaves Leaves) Ops
+```
+
+</details>
+
+**データ**
+
+<details>
+<summary>model と制約 → 型と、その確かめ</summary>
+
+`model` は、型になる。制約は、確かめになり、破ったフィールドの場所を、返す。
+
+```
+model OrderLine {
+  item: string;
+  @valid.min(1) quantity: int;
+}
+```
+
+```go
+type OrderLine struct {
+	Item     string `json:"item"`
+	Quantity int64  `json:"quantity"`
+}
+
+func (m OrderLine) Validate() error {
+	var violations []runtime.Violation
+	if int64(m.Quantity) < 1 {
+		violations = append(violations, runtime.Violation{Path: "quantity", Constraint: "min"})
+	}
+	if len(violations) == 0 {
+		return nil
+	}
+	return &runtime.ValidationError{Violations: violations}
+}
+```
+
+</details>
+
+**外との境**
+
+<details>
+<summary>`@http.*` → HTTP のハンドラ</summary>
+
+経路、入力を読む場所、必須かどうかは、デコレータから来る。関数そのものは、HTTP を知らない。
+
+```
+model PlaceOrderInput {
+  @http.header("Authorization") token: string?;
+  @http.required @http.body lines: OrderLine[];
+}
+
+@http.post("/orders")
+export fn placeOrder(in: PlaceOrderInput): Order;
+```
+
+```go
+mux.HandleFunc("POST /orders", func(w http.ResponseWriter, r *http.Request) {
+	var in PlaceOrderInput
+	req := httpRequest{r: r}
+	req.header("Authorization", &in.Token)
+	req.body("lines", &in.Lines, httpRequired)
+	if !req.ok(w) {
+		return
+	}
+	out, err := ops.PlaceOrder(r.Context(), in)
+	if err != nil {
+		httpWriteError(w, err)
+		return
+	}
+	httpWriteResult(w, out)
+})
+```
+
+</details>
+
+<details>
+<summary>`@db.*` → 表と、それを読み書きする文</summary>
+
+状態は、表。効果は、その表への、文。仕様の、ほかの所は、SQL を知らない。
+
+```
+model User {
+  @db.key    @db.text id: string;
+  @db.unique @db.text email: string;
+  @db.text name: string;
+}
+
+@db.table
+state users: list<User>;
+
+@db.insert
+effect fn createUser(user: User): effects users.post;
+```
+
+```go
+const Schema = `CREATE TABLE IF NOT EXISTS "users" (
+  "id" TEXT NOT NULL PRIMARY KEY,
+  "email" TEXT NOT NULL UNIQUE,
+  "name" TEXT NOT NULL
+);
+`
+
+func (t UsersTable) CreateUser(ctx context.Context, user User) error {
+	args, err := dbArgsUser(user)
+	if err != nil {
+		return err
+	}
+	return dbExec(ctx, t.db,
+		`INSERT INTO "users" ("id", "email", "name") VALUES (?1, ?2, ?3)`, args...)
+}
+```
+
+</details>
+
+**テスト**
+
+<details>
+<summary>中身のない関数 → それに要る、テストのケース</summary>
+
+人か AI が書く関数には、それぞれ、ケースが要る。ケースが足りない値は、`RunLeaves` に渡すところで、コンパイルできない。
+
+```
+fn sessionOf(token: Token): Session;
+```
+
+```go
+type SessionOfCases interface {
+	OK() SessionOfCase
+}
+
+type SessionOfCase struct {
+	Token auth.Token
+	Then  func(t *testing.T, got auth.Session, err error)
+}
+
+type LeafCases interface {
+	SessionOf() SessionOfCases
+}
+
+func RunLeaves(t *testing.T, leaves auth.Leaves, c LeafCases)
+```
+
+</details>
 
 ## 状態
 
