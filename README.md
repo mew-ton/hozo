@@ -420,7 +420,7 @@ D480;
 
 </details>
 
-The diagrams are drawn by hand for this page. In Hozo, they are drawn from the specification. The correspondence, part by part, is in [`docs/ide-chain.md`](docs/ide-chain.md), "対応".
+The diagrams are drawn by hand for this page. In Hozo, they are drawn from the specification.
 
 ## Status
 
@@ -429,14 +429,6 @@ Hozo is unreleased and at version 0.x. Nothing is compatible from one version to
 - **Exists**: the compiler `hozoc`, the language server, the VS Code extension, and the plugins for Go.
 - **Does not exist yet**: the UI for drawing, reviewing and correcting a design. Target languages other than Go. A license.
 
-## Read next
+## Documentation
 
-| You want to | Read |
-|---|---|
-| Know what the language is for | [`docs/requirements.md`](docs/requirements.md), "価値と位置づけ" |
-| Write a specification | [`docs/grammar.md`](docs/grammar.md), and [`docs/requirements.md`](docs/requirements.md), "書き方の指針" |
-| Run `hozoc` | [`docs/cli.md`](docs/cli.md). `make build` builds it into `bin/`, with Go 1.24.7 or later |
-| Write a plugin | [`docs/plugin-protocol.md`](docs/plugin-protocol.md) |
-| Work on Hozo itself | [`CLAUDE.md`](CLAUDE.md), then [`docs/README.md`](docs/README.md) |
-
-The documents are in Japanese for now. They will move to English, the first language of the toolchain.
+The documentation will be published as pages by the v1 release. Until then, there is none to point to.

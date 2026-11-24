@@ -420,7 +420,7 @@ D480;
 
 </details>
 
-図は、このページのために、手で描いたもの。Hozo では、仕様から、描かれる。部品ごとの対応は、[`docs/ide-chain.md`](docs/ide-chain.md)「対応」。
+図は、このページのために、手で描いたもの。Hozo では、仕様から、描かれる。
 
 ## 状態
 
@@ -429,14 +429,6 @@ Hozo は、未公開で、版は 0.x。版から版への互換は、まだ、�
 - **あるもの**: コンパイラ `hozoc`、言語サーバー、VS Code 拡張、Go のプラグイン。
 - **まだ、ないもの**: 設計を、描いて、レビューして、手直しする UI。Go のほかの言語への出力。ライセンス。
 
-## 次に読むもの
+## ドキュメント
 
-| したいこと | 読む場所 |
-|---|---|
-| 何のための言語かを知る | [`docs/requirements.md`](docs/requirements.md)「価値と位置づけ」 |
-| 仕様を書く | [`docs/grammar.md`](docs/grammar.md)、[`docs/requirements.md`](docs/requirements.md)「書き方の指針」 |
-| `hozoc` を動かす | [`docs/cli.md`](docs/cli.md)。`make build` で、`bin/` にできる（Go 1.24.7 以上） |
-| プラグインを書く | [`docs/plugin-protocol.md`](docs/plugin-protocol.md) |
-| Hozo 自身を直す | [`CLAUDE.md`](CLAUDE.md)、続けて [`docs/README.md`](docs/README.md) |
-
-文書は、今は、日本語。処理系の第一言語である、英語に、移す。
+ドキュメントは、v1 のリリースまでに、ページとして、用意する。それまでは、案内できるものが、ない。
