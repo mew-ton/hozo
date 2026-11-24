@@ -23,6 +23,238 @@ Hozo は、同じことを、ソフトウェアの設計にする。中身は、
 
 設計の手法で描くものは、その形の、一つの見え方。Hozo では、どの見え方も、一つの言語で、一つの仕様に書く。手法を開くと、図と、その図が言っていることを書いた Hozo が、出る。載せるのは、図が言っている範囲だけ: それが頼る宣言は、省いている。
 
+設計は、仕事に合う手法で行い、同じ仕様は、ほかの見え方でも、見せる: 一つの手法で作った設計を、別の手法の形で、プレビューできる。UML の図の多く（シーケンス図、クラス図、コンポーネント図）は、仕様から描く、このプレビュー。ユースケース図のように、マネージャーが設計に使うものは、直せる。
+
+**要求、ドメイン、アーキテクチャ**
+
+<details>
+<summary>ユーザーストーリー、要求のトレーサビリティ</summary>
+
+要求は、名前を持つケースで、文は、コメント。設計の側が、応える要求を指すので、どこからも指されていない要求は、穴。
+
+| 要求 | `authenticate` | `placeOrder` |
+|---|---|---|
+| `PRD_001` ログインしていない人は、注文できない | ✓ | ✓ |
+| `PRD_002` 注文したら、その注文が、自分の注文の一覧に出る | | ✓ |
+
+```
+classify Requirement of never {
+  /** ログインしていない人は、注文できない */
+  PRD_001;
+  /** 注文したら、その注文が、自分の注文の一覧に出る */
+  PRD_002;
+}
+
+@prd.ref(Requirement.PRD_001)
+fn authenticate();
+
+@prd.ref(Requirement.PRD_001, Requirement.PRD_002)
+export fn placeOrder();
+```
+
+**得られるもの**: 要求ごとに、テストの入れ物ができ、求めるテストが走ったことを、`hozoc` が確かめる。上の表は、仕様から描かれ、どこからも指されていない要求を、見せる。
+
+</details>
+
+<details>
+<summary>イベントストーミング</summary>
+
+コマンドは、関数。事実（イベント）は、効果: 関数の名前は、すること（〜する）で、起きたこと（〜した）は、デコレータが名付ける。読むモデルは、`read`。集約は、状態を持つ名前空間。
+
+```mermaid
+flowchart LR
+  subgraph ordering
+    c[placeOrder]:::command --> e[OrderPlaced]:::event --> r[ordersOf]:::read
+  end
+  classDef command fill:#8ecbff,color:#000
+  classDef event fill:#ffb347,color:#000
+  classDef read fill:#a8e6a1,color:#000
+```
+
+```
+namespace ordering {
+  state orders: list<Order>;
+
+  export fn placeOrder(order: Order) {
+    createOrder(order);
+  }
+
+  @prd.eventstorming.event("OrderPlaced")
+  effect fn createOrder(order: Order): effects orders.post;
+
+  read fn ordersOf(userId: string): Order[] reads orders;
+}
+```
+
+**得られるもの**: コマンドは、配線から、生成される。事実と、読むモデルは、埋める口で、`@db.*` を付ければ、生成される。状態は、その名前空間の中でしか、読み書きできない: ほかは、error。
+
+図に出ないもの: 方針。仕様では、呼ぶ順。
+
+</details>
+
+<details>
+<summary>C4 モデル、コンポーネント図</summary>
+
+部品は、名前空間。口は、外に出した（`export`）関数。依る向きは、名前空間をまたぐ呼び出し。シーケンス図と、同じ仕様: その、別の見え方。
+
+```mermaid
+flowchart LR
+  client --> server
+  server --> store
+  server --> mailer
+```
+
+```
+namespace client {
+  export fn order() {
+    server.placeOrder();
+  }
+}
+
+namespace server {
+  export fn placeOrder() {
+    store.saveOrder();
+    mailer.send();
+  }
+}
+
+namespace store {
+  export fn saveOrder();
+}
+
+namespace mailer {
+  export fn send();
+}
+```
+
+**得られるもの**: 名前空間をまたぐ呼び出しが、生成される。外に出していない関数を呼ぶこと、ほかの名前空間の状態に触れることは、error。
+
+</details>
+
+<details>
+<summary>業務フロー図、サービスブループリント</summary>
+
+フローは、ユースケースを、順に呼ぶ関数。レーンは、そのユースケースの、担い手。
+
+```mermaid
+flowchart LR
+  subgraph Customer
+    signIn --> order --> viewOrders
+  end
+```
+
+```
+@prd.business.flow
+export fn signInAndOrder() {
+  client.signIn();
+  client.order();
+  client.viewOrders();
+}
+```
+
+**得られるもの**: フローに、E2E テストが、求められる。ステップを呼ぶ所は、生成され、ケースは、人か AI が書く。
+
+</details>
+
+<details>
+<summary>決定の記録（ADR）</summary>
+
+決定は、名前を持つケース。背景と、採らなかった案は、コメントの中のタグ。ほかの決定との関係は、デコレータ。
+
+> **480. コメントの中に、タグとして書けるのは、注記だけ**
+>
+> 直す決定: 478
+>
+> 背景: そうしないと、振る舞いを決めるデコレータが、コメントの中から、本当に、付く。
+>
+> 採らなかった案: 今のまま。
+
+```
+/**
+ * コメントの中に、タグとして書けるのは、注記だけ。
+ *
+ * @adr.context そうしないと、振る舞いを決めるデコレータが、コメントの中から、本当に、付く。
+ * @adr.rejected 今のまま。
+ */
+@adr.amends(Decision.D478)
+D480;
+```
+
+**得られるもの**: 注記で、何も縛らない。宣言の裏にある決定は、その宣言と一緒に、見せる。
+
+</details>
+
+**データと API**
+
+<details>
+<summary>ER 図、テーブル定義</summary>
+
+表は、`state`。列、キー、参照は、`model` のフィールドの、デコレータ。
+
+```mermaid
+erDiagram
+  users ||--o{ orders : userId
+  users {
+    text id PK
+    text email UK
+    text name
+  }
+  orders {
+    text id PK
+    text userId FK
+    json lines
+    datetime placedAt
+  }
+```
+
+```
+model User {
+  @db.key    @db.text id: string;
+  @db.unique @db.text email: string;
+  @db.text name: string;
+}
+
+model Order {
+  @db.key       @db.text id: string;
+  @db.ref(User) @db.text userId: string;
+  @db.json lines: OrderLine[];
+  @db.datetime placedAt: datetime;
+}
+
+@db.table
+state users: list<User>;
+
+@db.table
+state orders: list<Order>;
+```
+
+**得られるもの**: 表の定義が、生成される（SQLite）。`read` と効果に `@db.*` を付ければ、表を読み書きするコードも、生成される。
+
+</details>
+
+<details>
+<summary>API の設計</summary>
+
+経路は、関数のデコレータ。入力を、要求のどこから読むかは、フィールドのデコレータ。
+
+| Method | Path | Header | Body | Response |
+|---|---|---|---|---|
+| `POST` | `/orders` | `Authorization` | `lines` (required) | `Order` |
+
+```
+model PlaceOrderInput {
+  @http.header("Authorization") token: string?;
+  @http.required @http.body lines: OrderLine[];
+}
+
+@http.post("/orders")
+export fn placeOrder(in: PlaceOrderInput): Order;
+```
+
+**得られるもの**: HTTP のハンドラが、生成される。
+
+</details>
+
 **UML**
 
 <details>
@@ -190,236 +422,6 @@ model OrderLine {
 ```
 
 **得られるもの**: model は、コードの型になる。
-
-</details>
-
-**データと API**
-
-<details>
-<summary>ER 図、テーブル定義</summary>
-
-表は、`state`。列、キー、参照は、`model` のフィールドの、デコレータ。
-
-```mermaid
-erDiagram
-  users ||--o{ orders : userId
-  users {
-    text id PK
-    text email UK
-    text name
-  }
-  orders {
-    text id PK
-    text userId FK
-    json lines
-    datetime placedAt
-  }
-```
-
-```
-model User {
-  @db.key    @db.text id: string;
-  @db.unique @db.text email: string;
-  @db.text name: string;
-}
-
-model Order {
-  @db.key       @db.text id: string;
-  @db.ref(User) @db.text userId: string;
-  @db.json lines: OrderLine[];
-  @db.datetime placedAt: datetime;
-}
-
-@db.table
-state users: list<User>;
-
-@db.table
-state orders: list<Order>;
-```
-
-**得られるもの**: 表の定義が、生成される（SQLite）。`read` と効果に `@db.*` を付ければ、表を読み書きするコードも、生成される。
-
-</details>
-
-<details>
-<summary>API の設計</summary>
-
-経路は、関数のデコレータ。入力を、要求のどこから読むかは、フィールドのデコレータ。
-
-| Method | Path | Header | Body | Response |
-|---|---|---|---|---|
-| `POST` | `/orders` | `Authorization` | `lines` (required) | `Order` |
-
-```
-model PlaceOrderInput {
-  @http.header("Authorization") token: string?;
-  @http.required @http.body lines: OrderLine[];
-}
-
-@http.post("/orders")
-export fn placeOrder(in: PlaceOrderInput): Order;
-```
-
-**得られるもの**: HTTP のハンドラが、生成される。
-
-</details>
-
-**要求、ドメイン、アーキテクチャ**
-
-<details>
-<summary>ユーザーストーリー、要求のトレーサビリティ</summary>
-
-要求は、名前を持つケースで、文は、コメント。設計の側が、応える要求を指すので、どこからも指されていない要求は、穴。
-
-| 要求 | `authenticate` | `placeOrder` |
-|---|---|---|
-| `PRD_001` ログインしていない人は、注文できない | ✓ | ✓ |
-| `PRD_002` 注文したら、その注文が、自分の注文の一覧に出る | | ✓ |
-
-```
-classify Requirement of never {
-  /** ログインしていない人は、注文できない */
-  PRD_001;
-  /** 注文したら、その注文が、自分の注文の一覧に出る */
-  PRD_002;
-}
-
-@prd.ref(Requirement.PRD_001)
-fn authenticate();
-
-@prd.ref(Requirement.PRD_001, Requirement.PRD_002)
-export fn placeOrder();
-```
-
-**得られるもの**: 要求ごとに、テストの入れ物ができ、求めるテストが走ったことを、`hozoc` が確かめる。上の表は、仕様から描かれ、どこからも指されていない要求を、見せる。
-
-</details>
-
-<details>
-<summary>イベントストーミング</summary>
-
-コマンドは、関数。事実（イベント）は、効果: 関数の名前は、すること（〜する）で、起きたこと（〜した）は、デコレータが名付ける。読むモデルは、`read`。集約は、状態を持つ名前空間。
-
-```mermaid
-flowchart LR
-  subgraph ordering
-    c[placeOrder]:::command --> e[OrderPlaced]:::event --> r[ordersOf]:::read
-  end
-  classDef command fill:#8ecbff,color:#000
-  classDef event fill:#ffb347,color:#000
-  classDef read fill:#a8e6a1,color:#000
-```
-
-```
-namespace ordering {
-  state orders: list<Order>;
-
-  export fn placeOrder(order: Order) {
-    createOrder(order);
-  }
-
-  @prd.eventstorming.event("OrderPlaced")
-  effect fn createOrder(order: Order): effects orders.post;
-
-  read fn ordersOf(userId: string): Order[] reads orders;
-}
-```
-
-**得られるもの**: コマンドは、配線から、生成される。事実と、読むモデルは、埋める口で、`@db.*` を付ければ、生成される。状態は、その名前空間の中でしか、読み書きできない: ほかは、error。
-
-図に出ないもの: 方針。仕様では、呼ぶ順。
-
-</details>
-
-<details>
-<summary>C4 モデル、コンポーネント図</summary>
-
-部品は、名前空間。口は、外に出した（`export`）関数。依る向きは、名前空間をまたぐ呼び出し。シーケンス図と、同じ仕様: その、別の見え方。
-
-```mermaid
-flowchart LR
-  client --> server
-  server --> store
-  server --> mailer
-```
-
-```
-namespace client {
-  export fn order() {
-    server.placeOrder();
-  }
-}
-
-namespace server {
-  export fn placeOrder() {
-    store.saveOrder();
-    mailer.send();
-  }
-}
-
-namespace store {
-  export fn saveOrder();
-}
-
-namespace mailer {
-  export fn send();
-}
-```
-
-**得られるもの**: 名前空間をまたぐ呼び出しが、生成される。外に出していない関数を呼ぶこと、ほかの名前空間の状態に触れることは、error。
-
-</details>
-
-<details>
-<summary>業務フロー図、サービスブループリント</summary>
-
-フローは、ユースケースを、順に呼ぶ関数。レーンは、そのユースケースの、担い手。
-
-```mermaid
-flowchart LR
-  subgraph Customer
-    signIn --> order --> viewOrders
-  end
-```
-
-```
-@prd.business.flow
-export fn signInAndOrder() {
-  client.signIn();
-  client.order();
-  client.viewOrders();
-}
-```
-
-**得られるもの**: フローに、E2E テストが、求められる。ステップを呼ぶ所は、生成され、ケースは、人か AI が書く。
-
-</details>
-
-<details>
-<summary>決定の記録（ADR）</summary>
-
-決定は、名前を持つケース。背景と、採らなかった案は、コメントの中のタグ。ほかの決定との関係は、デコレータ。
-
-> **480. コメントの中に、タグとして書けるのは、注記だけ**
->
-> 直す決定: 478
->
-> 背景: そうしないと、振る舞いを決めるデコレータが、コメントの中から、本当に、付く。
->
-> 採らなかった案: 今のまま。
-
-```
-/**
- * コメントの中に、タグとして書けるのは、注記だけ。
- *
- * @adr.context そうしないと、振る舞いを決めるデコレータが、コメントの中から、本当に、付く。
- * @adr.rejected 今のまま。
- */
-@adr.amends(Decision.D478)
-D480;
-```
-
-**得られるもの**: 注記で、何も縛らない。宣言の裏にある決定は、その宣言と一緒に、見せる。
 
 </details>
 

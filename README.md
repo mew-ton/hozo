@@ -23,6 +23,238 @@ This is what Hozo provides by its v1 release. Hozo is unreleased, and what exist
 
 What you draw with a design method is one view of those shapes. In Hozo, every view is written in one language, in one specification. Open a method to see a diagram, and the Hozo that says what the diagram says. Each piece shows only what the diagram shows: the declarations it leans on are left out.
 
+You design with the methods that suit your work, and the same specification is shown as the other views too: a design made with one method can be previewed in another. Most UML diagrams (sequence, class, component) are such previews, drawn from the specification. The ones a manager designs with, such as the use case diagram, can be edited.
+
+**Requirements, domain and architecture**
+
+<details>
+<summary>User stories, requirements traceability</summary>
+
+A requirement is a named case, and its text is the comment. The design points at the requirements it serves, so a requirement that nothing points at is a hole.
+
+| Requirement | `authenticate` | `placeOrder` |
+|---|---|---|
+| `PRD_001` A person who is not signed in cannot place an order | ✓ | ✓ |
+| `PRD_002` After an order is placed, it appears in the list of my orders | | ✓ |
+
+```
+classify Requirement of never {
+  /** A person who is not signed in cannot place an order */
+  PRD_001;
+  /** After an order is placed, it appears in the list of my orders */
+  PRD_002;
+}
+
+@prd.ref(Requirement.PRD_001)
+fn authenticate();
+
+@prd.ref(Requirement.PRD_001, Requirement.PRD_002)
+export fn placeOrder();
+```
+
+**You get**: Each requirement gets a slot for its tests, and `hozoc` checks that the required tests ran. The matrix above is drawn from the specification, and shows the requirements that nothing points at.
+
+</details>
+
+<details>
+<summary>Event Storming</summary>
+
+A command is a function. An event is an effect: the function is named for what it does, and the decorator names what has happened. A read model is a `read`. An aggregate is the namespace that owns the state.
+
+```mermaid
+flowchart LR
+  subgraph ordering
+    c[placeOrder]:::command --> e[OrderPlaced]:::event --> r[ordersOf]:::read
+  end
+  classDef command fill:#8ecbff,color:#000
+  classDef event fill:#ffb347,color:#000
+  classDef read fill:#a8e6a1,color:#000
+```
+
+```
+namespace ordering {
+  state orders: list<Order>;
+
+  export fn placeOrder(order: Order) {
+    createOrder(order);
+  }
+
+  @prd.eventstorming.event("OrderPlaced")
+  effect fn createOrder(order: Order): effects orders.post;
+
+  read fn ordersOf(userId: string): Order[] reads orders;
+}
+```
+
+**You get**: The command is generated from its wiring. The event and the read model are slots to fill, or generated when they carry `@db.*`. The state can be read and written only inside its namespace: anything else is an error.
+
+Not shown: policies. In the specification, they are the order of the calls.
+
+</details>
+
+<details>
+<summary>C4 model, component diagram</summary>
+
+A component is a namespace. Its interface is what it exports, and a dependency is a call across namespaces. This is the same specification as in the sequence diagram: another view of it.
+
+```mermaid
+flowchart LR
+  client --> server
+  server --> store
+  server --> mailer
+```
+
+```
+namespace client {
+  export fn order() {
+    server.placeOrder();
+  }
+}
+
+namespace server {
+  export fn placeOrder() {
+    store.saveOrder();
+    mailer.send();
+  }
+}
+
+namespace store {
+  export fn saveOrder();
+}
+
+namespace mailer {
+  export fn send();
+}
+```
+
+**You get**: The calls across namespaces are generated. Calling what a namespace does not export, or reaching into its state, is an error.
+
+</details>
+
+<details>
+<summary>Business flow, service blueprint</summary>
+
+A flow is a function that calls the use cases in order. A lane is the actor of those use cases.
+
+```mermaid
+flowchart LR
+  subgraph Customer
+    signIn --> order --> viewOrders
+  end
+```
+
+```
+@prd.business.flow
+export fn signInAndOrder() {
+  client.signIn();
+  client.order();
+  client.viewOrders();
+}
+```
+
+**You get**: An end-to-end test is required for the flow. The part that calls the steps is generated, and you supply the cases.
+
+</details>
+
+<details>
+<summary>Architecture decision records (ADR)</summary>
+
+A decision is a named case. Its context and its rejected options are tags in the comment, and its relation to another decision is a decorator.
+
+> **480. Only an annotation can be written as a tag inside a comment**
+>
+> Amends: 478
+>
+> Context: Otherwise a decorator that decides behaviour would take effect from inside a comment.
+>
+> Rejected: Leave it as it is.
+
+```
+/**
+ * Only an annotation can be written as a tag inside a comment.
+ *
+ * @adr.context Otherwise a decorator that decides behaviour would take effect from inside a comment.
+ * @adr.rejected Leave it as it is.
+ */
+@adr.amends(Decision.D478)
+D480;
+```
+
+**You get**: An annotation: it constrains nothing. The decisions behind a declaration are shown with it.
+
+</details>
+
+**Data and API**
+
+<details>
+<summary>ER diagram, table definition</summary>
+
+A table is a `state`. Its columns, keys and references are decorators on the fields of the `model`.
+
+```mermaid
+erDiagram
+  users ||--o{ orders : userId
+  users {
+    text id PK
+    text email UK
+    text name
+  }
+  orders {
+    text id PK
+    text userId FK
+    json lines
+    datetime placedAt
+  }
+```
+
+```
+model User {
+  @db.key    @db.text id: string;
+  @db.unique @db.text email: string;
+  @db.text name: string;
+}
+
+model Order {
+  @db.key       @db.text id: string;
+  @db.ref(User) @db.text userId: string;
+  @db.json lines: OrderLine[];
+  @db.datetime placedAt: datetime;
+}
+
+@db.table
+state users: list<User>;
+
+@db.table
+state orders: list<Order>;
+```
+
+**You get**: The table definitions are generated (SQLite). With `@db.*` on a `read` or an effect, the code that reads and writes the table is generated as well.
+
+</details>
+
+<details>
+<summary>API design</summary>
+
+A route is a decorator on a function. Where each input is read from is a decorator on a field.
+
+| Method | Path | Header | Body | Response |
+|---|---|---|---|---|
+| `POST` | `/orders` | `Authorization` | `lines` (required) | `Order` |
+
+```
+model PlaceOrderInput {
+  @http.header("Authorization") token: string?;
+  @http.required @http.body lines: OrderLine[];
+}
+
+@http.post("/orders")
+export fn placeOrder(in: PlaceOrderInput): Order;
+```
+
+**You get**: The HTTP handler is generated.
+
+</details>
+
 **UML**
 
 <details>
@@ -190,236 +422,6 @@ model OrderLine {
 ```
 
 **You get**: The models become types in the code.
-
-</details>
-
-**Data and API**
-
-<details>
-<summary>ER diagram, table definition</summary>
-
-A table is a `state`. Its columns, keys and references are decorators on the fields of the `model`.
-
-```mermaid
-erDiagram
-  users ||--o{ orders : userId
-  users {
-    text id PK
-    text email UK
-    text name
-  }
-  orders {
-    text id PK
-    text userId FK
-    json lines
-    datetime placedAt
-  }
-```
-
-```
-model User {
-  @db.key    @db.text id: string;
-  @db.unique @db.text email: string;
-  @db.text name: string;
-}
-
-model Order {
-  @db.key       @db.text id: string;
-  @db.ref(User) @db.text userId: string;
-  @db.json lines: OrderLine[];
-  @db.datetime placedAt: datetime;
-}
-
-@db.table
-state users: list<User>;
-
-@db.table
-state orders: list<Order>;
-```
-
-**You get**: The table definitions are generated (SQLite). With `@db.*` on a `read` or an effect, the code that reads and writes the table is generated as well.
-
-</details>
-
-<details>
-<summary>API design</summary>
-
-A route is a decorator on a function. Where each input is read from is a decorator on a field.
-
-| Method | Path | Header | Body | Response |
-|---|---|---|---|---|
-| `POST` | `/orders` | `Authorization` | `lines` (required) | `Order` |
-
-```
-model PlaceOrderInput {
-  @http.header("Authorization") token: string?;
-  @http.required @http.body lines: OrderLine[];
-}
-
-@http.post("/orders")
-export fn placeOrder(in: PlaceOrderInput): Order;
-```
-
-**You get**: The HTTP handler is generated.
-
-</details>
-
-**Requirements, domain and architecture**
-
-<details>
-<summary>User stories, requirements traceability</summary>
-
-A requirement is a named case, and its text is the comment. The design points at the requirements it serves, so a requirement that nothing points at is a hole.
-
-| Requirement | `authenticate` | `placeOrder` |
-|---|---|---|
-| `PRD_001` A person who is not signed in cannot place an order | ✓ | ✓ |
-| `PRD_002` After an order is placed, it appears in the list of my orders | | ✓ |
-
-```
-classify Requirement of never {
-  /** A person who is not signed in cannot place an order */
-  PRD_001;
-  /** After an order is placed, it appears in the list of my orders */
-  PRD_002;
-}
-
-@prd.ref(Requirement.PRD_001)
-fn authenticate();
-
-@prd.ref(Requirement.PRD_001, Requirement.PRD_002)
-export fn placeOrder();
-```
-
-**You get**: Each requirement gets a slot for its tests, and `hozoc` checks that the required tests ran. The matrix above is drawn from the specification, and shows the requirements that nothing points at.
-
-</details>
-
-<details>
-<summary>Event Storming</summary>
-
-A command is a function. An event is an effect: the function is named for what it does, and the decorator names what has happened. A read model is a `read`. An aggregate is the namespace that owns the state.
-
-```mermaid
-flowchart LR
-  subgraph ordering
-    c[placeOrder]:::command --> e[OrderPlaced]:::event --> r[ordersOf]:::read
-  end
-  classDef command fill:#8ecbff,color:#000
-  classDef event fill:#ffb347,color:#000
-  classDef read fill:#a8e6a1,color:#000
-```
-
-```
-namespace ordering {
-  state orders: list<Order>;
-
-  export fn placeOrder(order: Order) {
-    createOrder(order);
-  }
-
-  @prd.eventstorming.event("OrderPlaced")
-  effect fn createOrder(order: Order): effects orders.post;
-
-  read fn ordersOf(userId: string): Order[] reads orders;
-}
-```
-
-**You get**: The command is generated from its wiring. The event and the read model are slots to fill, or generated when they carry `@db.*`. The state can be read and written only inside its namespace: anything else is an error.
-
-Not shown: policies. In the specification, they are the order of the calls.
-
-</details>
-
-<details>
-<summary>C4 model, component diagram</summary>
-
-A component is a namespace. Its interface is what it exports, and a dependency is a call across namespaces. This is the same specification as in the sequence diagram: another view of it.
-
-```mermaid
-flowchart LR
-  client --> server
-  server --> store
-  server --> mailer
-```
-
-```
-namespace client {
-  export fn order() {
-    server.placeOrder();
-  }
-}
-
-namespace server {
-  export fn placeOrder() {
-    store.saveOrder();
-    mailer.send();
-  }
-}
-
-namespace store {
-  export fn saveOrder();
-}
-
-namespace mailer {
-  export fn send();
-}
-```
-
-**You get**: The calls across namespaces are generated. Calling what a namespace does not export, or reaching into its state, is an error.
-
-</details>
-
-<details>
-<summary>Business flow, service blueprint</summary>
-
-A flow is a function that calls the use cases in order. A lane is the actor of those use cases.
-
-```mermaid
-flowchart LR
-  subgraph Customer
-    signIn --> order --> viewOrders
-  end
-```
-
-```
-@prd.business.flow
-export fn signInAndOrder() {
-  client.signIn();
-  client.order();
-  client.viewOrders();
-}
-```
-
-**You get**: An end-to-end test is required for the flow. The part that calls the steps is generated, and you supply the cases.
-
-</details>
-
-<details>
-<summary>Architecture decision records (ADR)</summary>
-
-A decision is a named case. Its context and its rejected options are tags in the comment, and its relation to another decision is a decorator.
-
-> **480. Only an annotation can be written as a tag inside a comment**
->
-> Amends: 478
->
-> Context: Otherwise a decorator that decides behaviour would take effect from inside a comment.
->
-> Rejected: Leave it as it is.
-
-```
-/**
- * Only an annotation can be written as a tag inside a comment.
- *
- * @adr.context Otherwise a decorator that decides behaviour would take effect from inside a comment.
- * @adr.rejected Leave it as it is.
- */
-@adr.amends(Decision.D478)
-D480;
-```
-
-**You get**: An annotation: it constrains nothing. The decisions behind a declaration are shown with it.
 
 </details>
 
