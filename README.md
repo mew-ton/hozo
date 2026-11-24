@@ -2,115 +2,105 @@
 
 English | [日本語](README.ja.md)
 
-**Hozo is a specification language that serves as the single source of truth for an application's design.**
+## The name
 
-When an AI writes most of the code, what people still have to own is the design: what the application does, in which order, and what it must never do. Hozo keeps that design in a form that people can review and correct, and turns the reviewed design into the skeleton of the code and its test harness as it is. People are responsible for the specification. The bodies can be left to an AI.
+**Hozo** (枘) is the Japanese word for a tenon: the tongue cut on the end of a piece of wood, which fits into a hole in another piece. A joiner who builds with tenons does not match the insides of the wood. Only the shapes where two pieces meet have to match, and the pieces hold together.
 
-## What you write, and what you get
+Hozo does the same to the design of software. You do not write the insides. You decide only the shapes where the parts meet: what each part takes and returns, what it reads and writes, and what it calls in which order.
 
-You write a specification. This is an abridged excerpt from the sample [`tests/samples/shop-server/server.hozo`](tests/samples/shop-server/server.hozo):
+Those shapes are the design, and Hozo is the language that holds them as **the single source of truth**. When an AI writes most of the code, the design is what people still have to own. Hozo keeps it in a form that people can review and correct.
 
-```
-/** Place an order. The order and the record of its notice are stored together. */
-@http.post("/orders")
-export fn placeOrder(in: PlaceOrderInput): type.Order {
-  val session = authenticate(in.token);
-  val order = newOrder(session, in.lines);
-  val notice = composeNotice(order);
-  store.placeOrder(order, notice);
-  mailer.send(notice);
-  return order;
-}
+## Design methods, written as code
 
-/** Decide the identifier and the time, and build the order (written by hand) */
-fn newOrder(session: type.Session, lines: type.OrderLine[]): type.Order;
-```
+What you draw with a design method is one view of those shapes. In Hozo, the views are written in one language, in one specification.
 
-`hozoc build` writes the code. This is an abridged excerpt from the Go that the sample expects, [`tests/samples/shop-server/gen/server`](tests/samples/shop-server/gen/server):
-
-```go
-// inner/wiring.go: a function with a body is wiring. Its code is generated.
-func (o *ops) PlaceOrder(ctx context.Context, in PlaceOrderInput) (pkgtype.Order, error) {
-	session, err := o.Authenticate(ctx, in.Token)
-	// …
-	order, err := o.NewOrder(ctx, session, in.Lines)
-	// …
-}
-
-// inner/ops.go: a function without a body is yours to write.
-// A value that lacks even one method does not compile where it is passed.
-type Leaves interface {
-	NewOrder(ctx context.Context, session pkgtype.Session, lines []pkgtype.OrderLine) (pkgtype.Order, error)
-	// …
-}
-
-// servertest/leaves.go: the test cases that each of those functions needs.
-// A value that lacks even one case does not compile either.
-type LeafCases interface {
-	NewOrder() NewOrderCases
-	// …
-}
-
-// http.go: the decorator @http.post is interpreted by a plugin.
-func NewHandler(ops Ops) http.Handler
-```
-
-The comments in both excerpts are translated or added here. The compiler's own output is in Japanese today.
-
-## Who guarantees what
-
-| What | Who makes sure of it |
+| Design method | What you write in Hozo |
 |---|---|
-| The order of the calls, and what is passed to what | Hozo: the code is generated from the specification |
-| Every function without a body has an implementation | The compiler of the target language (`Leaves` in the excerpt) |
-| Every test case that the specification requires is written | The compiler of the target language (`LeafCases` in the excerpt) |
-| The required tests ran | `hozoc tests --coverage` |
-| The tests passed | Your own test run |
-| The body of a function, and the contents of a test case | The person or the AI who writes them |
+| Requirements list, traceability matrix | A requirement is a case of a classification. `@prd.ref` ties the design to it |
+| Use case diagram, use case description | An actor is a case of a classification. A use case is a function with `@prd.usecase.of`. Its flow is the wiring of the function |
+| Business flow diagram | The wiring of a function with `@prd.business.flow`: the use cases, in order |
+| Activity diagram, sequence diagram, decision table | Wiring: the order of the calls, `match` over a classification, `disjoint`, `for` |
+| State machine diagram, state transition table | The cases of a classification, and the transitions that an effect declares |
+| Class diagram, ER diagram | `model`, `state`, `@valid.*`, `@db.*` |
+| Component diagram, API design | Namespaces, `export`, `@http.*` |
 
-Two things Hozo leaves out on purpose:
+The full correspondence, with the parts that Hozo cannot write yet, is in [`docs/ide-chain.md`](docs/ide-chain.md), "対応".
 
-- **A specification has no conditions.** It says in which case what happens, and not how the case is told. That is a body.
-- **A plugin does not infer its output** from the way you write or from the types. What is generated is decided by declarations and decorators.
+Three pieces of the sample [`tests/samples/shop-server`](tests/samples/shop-server), abridged, with the comments translated:
 
-The reasons are in [`docs/requirements.md`](docs/requirements.md), "価値と位置づけ" and "出力を推論しない".
+```
+// Use case diagram and business flow: who does what, in which order.
+classify Actor of never {
+  @prd.actor.human Customer;
+}
+
+@prd.usecase.of(design.Actor.Customer)
+export fn order(token: type.Token, lines: type.OrderLine[]): type.Order {
+  return server.placeOrder({ token: token, lines: lines });
+}
+
+@prd.business.flow
+export fn signInAndOrder(email: type.Email, password: type.Password, lines: type.OrderLine[]): Ordered {
+  val token = client.signIn(email, password);
+  val placed = client.order(token, lines);
+  val listed = client.viewOrders(token);
+  return { placed: placed, listed: listed };
+}
+```
+
+```
+// Activity diagram and decision table: the cases, and what happens in each.
+classify Credential of type.Token? {
+  Presented: type.Token? as type.Token;
+  Absent:    type.Token? as else;
+}
+
+@prd.ref(design.Requirement.PRD_001)
+fn authenticate(token: type.Token?): type.Session {
+  return match (token by Credential) {
+    Presented => sessionOf(token);
+    Absent    => throw type.Unauthorized;
+  }
+}
+```
+
+```
+// Class diagram and ER diagram: the things, their constraints, and where they are kept.
+model User {
+  @db.key    @db.text id: UserId;
+  @db.unique @db.text email: Email;
+  @db.text @valid.length(min: 1, max: 100) name: string;
+}
+
+@db.table
+state users: list<type.User>;
+```
+
+## What the design becomes
+
+`hozoc` checks the specification, and turns it into the skeleton of the code and its test harness.
+
+- The wiring is generated as code.
+- A function without a body is left to a person or an AI. If its implementation is missing, the generated code does not compile.
+- The tests that the specification requires are determined from it, and `hozoc` checks that they ran.
+
+The first target language is Go. A pair of a specification and its code is in [`tests/samples/shop-server`](tests/samples/shop-server).
 
 ## Status
 
-Hozo is unreleased and at version 0.x. The language, the IR and the plugin protocol still change without compatibility.
+Hozo is unreleased and at version 0.x. Nothing is compatible from one version to the next yet.
 
-| | |
-|---|---|
-| Works today | `hozoc build` (check and write the code), `hozoc tests` (check that the required tests ran), `hozoc lsp` (language server), the VS Code extension |
-| Target language | Go only: types and functions, validation, `net/http` handlers, SQLite, command lines |
-| Plugins | Every line of generated code comes from a plugin. A plugin is a WebAssembly module that runs in a sandbox inside `hozoc`, without access to the network or to files |
-| Not yet | Other target languages. The UI for reviewing and correcting a specification. A license |
+- **Exists**: the compiler `hozoc`, the language server, the VS Code extension, and the plugins for Go.
+- **Does not exist yet**: the UI for drawing, reviewing and correcting a design. Target languages other than Go. A license.
 
-## Try it
-
-It needs Go 1.24.7 or later.
-
-```bash
-make build
-```
-
-```bash
-bin/hozoc build --no-emit
-```
-
-The second command checks this repository's own specification (`hozoc` is specified in Hozo: `cli.hozo` and the other `*.hozo` files at the root) and writes nothing. `bin/hozoc build --dry-run` lists the files that it would write.
-
-To read a complete pair of a specification and its code, open [`tests/samples/shop-server`](tests/samples/shop-server): the `*.hozo` files are the specification, `gen/` is the generated code, and `app/` is the code written by hand.
-
-## Where to read next
-
-The documents are in Japanese for now. English is the first language of the toolchain, and the compiler's output and the documents will move to it.
+## Read next
 
 | You want to | Read |
 |---|---|
 | Know what the language is for | [`docs/requirements.md`](docs/requirements.md), "価値と位置づけ" |
-| Write a specification | [`docs/grammar.md`](docs/grammar.md), [`docs/requirements.md`](docs/requirements.md) "書き方の指針", [`docs/vocab.md`](docs/vocab.md), [`docs/config.md`](docs/config.md) |
-| Run the commands, or set up an editor | [`docs/cli.md`](docs/cli.md), [`docs/editors.md`](docs/editors.md) |
-| Write a plugin | [`docs/plugin-protocol.md`](docs/plugin-protocol.md), [`docs/ir.md`](docs/ir.md), [`schema/ir.schema.json`](schema/ir.schema.json) |
-| Work on Hozo itself | [`CLAUDE.md`](CLAUDE.md), then [`docs/README.md`](docs/README.md) for which document decides what |
-| Know what is decided, and what is not | [`docs/decisions.md`](docs/decisions.md), [`docs/open.md`](docs/open.md) |
+| Write a specification | [`docs/grammar.md`](docs/grammar.md), and [`docs/requirements.md`](docs/requirements.md), "書き方の指針" |
+| Run `hozoc` | [`docs/cli.md`](docs/cli.md). `make build` builds it into `bin/`, with Go 1.24.7 or later |
+| Write a plugin | [`docs/plugin-protocol.md`](docs/plugin-protocol.md) |
+| Work on Hozo itself | [`CLAUDE.md`](CLAUDE.md), then [`docs/README.md`](docs/README.md) |
+
+The documents are in Japanese for now. They will move to English, the first language of the toolchain.
