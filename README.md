@@ -298,12 +298,12 @@ export fn placeOrder();
 <details>
 <summary>Event Storming</summary>
 
-A command is a function. An event is an effect. A read model is a `read`. An aggregate is the namespace that owns the state.
+A command is a function. An event is an effect: the function is named for what it does, and the decorator names what has happened. A read model is a `read`. An aggregate is the namespace that owns the state.
 
 ```mermaid
 flowchart LR
   subgraph ordering
-    c[placeOrder]:::command --> e[orderPlaced]:::event --> r[ordersOf]:::read
+    c[placeOrder]:::command --> e[OrderPlaced]:::event --> r[ordersOf]:::read
   end
   classDef command fill:#8ecbff,color:#000
   classDef event fill:#ffb347,color:#000
@@ -315,10 +315,11 @@ namespace ordering {
   state orders: list<Order>;
 
   export fn placeOrder(order: Order) {
-    orderPlaced(order);
+    createOrder(order);
   }
 
-  effect fn orderPlaced(order: Order): effects orders.post;
+  @prd.eventstorming.event("OrderPlaced")
+  effect fn createOrder(order: Order): effects orders.post;
 
   read fn ordersOf(userId: string): Order[] reads orders;
 }

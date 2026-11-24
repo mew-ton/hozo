@@ -298,12 +298,12 @@ export fn placeOrder();
 <details>
 <summary>イベントストーミング</summary>
 
-コマンドは、関数。事実（イベント）は、効果。読むモデルは、`read`。集約は、状態を持つ名前空間。
+コマンドは、関数。事実（イベント）は、効果: 関数の名前は、すること（〜する）で、起きたこと（〜した）は、デコレータが名付ける。読むモデルは、`read`。集約は、状態を持つ名前空間。
 
 ```mermaid
 flowchart LR
   subgraph ordering
-    c[placeOrder]:::command --> e[orderPlaced]:::event --> r[ordersOf]:::read
+    c[placeOrder]:::command --> e[OrderPlaced]:::event --> r[ordersOf]:::read
   end
   classDef command fill:#8ecbff,color:#000
   classDef event fill:#ffb347,color:#000
@@ -315,10 +315,11 @@ namespace ordering {
   state orders: list<Order>;
 
   export fn placeOrder(order: Order) {
-    orderPlaced(order);
+    createOrder(order);
   }
 
-  effect fn orderPlaced(order: Order): effects orders.post;
+  @prd.eventstorming.event("OrderPlaced")
+  effect fn createOrder(order: Order): effects orders.post;
 
   read fn ordersOf(userId: string): Order[] reads orders;
 }
