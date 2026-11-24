@@ -6,9 +6,24 @@ English | [日本語](README.ja.md)
 
 **Hozo** (枘) is the Japanese word for a tenon: the tongue cut on the end of a piece of wood, which fits into a hole in another piece. A joiner who builds with tenons does not match the insides of the wood. Only the shapes where two pieces meet have to match, and the pieces hold together.
 
-Hozo does the same to the design of software. You do not write the insides. You decide only the shapes where the parts meet: what each part takes and returns, what it reads and writes, and what it calls in which order.
+Hozo does the same to the design of software. You do not write the insides. You decide only the shapes where the parts meet: what each part takes and returns, what it reads and writes, and what it calls in which order. Those shapes are the design.
 
-Those shapes are the design, and Hozo is the language that holds them as **the single source of truth**. When an AI writes most of the code, the design is what people still have to own. Hozo keeps it in a form that people can review and correct.
+## The value
+
+**Hozo is the single source of truth for an application's design.**
+
+Parts of this are not built yet. They are marked *(planned)*.
+
+1. **People can review and correct the design, even when an AI wrote it.**
+   - Today: the design is text in one language. A compiler checks it, and a language server and a VS Code extension help to read and write it.
+   - *(Planned)* A UI that shows the design as diagrams, the views in the next section, where people review and correct it.
+2. **The reviewed design becomes the skeleton of the code and its test harness, as it is.**
+   - Today: `hozoc` generates the wiring as code. A function without a body is a slot that a person or an AI fills, and a missing implementation does not compile. The tests that the specification requires are determined from it, and `hozoc` checks that they ran. The target language is Go.
+   - *(Planned)* Tests that are generated from the specification itself. Target languages other than Go.
+3. **It is clear what people are responsible for.** People are responsible for the specification. The bodies can be left to an AI, and the harness holds them to the specification.
+4. **You can see how much each design method buys.** A part of a design gives a harness of some strength: generated code, required tests, a type, or nothing but an annotation.
+   - Today: each method in the next section says what you get from it.
+   - *(Planned)* The strength shown as a number for each diagram, so that you can see what a design leaves unguarded.
 
 ## Design methods, written as code
 
@@ -44,6 +59,8 @@ export fn order();
 export fn viewOrders();
 ```
 
+**You get**: Each use case becomes a function in the code. The actor is an annotation: it constrains nothing.
+
 Not yet: extend.
 
 </details>
@@ -68,6 +85,8 @@ fn authenticate(token: Token?): Session {
   }
 }
 ```
+
+**You get**: The branch is generated as code. A case that no arm takes is an error in the specification.
 
 Also written as wiring: parallel steps (`disjoint`) and loops (`for`).
 
@@ -112,6 +131,8 @@ namespace mailer {
 }
 ```
 
+**You get**: The calls are generated as code, in this order. A function that is not exported cannot be called from another namespace.
+
 Not yet: combined fragments.
 
 </details>
@@ -139,6 +160,8 @@ effect fn createOrder(order: Order): effects orders.post as Standing.AwaitingPay
 effect fn acceptOrder(order: Order on Standing.AwaitingPayment): effects orders.put as Standing.Accepted;
 effect fn expireOrder(order: Order on Standing.AwaitingPayment): effects orders.put as Standing.Expired;
 ```
+
+**You get**: An effect can be called only on a row that is known to be in its `on` case: anything else is an error in the specification. *(Planned)* A test that the body moves the row only in the declared direction.
 
 Not yet: guards, nested states, history.
 
@@ -175,6 +198,8 @@ model OrderLine {
   quantity: int;
 }
 ```
+
+**You get**: The models become types in the code.
 
 Not yet: operations, generalization, the difference between aggregation and composition.
 
@@ -224,6 +249,8 @@ state users: list<User>;
 state orders: list<Order>;
 ```
 
+**You get**: The table definitions are generated (SQLite). With `@db.*` on a `read` or an effect, the code that reads and writes the table is generated as well.
+
 </details>
 
 <details>
@@ -244,6 +271,8 @@ model PlaceOrderInput {
 @http.post("/orders")
 export fn placeOrder(in: PlaceOrderInput): Order;
 ```
+
+**You get**: The HTTP handler is generated.
 
 </details>
 
@@ -273,6 +302,8 @@ fn authenticate();
 @prd.ref(Requirement.PRD_001, Requirement.PRD_002)
 export fn placeOrder();
 ```
+
+**You get**: Each requirement gets a slot for its tests, and `hozoc` checks that the required tests ran. *(Planned)* The matrix above, drawn from the specification, with the requirements that nothing points at.
 
 Not yet: acceptance criteria as conditions on values.
 
@@ -306,6 +337,8 @@ namespace ordering {
   read fn ordersOf(userId: string): Order[] reads orders;
 }
 ```
+
+**You get**: The command is generated from its wiring. The event and the read model are slots to fill, or generated when they carry `@db.*`. The state can be read and written only inside its namespace: anything else is an error.
 
 Not shown: policies. In the specification, they are the order of the calls.
 
@@ -346,6 +379,8 @@ namespace mailer {
 }
 ```
 
+**You get**: The calls across namespaces are generated. Calling what a namespace does not export, or reaching into its state, is an error.
+
 Not yet: the boundary between the system and the outside.
 
 </details>
@@ -370,6 +405,8 @@ export fn signInAndOrder() {
   client.viewOrders();
 }
 ```
+
+**You get**: An end-to-end test is required for the flow. The part that calls the steps is generated, and you supply the cases.
 
 Not yet: branches, waits and compensation between the steps.
 
@@ -399,19 +436,11 @@ A decision is a named case. Its context and its rejected options are tags in the
 D480;
 ```
 
+**You get**: An annotation: it constrains nothing. *(Planned)* The decisions behind a declaration, shown in the UI.
+
 </details>
 
-The diagrams are drawn by hand for this page: the UI that draws them from a specification does not exist yet. The correspondence, part by part, is in [`docs/ide-chain.md`](docs/ide-chain.md), "対応".
-
-## What the design becomes
-
-`hozoc` checks the specification, and turns it into the skeleton of the code and its test harness.
-
-- The wiring is generated as code.
-- A function without a body is left to a person or an AI. If its implementation is missing, the generated code does not compile.
-- The tests that the specification requires are determined from it, and `hozoc` checks that they ran.
-
-The first target language is Go.
+The diagrams are drawn by hand for this page. *(Planned)* The UI draws them from the specification. The correspondence, part by part, is in [`docs/ide-chain.md`](docs/ide-chain.md), "対応".
 
 ## Status
 
