@@ -7,7 +7,7 @@
 
 /** go-http が、生成したハンドラについて、満たし続けること */
 namespace hozo.gohttp {
-  /** 要求: 生成したハンドラの振る舞い。どの宣言が、どの要求のためのものかは、@prd.ref が言う */
+  /** 要求: 生成したハンドラの振る舞い */
   classify Requirement of never {
     /**
      * request body が上限（オプション maxBodyBytes。なければ 1 MiB）を超えた要求は、op を呼ばずに、413 と
@@ -39,52 +39,5 @@ namespace hozo.gohttp {
      * 持ち主: docs/plugin-go-http.md「補助」の「union の読み書き」、docs/plugin-http.md「値の JSON」
      */
     ScalarJSON;
-  }
-
-  /** 単位のオプション [emit.options.go-http]（docs/plugin-go-http.md「オプション」） */
-  @prd.ref(Requirement.BodyLimit)
-  model Options {
-    /** true なら、入力を読んだ後、op を呼ぶ前に、入力の制約を確かめる */
-    validate: boolean;
-    /** request body の上限（バイト）。正の整数。なければ 1048576 */
-    maxBodyBytes: int?;
-  }
-
-  /** 経路の入力の、request body の項目一つ（http.body の付いたフィールド）。項目がないときの扱いは、フィールドのデコレータが言う */
-  @prd.ref(Requirement.NullIsAbsent)
-  model BodyItem {
-    /** 項目の名前（request body の JSON のオブジェクトのキー） */
-    name: string;
-    /** デコレータ http.required が付いている */
-    required: boolean;
-    /** デコレータ http.default が付いている */
-    hasDefault: boolean;
-  }
-
-  /** 経路の入力の、ヘッダかクエリの項目一つ（http.header か http.query の付いたフィールド）。値は、文字列一つを、フィールドの型で読む */
-  @prd.ref(Requirement.FiniteFloat)
-  model TextItem {
-    /** 項目の名前（ヘッダの名前か、クエリの名前） */
-    name: string;
-    /** 通信の上の文字列 */
-    text: string;
-  }
-
-  /** ハンドラが 500 にした失敗一つ: 要求と、op が返したエラー。WithInternalError の関数が受け取る */
-  @prd.ref(Requirement.InternalErrorHook)
-  model InternalFailure {
-    /** 要求のメソッドとパス */
-    route: string;
-    /** op が返したエラーの文言 */
-    message: string;
-  }
-
-  /** 通信に出る scalar 一つ: 名前と、元の核の型の名前（datetime など） */
-  @prd.ref(Requirement.ScalarJSON)
-  model WireScalar {
-    /** scalar の FQN */
-    name: string;
-    /** 元の核の型の名前 */
-    core: string;
   }
 }

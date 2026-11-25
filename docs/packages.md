@@ -41,7 +41,7 @@ plugins/<name>/        プラグイン。一つのディレクトリが、一つ
 plugins/go/            Go の基底のプラグイン（main。中身は internal/gobase/）
 plugins/go-valid/      go-valid プラグイン（main。中身は internal/govalid/）
 plugins/go-sqlite/     go-sqlite プラグイン（main。中身は internal/gosqlite/）。go-http と同じく、それ自体が一つの Hozo のプロジェクト（go-sqlite.hozo: go-sqlite 自身の要求）で、internal/spec/ はその生成物
-plugins/go-http/       go-http プラグイン（main。中身は internal/gohttp/）。それ自体が一つの Hozo のプロジェクト（hozo.toml と go-http.hozo: go-http 自身の要求）で、internal/spec/ はその生成物（型のパッケージ gohttp と、テストのパッケージ gohttptest の、要求のテストの入れ物の口。docs/plugin-go-http.md「go-http 自身の要求」）
+plugins/go-http/       go-http プラグイン（main。中身は internal/gohttp/）。それ自体が一つの Hozo のプロジェクト（hozo.toml と go-http.hozo: go-http 自身の要求）で、internal/spec/ はその生成物（テストのパッケージ gohttptest の、要求のテストの入れ物の口。docs/plugin-go-http.md「go-http 自身の要求」）
 plugins/http/          語彙のプラグイン http（main。中身は、公開のライブラリ plugin/httpvocab）
 plugins/valid/         語彙のプラグイン valid（main。中身は、公開のライブラリ plugin/validvocab）
 plugins/db/            語彙のプラグイン db（main。中身は、公開のライブラリ plugin/dbvocab）

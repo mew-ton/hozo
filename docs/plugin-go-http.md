@@ -444,9 +444,9 @@ go-http の出力の振る舞いのうち、テストで確かめ続けるもの
 
 - **`plugins/go-http` は、それ自体で一つの Hozo のプロジェクト**: `plugins/go-http/hozo.toml` が、`sources = ["go-http.hozo"]`、`plugin_dirs = [".."]`（リポジトリの `plugins/`）と、単位を一つ持つ: 名前空間 `hozo.gohttp`、トランスパイラ `go` と `go-design`、出力先 `internal/spec`、`[emit.options.go-design]` の `requirements = ["hozo.gohttp.Requirement"]`。リポジトリのルートの `hozo.toml` には、入れない（ルートの `plugin_dirs` の下は、`sources` から除かれる: `docs/config.md`「形」）。
 - **Go のモジュールは、リポジトリのルートの `go.mod`**。`[options.go]` の `module` は、モジュールのパスに、このディレクトリまでのパスを足したもの（`github.com/mew-ton/hozo/plugins/go-http`）にし、生成物の import パスを、リポジトリの中のものに合わせる。
-- **生成物**は `plugins/go-http/internal/spec/**`: 型のパッケージ `gohttp`（仕様の model）と、テストのパッケージ `gohttptest`（`design.go` の `Requirements` と `RunRequirements`）。`make generate` で作り直す（`docs/packages.md`「生成するもの」「自己生成の手順」）。
+- **生成物**は `plugins/go-http/internal/spec/**`: 入口のパッケージ `gohttp`（宣言を持たないので、`doc.go` だけ）と、テストのパッケージ `gohttptest`（`design.go` の `Requirements` と `RunRequirements`）。`make generate` で作り直す（`docs/packages.md`「生成するもの」「自己生成の手順」）。
 - 仕様は、この文書の**写し**: 振る舞いの持ち主は、この文書の見出しで、要求の説明が、それを名指しする。食い違えば、この文書が正しい（`docs/README.md`「書き方」）。
-- 単位のオプション（「オプション」）は、仕様の model `hozo.gohttp.Options` に写す。要求は、`@prd.ref` で、そのオプションか、振る舞いを決めるもの（`hozo.gohttp.BodyItem`: request body の項目一つ）に結ぶ（`docs/plugin-go-design.md`「指している設計」）。
+- 仕様は、要求の分類だけを持つ。要求を結ぶ宣言（`@prd.ref` の付く先）は、持たない: go-http の振る舞いを決める宣言は、仕様の外（文書と、語彙 `http` の宣言）にあり、写した宣言を置けば、何からも使われない形が、仕様に残る。そのため、go-design は、要求ごとに「指している設計: なし」の warning を返す（`docs/plugin-go-design.md`「指している設計」。`plugins/go-http` で `hozoc build` を走らせたときだけ。`docs/open.md`「サンプルと、hozoc 自身の仕様」）。`docs/plugin-go-sqlite.md`「go-sqlite 自身の要求」も同じ。
 
 ### 要求
 

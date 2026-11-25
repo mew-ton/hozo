@@ -10,12 +10,12 @@ type Requirements interface {
 	// ForeignKeysOn は、要求 hozo.gosqlite.Requirement.ForeignKeysOn: Schema が外部キー（REFERENCES）を持つとき、PRAGMA foreign_keys が効いていない db では、CreateTables は、表を作らずにエラーを返す。
 	// 効いていれば、表を作り、参照の違反を断る。REFERENCES がなければ、確かめない。
 	// 持ち主: docs/plugin-go-sqlite.md「表」
-	// 指している設計: hozo.gosqlite.Reference
+	// 指している設計: なし
 	ForeignKeysOn(t *testing.T)
 	// NestedRollback は、要求 hozo.gosqlite.Requirement.NestedRollback: db.transaction の op の中から、別の db.transaction の op を呼んだとき（入れ子。同じ db）、内側が失敗すれば、内側がしたことだけが
 	// 消える。外側がその失敗を受けて成功すれば、外側の残りは確定する。確定するのは、いちばん外側。
 	// 持ち主: docs/vocab.md「db の read と効果」の transaction、docs/plugin-go-sqlite.md「トランザクション」
-	// 指している設計: hozo.gosqlite.TransactionCall
+	// 指している設計: なし
 	NestedRollback(t *testing.T)
 }
 

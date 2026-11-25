@@ -7,7 +7,7 @@
 
 /** go-sqlite が、生成した表のコードについて、満たし続けること */
 namespace hozo.gosqlite {
-  /** 要求: 生成した表のコードの振る舞い。どの宣言が、どの要求のためのものかは、@prd.ref が言う */
+  /** 要求: 生成した表のコードの振る舞い */
   classify Requirement of never {
     /**
      * Schema が外部キー（REFERENCES）を持つとき、PRAGMA foreign_keys が効いていない db では、CreateTables は、表を作らずにエラーを返す。
@@ -21,27 +21,5 @@ namespace hozo.gosqlite {
      * 持ち主: docs/vocab.md「db の read と効果」の transaction、docs/plugin-go-sqlite.md「トランザクション」
      */
     NestedRollback;
-  }
-
-  /** 表の列の参照一つ（db.ref の付いたフィールド）: 指す先の表と列 */
-  @prd.ref(Requirement.ForeignKeysOn)
-  model Reference {
-    /** 参照する列の表 */
-    table: string;
-    /** 指す先の表 */
-    target: string;
-    /** 指す先の列 */
-    column: string;
-  }
-
-  /** db.transaction の付いた op の呼び出し一つ: 入れ子の深さ（いちばん外側は 0）と、成功したか */
-  @prd.ref(Requirement.NestedRollback)
-  model TransactionCall {
-    /** op の FQN */
-    op: string;
-    /** 入れ子の深さ。いちばん外側は 0 */
-    depth: int;
-    /** op が成功したか */
-    succeeded: boolean;
   }
 }
