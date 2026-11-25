@@ -1,0 +1,29 @@
+// DEC-24（docs/check.md「デコレータ」）: 本体が、状態を、値として読む（呼び出しの引数、レコードリテラルのフィールド、
+// val に入れる式）。別の名前空間の配線からは、状態に触れられない
+namespace a {
+  model Who { name: string; }
+  state current: single<string>;
+  export fn show(text: string);
+  export fn greet(who: Who);
+  decorator fn showsArg(next: fn) {
+    show(current);
+    next();
+  }
+  decorator fn showsField(next: fn) {
+    greet({ name: current });
+    next();
+  }
+  decorator fn keeps(next: fn) {
+    val c = current;
+    show(c);
+    next();
+  }
+}
+namespace b {
+  @a.showsArg                              // ERROR: DEC-24
+  fn f();
+  @a.showsField                            // ERROR: DEC-24
+  fn g();
+  @a.keeps                                 // ERROR: DEC-24
+  fn h();
+}

@@ -1,5 +1,5 @@
 // 設計書 §4.2 語彙プラグイン。
-// `decorator cache(...)` はスコープ外（`docs/open.md`「スコープ外にした設計書の例」）なので外した。
+// `decorator cache(...)` はスコープ外（決定 D792）なので外した。
 // `from?: any state` などは `from: any state?` に直した（docs/grammar.md「決めたこと」）。
 
 namespace http {

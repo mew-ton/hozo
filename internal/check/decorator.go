@@ -65,34 +65,97 @@ func checkDec25(ix *index, o *ir.Op, r *reporter) {
 		if d == nil || d.Body == nil {
 			continue
 		}
-		stmts := d.Body.Statements
-		for i, st := range stmts {
-			expr, span, ok := stmtExpr(st)
-			if !ok {
-				continue
-			}
-			proceeds := false
-			switch e := expr.(type) {
-			case ir.CallExpr:
-				proceeds = e.Call.IsProceed()
-			case ir.MatchExpr:
-				for _, arm := range e.Match.Arms {
-					if c, isCall := arm.Body.(ir.CallExpr); isCall && c.Call.IsProceed() {
-						proceeds = true
-					}
-				}
-			}
-			if !proceeds {
-				continue
-			}
-			if i < len(stmts)-1 {
-				_, next, _ := stmtExpr(stmts[i+1])
-				r.report(diag.Error, "DEC-25", app.Span, sprintf("デコレータ %s の本体は、包んだ関数の呼び出しの後ろに、文を持つので、never を返す op %s には付けられない（op は、いつも、例外を投げるので、後ろの文が、評価されない）", d.Name, o.Name),
-					[]related{{span: span, msg: "包んだ関数の呼び出し"}, {span: next, msg: "評価されない文"}}, nil)
-			}
-			break
+		if call, next, ok := proceedTail(d.Body.Statements); ok {
+			r.report(diag.Error, "DEC-25", app.Span, sprintf("デコレータ %s の本体は、包んだ関数の呼び出しの後ろに、文を持つので、never を返す op %s には付けられない（op は、いつも、例外を投げるので、後ろの文が、評価されない）", d.Name, o.Name),
+				[]related{{span: call, msg: "包んだ関数の呼び出し"}, {span: next, msg: "評価されない文"}}, nil)
 		}
 	}
+}
+
+// proceedTail は、文の並びの、包んだ関数の呼び出し（か、そのアームを持つ match）の後ろの、最初の文。呼び出しを中に持つ文
+// （try、for、disjoint）は、中の並びを先に見て、中に後ろの文がなければ、その文の下の文を、後ろの文とする。
+// call は、包んだ関数の呼び出しを持つ文の位置。後ろの文がなければ ok は偽。
+func proceedTail(stmts []ir.Statement) (call, next ir.Span, ok bool) {
+	for i, st := range stmts {
+		var found bool
+		switch s := st.(type) {
+		case ir.TryStmt:
+			if call, next, ok = proceedTail(s.Body); ok {
+				return call, next, true
+			}
+			found = hasProceed(s.Body)
+			call = s.Span
+		case ir.ForStmt:
+			if call, next, ok = proceedTail(s.Body); ok {
+				return call, next, true
+			}
+			found = hasProceed(s.Body)
+			call = s.Span
+		case ir.DisjointStmt:
+			for _, arm := range s.Arms {
+				if call, next, ok = proceedTail(arm.Statements); ok {
+					return call, next, true
+				}
+				found = found || hasProceed(arm.Statements)
+			}
+			call = s.Span
+		default:
+			found = proceeds(st)
+			_, call, _ = stmtExpr(st)
+		}
+		if !found {
+			continue
+		}
+		if i < len(stmts)-1 {
+			return call, stmtSpan(stmts[i+1]), true
+		}
+		return ir.Span{}, ir.Span{}, false
+	}
+	return ir.Span{}, ir.Span{}, false
+}
+
+// proceeds は、文が、包んだ関数の呼び出しか、そのアームを持つ match か。
+func proceeds(st ir.Statement) bool {
+	expr, _, ok := stmtExpr(st)
+	if !ok {
+		return false
+	}
+	switch e := expr.(type) {
+	case ir.CallExpr:
+		return e.Call.IsProceed()
+	case ir.MatchExpr:
+		for _, arm := range e.Match.Arms {
+			if c, isCall := arm.Body.(ir.CallExpr); isCall && c.Call.IsProceed() {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// hasProceed は、文の並び（中のブロックを含む）に、包んだ関数の呼び出しがあるか。
+func hasProceed(stmts []ir.Statement) bool {
+	found := false
+	ir.WalkStatements(stmts, func(st ir.Statement) {
+		found = found || proceeds(st)
+	})
+	return found
+}
+
+// stmtSpan は、文の位置。
+func stmtSpan(st ir.Statement) ir.Span {
+	switch s := st.(type) {
+	case ir.TryStmt:
+		return s.Span
+	case ir.ForStmt:
+		return s.Span
+	case ir.DisjointStmt:
+		return s.Span
+	case ir.ThrowStmt:
+		return s.Span
+	}
+	_, span, _ := stmtExpr(st)
+	return span
 }
 
 // checkDec24 は DEC-24（docs/check.md「デコレータ」）: 本体のあるデコレータを、宣言した名前空間のほかの op に付けていて、
@@ -131,6 +194,12 @@ func checkDec24(ix *index, o *ir.Op, ns string, r *reporter) {
 			}
 		}
 		ir.WalkStatements(d.Body.Statements, func(st ir.Statement) {
+			// 状態を、値として読む（呼び出しの引数、throw の引数、val に入れる式、アームの本体の値。レコードリテラルの中も）
+			for _, at := range stmtAtoms(st) {
+				for _, state := range atomStates(at.atom) {
+					hit("状態 "+state, at.span)
+				}
+			}
 			expr, ok := ir.StatementExpr(st)
 			if !ok {
 				return
@@ -148,6 +217,53 @@ func checkDec24(ix *index, o *ir.Op, ns string, r *reporter) {
 		}
 		r.report(diag.Error, "DEC-24", app.Span, sprintf("デコレータ %s の本体は、名前空間 %s の配線からは呼べないものに触れているので、op %s には付けられない: %s。別の名前空間の op に付けるデコレータの本体が呼べるのは、export の op だけ", d.Name, ns, o.Name, joinNames(whats)), rel, nil)
 	}
+}
+
+// spannedAtom は、文に書いた Atom と、その位置（呼び出しなら、その呼び出し。ほかは、文）。
+type spannedAtom struct {
+	atom ir.Atom
+	span ir.Span
+}
+
+// stmtAtoms は、文そのものに書いた Atom（中のブロックの文は、含まない）: 呼び出しと throw の引数、式の Atom、match のアームの
+// 本体の値と、呼び出しと throw の引数。match の対象は、含まない（状態の対象は、呼び元が、別に見る）。
+func stmtAtoms(st ir.Statement) []spannedAtom {
+	var out []spannedAtom
+	call := func(c ir.Call) {
+		for _, a := range c.Args {
+			out = append(out, spannedAtom{a.Value, c.Span})
+		}
+	}
+	if ts, ok := st.(ir.ThrowStmt); ok {
+		for _, a := range ts.Throw.Args {
+			out = append(out, spannedAtom{a.Value, ts.Span})
+		}
+		return out
+	}
+	expr, span, ok := stmtExpr(st)
+	if !ok {
+		return nil
+	}
+	switch e := expr.(type) {
+	case ir.CallExpr:
+		call(e.Call)
+	case ir.AtomExpr:
+		out = append(out, spannedAtom{e.Atom, span})
+	case ir.MatchExpr:
+		for _, arm := range e.Match.Arms {
+			switch b := arm.Body.(type) {
+			case ir.CallExpr:
+				call(b.Call)
+			case ir.AtomExpr:
+				out = append(out, spannedAtom{b.Atom, span})
+			case ir.ThrowBody:
+				for _, a := range b.Args {
+					out = append(out, spannedAtom{a.Value, b.Span})
+				}
+			}
+		}
+	}
+	return out
 }
 
 // checkDec4 は DEC-4: catches ... ignores を持つデコレータが、returns が null でない op に付いている。

@@ -45,7 +45,7 @@ interprets = [
 
 - 継承した model は、展開済みのフィールド（受け継いだデコレータを含む）で判定する。受け継いだ制約は外せない。
 - union と exception は `Validate` を持たない（例外の引数の型が `Validate` を持つ型でも、例外の構造体には出さない。例外の値を確かめる者は、いない）。union のインターフェースには、メソッドを足せない。
-- **union のアームの検証**は、値が当たっているアームのものを、呼ぶ（決定 D399 に合わせて決めた。決定 D668、D670）: union をフィールドに持つ model の `Validate`（上の 5）が、実行時に、値が `Validate() error` を持つかを見て、呼ぶ（「model」の表）。アームの値の Go の型（`docs/plugin-go.md`「union」）が `Validate` を持つのは、次の二つ:
+- **union のアームの検証**は、値が当たっているアームのものを、呼ぶ（決定 D399 に合わせて決めた。決定 D673、D675）: union をフィールドに持つ model の `Validate`（上の 5）が、実行時に、値が `Validate() error` を持つかを見て、呼ぶ（「model」の表）。アームの値の Go の型（`docs/plugin-go.md`「union」）が `Validate` を持つのは、次の二つ:
   - アームの型が、union と同じ名前空間の model で、その model が `Validate` を持つ（その構造体が、アームの値）。
   - アームの型が、`Validate` を持つ型への `ref` で、アームの値が、包む型（別の名前空間の model、scalar）。包む型に、`Validate` を出す（「出力」）。
 - アームの型が、`ref` でなく（`optional`、`array`）、または、インデックスの model か、別の union への `ref` で、その中（4 と同じに、通して見たもの。union なら、そのアームも）に `Validate` を持つ型があれば、GOVALID-4（その形のアームを、確かめる形が、まだない）。

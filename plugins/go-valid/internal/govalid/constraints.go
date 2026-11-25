@@ -40,7 +40,7 @@ func (c constraint) condition(value string, f *file) string {
 			cmp = ">"
 		}
 		if c.Core == ir.CoreInt {
-			return fmt.Sprintf("int64(%s) %s %d", value, cmp, int64(c.Bound))
+			return fmt.Sprintf("int64(%s) %s %d", value, cmp, c.IntBound)
 		}
 		return fmt.Sprintf("float64(%s) %s %s", value, cmp, c.BoundText)
 	case validvocab.Length:

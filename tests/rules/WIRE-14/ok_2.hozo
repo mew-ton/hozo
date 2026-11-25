@@ -1,0 +1,18 @@
+// WIRE-14（docs/check.md「繰り返し」の「集める」）: 同じ disjoint の、別々のアームから、同じ val に集めるのは、よい
+namespace a {
+  model M { id: string; }
+  fn one(m: M): M;
+  fn use(ms: M[]);
+  fn f(ms: M[], ns: M[]) {
+    val xs: M[];
+    disjoint {
+      for (val m of ms) {
+        xs collect one(m);
+      }
+      for (val n of ns) {
+        xs collect one(n);
+      }
+    }
+    use(xs);
+  }
+}

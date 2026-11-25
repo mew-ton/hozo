@@ -323,7 +323,7 @@ namespace hozo.compiler {
    */
   @prd.usecase.of(Actor.Agent, Actor.Engineer)
   @prd.ref(Requirement.SingleSource, Requirement.Deterministic)
-  @adr.decided(hozo.decisions.Decision400.D472, hozo.decisions.Decision400.D473, hozo.decisions.Decision700.D738)
+  @adr.decided(hozo.decisions.Decision400.D472, hozo.decisions.Decision400.D473, hozo.decisions.Decision700.D743)
   export fn write(in: EmitInput): BuildResult
     effects syncOutputs
     throws CheckFailed, ConfigInvalid, LanguageMismatch, OutputConflict, UnknownNamespace prevents effects

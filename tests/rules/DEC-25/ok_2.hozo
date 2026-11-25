@@ -1,0 +1,17 @@
+// DEC-25: 包んだ関数の呼び出しを try のブロックに持ち、try のブロックでも、try の文の後ろでも、それが最後なら、
+// never を返す op にも付けられる（catch のブロックは「返らない」: DEC-27）
+namespace a {
+  exception Denied;
+  fn record();
+  decorator fn logged(next: fn) {
+    record();
+    try {
+      next();
+    } catch (e) {
+      record();
+      throw e;
+    }
+  }
+  @logged
+  fn denied(): never throws Denied;
+}

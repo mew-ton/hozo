@@ -5,6 +5,54 @@ namespace hozo.decisions {
   /** 決めたこと。600〜699 */
   classify Decision600 of never {
     /**
+     * デコレータの宣言の、付ける先の並びの、なくした区切り（`for model \| op`）は、`,` として読み進める（対象は、どちらも読める。決定 D358）。ホバーの見出しと、DEC-1 のメッセージの「for:」も、`,` で並べる
+     *
+     * 持ち主: `docs/grammar.md`「decorator の宣言」
+     */
+    @adr.proposed
+    D600;
+
+    /**
+     * インデックスの model（決定 D360）の、言語の側の細かい所: 本体は、フィールドの並びか、インデックス一つ（混ぜる、二つ書く、`extends` を持つ model に書く、その場で書く model に書く、は SYNTAX）。インデックスには、デコレータも、説明も、付けられない。キーの型は、`string` か、元が `string` の scalar（TYPE-11 を、この形の規則にした）。インデックスの model を `extends` の元にすれば、TYPE-10。ほかの model と同じに、名前で比べる（互換の 7 と、変えられる型の 6 は、欠番）。レコードリテラルは、空（`{}`）だけが、当てはまる
+     *
+     * 別の案: キーと値の型が同じなら、別のインデックスの model にも、渡せる。インデックスにも、デコレータと説明を、付けられる
+     *
+     * 持ち主: `docs/types.md`「インデックスの model」、`docs/grammar.md`「model」
+     */
+    @adr.proposed
+    D601;
+
+    /**
+     * プラグインの、インデックスの model の扱い。`go-http`: 入力の model にも（HTTP-2）、全体の形にも（HTTP-9。`@http.bodyObj` を含む）、できない。本文の項目、結果には、できる。`go-sqlite`: 表の要素には、できない（DB-1。前は GOSQL-1）。`@db.json` の列には、できる。`go-valid`: インデックスの model そのものは、`Validate` を持たず、それをフィールドの型に持つ model が、値を回す（出るコードは、`Record` のときと同じ）。`go-cli`: 受けない（CLI-3）
+     *
+     * 別の案: `@http.bodyObj` で、本文の全体を、キーが決まっていない構造として、受ける。インデックスの model が、自分の `Validate` を持つ
+     *
+     * 持ち主: `docs/plugin-http.md`「対象」、`docs/plugin-db.md`「表」、`docs/plugin-go-sqlite.md`「しまい方」、`docs/plugin-go-valid.md`「Validate を持つ型」
+     */
+    @adr.proposed
+    D602;
+
+    /**
+     * 標準の語彙 `browser.page` に、インデックスの model `browser.page.Query`（URL のクエリ。名前から、値の並びを引く）を足し、`@browser.page.query` を付ける状態の型にした（コーパスと、サンプル `order-app` の、`state query: single<browser.page.Query>;`）。`cli.hozo` には、`DiagnosticData` を足した
+     *
+     * 別の案: 使う名前空間ごとに、インデックスの model を宣言する
+     *
+     * 持ち主: `docs/vocab.md`「同梱する語彙」、`docs/cli.md`
+     */
+    @adr.proposed
+    D603;
+
+    /**
+     * `go-http` が出す補助 `httpWriteResult` のコメントの一行を、新しい言葉に替えた（「値のない record」→「値のない、インデックスの model（nil のマップ）」）。サンプル `shop-server` の期待する出力（`gen/server/http.go`）の、同じ一行を、手で直した
+     *
+     * 別の案: コメントは、変えない
+     *
+     * 持ち主: `docs/plugin-go-http.md`「補助」
+     */
+    @adr.proposed
+    D604;
+
+    /**
      * 標準の分類のケースの名前を替えた後（決定 D362）、形に合わない名前（`nullable` に `Empty` / `HasItems`、`list` に `None` / `Some`）を書いたときは、専用の診断を足さず、今ある MATCH-2（アーム）と STATE-4（状態の遷移）が、その形のケースを、メッセージに並べる
      *
      * 別の案: 名前が変わったことを言う、専用のメッセージか、構文エラーにする
@@ -12,7 +60,7 @@ namespace hozo.decisions {
      * 持ち主: `docs/check.md`「分類」の「標準の分類」
      */
     @adr.proposed
-    D600;
+    D605;
 
     /**
      * Go の出力のうち、標準の分類 `nullable` の `match` の、枝の頭のコメントは、新しい名前で出る（`// Some: found は app.Item`、`// None`。ケースの名前を、そのまま書く決まりのまま）。状態の単位のメソッド `IsEmpty` は、形が `nullable` でも、変えない
@@ -22,7 +70,7 @@ namespace hozo.decisions {
      * 持ち主: `docs/plugin-go.md`「match」「状態の単位」
      */
     @adr.proposed
-    D601;
+    D606;
 
     /**
      * ユースケースの op が、操作の op になった（決定 D365）ので、ハーネスの段の当て方を、移した。ユースケースは、段 3（テストの規約）から、段 4（操作の op が、配線のとき）と、段 2（葉のとき）へ。業務フロー図の段 3 は、「ステップ」から、「フロー（E2E テストの、ケース）」へ。節への当て方の、段 3 の例も、ユースケースの op から、フローの op に替えた
@@ -32,7 +80,7 @@ namespace hozo.decisions {
      * 持ち主: `docs/ide-chain.md`「図ごとの、ハーネスの段」、`docs/ide-screens.md`「中身の強度の段」
      */
     @adr.proposed
-    D602;
+    D607;
 
     /**
      * テスト用の単位が出す形（決定 D367）の、言語によらない決まりの持ち主は、`docs/ide-chain.md`「テストの規約」の「E2E テスト」。担保の仕方は、表にした（書かれていること、その順で呼んでいること、通っていること、ラベル）。Go の形は、プラグインを作ったときに、プラグインの文書（`docs/plugin-go-design.md`「E2E テストの口」）へ移し、`docs/ide-chain.md` の Go の例は、消した
@@ -42,7 +90,7 @@ namespace hozo.decisions {
      * 持ち主: `docs/ide-chain.md`「テストの規約」、`docs/plugin-go-design.md`「E2E テストの口」
      */
     @adr.proposed
-    D603;
+    D608;
 
     /**
      * ユースケースの op が、概念の op だったときの決まりのうち、365 が名指ししていないものは、書き換えずに、未決の点にした: 「代わりの流れと、例外の流れは、ユースケースの op には、ない」（決定 D228）を残すか。`order-app` の今の入口と、`@browser.page.interaction` の op が、操作の op に当たるか、それから呼ばれる op に当たるか（決定 D256 の見方）。「含む」を、許すか
@@ -52,7 +100,7 @@ namespace hozo.decisions {
      * 持ち主: `docs/ide-chain.md`「ユースケース記述」「ロバストネス図」「画面遷移図」「ユースケース図」
      */
     @adr.proposed
-    D604;
+    D609;
 
     /**
      * 葉の op に、結果ごとの単体テストが決まるようになった（決定 D375）ので、節への当て方で、葉の op を、段 2（枠）から、段 3（テストの規約）に移した。段 2 の例は、デコレータを付けていない read と効果にした。図の部品ごとの表（`docs/ide-chain.md`「図ごとの、ハーネスの段」）は、直さずに、断りの一行を足した
@@ -62,7 +110,7 @@ namespace hozo.decisions {
      * 持ち主: `docs/ide-screens.md`「中身の強度の段」、`docs/ide-chain.md`「図ごとの、ハーネスの段」
      */
     @adr.proposed
-    D605;
+    D610;
 
     /**
      * ハーネスの段の表の、段 3 の言い方を、373 に合わせて直した: Hozo が守ることは、「必要なテストケースが決まり、用意されていて、通っていること。作れる中身は、作る」。人に残る責任は、「設計と、人か AI が書いた、テストの中身」。段の数と、分け方は、変えていない
@@ -72,7 +120,7 @@ namespace hozo.decisions {
      * 持ち主: `docs/requirements.md`「もとの考えと、Hozo が守るもの」
      */
     @adr.proposed
-    D606;
+    D611;
 
     /**
      * ハーネスの段の表（`docs/ide-chain.md`「図ごとの、ハーネスの段」）で、要求を、段 3（要求ごとの、テストの入れ物。決定 D377）に置き、設計から要求への紐づけ（`@prd.ref`）を、段 1（印だけ）に移した
@@ -82,7 +130,7 @@ namespace hozo.decisions {
      * 持ち主: `docs/ide-chain.md`「図ごとの、ハーネスの段」
      */
     @adr.proposed
-    D607;
+    D612;
 
     /**
      * 同梱の語彙のファイルは、いちばん外側の名前空間ごとに、一つ（`vocab/browser.hozo` が `browser` と `browser.page`、`vocab/prd.hozo` が `prd` と、その下の `actor`、`usecase`、`business`）。下の名前空間は、入れ子の `namespace` で書く
@@ -92,7 +140,7 @@ namespace hozo.decisions {
      * 持ち主: `docs/vocab.md`「同梱する語彙」
      */
     @adr.proposed
-    D608;
+    D613;
 
     /**
      * `@prd.business.flow` を付けた op が、操作の op のほかを呼んでいても、検査器は、何も出さない。出すのは、語彙を読む、テストのプラグイン（決定 D378）。プラグインを使っていない間は、誰も出さない
@@ -102,7 +150,7 @@ namespace hozo.decisions {
      * 持ち主: `docs/ide-chain.md`「業務フロー図」
      */
     @adr.proposed
-    D609;
+    D614;
 
     /**
      * 単体テストと、インテグレーションテストを受け取る口の形（決定 D375、D376）の、今の持ち主を、`docs/ide-chain.md`「テストの規約」の、二つの小見出しにした（E2E テストの分と、同じ扱い）。プラグインを作るときに、基底と、プラグインの文書へ移す（移した: 単体テストの分は `docs/plugin-go.md`「単体テストの口」、インテグレーションテストの分は `docs/plugin-go-http.md`「インテグレーションテストの口」。`docs/ide-chain.md` に残るのは、言語によらない決まりと、E2E テストと、要求のテストの形）
@@ -112,7 +160,7 @@ namespace hozo.decisions {
      * 持ち主: `docs/ide-chain.md`「テストの規約」
      */
     @adr.proposed
-    D610;
+    D615;
 
     /**
      * ハッピーパスのほか（代わりの流れ、例外の流れ）は、入口の op の、結果ごとのインテグレーションテストが受け持つ見込み、と書いた（決定 D376 の、「結果ごとに、一つ」から、読み取った）。フローの側でも、求めるかは、未決のまま
@@ -120,7 +168,7 @@ namespace hozo.decisions {
      * 持ち主: `docs/ide-chain.md`「業務フロー図」
      */
     @adr.proposed
-    D611;
+    D616;
 
     /**
      * 絞り込んだ型の、意味の診断: 知らないケースは RES-3。ケースの名前だけを、型の位置に書いたとき（`fn f(): Stage.Draft`）、状態の分類のケース、対象のない分類（`of never`）のケースは RES-4。`T` が分類の対象の型に渡せない、二つの分類のケースを並べた、同じケースを二度書いた、は TYPE-12（新しい ID は、足していない）
@@ -130,7 +178,7 @@ namespace hozo.decisions {
      * 持ち主: `docs/types.md`「診断」、`docs/resolve.md`「位置ごとに受け付ける種類」
      */
     @adr.proposed
-    D612;
+    D617;
 
     /**
      * 行の引数の決め方（STATE-7）: 型が、状態の要素の型 T と等しいか、T を絞り込んだ型の引数が、ちょうど一つ。絞り込みの分類は、`as` の分類と、違ってもよい（`effect fn pack(order: Order on Stage.Accepted): effects orders.put as Packing.Packed;`: そのときは、`as` の分類について、前は、どのケースでも）。行の引数でない引数にも、絞り込んだ型を書ける（呼ぶ側は、同じに、型で確かめる）
@@ -140,7 +188,7 @@ namespace hozo.decisions {
      * 持ち主: `docs/check.md`「行の遷移」の「結びつき」
      */
     @adr.proposed
-    D613;
+    D618;
 
     /**
      * 呼ぶ側の検査は、型の検査に入れた（STATE-9 は欠番）: 絞り込んだ引数に、渡せない値を渡せば、TYPE-4（`match` のアームの中で、対象を渡したなら MATCH-4）。効果のほか（op、`read`）の、絞り込んだ引数にも、同じに掛かる
@@ -150,7 +198,7 @@ namespace hozo.decisions {
      * 持ち主: `docs/check.md`「行の遷移」の「呼ぶ側」、`docs/requirements.md`「検査の規則の一覧」の欠番の表
      */
     @adr.proposed
-    D614;
+    D619;
 
     /**
      * アームの中の対象の型（決定 D370）の、細かい所。（a）二つ以上のケースを受ける `else` のアームは、受けるケースの並びに絞り込むが、もとの型は、変えない（前は、絞り込まなかった）。（b）ケースが `as` に書いた型が、もう、絞り込んだ型（`Passed: Order as Order on Stage.Accepted;`）なら、アームの中の型は、その型のまま（`Check.Passed` には、絞り込まない）。（c）残りのケース（`as else`）と、ない側のケース（`as none`）のアームも、もとの型はそのままで、そのケースに絞り込む（`Order? on Life.Absent`）。（d）対象が、もう、別の分類で絞り込んだ型なら、前の絞り込みは、捨てる
@@ -160,7 +208,7 @@ namespace hozo.decisions {
      * 持ち主: `docs/types.md`「アームの中の対象の型」
      */
     @adr.proposed
-    D615;
+    D620;
 
     /**
      * 診断とホバーは、絞り込んだ型を、仕様の綴りで出す（`Order on Stage.Draft \| Stage.Accepted`）。`optional` と `array` の中では、`nullable<T on C.K>`、`list<T on C.K>`
@@ -168,7 +216,7 @@ namespace hozo.decisions {
      * 持ち主: `docs/types.md`「型の種類」の「絞り込んだ型」
      */
     @adr.proposed
-    D616;
+    D621;
 
     /**
      * Go の基底のコメント: 行の遷移の表示は、`as <分類の FQN>.<ケース>` か `as else`。絞り込んだ引数の表示（`order on shop.Stage.Draft \| shop.Stage.Accepted`。いくつかあれば `、` でつなぐ）を足し、状態の単位のメソッドのコメントでは、`throws` と `effects` の前に、効果の定数のコメントでは、行の遷移を持つ効果の `effects` の前に置く。`match` の枝の頭のコメント（`// <ケース>: <対象> は <型>`）は、表示する型（絞り込みを捨てた型）が、外と違うアームにだけ出す（今までと同じ出力）
@@ -178,7 +226,7 @@ namespace hozo.decisions {
      * 持ち主: `docs/plugin-go.md`「コメント」「match」
      */
     @adr.proposed
-    D617;
+    D622;
 
     /**
      * `go-sqlite`: `@db.insert` / `@db.update` の引数の「M の行一つ」は、M を絞り込んだ型でもよい。DB-17（前は GOSQL-30）は、行の引数の型が、`as` と同じ分類で絞り込んだ型で、後のケースが、その並びにないとき（前は、`RowTransition.from`）。メソッドのコメントの「行の遷移（…）は、確かめない。」と、DB-17 のメッセージは、絞り込んだ引数の表示を、行の遷移の表示の前に置く
@@ -188,7 +236,7 @@ namespace hozo.decisions {
      * 持ち主: `docs/plugin-db.md`「効果」、`docs/plugin-go-sqlite.md`「メソッドの形とコメント」
      */
     @adr.proposed
-    D618;
+    D623;
 
     /**
      * 関数の戻り値の後ろの `on` は、後ろが `<分類>.<ケース>` の形のときだけ、絞り込んだ型として読む。それ以外（`fn f(): T on users;`、`read fn r(): T on 状態;`）は、なくした書き方の `on` として、今までのメッセージを出す
@@ -198,7 +246,7 @@ namespace hozo.decisions {
      * 持ち主: `docs/grammar.md`「決めたこと」
      */
     @adr.proposed
-    D619;
+    D624;
 
     /**
      * サンプル `order-app` の、`payment.markSecured`: 二つの分類の絞り込みを持てないので、分ける対象を、別の `val` に受ける形に、書き換えた（`README.md`「分かったこと」の F59）。README の、行の遷移の一覧に、前から抜けていた二つの効果（`addJob`、`notePrepayFailure`）を足した
@@ -208,7 +256,7 @@ namespace hozo.decisions {
      * 持ち主: `tests/samples/order-app/README.md`
      */
     @adr.proposed
-    D620;
+    D625;
 
     /**
      * 規則のテストの置き場: STATE-9 の例は、消した。呼ぶ側の例は、TYPE-4（`ng_5`、`ok_3`）と MATCH-4（`ng_6`）に、絞り込んだ型の形の例は、TYPE-12（`ng_3`、`ok_3`）に、なくした書き方は、`SYNTAX/ng_removed_forms.hozo` に置いた
@@ -216,7 +264,7 @@ namespace hozo.decisions {
      * 持ち主: `docs/testing.md`「規則ごとのテスト」
      */
     @adr.proposed
-    D621;
+    D626;
 
     /**
      * 葉の戻り値の型が、述語で決まる分類で絞り込んだ型なら、`RunLeaves` が、その述語を引数で受け取り、正常のケースで、判定を当てる
@@ -226,7 +274,7 @@ namespace hozo.decisions {
      * 持ち主: `docs/testing.md`「葉の op」
      */
     @adr.proposed
-    D622;
+    D627;
 
     /**
      * 効果の入口の確かめの形（決定 D371、D372 の、作るときに決めた細部）: 非公開の型 `checked<状態>State` が、状態の単位を包み、`New` が、渡された単位を、それで包む。`New` に渡す前の単位を、人のコードが直に呼べば、確かめは掛からない
@@ -236,7 +284,7 @@ namespace hozo.decisions {
      * 持ち主: `docs/plugin-go.md`「効果の入口の確かめ」
      */
     @adr.proposed
-    D623;
+    D628;
 
     /**
      * 入口で確かめるのは、型が、そのまま、絞り込んだ型の引数だけ。並びや、省略可能の中の絞り込み（`list<Order on Stage.Sent>`）は、確かめない
@@ -246,7 +294,7 @@ namespace hozo.decisions {
      * 持ち主: `docs/plugin-go.md`「効果の入口の確かめ」
      */
     @adr.proposed
-    D624;
+    D629;
 
     /**
      * テストのパッケージのファイルは、N の入口のパッケージを、名前が、import パスの最後の要素と同じでも、いつも、名前を書いて import する（同じ名前空間の、二つの単位のファイルが、自分のディレクトリのほかは、同じになるように）
@@ -256,7 +304,7 @@ namespace hozo.decisions {
      * 持ち主: `docs/plugin-go.md`「単体テストの口」の「テストのパッケージ」
      */
     @adr.proposed
-    D625;
+    D630;
 
     /**
      * GO-2 を、テストのパッケージの公開の名前と、`<Op>Case` のフィールドにも広げた: 大文字化で同じ名前になる二つの op（`foo` と `Foo`）は、`Ops` の分に加えて、`FooCases` と `FooCase` の分の診断も出る
@@ -266,7 +314,7 @@ namespace hozo.decisions {
      * 持ち主: `docs/plugin-go.md`「単体テストの口」の「テストのパッケージ」、同「診断」
      */
     @adr.proposed
-    D626;
+    D631;
 
     /**
      * サンプル `shop-server` での、「口を一つ欠いた実装が、コンパイルできない」の確かめ: サンプルのテストは、口が求めるメソッドを、リフレクションで確かめる。コンパイルできないことそのものは、`plugins/go` の単体テスト（入力 `unittest`）が、生成したコードをコンパイルして確かめる
@@ -276,7 +324,7 @@ namespace hozo.decisions {
      * 持ち主: `tests/samples/shop-server/README.md`「人が書いたもの」、`docs/testing.md`「単体テスト」
      */
     @adr.proposed
-    D627;
+    D632;
 
     /**
      * 基底 `go` の、「どの関数も、`ctx` を取り、`error` を返す」の確かめ（`plugins/go/internal/gobase/uniform_test.go`）から、テストのパッケージの関数を、外した。そこの関数は、仕様の宣言を写したものではなく、`testing` が、形を決める。確かめる対象を、狭めた変更
@@ -286,7 +334,7 @@ namespace hozo.decisions {
      * 持ち主: `docs/plugin-go.md`「op の形」「単体テストの口」
      */
     @adr.proposed
-    D628;
+    D633;
 
     /**
      * インテグレーションテストの、必要なケースの数え方（決定 D376 の「結果ごとに、一つ」の、当てはめ）: 正常 `OK`。op を呼ぶ前の失敗 `BadRequest`（入力の model が、本文のデコレータか、`@http.required` の付いたフィールドを持つ op だけ。型は見ない: クエリの値が読めないことと、制約の違反は、数える理由にしない）。op が投げうる例外の、出どころごと（はじめは、例外ごとだった。出どころごとに数え、作れるものは Hozo が作る形にしたのは、決定 D389、D441。もとは `Op.signature.exceptions`。`@rate.limited` の `rate.LimitExceeded` のように、デコレータが運ぶ例外も数える。基底の、葉の op の口は、数えない）。`@http.status` を持たない例外も数え、走らせる側は、500 と `internal` までを確かめる（どの例外かは、応答では、見分けられない）
@@ -296,7 +344,7 @@ namespace hozo.decisions {
      * 持ち主: `docs/plugin-go.md`「必要なケース」
      */
     @adr.proposed
-    D629;
+    D634;
 
     /**
      * `<Op>HTTPCase` の形: 入力（op の引数の名前のフィールド）、`Given`、`Request`、`Then`。`Request`（組み立てた要求を、送る前に、手直しする）は、`docs/ide-chain.md` の案になかったもの: 入力は、型の付いた値なので、読めない本文や、項目のない要求（`BadRequest` のケース）は、値では作れない。`Then` は `func(t, res *httptest.ResponseRecorder, f *Fakes)`（案は `func(t, got, err error)`。HTTP の層の向こうに、`err` はない。にせもの `f` を取るようにしたのは、決定 D391、D459）。例外が運ぶ値と、`http.BadRequest` の中身は、`Then` が、`res` の本文から読む。`Given` と `Request` と `Then` は、`nil` なら呼ばない
@@ -306,7 +354,7 @@ namespace hozo.decisions {
      * 持ち主: `docs/plugin-go.md`「口の形」
      */
     @adr.proposed
-    D630;
+    D635;
 
     /**
      * 要求の組み立て（「入力の読み方」の裏返し）: 入力の値は、いつも送る（`@http.default` の項目も、零値も）。送らないのは、`nil` のポインタ（省略可能で、値がない）だけ。項目を送らない要求は、`Request` で作る。`httptest.NewRequest` と `NewRecorder` で、ハンドラを直に呼ぶ（ネットワークは使わない）。組み立てられない入力の形は、ない（HTTP-3〜HTTP-5、HTTP-9 が、先に断る）
@@ -316,7 +364,7 @@ namespace hozo.decisions {
      * 持ち主: `docs/plugin-go.md`「要求の組み立て」
      */
     @adr.proposed
-    D631;
+    D636;
 
     /**
      * 走らせる側の、確かめの深さ: 正常のケースは、ステータス（値を返す op は 200、返さない op は 204。Go でポインタになる省略可能な結果は、204 でもよい）、`Content-Type`、本文が、結果の型に読める JSON（`encoding/json`。知らないキーは許す。`null` は許さない）。値の中身は、確かめない（`Then`）。例外のケースは、ステータス、`error` の FQN、`value` が、例外の型に読めること（引数のない例外は、`value` がないこと）。`BadRequest` は、400、`http.BadRequest`、`message` と `violations` があること
@@ -326,7 +374,7 @@ namespace hozo.decisions {
      * 持ち主: `docs/plugin-go.md`「必要なケース」
      */
     @adr.proposed
-    D632;
+    D637;
 
     /**
      * テストのプラグインの名前を、`go-design` にした（決定 D367、D378 の、仮の名前 `go-e2e` から、変えた）。フローの E2E テストの口だけでなく、要求の入れ物の口も出し、読むのが、設計の図の語彙だから。診断の ID の前置きは、英字だけ（`GODESIGN-n`。`tests/codes_test.go` の形）で、`go-e2e` からは、そのままでは作れない。ファイルは `design.go`、文書は `docs/plugin-go-design.md`
@@ -336,7 +384,7 @@ namespace hozo.decisions {
      * 持ち主: `docs/plugin-go-design.md`「この文書が決めること」「マニフェスト」
      */
     @adr.proposed
-    D633;
+    D638;
 
     /**
      * `RunFlows` は、フローが、正常に終わったことを確かめてから、`Then` を呼ぶ。`Then` は `func(t, got)`（値を返さないフローは `func(t)`）。`docs/ide-chain.md` にあった案は、`Then func(t, got, err error)` で、走らせる側は、何も確かめなかった。変えたのは、ケースが、フロー一つに、ハッピーパスの一本で、段 2・段 3 の口（走らせる側が、結果の見分けを済ませてから、`Then` を呼ぶ）と、揃えるため。`Given` と `Then` は、`nil` なら呼ばない。`RunFlows(t, ops, c)` は、`ops` 一つを、すべてのフローで使う
@@ -346,7 +394,7 @@ namespace hozo.decisions {
      * 持ち主: `docs/plugin-go-design.md`「E2E テストの口」の「口の形」
      */
     @adr.proposed
-    D634;
+    D639;
 
     /**
      * フローの op の決まりを、error にした: `export` が要る（GODESIGN-1）。配線で、`never` を返さない（GODESIGN-2）。呼べるのは、`@prd.usecase.of` の付いた op だけ（GODESIGN-3。同じ名前空間の、`@prd.usecase.of` のない op も、別のフローも、`read` も、効果も、呼べない。状態を、名前で読むことは、見ない）。フローを持つ名前空間に、`@prd.usecase.of` の付いた op を置けない（GODESIGN-4。決定 D248、D366 の「操作の op とは、別の名前空間」）
@@ -356,7 +404,7 @@ namespace hozo.decisions {
      * 持ち主: `docs/plugin-go-design.md`「E2E テストの口」の「フローの op の決まり」
      */
     @adr.proposed
-    D635;
+    D640;
 
     /**
      * どこからも指されていない要求は、warning（要求ごとに、一つ）。入れ物の口は、出し、コメントは「指している設計: なし」。フローも、要求もない単位も、warning で、ファイルを出さない
@@ -366,7 +414,7 @@ namespace hozo.decisions {
      * 持ち主: `docs/plugin-go-design.md`「要求の、テストの入れ物の口」の「指している設計」、同「対象」
      */
     @adr.proposed
-    D636;
+    D641;
 
     /**
      * 要求を指している設計は、仕様の全体から集める（単位の対象かどうかにも、名前空間が単位を持つかどうかにも、依らない）。並びは、名前空間の FQN の辞書順、その中は、宣言順。`Requirements` のメソッドの名前は、ケースの名前の、先頭を大文字にしたもの。二つの要求の分類が、同じ名前のケースを持てば、GODESIGN-6（分類の名前を、前に付けない）
@@ -376,7 +424,7 @@ namespace hozo.decisions {
      * 持ち主: `docs/plugin-go-design.md`「口の形」「指している設計」
      */
     @adr.proposed
-    D637;
+    D642;
 
     /**
      * `go-design` が、見ないもの: `@prd.usecase.of` の引数（担い手。引数のない `@prd.usecase.of()` も、操作の op の印として数える）。`prd.actor` の語彙（担い手のケースが、種類を、一つ持つこと）。`@prd.ref` の引数が、`requirements` に並べた分類のケースであること（並べていない分類を指す `@prd.ref` は、読み飛ばす）。フローの名前空間が、アプリの単位の対象にも、なっていること
@@ -386,7 +434,7 @@ namespace hozo.decisions {
      * 持ち主: `docs/plugin-go-design.md`「マニフェスト」「フローの op の決まり」
      */
     @adr.proposed
-    D638;
+    D643;
 
     /**
      * サンプル `shop-server` に足したもの: 名前空間 `design`（担い手と、要求。単位を置かない）、`client`（操作の op。三つとも、機能入口を呼ぶだけの配線で、状態を持たない: トークンは、引数で受け取り、戻り値で返す）、`flows`（フロー一つと、その結果の model `Ordered`）。単位を、三つ足した: 標準の語彙 `http` の型（機能入口が `@http.*` なので、呼ぶ側の `throws` に、`http.ServerError` と `http.NetworkError` が要り、その型の置き場が要る）、`client`、`flows`。`@prd.ref` は、`server` の三つの op（`authenticate`、`getOrders`、`placeOrder`）に付けた。人のテストは、`client` と `server` を、Go の上で、直につなぐ（`client.New(server.New(…))`）: HTTP の層は、通らないので、二つの通信の例外は、`throws` に出るが、起きない。「口を一つ欠いた実装が、コンパイルできない」は、段 2・段 3 と同じ分け方（サンプルは、リフレクション。コンパイルそのものは、`plugins/go-design` の単体テスト）
@@ -396,7 +444,7 @@ namespace hozo.decisions {
      * 持ち主: `tests/samples/shop-server/README.md`「R6 のプラグインの部分で足したこと」
      */
     @adr.proposed
-    D639;
+    D644;
 
     /**
      * 決定 D379 に合わせて、書き方の指針に「配線の op には、`throws`、`reads`、`effects` の節を、書かない」を足した（381 の後は、「配線の op が節を書くのは、例外と効果の関係を言うときだけ」を、添えている）。勧めで、検査はしない（節を書いた配線の op に、診断は出ない）
@@ -406,7 +454,7 @@ namespace hozo.decisions {
      * 持ち主: `docs/requirements.md`「書き方の指針」
      */
     @adr.proposed
-    D640;
+    D645;
 
     /**
      * 決定 D379 に合わせて、サンプルの、配線の op の `throws` の節を、消した（`shop-server` 16、`order-app` 99）。残したのは、関係を言う `payment.capture` の一つ（関係を付けない節も、一緒に残していたが、381 で、その節を消した）。消した op の頭は、一行に書いた（`export fn login(in: LoginInput): LoginOk {`）。hozoc 自身の仕様（`cli.hozo`）は、`throws` を書いているのが葉の op だけなので、変えていない
@@ -416,7 +464,7 @@ namespace hozo.decisions {
      * 持ち主: `tests/samples/shop-server/README.md`「配線の op の `throws` を消したこと」、`tests/samples/order-app/README.md`「配線の op の `throws` を消したこと」
      */
     @adr.proposed
-    D641;
+    D646;
 
     /**
      * 決定 D380 に合わせて、`go-design` の `RunRequirements` が、要求の入れ物を、その場の関数で包んで呼ぶ形にした（`t.Run(<名前>, func(t *testing.T) { c.<メソッド>(t) })`）。`RunRequirements` の中に、要求ごとの行を持つため。人が書く側（`Requirements` の実装）は、変わらない
@@ -426,7 +474,7 @@ namespace hozo.decisions {
      * 持ち主: `docs/plugin-go-design.md`「要求の、テストの入れ物の口」の「口の形」
      */
     @adr.proposed
-    D642;
+    D647;
 
     /**
      * 決定 D380 の、Go のカバレッジの読み方: 最初の行が `mode: set` / `count` / `atomic` なら、読める形。同じ区切りが、二度出てくるとき（`-coverpkg` で、パッケージごとの実行をまとめたファイル）は、どれかの回数が 1 以上なら、実行済み。形の違う行は、誤り（終了コード 1）。import パスは、要求の `outputs` の `module` から作る（`go.mod` は、探さない。決定 D425、D444）。`-coverpkg` に、テストのパッケージが入っていなければ、TESTS-1（走っていない、か、測っていない、の文面）
@@ -436,7 +484,7 @@ namespace hozo.decisions {
      * 持ち主: `docs/plugin-go.md`「カバレッジを読む」
      */
     @adr.proposed
-    D643;
+    D648;
 
     /**
      * 決定 D380 の、`cli.hozo` の形: `tests` は、`check` と、葉の op `matchTests` を呼ぶ配線。ファイルを集めるところは、`collectOutputs` を呼ばず、`matchTests` の中に置いた（配線は、リストのリテラルを書けず、`EmitInput` を作れない）。`matchTests` は、置き場のファイルと、カバレッジのファイルを読むが、状態（`outputs`）を読む、とは、書いていない（葉の op は、`reads` を書けない）
@@ -446,7 +494,7 @@ namespace hozo.decisions {
      * 持ち主: `docs/cli.md`「cli.hozo」の `tests` の項目、「手で書くもの」
      */
     @adr.proposed
-    D644;
+    D649;
 
     /**
      * 決定 D380 の、サンプルのテスト: `shop-server` に、サブテスト `tests` を足した（`all`: すべて走らせたカバレッジで、対応表のテストが、すべて走ったと言うこと。`missing`: `go test -skip ^TestFlows$` のカバレッジで、`go-design: flows.signInAndOrder` だけが、名指しされること）。口を渡す一行を、消したファイルは、作っていない（その Go のテストを、除いて走らせる。カバレッジは、同じになる）。`sample.json` に、キー `tests`（`skip`、`missing`）を足した
@@ -456,7 +504,7 @@ namespace hozo.decisions {
      * 持ち主: `tests/samples/README.md`「テスト」「sample.json」
      */
     @adr.proposed
-    D645;
+    D650;
 
     /**
      * 決定 D381 の、上書き（関係を付けた `throws`）の確かめ: 計算は、変えていない。REL-4 が、書いた関係（目的語は、その op の効果のすべて）と、計算した関係を、比べる。向きを変えた上書きと、広げた範囲に、例外の前に起きる効果がある上書きは、どちらも、今までの REL-4 に、そのまま当たる（規則も、ID も、足していない）。計算した関係が「分からない」の組に、`prevents` か `keeps` を書いたときも、今までどおり、REL-4
@@ -466,7 +514,7 @@ namespace hozo.decisions {
      * 持ち主: `docs/check.md`「状態に触れるもの」の「節に書く要素」、「診断」の REL-4
      */
     @adr.proposed
-    D646;
+    D651;
 
     /**
      * 決定 D381 に合わせて、直したもの: 書き方の指針（配線の op が節を書くのは、関係を言うときだけ。伝わってくる例外を、関係なしで書くことと、本体にないものを書くことは、通るが、勧めない）。コードアクションの案から、THROWS-1 と READS-2 の分を、なくした（言語サーバーに、コードアクションの実装は、まだない）。サンプル `order-app` の `payment.capture` は、関係を言う節だけにした。`reads` / `effects` の節を書いている配線の op は、二つのサンプルに、なかった（`prevents effects` の `effects` だけ）。コーパス（`tests/corpus/`）の、節を書いた配線の op は、そのまま（どれも、今までどおり通り、`Signature` も変わらない）。hozoc 自身の仕様（`cli.hozo`）の `writeOutputs` と `emit` は、節のすべての例外に、関係を付けているので、そのまま
@@ -476,7 +524,7 @@ namespace hozo.decisions {
      * 持ち主: `docs/requirements.md`「書き方の指針」、`docs/lsp.md`「段階 4 の後」、`tests/samples/order-app/README.md`「配線の op の `throws` を消したこと」
      */
     @adr.proposed
-    D647;
+    D652;
 
     /**
      * 決定 D388 の、サンプル `shop-server` への当てはめ: `app/both_test.go` は、残る中身（`TestOpsHoldExportedOpsOnly`）に合わせて、`app/ops_test.go` に、名前を変えた。`TestStatesFromTwoImplementations`（状態の単位を、状態ごとに、別の実装から取れる）は、消さずに、`app/onsqlite/store_test.go` に移し、メモリの側は、テストの中に書いた `memNotifications`（状態 `notifications` の単位）にした。`app/handlertest`、`app/storetest`、`app/flowtest` は、パッケージの分け方（試す相手を、組み立てる関数で受け取る）を、そのままにした。README の、前の記録（「まだないもの」の下の節と、「分かったこと」）は、書き直さず、新しい節「メモリ版の `store` をなくしたこと」が、今の形でないものを、名指しする。単位の番号は、詰めた（5〜8 が、4〜7）。`store` の配線まで通す、DB なしのテストは、作り直し（決定 D384、D385）が入るまで、ない
@@ -486,7 +534,7 @@ namespace hozo.decisions {
      * 持ち主: `tests/samples/shop-server/README.md`「メモリ版の `store` をなくしたこと」
      */
     @adr.proposed
-    D648;
+    D653;
 
     /**
      * インテグレーションテストの作り直し（決定 D391）: にせものは、ケースごとに、新しく作る（ケースどうしが、混ざらない）
@@ -496,7 +544,7 @@ namespace hozo.decisions {
      * 持ち主: `docs/ide-chain.md`「テストの規約」の「インテグレーションテストの作り直し」
      */
     @adr.proposed
-    D649;
+    D654;
 
     /**
      * 決定 D391: 呼ぶ先の名前空間（`store`）の、流れの端と継ぎ目の、にせものは、その名前空間の単位の、テストのパッケージに、基底が出す。入口の名前空間（`server`）のテストのパッケージが、それと、呼ぶ先の単位のパッケージを import する（テストのコードに限って、単位をまたぐ import が、生まれる。テストでない出力は、今までどおり、別の単位を import しない）
@@ -506,7 +554,7 @@ namespace hozo.decisions {
      * 持ち主: `docs/ide-chain.md`「テストの規約」の「インテグレーションテストの作り直し」
      */
     @adr.proposed
-    D650;
+    D655;
 
     /**
      * 決定 D391: 外の仕組みの op（単位のない名前空間の op。`mailer.send`）のにせものも、`read fn`・`effect fn` と同じ形（返す値を、ケースごとに指定し、呼ばれたことを覚える）で、基底が作る
@@ -516,7 +564,7 @@ namespace hozo.decisions {
      * 持ち主: `docs/ide-chain.md`「テストの規約」の「インテグレーションテストの作り直し」
      */
     @adr.proposed
-    D651;
+    D656;
 
     /**
      * 決定 D391: 「起きていない」と計算された効果が、呼ばれていないことの確かめは、作らない。配線も、にせものの継ぎ目も、Hozo が作るので、検査の計算と、同じことを言うだけになる
@@ -526,7 +574,7 @@ namespace hozo.decisions {
      * 持ち主: `docs/ide-chain.md`「テストの規約」の「インテグレーションテストの作り直し」
      */
     @adr.proposed
-    D652;
+    D657;
 
     /**
      * `fakes.go` を出すのは、op があり、`New` が、引数を一つでも取り、組み立てを作れる出力だけ。作れない出力（通す先の名前空間に、同じ基底の単位が二つ以上ある。名前空間どうしが、輪になって呼び合う）には、にせものの型も出さず、診断も出さない。その組み立てを要るプラグインが、自分の診断で報告する
@@ -536,7 +584,7 @@ namespace hozo.decisions {
      * 持ち主: `docs/plugin-go.md`「テストのにせもの」の「出すとき」「別の名前空間」
      */
     @adr.proposed
-    D653;
+    D658;
 
     /**
      * 別の単位の出力の形（葉を持つか、など）は、その単位の `in` を省いたものとして、求める（`View` に、ほかの単位の `in` がない。`golang.HomeOf` と、同じ割り切り）。`in` で絞った単位の出力を、別の単位から通すと、`NewOps` の引数が合わず、コンパイルできないことがある
@@ -546,7 +594,7 @@ namespace hozo.decisions {
      * 持ち主: `docs/plugin-go.md`「テストのにせもの」の「別の名前空間」
      */
     @adr.proposed
-    D654;
+    D659;
 
     /**
      * テストのパッケージの `doc.go` のコメントを、一つの文面に変えた（「テストのためのもの: 単体テストの口と、にせもの」）。にせものだけのパッケージ（`storetest`）と、口だけのパッケージで、文面を分けない
@@ -556,7 +604,7 @@ namespace hozo.decisions {
      * 持ち主: `docs/plugin-go.md`「単体テストの口」の「テストのパッケージ」
      */
     @adr.proposed
-    D655;
+    D660;
 
     /**
      * にせものが入ったので、相乗りの単体テストの入力を、意味を変えずに直した: `go-http` の `gohttp21`（`n` の op が、別の名前空間を呼ばず、値を返す: 基底が、テストのパッケージを作らない出力）と、`go-design` の `godesign7`（`act` を、もう一つの単位にも出す: `n` の組み立てを作れず、基底が、テストのパッケージを作らない）。別の名前空間を呼ぶ出力は、たいてい、`fakes.go` を持つので、GOHTTP-21 と GODESIGN-7 が出る場面は、狭くなった（重なりは、基底の GO-4 が、先に返す）
@@ -564,7 +612,7 @@ namespace hozo.decisions {
      * 持ち主: `docs/plugin-go-http.md`「診断」、`docs/plugin-go-design.md`「診断」
      */
     @adr.proposed
-    D656;
+    D661;
 
     /**
      * `go-http` の `Then` は、応答 `res` と、にせもの `f` の、両方を取る（決定 D391 の案は、`f` だけ）。例外が運ぶ値と、`http.BadRequest` の中身は、応答の本文にしか、ない
@@ -574,7 +622,7 @@ namespace hozo.decisions {
      * 持ち主: `docs/plugin-go-http.md`「インテグレーションテストの口」の「口の形」
      */
     @adr.proposed
-    D657;
+    D662;
 
     /**
      * N の出力の `New` が、引数を取らないとき、`go-http` は、`Fakes` を使わない形の口を出す（`Given` がなく、`Then` は `f` を取らない）。組み立てを作れない出力には、口を出さず、warning を返す（error にすると、同じ名前空間を二つの単位に出す、正しい設定が、`emit` できなくなる）
@@ -584,7 +632,7 @@ namespace hozo.decisions {
      * 持ち主: `docs/plugin-go-http.md`「インテグレーションテストの口」の「置き場と名前」「診断」
      */
     @adr.proposed
-    D658;
+    D663;
 
     /**
      * `go-http` の単体テストの入力 `routes` の、人が書いたテストを、新しい口に合わせた: 例外のケースのメソッド（葉が投げる例外。Hozo が作る）を消し、応答が合わないときに落ちることの確かめ（`httpmismatch_test.go`）は、正常のケースの要求を、読めなくして（400）、Hozo が作る例外のテストごと、落とす形にした。`Given` が失敗を返すことの確かめは、なくした（`Given` は、失敗を返さない）
@@ -592,7 +640,7 @@ namespace hozo.decisions {
      * 持ち主: `docs/testing.md`「単体テスト」
      */
     @adr.proposed
-    D659;
+    D664;
 
     /**
      * サンプル `shop-server` の `TestHTTPCases` と `TestIncompleteHTTPCasesAreRejected` を、`app/onsqlite` から、`app`（`app/httpcases_test.go`）に移した。DB が、要らなくなったため。`app/handlertest/httpcases.go` は、なくした
@@ -602,7 +650,7 @@ namespace hozo.decisions {
      * 持ち主: `tests/samples/shop-server/README.md`「インテグレーションテストの作り直しで変えたこと」
      */
     @adr.proposed
-    D660;
+    D665;
 
     /**
      * デコレータの本体（決定 D392）の検査の切り方: DEC-19（包んだ関数の呼び出し の位置と引数）、DEC-20（道ごとに、ちょうど一度）、DEC-21（`return`）、DEC-22（本体のあるデコレータの `catches`）、DEC-23（値として読めない引数）、DEC-24（付けた所から、呼べないもの）。包んだ関数の呼び出し を、値の位置に書いたとき（`val x = next();`）は、値がないので、今ある WIRE-2。DEC-20 は、`never` を返す op の呼び出しで終わる道を、見分けない（投げて終わる道として数えるのは、`throw` のアームだけ）
@@ -612,7 +660,7 @@ namespace hozo.decisions {
      * 持ち主: `docs/check.md`「デコレータ」
      */
     @adr.proposed
-    D661;
+    D666;
 
     /**
      * 本体のあるデコレータの、Go の出力（決定 D392〜D395）: 外側のメソッドは、適用ごとに一つで、名前は、継ぎ目のメソッドの名前の、先頭を小文字にしたもの（`logoutServerAudited`）。置き場は `wiring.go`。値を返す op で、包んだ関数の呼び出し の後ろに文が続くときの、結果の変数は `result`。本体のあるデコレータを含むときの、コメントの言い方は「デコレータ」。単位のトランスパイラが、本体のあるデコレータに、継ぎ目を宣言していれば、基底の診断 GO-7（設定の診断 CFG-n には、しなかった: 本体があるかは、仕様を読まないと、分からない）
@@ -622,7 +670,7 @@ namespace hozo.decisions {
      * 持ち主: `docs/plugin-go.md`「本体のあるデコレータ」「診断」
      */
     @adr.proposed
-    D662;
+    D667;
 
     /**
      * 出どころの計算（`docs/check.md`「入口ごとの、求めるケース」）での、本体のあるデコレータ（決定 D395）: 本体を、配線として辿り、包んだ関数の呼び出し の所で、内側の層へ進む。本体の `throw` のアームの出どころの名前は、`<op の FQN>@<デコレータの FQN>.<ケース>`。本体のあるデコレータを持つ葉の op の、自分で投げる例外は、節に書いた例外（計算した例外には、本体の分が、混ざる）
@@ -632,7 +680,7 @@ namespace hozo.decisions {
      * 持ち主: `docs/check.md`「入口ごとの、求めるケース」の「流れ」「出どころ」、`docs/plugin-go.md`「本体のあるデコレータ」
      */
     @adr.proposed
-    D663;
+    D668;
 
     /**
      * 受けるケース（決定 D398）の、Go の形: テストの名前は、`<op の FQN>@<デコレータの FQN>/catches/<例外の名前>`（`catches` は、予約語なので、結果の名前と、当たらない）。その op の、計算した例外にない例外（DEC-16 の warning が出る適用）にも、テストを作る。一つの op に、同じデコレータを、二度付けたとき（`@repeatable`）は、継ぎ目が一つなので、受ける例外を、合わせる。`recovers` で、デコレータが `throws` を持たなければ、失敗が返らないことまで、確かめる（決定の「その例外が、返らない」より、強い）。`halts` では、受けた例外が、返らないことだけ（ほかの失敗は、見ない: `halts` の効果が、投げうる）。受けた例外が、そのデコレータの `throws` にもあるとき（DEC-6）は、「受けた例外が、返らない」を、確かめない
@@ -642,7 +690,7 @@ namespace hozo.decisions {
      * 持ち主: `docs/plugin-go.md`「デコレータのテストの口」の「受けるケース」
      */
     @adr.proposed
-    D664;
+    D669;
 
     /**
      * サンプル `shop-server` に足した、本体のあるデコレータの例: `server.audited`（`next(); recordAudit();`）と、それが呼ぶ葉 `server.recordAudit`。`logout` に付けた。葉は、十になった。`@rate.limited` は、プラグインが包む例として、本体のないまま。基底 `go` の単体テストに、入力 `wraps`（本体のあるデコレータの各行: 前で確かめる、後で記録する、値の引数、別の名前空間、継ぎ目との入れ子、関係ごとのデコレータのテスト）を足した
@@ -652,7 +700,7 @@ namespace hozo.decisions {
      * 持ち主: `tests/samples/shop-server/README.md`「本体のあるデコレータと、デコレータのテストで足したこと」
      */
     @adr.proposed
-    D665;
+    D670;
 
     /**
      * テストの重さを数えた記録（`docs/test-weight-trial.md`）の、物差し。「道の上に、人か AI が書いた中身があるか」を、仕様から、三つ（ある、用意しだい、ない）に分ける。人か AI が書いた中身は、本物として動く、葉の op と、述語で決まる、値の分類の判定。外の仕組み（`psp`、`carriergw`、`assets`、`mailer` の op と、`clock.now`）は、単位を足して葉になっていても、数えない。出どころの葉そのもの（にせものが投げる）と、にせもので曲げた判定は、数えない。「ある」は、評価される、という意味で、確かめている、という意味ではない。記録の置き場は、新しい文書にした（`docs/ide-harness-trial.md` は、ハーネスのプレビューの記録なので、分けた）
@@ -662,7 +710,7 @@ namespace hozo.decisions {
      * 持ち主: `docs/test-weight-trial.md`「数え方」
      */
     @adr.proposed
-    D666;
+    D671;
 
     /**
      * 同じ記録の、「どの入口からも、届かない op」の物差し: 届くかは、入口の本体から、op の呼び出し（本体のあるデコレータの本体を含む）を辿って、行き着くかだけで決めた。入口は、インテグレーションテストの口が出る op（`@http.*` のサーバーの入口）だけ。E2E テストの口が出るフローの op と、時刻で起きる入口（`@clock.tick`）は、入口に数えていない
@@ -672,7 +720,7 @@ namespace hozo.decisions {
      * 持ち主: `docs/test-weight-trial.md`「届く、の決め方」
      */
     @adr.proposed
-    D667;
+    D672;
 
     /**
      * union のアームに、制約を持つ型（`Validate` を持つ型）があるとき、`go-valid` は、値が当たっているアームの検証を呼ぶ（入った。前は、どのアームでも GOVALID-4 で、error だった。GOVALID-4 は、確かめる形のないアーム（`ref` でない、インデックスの model、別の union）にだけ、残る。決定 D399 で、union が、通信に出せるようになるのに合わせて、決めた）
@@ -682,7 +730,7 @@ namespace hozo.decisions {
      * 持ち主: `docs/plugin-go-valid.md`「Validate を持つ型」
      */
     @adr.proposed
-    D668;
+    D673;
 
     /**
      * 決定 D399 の、通信に出せる union の条件の細部: 「フィールドを持つ model」に、インデックスの model は、含まない。決め手は、省略可能でないフィールド（配列のフィールドを含む: キーは、いつも書かれる）で、名前は、ほかのアームの、どのフィールド（省略可能なものを含む）とも違うもの。union の中の union（アームの model のフィールドが union）も、同じ条件で、辿る。診断は、op ごと、型ごとに、一つ（HTTP-5 を、狭めた。ID は、足していない）
@@ -692,17 +740,17 @@ namespace hozo.decisions {
      * 持ち主: `docs/plugin-http.md`「通信の形」の「union」
      */
     @adr.proposed
-    D669;
+    D674;
 
     /**
-     * union のアームの検証の、形（決定 D669 の続き）: union をフィールドに持つ model の `Validate` が、実行時に、値が `Validate() error` を持つかを見て、呼ぶ。包む型のアーム（別の名前空間の model、scalar）で、アームの型が `Validate` を持つ型への `ref` のものに、`go-valid` が、`Validate` を出す。違反の `Path` に、アームの名前は、入れない（通信の上にも、アームの名前は、ない）。`Validate` を持つ型の決まりに、5（アームが `Validate` を持つ union を、フィールドに持つ model）を足した。GOVALID-4 は、欠番にせず、狭めた: アームの型が、`ref` でない（`optional`、配列）か、インデックスの model か、別の union で、その中に `Validate` を持つ型があるとき
+     * union のアームの検証の、形（決定 D674 の続き）: union をフィールドに持つ model の `Validate` が、実行時に、値が `Validate() error` を持つかを見て、呼ぶ。包む型のアーム（別の名前空間の model、scalar）で、アームの型が `Validate` を持つ型への `ref` のものに、`go-valid` が、`Validate` を出す。違反の `Path` に、アームの名前は、入れない（通信の上にも、アームの名前は、ない）。`Validate` を持つ型の決まりに、5（アームが `Validate` を持つ union を、フィールドに持つ model）を足した。GOVALID-4 は、欠番にせず、狭めた: アームの型が、`ref` でない（`optional`、配列）か、インデックスの model か、別の union で、その中に `Validate` を持つ型があるとき
      *
      * 別の案: アームごとに、型の `switch` を出す。`Path` に、アームの名前を入れる（`buyer(Named).name`）
      *
      * 持ち主: `docs/plugin-go-valid.md`「Validate を持つ型」「model」
      */
     @adr.proposed
-    D670;
+    D675;
 
     /**
      * 値を、有限に作れない型の規則（決定 D403）の、切り方: ID は TYPE-19 で、持ち主は `docs/types.md`「値を、有限に作れない型」（型の規則は、どれも `docs/types.md`「診断」が持つ。決定の行が言う `docs/check.md` には、「診断」の「型」に、そこを引く一文だけを置いた）。意味の解析（`internal/sema`）が出す。報告は、互いに辿り合える宣言のまとまりごとに、一つ（WIRE-7 の流儀: 位置は、最初に現れる宣言。`Related` に、示した輪の上の宣言）。文面は、自分に戻る、いちばん短い道を、フィールドとアームの名前で示す。輪に入らず、持てない型を持つだけの宣言には、出さない。アームを一つも持たない union と、解決できなかった参照は、見ない。`docs/requirements.md`「検査の規則の一覧」には、足していない（その表は、設計書に出どころのある規則だけ）
@@ -712,7 +760,7 @@ namespace hozo.decisions {
      * 持ち主: `docs/types.md`「値を、有限に作れない型」
      */
     @adr.proposed
-    D671;
+    D676;
 
     /**
      * 言語サーバーの、プラグインの診断（決定 D405）の、きっかけ: `didSave` は、いつも走らせる。`didOpen` と、ファイルの監視（`workspace/didChangeWatchedFiles`）は、今の中身の診断を、まだ持っていないときだけ。`initialized` では、走らせない（最初に開いた文書の `didOpen` で、走る）。ファイルの監視を、きっかけに入れたのは、エディタの外で、ディスクが書き換わったとき（別の道具、`git`）のため。保存の直後に届く、同じ中身の監視の知らせは、同じ中身の check が走っているので、何もしない
@@ -722,7 +770,7 @@ namespace hozo.decisions {
      * 持ち主: `docs/lsp.md`「プラグインの診断」
      */
     @adr.proposed
-    D672;
+    D677;
 
     /**
      * 決定 D405 の、プラグインの診断を出す間: それを求めた中身（解析が読んだ、すべてのファイルと `hozo.toml` の内容）と、今の中身が、同じ間だけ。保存の後に編集したら、消し、編集を取り消して、中身が戻れば、また出す。クライアントが、診断の位置を、編集に合わせて動かすことは、当てにしない
@@ -732,7 +780,7 @@ namespace hozo.decisions {
      * 持ち主: `docs/lsp.md`「プラグインの診断」
      */
     @adr.proposed
-    D673;
+    D678;
 
     /**
      * 決定 D405 の、裏の check の重なり: 一度に一つ。走っている間に、中身が変わったら、やめさせて（動いているプラグインも、その場で止める: `docs/lsp.md`「プラグインの診断」）、答えは、使わない。待たせるのは、最後に求めた一つ。終わるときは、やめさせて、止まるのを、5 秒まで待つ。`internal/project` の `Options.Context` を足した（やめさせる口）
@@ -742,7 +790,7 @@ namespace hozo.decisions {
      * 持ち主: `docs/lsp.md`「プラグインの診断」
      */
     @adr.proposed
-    D674;
+    D679;
 
     /**
      * 決定 D405 の、プラグインの check が、最後まで走らなかったとき: 言語サーバーだけの診断 LSP-2（warning。`hozo.toml` の 1 行 1 列）を足して、そこまでに返った診断と一緒に出す。サーバーは、止まらない
@@ -752,7 +800,7 @@ namespace hozo.decisions {
      * 持ち主: `docs/lsp.md`「診断」
      */
     @adr.proposed
-    D675;
+    D680;
 
     /**
      * 言語サーバーが、プラグインを起動してよいかを、受け取る口（決定 D412）: 起動のときは、`initialize` の `initializationOptions` の `{ "pluginChecks": true }`。動いている間は、通知 `workspace/didChangeConfiguration` の `settings` の `{ "hozo": { "pluginChecks": true } }`（サーバーは、起動し直さない）。真偽値として読めないものは、起動のときは、許していない、と読み、動いている間は、何も変えない（どちらも、誤りにしない）。許しが、なくなったら、覚えている答えも、捨てる（また許されたら、走り直す）
@@ -762,7 +810,7 @@ namespace hozo.decisions {
      * 持ち主: `docs/lsp.md`「プラグインの診断」の「許し」
      */
     @adr.proposed
-    D676;
+    D681;
 
     /**
      * VS Code 拡張の、許し方（決定 D412）: 許すのは、ワークスペースが信頼されていて、設定 `hozo.pluginChecks`（既定は、入）が入のとき。信頼していないワークスペースでは、設定 `hozo.hozocPath` も、ワークスペースの設定からは、読まない（`capabilities.untrustedWorkspaces.restrictedConfigurations`）: 信頼していないリポジトリの `.vscode/settings.json` が、言語サーバーとして起動する実行ファイルを、決められた（決定の言い方には、ない。同じ穴なので、一緒に、ふさいだ）。決める関数は、`src/trust.ts` に切り出し、エディタを立ち上げずに、確かめる
@@ -772,7 +820,7 @@ namespace hozo.decisions {
      * 持ち主: `docs/editors.md`「VS Code 拡張」
      */
     @adr.proposed
-    D677;
+    D682;
 
     /**
      * 例外の分類の細部: `as` の後ろに、例外のユニオンの名前を書ける（要素に展開する）。`as none` は、構文エラー。同じ例外を、二つのケースに書けば CLS-10。使えるのは、受けた例外の `match` だけ（ほかは MATCH-7、RES-4、STATE-7）。受けた例外の `match` に書けるのは、例外の分類だけ。漏れ（MATCH-10）は、検査の計算で確かめ、デコレータの本体の `try` では、適用ごとに確かめる。当たる例外のないケースは、診断しない。受けた例外の `match` は、文のほか、値の位置（`val x = match (e by C) { … }`）にも書ける
@@ -782,7 +830,7 @@ namespace hozo.decisions {
      * 持ち主: `docs/check.md`「分類」の「例外の分類」、`docs/grammar.md`「classify」
      */
     @adr.proposed
-    D678;
+    D683;
 
     /**
      * デコレータの本体の `try`: 包んだ関数の呼び出し は、`try` のブロックの、最初の文にだけ書け、`catch` のブロックには、書けない（DEC-19）。包んだ関数の呼び出し の例外を受けて、「返らない」でない `catch` を持つデコレータは、値を返す op と、`never` を返す op に、付けられない（DEC-27）。DEC-22（本体のあるデコレータは `catches` の節を持てない）は、残す
@@ -792,7 +840,7 @@ namespace hozo.decisions {
      * 持ち主: `docs/check.md`「デコレータの本体」、`docs/grammar.md`「デコレータの本体」
      */
     @adr.proposed
-    D679;
+    D684;
 
     /**
      * 例外を受ける文の、検査の計算: `try` と `catch` のブロックを、「動いたか、分からない」範囲として数える（`catch` のブロックが「返らない」なら、後ろの文から見て、`try` の中の効果は「起きている」、`catch` の中の効果は「ない」）。`throw e` は、受ける例外の集まりの、すべての出どころ（受けた例外の `match` のアームなら、そのアームが受けるケースの例外だけ）。成功のアームでは、`catch` が「返らない」でない文の、`try` と `catch` の中の効果は `unknown`
@@ -802,7 +850,7 @@ namespace hozo.decisions {
      * 持ち主: `docs/check.md`「計算」の「Sig(O, v)」の「例外を受ける文」
      */
     @adr.proposed
-    D680;
+    D685;
 
     /**
      * 基底 `go` の、例外を受ける文の出力: `try` のブロックは、その場で呼ぶ関数 `func(ctx context.Context) error { … }(ctx)`。受けるかは、runtime パッケージの `Exception` に当たるか（`errors.As`）で決め、計算した、受ける例外の集まりでは、決めない（仕様にない、仕様の例外を、葉が返したときも、受ける）。受けた例外の `match` は、型の `switch` で、残りのケースがない分類の `default` は、受けた失敗を、そのまま返す。`throw e` は、受けた失敗を、包み直さずに返す
@@ -812,7 +860,7 @@ namespace hozo.decisions {
      * 持ち主: `docs/plugin-go.md`「例外を受ける文」
      */
     @adr.proposed
-    D681;
+    D686;
 
     /**
      * 入口ごとの、求めるケースの形（決定 D409 の、言語に依らない分の切り方）: 本体が渡すのは、出どころと、差し替えに言うこと（相手の種類、FQN、通った名前空間。`docs/ir.md`「その名前空間から見た IR」の `Entry`）。にせものの、どのフィールドに言うかは、プラグインが決める。入れない理由（`why`）は、日本語の句で、文言は、決めない（利用者は、番号にして、英語の辞書を引く形にする、とした: 決定 D442。直すのは、後）
@@ -822,7 +870,7 @@ namespace hozo.decisions {
      * 持ち主: `docs/check.md`「入口ごとの、求めるケース」、`docs/ir.md`「その名前空間から見た IR」
      */
     @adr.proposed
-    D682;
+    D687;
 
     /**
      * 相手の入口は、op ごとに、流れの端（本体）。Go のにせものは、名前空間ごと: 呼ぶ op が、どれも入口の名前空間だけを、にせものにする（`shop-server` の `client` → `server`）
@@ -832,7 +880,7 @@ namespace hozo.decisions {
      * 持ち主: `docs/check.md`「入口ごとの、求めるケース」の「流れ」、`docs/plugin-go.md`「テストのにせもの」の「別の名前空間」
      */
     @adr.proposed
-    D683;
+    D688;
 
     /**
      * 例外を受ける文の中の、出どころ: `throw e` は、`try` の中の出どころを、そのまま。`catch` のブロックの `throw 例外` と、呼び出しの出どころには、`try` の中の、入れる、最初の出どころに投げさせて、入らせる。`throw 例外` の名前は `<op の FQN>.catch`（アームなら、後ろに `.<ケース>`）
@@ -842,7 +890,7 @@ namespace hozo.decisions {
      * 持ち主: `docs/check.md`「入口ごとの、求めるケース」の「例外を受ける文の中」
      */
     @adr.proposed
-    D684;
+    D689;
 
     /**
      * 受ける道のケース（決定 D419）: 数えるのは、`try` の中の出どころごと。テストの名前は `<op>/caught/<例外の名前>/<出どころ>`、口のメソッドは `Caught<例外の名前><出どころの名前>`。Hozo が作るケースは、成功の応答だけを確かめ、`Then` は、呼ばない。受けた後の道への用意は、足さない（`catch` が呼ぶものは、正常のケースの用意のまま、動く）。同じ出どころが、`try` の外でも投げうるなら、人が書く（にせものに、呼び出しごとの結果を言って、書く: `ReturnsAt`、`ThrowsAt`。決定 D424）
@@ -852,7 +900,7 @@ namespace hozo.decisions {
      * 持ち主: `docs/check.md`「入口ごとの、求めるケース」の「受ける道」、`docs/plugin-go-http.md`「インテグレーションテストの口」の「必要なケース」
      */
     @adr.proposed
-    D685;
+    D690;
 
     /**
      * 本体のないデコレータの `throws` は、継ぎ目の設定によらず、出どころに数える（種類 `decorator`）。継ぎ目がなければ、Go では、作れない。葉の op が、同じ例外を、節にも書いていれば、`decorator` の出どころだけを数える
@@ -862,7 +910,7 @@ namespace hozo.decisions {
      * 持ち主: `docs/check.md`「入口ごとの、求めるケース」の「出どころ」
      */
     @adr.proposed
-    D686;
+    D691;
 
     /**
      * テストのパッケージのファイルは、別の名前空間の型も、その型の置き場の、入口のパッケージから書く（実装は、前から、この形。文書に、例外として書き足した）
@@ -872,7 +920,7 @@ namespace hozo.decisions {
      * 持ち主: `docs/plugin-go.md`「単体テストの口」の「テストのパッケージ」
      */
     @adr.proposed
-    D687;
+    D692;
 
     /**
      * サンプルの、例外を受ける文の例: `shop-server` は、`resendNotices` の配送（`mailer.send`）を囲み、葉 `recordAudit` で記録して、`throw e` で投げ直す（op の関数の型と、テストの口が、変わらない形を選んだ）。`order-app` は、`payment.prepay` を、例外の分類 `PrepayFailure`（`Expected` / `Unexpected`）で、`notice.bestEffort` を、例外の分類 `Delivery`（`Undelivered` / `Other`）で書き直し、`payment.noteFailure` を、なくした
@@ -882,7 +930,7 @@ namespace hozo.decisions {
      * 持ち主: `tests/samples/shop-server/README.md`「例外を受ける文で足したこと」、`tests/samples/order-app/README.md`
      */
     @adr.proposed
-    D688;
+    D693;
 
     /**
      * 検査の op `check` は、コマンドではない、内部の葉の op として残した（`build` と `tests` の配線が呼ぶ）。その入力 `CheckInput` から、`@cli.flag` と `@cli.env` を外した。コマンドの入力と結果は `BuildInput` / `BuildResult`（前の `EmitInput` / `EmitResult`）。書き出す予定の model の名前は、`EmitPlan` のまま（`noEmit` を足した）。`docs/cli.md` の見出し「check」「emit」は、「build」の下の「検査」「書き出し」にして、ほかの文書の参照を、直した
@@ -892,7 +940,7 @@ namespace hozo.decisions {
      * 持ち主: `docs/cli.md`「cli.hozo」「build」
      */
     @adr.proposed
-    D689;
+    D694;
 
     /**
      * `wasm` のファイルが、あるかは、マニフェストを読むときには、確かめない。起動するときに、なければ `Crashed`（入っているだけで、使わないプラグインと、語彙だけのプラグインのために）
@@ -902,7 +950,7 @@ namespace hozo.decisions {
      * 持ち主: `docs/plugin-protocol.md`「マニフェスト `hozo-plugin.toml`」
      */
     @adr.proposed
-    D690;
+    D695;
 
     /**
      * WASM の実行環境は `github.com/tetratelabs/wazero` の v1.11.0。v1.12.0 は、Go 1.25 を要るので、選ばなかった（このリポジトリは Go 1.24.7）
@@ -912,7 +960,7 @@ namespace hozo.decisions {
      * 持ち主: `docs/packages.md`「依存の向き」
      */
     @adr.proposed
-    D691;
+    D696;
 
     /**
      * 途中で止められる形の WASM（実行環境の `WithCloseOnContextDone`）を使うのは、言語サーバーだけ。`hozoc build` と `hozoc tests` は、止められない、速い形で動かす: 止められる形は、五倍ほど遅い（`shop-server` の検査が、3 秒ほどから、13.7 秒に）。二つの形は、機械の言葉が違い、実行環境の置き場が、それを見分けないので、置き場を分けた（`wasm/` と `wasm-stoppable/`）
@@ -922,7 +970,7 @@ namespace hozo.decisions {
      * 持ち主: `docs/plugin-protocol.md`「起動」
      */
     @adr.proposed
-    D692;
+    D697;
 
     /**
      * 途中で止めた起動は、`Crashed` にせず、止める口（Context）の誤りを、そのまま返す（言語サーバーは、やめさせた check の答えを、捨てる。診断にも、LSP-2 にも、しない）
@@ -932,7 +980,7 @@ namespace hozo.decisions {
      * 持ち主: `docs/plugin-protocol.md`「起動」
      */
     @adr.proposed
-    D693;
+    D698;
 
     /**
      * 言語サーバーが、終わるとき、動いているプラグインは、その場で止める。前は、起動したプラグインが終わるのを、5 秒まで待った。待つ上限（5 秒）は、残した（止まるのが、間に合わないとき）
@@ -940,56 +988,6 @@ namespace hozo.decisions {
      * 別の案: 前のとおり、プラグインが終わるのを待つ
      *
      * 持ち主: `docs/lsp.md`「プラグインの診断」
-     */
-    @adr.proposed
-    D694;
-
-    /**
-     * 機械の言葉に直すのは、関数ごとに、コアの数だけ、並べて行う（実行環境の `experimental` の口。はじめての実行が、19 秒から 8.3 秒に）
-     *
-     * 別の案: 並べない（実行環境の、安定した口だけを使う）
-     *
-     * 持ち主: `docs/plugin-protocol.md`「起動」
-     */
-    @adr.proposed
-    D695;
-
-    /**
-     * `Makefile` の `build` は、`bin/hozoc-plugin-go-cli`（配るための、プラグインの実行ファイル）を作らなくなった。代わりに、`make plugins` が、`plugins/` の六つを WASM にビルドする（`build` は、それを先に行う）
-     *
-     * 別の案: `Makefile` に、WASM の作り方を、置かない
-     *
-     * 持ち主: `docs/testing.md`「プラグインの WASM」
-     */
-    @adr.proposed
-    D696;
-
-    /**
-     * サンプル `shop-server` の `go.mod` と `go.sum` を、`go mod tidy` で直した（`golang.org/x/sys` が v0.37.0 から v0.38.0 に）: リポジトリのモジュールが、`wazero` を通して、それを要るようになり、サンプルは、`replace` で、リポジトリのモジュールに依るので、直さないと、サンプルの中のプラグインを、ビルドできない
-     *
-     * 別の案: サンプルの中のプラグインを、サンプルとは別のモジュールにする
-     *
-     * 持ち主: `tests/samples/shop-server/README.md`「モジュール」
-     */
-    @adr.proposed
-    D697;
-
-    /**
-     * `cli.hozo` の model `Plugin` は、`name` と `wasm`（WASM のファイルのパス）だけにした。`command`、`dir`、`root` は、なくした（作業ディレクトリも、引数も、渡さないので）
-     *
-     * 別の案: `dir` を残して、`wasm` を、そこからの相対にする
-     *
-     * 持ち主: `docs/cli.md`
-     */
-    @adr.proposed
-    D698;
-
-    /**
-     * テストの、にせもののプラグインも、WASM で動かす。振る舞いを決めるファイルと、記録を、読み書きできるように、テストだけが呼べる口（`internal/plugin` の `MountForTest`。テストのプロセスでなければ、panic）で、にせものの置き場のディレクトリだけを、にせものに見せる。マニフェストからも、設定からも、コマンドからも、この口には、届かない
-     *
-     * 別の案: にせものを、WASM でなく、テストのプロセスの中の関数にする（WASM の起動を、通らない）。にせものに、振る舞いを、標準入力の要求に混ぜて渡す（要求の形が、本物と変わる）
-     *
-     * 持ち主: `docs/testing.md`「環境からの独立」
      */
     @adr.proposed
     D699;

@@ -1,0 +1,50 @@
+// BIND-4（docs/check.md「必須の入力」の「呼び出しの引数の外の、レコードリテラル」。決定 D548）: return、型を書いた val、
+// 値を入れる文、集める文、match のアームの本体、デコレータの本体の val。位置は、そのリテラル
+namespace a {
+  model U { id: string; name: string; note: string?; }
+  model W { u: U; tag: string; }
+  model Dog { name: string; owner: string; }
+  model Cat { lives: int; }
+  union Pet { D: Dog; C: Cat; }
+  classify K of U { A; B; }
+  fn mk(): U {
+    return { id: "x" };                // ERROR: BIND-4
+  }
+  fn mkW(): W {
+    return { u: { name: "n" } };       // ERROR: BIND-4
+  }
+  fn mkPet(): Pet {
+    return { name: "pochi" };          // ERROR: BIND-4
+  }
+  fn take(u: U);
+  fn takeAll(us: U[]);
+  fn f(us: U[]) {
+    val x: U = { name: "n" };          // ERROR: BIND-4
+    val y: U;
+    y = { id: "y" };                   // ERROR: BIND-4
+    val zs: U[];
+    for (val u of us) {
+      zs collect { id: "z" };          // ERROR: BIND-4
+    }
+    take(x);
+    take(y);
+    takeAll(zs);
+  }
+  fn g(u: U): U {
+    return match (u by K) {
+      A => { id: "a", name: "a" };
+      B => { id: "b" };                // ERROR: BIND-4
+    };
+  }
+  fn put(u: U);
+  decorator fn stamped(next: fn) {
+    val u: U = { id: "d" };            // ERROR: BIND-4
+    put(u);
+    next();
+  }
+  @stamped
+  fn h();
+}
+namespace b {
+  fn h();
+}

@@ -306,7 +306,7 @@ namespace flows {
 ## 同梱しない語彙
 
 - `cli`（`examples/hozoc.hozo` の `namespace cli { command / arg / flag / env / exitCode }`）: go-cli プラグインが `vocabulary` で提供する（`plugins/go-cli/cli.hozo`。宣言の全文と、出典から変えたところ（`arg` の位置、`flag` と `env` の省ける名前、足した `required` と `default`）の持ち主は `docs/plugin-go-cli.md`「語彙」）。`http` や `page` と同じく、意味をコードにするプラグインが語彙の持ち主になる。hozoc 自身は `hozo.toml` の単位の `transpilers = ["go", "go-valid", "go-cli"]` で読む。
-- `cache`（§4.2）: 今のスコープでは考えない（`docs/open.md`「スコープ外にした設計書の例」）。
+- `cache`（§4.2）: 今のスコープでは考えない（決定 D792）。
 
 ## 語彙の意味の実装
 

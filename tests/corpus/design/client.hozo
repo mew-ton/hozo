@@ -1,7 +1,7 @@
 // 設計書（mew-ton/drafts の hozo/README.md）§5〜§11 の `client` の例を一つにまとめたもの。
 // 設計書の言葉をそのまま写す。写せなかった箇所と足した宣言は、同じディレクトリの README.md に一覧する。
 // 各ブロックの上の `// §n.m` は、設計書のどの節の例かを示す。`// 追加:` は設計書にない宣言。
-// スコープ外（`docs/open.md`「スコープ外にした設計書の例」）: §8.1 の redirectOn / redirectToLogin、§11.1 の @cache と @redirectToLogin。
+// スコープ外（決定 D791、D792）: §8.1 の redirectOn / redirectToLogin、§11.1 の @cache と @redirectToLogin。
 
 namespace client {
   // ---- §5.2 model と状態 ----
@@ -168,7 +168,7 @@ namespace client {
   fn askWarrantyPlan(item: server.Item on WarrantyAvailable.Available): server.PlanId;
 
   // ---- §11.1 fetch の層 ----
-  // @redirectToLogin と @cache はスコープ外（docs/open.md「スコープ外にした設計書の例」）なので外し、配線だけを残す
+  // @redirectToLogin と @cache はスコープ外（決定 D791、D792）なので外し、配線だけを残す
 
   fn fetchMe(): server.PublicUser
     throws http.NetworkError, http.ServerError
