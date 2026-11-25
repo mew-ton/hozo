@@ -1,0 +1,12 @@
+{
+  "name": "hozo-secretlint",
+  "private": true,
+  "description": "CI の秘密の検出（docs/testing.md「CI」）。版を固めるためだけのパッケージ",
+  "engines": {
+    "node": ">=22"
+  },
+  "devDependencies": {
+    "@secretlint/secretlint-rule-preset-recommend": "13.1.0",
+    "secretlint": "13.1.0"
+  }
+}

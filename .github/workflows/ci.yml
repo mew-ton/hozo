@@ -41,3 +41,16 @@ jobs:
       - run: npm run build
       # TextMate の文法で実物の .hozo を字句に分け、scope を確かめる（docs/editors.md「TextMate の文法」）
       - run: npm test
+  # 秘密の検出（docs/testing.md「CI」）: リポジトリのすべてのファイルを SecretLint で調べる。版は tools/secretlint の package-lock.json
+  secretlint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: tools/secretlint/package-lock.json
+      - run: npm ci
+        working-directory: tools/secretlint
+      - run: tools/secretlint/node_modules/.bin/secretlint --secretlintrc tools/secretlint/.secretlintrc.json "**/*"
