@@ -808,15 +808,14 @@ namespace hozo.decisions {
      * `go-http` は、単位のオプション `maxBodyBytes`（正の整数。既定は 1048576）で持ち、`NewHandler` が、`mux` を
      * `http.MaxBytesHandler(mux, <値>)` で包んで返す。request body を読む経路がなくても、いつも包む。
      *
-     * @adr.context 生成したハンドラは、request body を、上限なしで、すべてメモリに読んでいた（#164 の 1）。人が NewHandler を
-     * http.MaxBytesHandler で包むことはできたが、超えた要求は 400 body: invalid JSON になっていた。
-     * 利用者は、三つの案（A: この決定の上限とオプション。B: 上限は人に任せ、413 だけ直す。C: 今のまま）から A を選んだ。
-     * 413 の本文の形と、いつも包むことは、聞かずに決めた。
+     * @adr.context 生成したハンドラは、request body を、上限なしで、すべてメモリに読んでいた（#164 の 1）。大きな本文を送られると、
+     * サーバーのメモリを使い切れる。上限は、どの経路にも要る、サーバーの決まりなので、request body を読まない経路も含めて包む。
      * @adr.consequence 生成したコードを、そのまま外に出しても、大きな request body でメモリを使い切らない。1 MiB を超える本文を
      * 受ける経路は、オプションで上限を上げる。
-     * @adr.alternative 上限は人に任せ（NewHandler を包む）、超えたときの応答だけを 413 に直す
+     * @adr.alternative 上限を持たない（これまでの形。文書は「本文の大きさは制限しない」と決めていた）: 大きな本文で、メモリを使い切れる
+     * @adr.alternative 上限は、使う側が NewHandler を http.MaxBytesHandler で包んで持ち、生成するコードは、超えたときの応答を 413 に
+     * するだけ: 包み忘れれば、上限がないままで、仕様にも、設定にも、上限が現れない
      * @adr.alternative 上限を超えた要求に、新しい例外（http.PayloadTooLarge など）を足す: 語彙の宣言が増え、クライアントの読み方が分かれる
-     * @adr.said A
      */
     @adr.proposed
     D793;
@@ -827,12 +826,13 @@ namespace hozo.decisions {
      * フィールド、配列の要素）の `null` は、今までどおり、「値の JSON」の読み方。
      *
      * @adr.context go-http は、キーがあれば、値が null でも、あるものと読んでいた（#164 の 2）。@http.required の項目に null を
-     * 送ると、400 にならず、零値のまま op に届いた。通信の形では、値のない項目は、キーを省く。
-     * 利用者は、四つの案（A: この決定。B: required だけ null を断る。C: null をいつも断る。D: 今のまま）から A を選んだ。
+     * 送ると、400 にならず、零値のまま op に届いた。通信の形では、値のない項目は、キーを省き、読む側は、キーがないことと null を、
+     * どちらも「ない」と読む（docs/plugin-http.md「値の JSON」の optional の行）。項目の null も、それにそろえる。
      * @adr.consequence 変わるのは @http.required と @http.default の項目だけで、ほかの項目の振る舞いは、今と同じ。
-     * @adr.alternative @http.required の項目の null だけを 400 にする: @http.default の項目に null を送ると、既定の値が入らない
+     * @adr.alternative 値が null でも、キーがあれば、あるものと読む（これまでの形）: @http.required の項目が、null で素通りする
+     * @adr.alternative @http.required の項目の null だけを 400 にする: @http.default の項目に null を送ると、既定の値が入らず、
+     * 同じ null が、デコレータによって、ないものとも、あるものとも読まれる
      * @adr.alternative null を、いつも 400 body: invalid JSON にする: 省略可能な項目に null を送るクライアントが、壊れる
-     * @adr.said A. null はキーがないのと同じ (Recommended)
      */
     @adr.proposed
     D794;
@@ -844,20 +844,21 @@ namespace hozo.decisions {
      * go-design が作り（出力先 `plugins/go-http/internal/spec`、`make generate` で作り直す）、go-http の単体テストが満たす。
      * go-http を使う人は、これらのテストを書かない。仕様は、`docs/plugin-go-http.md` の写しで、振る舞いの持ち主は、文書の見出し。
      *
-     * @adr.context #164 の 1 を、go-http の出力を直し、サンプルに、それを確かめるテストを足して進めたところ、利用者が、
-     * 振る舞いの決まりを Hozo の仕様に書き、そのテストを、仕様から作るよう求めた。形は、利用者が、三つの案（A: 要求として書き、
-     * go-design で口を作る。B: 生成したハンドラを op として書く。C: 先に issue にする）から A を、置き場は、三つの案
-     * （A: plugins/go-http の下。B: internal/gen の下。C: tests/ の下）から A を選んだ。仕様のファイルが、ルートの plugin_dirs の
-     * 下で sources から除かれると分かったとき、利用者は「プラグインのルートで hozo を使えばいい」と言った。
-     * 仕様を写しにしたことと、要求の名前、要求を満たすテストの形は、聞かずに決めた。
+     * @adr.context 生成するコードの振る舞いを決めても、それを確かめるテストが、決まりと結ばれていなければ、決まりが守られ続けることを、
+     * 誰も確かめない。決まりは Hozo の仕様に書き、テストは仕様から作るのが、Hozo の考えに合う。go-http を使う人のテスト（サンプルの
+     * テストなど）で確かめれば、使う人ごとに、同じテストを書くことになる。仕様のファイルは、ルートの hozo.toml の sources に入れられない
+     * （ルートの plugin_dirs の下は、いつも除かれる）ので、プラグインのディレクトリを、それ自体で一つのプロジェクトにする。
      * @adr.consequence 要求を足せば、Requirements のメソッドが増え、go-http のテストを書くまで、コンパイルできない。
-     * 自己生成と tests/generated_test.go は、プロジェクトを二つ扱う。plugins/go-http の置き場は、リポジトリの中にあるので、
-     * 一時ディレクトリでは、置き場への道の上のディレクトリだけを本物にし、ほかをリンクする。
+     * 自己生成と tests/generated_test.go は、プラグインのプロジェクトも扱う。置き場が、リポジトリの中にあるので、一時ディレクトリでは、
+     * 置き場への道の上のディレクトリだけを本物にし、ほかをリンクする。
+     * @adr.alternative 直した振る舞いを、使う人のテスト（サンプル shop-server のテスト）で確かめる: 決まりと、テストが結ばれず、
+     * 使う人ごとに、同じテストが要る
      * @adr.alternative 生成したハンドラを op として書き、基底 go の単体テストの口で求める: 振る舞いの分かれが型とケースで書けるが、
      * 書く量と、書けない穴が多い
-     * @adr.alternative 口を internal/gen の下に置く: プラグインのテストが internal/ を import する
+     * @adr.alternative 口を internal/gen の下に置く: プラグインのテストが internal/ を import することになり、依存の向きの決まりに反する
      * @adr.alternative 口を満たすテストを tests/ に置く: go-http の振る舞いのテストと、要求のテストが、別の場所に分かれる
-     * @adr.said go-http の仕様を hozo でちゃんと書いてあって、そのテストがそこから作られるべきだ　という話 go-http を使う側はそのテストをしなくていいんだよ
+     * @adr.alternative 仕様のファイルを、ルートの hozo.toml の sources に入れるため、plugin_dirs の下を除く決まりを変える: プラグインが
+     * 持つ語彙の .hozo まで、プロジェクトの仕様として読まれうる
      */
     @adr.proposed
     D795;
@@ -867,12 +868,12 @@ namespace hozo.decisions {
      * 読めない値で、op を呼ばずに 400 の `<場所> <名前>: invalid float`。通信の形の float は「10 進の小数か指数」で、有限の値だけ。
      * go-http 自身の要求 hozo.gohttp.Requirement.FiniteFloat に書き、そこから作るテストで確かめる（D795）。
      *
-     * @adr.context go-http は strconv.ParseFloat の読めるものを、そのまま op に渡していた（#164 の 3）。request body の JSON では、
-     * NaN と無限大は、もともと送れない。利用者は、三つの案（A: この決定。B: 通し、文書に書く。C: 今のまま）から A を選んだ。
-     * 要求の名前と、仕様の model TextItem は、聞かずに決めた。
-     * @adr.consequence クエリとヘッダで、NaN と無限大を受けていたクライアントは、400 になる。
-     * @adr.alternative 通して、文書に書く: 断るかどうかは、op の中身か、制約に任せる
-     * @adr.said A. 400 で断る (Recommended)
+     * @adr.context go-http は strconv.ParseFloat の読めるものを、そのまま op に渡していた（#164 の 3）。NaN と無限大は、通信の形の
+     * 「10 進の小数か指数」に入らず、request body の JSON では、もともと送れない。
+     * @adr.consequence クエリとヘッダで、NaN と無限大を送っていたクライアントは、400 になる。
+     * @adr.alternative strconv.ParseFloat の読めるものを、すべて読む（これまでの形）: 文書の通信の形と食い違い、NaN が op に届く
+     * @adr.alternative 読んで、通信の形の文書に「NaN と無限大も読む」と書き、断るかは、op の中身か制約に任せる: クエリと request body
+     * で、送れる値が食い違ったまま
      */
     @adr.proposed
     D796;
@@ -885,14 +886,12 @@ namespace hozo.decisions {
      * hozo.gohttp.Requirement.InternalErrorHook に書き、そこから作るテストで確かめる（D795）。
      *
      * @adr.context 生成したハンドラは、想定していない失敗を 500 にするだけで、エラーの中身を、どこにも渡していなかった（#164 の 4）。
-     * NewHandler を包んでも、エラーは見えない。利用者は、三つの案（A: この決定。B: log/slog に出す。C: 今のまま）について、
-     * 「やりすぎるとフレームワークになってしまうが、問題ないか？問題ないならA」と言い、口を一つに限る線引きを添えて、A にした。
-     * 名前（HandlerOption、WithInternalError）と、補助の形は、聞かずに決めた。
+     * NewHandler の外を包んでも、エラーは見えないので、使う側は、記録も通知もできない。生成するコードが、ロガーやミドルウェアの仕組みを
+     * 持ち始めると、フレームワークになるので、口は、ハンドラの中にしかない情報を渡すものに限る。
      * @adr.consequence 入口のパッケージの公開の名前が、NewHandler 一つから三つになる。GOHTTP-10 は、三つを見る。
      * 今の呼び出し NewHandler(ops) は、そのままコンパイルできる。
+     * @adr.alternative 500 のエラーを、どこにも渡さない（これまでの形）: 想定していない失敗を、使う側が記録できない
      * @adr.alternative 500 のとき、log/slog の既定に書く: API は変わらないが、生成したコードが、仕様にない出力を持つ
-     * @adr.alternative 今のまま、記録は op の側に任せる: op を呼ぶ前の失敗や、ハンドラの中の失敗は、記録できない
-     * @adr.said やりすぎるとフレームワークになってしまうが、問題ないか？問題ないならA
      */
     @adr.proposed
     D797;
@@ -901,10 +900,9 @@ namespace hozo.decisions {
      * 基底 go の例外の Error() は、今までどおり、例外の FQN だけを返し、引数の値を入れない。理由を、文書に書く。
      *
      * @adr.context #164 の 4 は、生成した例外の Error() が名前だけを返すことも挙げていた。WithInternalError（D797）で記録するとき、
-     * 引数は、値を errors.As で取り出せば読める。Error() に入れれば、引数の秘密（トークンなど）が、ログにそのまま出る。
-     * 利用者は、二つの案（A: 今のまま。B: 引数も入れる）から A を選んだ。
-     * @adr.alternative Error() に引数を入れる（"rate.LimitExceeded(retryAfter: 30s)"）: 記録は楽になるが、秘密がログに出る
-     * @adr.said A. 今のまま (Recommended)
+     * 引数は、値を errors.As で取り出せば読める。Error() の文言は、ログにそのまま出る。
+     * @adr.alternative Error() に引数を入れる（"rate.LimitExceeded(retryAfter: 30s)"）: 記録は楽になるが、引数の秘密（トークンなど）が、
+     * ログに出る
      */
     @adr.proposed
     D798;
@@ -916,15 +914,14 @@ namespace hozo.decisions {
      * そこから作るテストで確かめる（D795 と同じ形）。自己生成は、プラグインのプロジェクトを並べて扱う。
      *
      * @adr.context go-sqlite は REFERENCES を出すが、SQLite は既定で外部キーを確かめない（#164 の 5）。PRAGMA foreign_keys は
-     * 接続ごとの設定で、database/sql は接続をプールするので、生成したコードが一度実行しても、ほかの接続には効かない。
-     * 利用者は、三つの案（A: この決定。B: 文を実行するたびに効かせる。C: 今のまま）について、「PRAGMA foreign_keys を自動付与するか？
-     * というオプションにするか、Aかのいずれか」と言った。自動で付ける形は、プールのすべての接続に掛けるために、DB の開き方
-     * （driver.Connector を包む sql.OpenDB）を、生成したコードが引き受けることになるので、A にした。
-     * エラーの文言と、要求の名前は、聞かずに決めた。
+     * 接続ごとの設定で、database/sql は接続をプールするので、生成したコードが一度実行しても、ほかの接続には効かない。DSN で効かせれば、
+     * どの接続も同じなので、接続一つを確かめれば、効かせ忘れが、起動したときに分かる。
      * @adr.consequence DSN で外部キーを効かせていない使う側は、CreateTables が失敗するようになる。
-     * @adr.alternative オプションで、自動で効かせる: 生成したコードが、DB を開く関数（connector を包む）を持ち、使う側の sql.Open を替える
+     * @adr.alternative 外部キーを効かせるのは、このトランスパイラの外とし、確かめない（これまでの形）: 効かせ忘れると、REFERENCES が
+     * 黙って効かない
+     * @adr.alternative オプションで、生成したコードが自動で効かせる: プールのすべての接続に掛けるために、DB の開き方（driver.Connector を
+     * 包む sql.OpenDB）を、生成したコードが引き受けることになり、使う側の sql.Open の書き方が変わる
      * @adr.alternative 文ごとに、接続を取り出して PRAGMA を掛ける: 文ごとに一往復増え、Conn の形が変わる
-     * @adr.said PRAGMA foreign_keys を自動付与するか？というオプションにするか、Aかのいずれか
      */
     @adr.proposed
     D799;

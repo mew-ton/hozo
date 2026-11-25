@@ -11,17 +11,18 @@ namespace hozo.decisions {
      * go-sqlite 自身の要求 hozo.gosqlite.Requirement.NestedRollback に書き、そこから作るテストで確かめる。docs/plugin-go-sqlite.md の
      * 「入れ子の内側は、外側に加わるだけで、セーブポイントは、しない」を、置き換える。
      *
-     * @adr.context 入れ子の内側の失敗を、途中のデコレータが吸収して外側が成功すると、内側が失敗までに書いたものが確定していた
-     * （#164 の 6）。利用者は、別のデコレータ（db.savepoint）にする案を問い、焦点は「トランザクションの入れ子を明示したとき、
-     * それが savepoint と思われるかどうか」だと言った。ほかの仕組み（Django の atomic、Rails の transaction、Spring の REQUIRED と
-     * NESTED）では、入れ子の意味が分かれるが、内側の失敗の途中の書き込みが黙って確定するのは、Rails の既定だけ。期待が分かれるので、
-     * 語彙の文書に意味を書くことにし、三つの案（A: この決定。B: 外側ごと取り消す。C: 引数で書き分ける）から、利用者が A を選んだ。
-     * SAVEPOINT の名前と、取り消しに、中断されない ctx を使うことは、聞かずに決めた。
+     * @adr.context 入れ子の内側の失敗を、途中のデコレータが受けて（catches … recovers）外側が成功すると、内側が失敗までに書いたものが
+     * 確定していた（#164 の 6）。入れ子のトランザクションの意味は、ほかの仕組みでも分かれる（Django の atomic と SQLAlchemy の
+     * begin_nested は SAVEPOINT、Rails の transaction は外側に加わるだけ、Spring の REQUIRED は外側ごと取り消す）ので、読む人の期待に
+     * 任せず、語彙の文書に意味を書く。一つの op は、直にも、入れ子でも呼ばれうるので、意味が呼ばれ方で変わらないものにする。
      * @adr.consequence 入れ子の内側の失敗を受けて成功する外側は、内側の書き込みを、確定しなくなる。
-     * @adr.alternative 入れ子の内側が失敗すれば、外側が受けても、いちばん外側を取り消す（Spring の REQUIRED に近い）
+     * @adr.alternative 入れ子の内側は、外側に加わるだけ（これまでの形。Rails の既定と同じ）: 内側の失敗を受けると、途中の書き込みが、
+     * 黙って確定する
+     * @adr.alternative 入れ子の内側が失敗すれば、外側が受けても、いちばん外側を取り消す（Spring の REQUIRED に近い）: 途中の書き込みは
+     * 残らないが、失敗を受けて続ける外側の op も、失敗になる
      * @adr.alternative db.transaction(nested: …) で書き分ける: op を書く人が、呼ばれ方を知って選ぶことになる
-     * @adr.alternative db.savepoint を足す: 一つの op が、直にも入れ子でも呼ばれうるので、どちらを付けるかが、呼ばれ方で決まる
-     * @adr.said transaction をネストすることを明示的に指定するとき、それが savepoint と思われるかどうか？が焦点にあるかと思います。
+     * @adr.alternative SAVEPOINT 用のデコレータ（db.savepoint）を足す: 一つの op が、直にも入れ子でも呼ばれうるので、どちらを付けるかが、
+     * 呼ばれ方で決まる
      */
     @adr.proposed
     D800;
@@ -32,12 +33,10 @@ namespace hozo.decisions {
      * 決める形が持ち、トランスパイラは、出力先の言語の型によらずに、それを守る。ある言語の中だけの型の表し方が要るなら、それも、
      * その言語の語彙のデコレータで書く。持ち主は docs/requirements.md「型の仕組みは、出力先の語彙を持たない」。
      *
-     * @adr.context #164 の 7（日時の scalar を、Go では名前付きの型で出すので、JSON で文字列にならない）の直し方を相談したとき、
-     * 利用者が、この方針を述べ、文書に書かれていないなら不備だと言った。書かれていなかった。
+     * @adr.context Hozo の前からの方針だが、文書に書かれていなかった。#164 の 7（日時の scalar を、Go では名前付きの型で出すので、
+     * JSON で文字列にならない）を、型（scalar）の問題として扱いかけたことで、書かれていないことが分かった。
      * @adr.consequence 7 は、基底 go の scalar に JSON のメソッドを足すのではなく、go-http が、通信の形（scalar は、元の型の JSON）に
      * 合わせて直す（D802）。Go の型に JSON の形を任せている、ほかの所（go-cli の表示、go-sqlite の @db.json の中）は、未決の点に置いた。
-     * @adr.said hozo の基本方針は、model, fn などの基本的な型システムにおいては、変換後の言語に対する語彙を持たない前提としています。 (そう書いてないなら不備) で、それを、 SQL だったらどういう型にするか？などの補足をデコレータで行います この前提で考えると、 scalar Stamp は変です
-     * @adr.said 一方で、 Go 言語内でだけ使う model を定義したいケースがあるなら、 stamp 型をデコレータとして表現するべきです。
      */
     @adr.proposed
     D801;
@@ -49,10 +48,13 @@ namespace hozo.decisions {
      * hozo.gohttp.Requirement.ScalarJSON に書き、そこから作るテストで確かめる。
      *
      * @adr.context 基底 go の名前付きの型は、元の型の JSON の読み書き（MarshalJSON など）を引き継がないので、encoding/json に任せると、
-     * 日時の scalar の値が、文字列にならなかった（#164 の 7）。利用者は、型の仕組みが出力先の語彙を持たない前提（D801）で、
-     * 直すべきは、通信の形に合わせない go-http の側だ、という読み方を認めた（「あっています」）。表の名前と、補助の形は、聞かずに決めた。
+     * 日時の scalar の値が、文字列にならなかった（#164 の 7）。JSON の形は、型ではなく、http の語彙の通信の形が持つ（D801）ので、
+     * 合わせるのは go-http。
      * @adr.alternative 基底 go が、日時の scalar に、元の型へ委ねる JSON のメソッドを出す: 型の仕組みが、JSON という出力先の形を持つ
-     * @adr.said あっています
+     * @adr.alternative scalar を、構造体に埋め込む形（type Stamp struct{ time.Time }）にする: 変換の書き方が変わり、基底と相乗りの出力の
+     * 広い範囲が変わる
+     * @adr.alternative scalar を、別名（type Stamp = time.Time）にする: time.Time と区別できなくなり、制約のある scalar に Validate を
+     * 付けられない
      */
     @adr.proposed
     D802;
