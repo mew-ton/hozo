@@ -159,6 +159,7 @@ hozoc が起動するのは、WASM だけ（`docs/plugin-protocol.md`「マニ�
 
 - **秘密の検出。** ジョブ `secretlint` が、リポジトリのすべてのファイルを、SecretLint（推奨の規則の組 `@secretlint/secretlint-rule-preset-recommend`）で調べる。一つでも見つかれば、落ちる。道具の版と、規則の設定は `tools/secretlint/`（`package.json` と `package-lock.json` で版を固め、`npm ci` で入れる。設定は `.secretlintrc.json`）。手元では `(cd tools/secretlint && npm ci) && tools/secretlint/node_modules/.bin/secretlint --secretlintrc tools/secretlint/.secretlintrc.json "**/*"`。
 - **実行は、同時に一つだけ。** `main` への push と、どの PR の実行も、一つの組（`concurrency` の `group: ci`）に入れる。新しい実行が始まると、動いている実行と、待っている実行は、止まる（`cancel-in-progress`）。止められた実行は、緑ではない。
+- **決めていないこと: `hozoc tests --coverage`（`docs/cli.md`「tests」）を、CI の確かめに入れるか**（外からの指摘）。hozoc 自身に掛けると、今は、`compilertest` の口を満たすテストがないので、走っていないと出る（`docs/open.md`「サンプルと、hozoc 自身の仕様」）。
 
 ## トランスパイラのテスト
 
