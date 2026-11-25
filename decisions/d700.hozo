@@ -1,0 +1,805 @@
+// 決定の記録（700〜799）。名前空間 hozo.decisions。書き方は decisions/adr.hozo の頭のコメント。
+// コードには、ならない（hozo.toml の単位の対象ではない）。
+
+namespace hozo.decisions {
+  /** 決めたこと。700〜799 */
+  classify Decision700 of never {
+    /**
+     * 機械の言葉に直すのは、関数ごとに、コアの数だけ、並べて行う（実行環境の `experimental` の口。はじめての実行が、19 秒から 8.3 秒に）
+     *
+     * 別の案: 並べない（実行環境の、安定した口だけを使う）
+     */
+    @adr.proposed
+    D700;
+
+    /**
+     * `Makefile` の `build` は、`bin/hozoc-plugin-go-cli`（配るための、プラグインの実行ファイル）を作らなくなった。代わりに、`make plugins` が、`plugins/` の六つを WASM にビルドする（`build` は、それを先に行う）
+     *
+     * 別の案: `Makefile` に、WASM の作り方を、置かない
+     */
+    @adr.proposed
+    D701;
+
+    /**
+     * サンプル `shop-server` の `go.mod` と `go.sum` を、`go mod tidy` で直した（`golang.org/x/sys` が v0.37.0 から v0.38.0 に）: リポジトリのモジュールが、`wazero` を通して、それを要るようになり、サンプルは、`replace` で、リポジトリのモジュールに依るので、直さないと、サンプルの中のプラグインを、ビルドできない
+     *
+     * 別の案: サンプルの中のプラグインを、サンプルとは別のモジュールにする
+     */
+    @adr.proposed
+    D702;
+
+    /**
+     * `cli.hozo` の model `Plugin` は、`name` と `wasm`（WASM のファイルのパス）だけにした。`command`、`dir`、`root` は、なくした（作業ディレクトリも、引数も、渡さないので）
+     *
+     * 別の案: `dir` を残して、`wasm` を、そこからの相対にする
+     */
+    @adr.proposed
+    D703;
+
+    /**
+     * テストの、にせもののプラグインも、WASM で動かす。振る舞いを決めるファイルと、記録を、読み書きできるように、テストだけが呼べる口（`internal/plugin` の `MountForTest`。テストのプロセスでなければ、panic）で、にせものの置き場のディレクトリだけを、にせものに見せる。マニフェストからも、設定からも、コマンドからも、この口には、届かない
+     *
+     * 別の案: にせものを、WASM でなく、テストのプロセスの中の関数にする（WASM の起動を、通らない）。にせものに、振る舞いを、標準入力の要求に混ぜて渡す（要求の形が、本物と変わる）
+     */
+    @adr.proposed
+    D704;
+
+    /**
+     * リポジトリのプラグインの WASM は、プラグインのディレクトリの `plugin.wasm` に、テストと `make generate` が、ビルドして置く（`internal/wasmbuild`。同時にビルドしないように、鍵のファイルで、順に）。リポジトリには、入れない（`.gitignore`）。`CLAUDE.md`「確かめ方」の四つは、変えていない（三つ目は、一つ目か二つ目が置いた WASM を使う）
+     *
+     * 別の案: ビルドした WASM を、リポジトリに入れる（ソースと、ずれうる。6 MB ずつ）。`make plugins` を、確かめに足す
+     */
+    @adr.proposed
+    D705;
+
+    /**
+     * プラグインの単体テストが、基底の出力を作るために、基底のプラグインを、ふつうの Go のプログラムとして、じかに走らせる道具（`plugins/*／internal/*／fixtures_test.go` など）は、そのままにした: hozoc の起動を通らない、テストの道具で、プラグインの中身は、同じ Go のコード
+     *
+     * 別の案: これも、WASM で走らせる（テストが、遅くなる）
+     * （元の行の、コメントを閉じる二字（* と /）は、コメントが、そこで終わるので、`*／` と書いた）
+     */
+    @adr.proposed
+    D706;
+
+    /**
+     * GOHTTP-* の仕分け: 言語に依らない 15 個を、HTTP-1〜HTTP-15 に移し、番号は、1 から詰めて振り直した（GOHTTP-12〜15、17〜19 が、HTTP-9〜15）。GOHTTP-16（省略可能な配列を返す経路）は、Go に固有として、残した: 通信の上の形は、204 と `[]` を分けられる。GOHTTP-19（補う値と、制約）は、移した: 語彙のプラグイン `http` が、`plugin/validvocab` の `CheckLiteral` を使う（はじめは `plugin/govalid` にあり、`valid` の語彙のプラグインを作ったときに、移した）
+     *
+     * 別の案: GOHTTP と同じ番号のまま移す（HTTP-9〜11、16 が、はじめから、ない）。GOHTTP-16 も移す（どの言語のサーバーにも、同じ経路を断らせる）。GOHTTP-19 は、`valid` の語彙のプラグインができるまで、`go-http` に残す
+     */
+    @adr.proposed
+    D707;
+
+    /**
+     * HTTP-8（同じメソッドとパス）は、一つの名前空間の中で比べる（前は、単位の対象の op の中: `in` で分けた二つの単位が、同じ経路を、別々に持てた）。検査の範囲（どの名前空間の経路も。単位に依らない）は、利用者が、確かめた（決定 D429）
+     *
+     * 別の案: 単位の対象の op の中で、比べる
+     */
+    @adr.proposed
+    D708;
+
+    /**
+     * 決定 D429 で直した仕様の、直し方: サンプル `order-app` の、外の仕組みの、依頼の model の 20 のフィールドは、すべて `@http.body`（どれも `@http.post` の経路）。コーパス `tests/corpus/design` の `requestPasswordReset` の入力の model は、`PasswordResetInput`（フィールドは `@http.body email: Email` 一つ）
+     *
+     * 別の案: 相手の API の実際の形に合わせて、一部を、ヘッダかクエリにする（冪等性のキーを、ヘッダにする、など）
+     *
+     * 持ち主: `tests/samples/order-app/external/`、`tests/corpus/design/server.hozo`
+     */
+    @adr.proposed
+    D709;
+
+    /**
+     * HTTP-* の診断のメッセージ: 型は、言語の綴り（`ir` の型の `String`: 絞り込んだ型は `T on C.K`）で書く（前は、Go の基底の「型の表示」で、絞り込みを書かなかった）。HTTP-1 から、Go の言い方（「入口の `Ops` のメソッドとして op を呼ぶ」）を外した
+     *
+     * 別の案: 前の書き方のまま（語彙のライブラリが、`plugin/golang` を使う）
+     *
+     * 持ち主: `plugin/httpvocab`
+     */
+    @adr.proposed
+    D710;
+
+    /**
+     * GOVALID-* の仕分け: GOVALID-1（制約の使い方の誤り）を、条件ごとに、四つの VALID-1〜VALID-4 に分けて、語彙のプラグイン `valid` に移した（メッセージは、同じ）。GOVALID-5（利用者が `valid` に足した制約）は、Go に固有として、残した: 足した制約を、受け取る形がないのは、`go-valid` の都合で、語彙のプラグイン `valid` は、足した制約を、読まない（診断にも、しない）。GOVALID-3、4、6、7 は、Go の出力の形の診断で、残した
+     *
+     * 別の案: GOVALID-1 を、一つの VALID-1 のまま移す。GOVALID-5 も移す（足した制約を、言語に依らず、断る）
+     */
+    @adr.proposed
+    D711;
+
+    /**
+     * `requires_vocabulary = ["valid"]` を書くのは、`go-valid` だけ。`go-http` と `go-cli` は、`@valid.*` を読む（補う値の検査、`Validate` を持つ型）が、`requires` に `go-valid` を持ち、単位に `go-valid` が並ぶので、書かない。`go-sqlite`、`go-design`、基底 `go` は、`valid` を読まない
+     *
+     * 別の案: `valid` を読むトランスパイラの、すべてに書く
+     */
+    @adr.proposed
+    D712;
+
+    /**
+     * GOSQL-* の仕分け: デコレータと宣言の整合の検査 19 個を、DB-1〜DB-19 に移し、番号は、もとの順のまま、1 から詰めて振り直した（対応は `docs/plugin-go-sqlite.md`「診断」の「欠番」）。残したのは、しまい方の四つ（利用者が、確かめた: 決定 D431）と、GOSQL-4、GOSQL-6、GOSQL-29（継ぎ目の実装を置くファイルがない: Go の出力の都合）、GOSQL-33（`throws` に、`@db.conflict` が名指ししていない例外: `docs/vocab.md` は、決まりとして言っていない。投げられないのは、このトランスパイラ）。GOSQL-15 の「キーでない列を一つも持たない」（書き換えるものがない）は、キーがないことと一緒に、移した
+     *
+     * 別の案: GOSQL-33 も、語彙の決まりとして移す（デコレータで中身が決まる効果は、ほかの例外を投げない）。GOSQL-15 の「キーでない列がない」は、SQL の都合として、`go-sqlite` に残す
+     */
+    @adr.proposed
+    D713;
+
+    /**
+     * 語彙のプラグイン `db` は、名前空間を、一つずつ見る: 表の状態も、`@db.ref` の指す先も、`read` と効果も、宣言した名前空間のもの（`go-sqlite` が、単位の名前空間 N で見ていたのと、同じ見方）。同じ model を、二つの名前空間が、表の model にしてよい。`@db.transaction` は、確かめない（表の状態のない名前空間の op に付いていることは、`go-sqlite` の GOSQL-29 のまま）
+     *
+     * 別の案: `@db.transaction` の付いた op の名前空間に、表の状態がないことも、語彙のプラグインが断る
+     */
+    @adr.proposed
+    D714;
+
+    /**
+     * DB-* のメッセージ: 型は、言語の綴り（`ir` の型の `String`。絞り込んだ型は `T on C.K`。`http` と同じ）。DB-19 の「引数を持つ」の文面から、「このトランスパイラは、値を埋められない」を外し、「`@db.conflict` は、値を埋める書き方を持たない」にした（語彙のプラグインは、トランスパイラでない）。ほかの文面は、GOSQL-* のまま
+     *
+     * 別の案: 前の文面のまま
+     */
+    @adr.proposed
+    D715;
+
+    /**
+     * コーパス `tests/corpus/view` の直し（決定 D429 の当てはめ）: `read api.sessionsOf` の `@db.where("revoked", false)`、`@db.where("kind", "web")` が、表の model `api.Session` にない列を名指ししていた（DB-4）ので、`api.Session` に、フィールド `revoked: boolean`、`kind: string` を足した（期待する View は、その二つのフィールドの分だけ変わった）
+     *
+     * 別の案: `@db.where` の列を、今あるフィールドに変える（`tests/view_test.go` が、二つのリテラルの種類を、名指しで確かめているので、テストも変わる）
+     *
+     * 持ち主: `tests/corpus/view/api.hozo`
+     */
+    @adr.proposed
+    D716;
+
+    /**
+     * CFG-26 は、`unsupported`（CFG-6）と、別に出す: どのトランスパイラも解釈せず、単位のトランスパイラが `unsupported` に書いたデコレータには、同じ所に、二つの warning が出る
+     *
+     * 別の案: CFG-6 が出る所には、CFG-26 を出さない
+     */
+    @adr.proposed
+    D717;
+
+    /**
+     * CFG-26 のメッセージは、消す道を示す: `decorator fn` なら「本体を書く」、いつも「トランスパイラを並べる」、節も `@entry` も持たない宣言なら「`@hint` を付ける」。位置は、付けた所。名前付きデコレータを通した適用は、その名前で言う
+     *
+     * 別の案: 解釈するトランスパイラ（入っているプラグインのうち、`interprets` に持つもの）の名前を、メッセージに示す
+     */
+    @adr.proposed
+    D718;
+
+    /**
+     * 標準のプラグインの `interprets`: `go-valid` は `valid` の五つ、`go-http` は `http` の十一（`http.retry` を除く）、`go-sqlite` は `db` の二十（`db.transaction` は `seams`）、`go-cli` は `cli` の七つ、`go-design` は `prd.business.flow`、`prd.usecase.of`、`prd.ref`。基底 `go` は、持たない。`go-cli` と `go-http` が、確かめのために読む `valid` の制約は、書かない（解釈するのは、`requires` の `go-valid`）
+     *
+     * 別の案: 読むものを、すべて書く
+     */
+    @adr.proposed
+    D719;
+
+    /**
+     * 版の合わせ方の細部: 版の文字列は、十進の数二つを `.` でつないだもの（符号、空白、三つ目の数は、読めない: MAN-2）。hozoc は、要求の `protocol` に、自分の版を書く（マニフェストの知らないキーを MAN-4 のままにすることは、利用者が、確かめた: 決定 D435）
+     *
+     * 別の案: 三つ目の数（直しの版）も読む
+     */
+    @adr.proposed
+    D720;
+
+    /**
+     * コーパス（`tests/corpus/design`、`view`、`units`、`model`）は、単位を基底だけのままにし、CFG-26 を、ゴールデン（`check.txt`）に持たせた（64、35、5、1）。`model` の、印のデコレータ `marks.context` と `marks.manual` に `@hint` を付けた（`marks.requirement` は、節を持つので、付けられず、warning が一つ残る）。コーパスを、診断のない入力として使うテストは、にせもののトランスパイラに `interprets` を名乗らせた（`internal/fakeplugin` の `DesignDecorators`）。規則の例（`tests/rules`）は、既定の fixture の `go` に、例のデコレータ（105 個）を `interprets` として並べた
+     *
+     * 別の案: コーパスの単位に、解釈するトランスパイラを並べて、warning をなくす。規則の例の、既定の設定から、単位を外す
+     */
+    @adr.proposed
+    D721;
+
+    /**
+     * `internal/syntax/testdata/hozoc.hozo`（設計書の `examples/hozoc.hozo` を写した、構文解析のテストの入力。自分で `namespace proc` を宣言し、`@proc.stdio("{plugin.command}")` を書く）は、そのまま残した: 標準の語彙を使わない、解析の入力で、出典の写し
+     *
+     * 別の案: 出典から離して、`proc` を外す
+     *
+     * 持ち主: `internal/syntax/testdata_test.go`
+     */
+    @adr.proposed
+    D722;
+
+    /**
+     * 包んだ関数の引数（決定 D447）の、断り方の切り方: 型の位置の `fn` を、書けない所に書いたとき（二つ目以降の引数、残りの引数、`?` か `[]` を付けた、`for` の形のデコレータの引数、関数の引数、フィールド）は、SYNTAX（文法で閉じる）。本体と、この引数が、そろっていないとき（本体があるのに、ない。本体がないのに、ある。ほかの引数と同じ名前）は、新しい DEC-28。この引数を、呼び出しでない位置に書いたときは、DEC-19（DEC-19 から、「本体の外の `proceed()`」の条件は、なくなった: 今は、ふつうの名前で、宣言がなければ RES-1）
+     *
+     * 別の案: `fn` の位置の誤りも、DEC-28 にする。値の位置は、新しい ID にする
+     */
+    @adr.proposed
+    D723;
+
+    /**
+     * 包んだ関数の引数を持たない、本体のあるデコレータ（DEC-28）の、本体の読み進め方: なくした書き方 `proceed()` は、その名前の op が見えていなければ、包んだ関数の呼び出しとして読み、RES-1 を重ねない。DEC-20（ちょうど一度）は、出さない。ほかの引数と同じ名前を付けたとき（DEC-28）、本体の中のその名前は、包んだ関数を指す
+     *
+     * 別の案: `proceed()` を、RES-1 にする
+     */
+    @adr.proposed
+    D724;
+
+    /**
+     * 包んだ関数の引数の、診断の文面: 構文解析と、名前の解決の診断（SYNTAX、DEC-19、DEC-20、DEC-28）は、書いた名前で言う（`next()`）。IR だけを見る検査（DEC-25、DEC-27）は、名前を知らないので、「包んだ関数の呼び出し」と言う
+     *
+     * 別の案: IR に、名前を足して、どの診断も、名前で言う（IR の項目が増える）
+     */
+    @adr.proposed
+    D725;
+
+    /**
+     * 基底 `go` が、外側のメソッドに書くコメントの文面を、変えた: 「proceed() が、内側（…）を呼ぶ」を、「包んだ関数の呼び出しが、内側（…）を呼ぶ」に（IR は、名前を持たないので、書いた名前では、言えない）。サンプル `shop-server` の、手で書いた期待する出力（`gen/server/inner/wiring.go` の一行）を、手で直した。コードは、変わらない
+     *
+     * 別の案: コメントから、その一文を外す
+     */
+    @adr.proposed
+    D726;
+
+    /**
+     * 言語サーバーの、包んだ関数の引数: 宣言と、本体の中の呼び出しから、定義へ移れる。ホバーは、見出し（付ける側が書く引数だけの、デコレータの宣言）と、`<名前>: fn` の一行。デコレータ自身のホバーの見出しには、出さない（IR の `Decorator.params` に、入らない）。ドキュメンテーションコメントの `@param` では、指せない（DOC-1: 付ける側が書く引数では、ない）。エディタの色付けは、型の位置の `fn` を予約語として塗るだけで、名前と呼び出しに、特別な scope は付けない
+     *
+     * 別の案: 見出しに、包んだ関数の引数も出す。`@param` で、説明を書ける
+     */
+    @adr.proposed
+    D727;
+
+    /**
+     * 核の型と形の名前を、予約語から外したとき（決定 D448）、同じ名前を、宣言の名前にできない宣言の種類: `model`、`scalar`、`union`、`exception`、`classify`（13 語のどれでも。RES-7。新しい ID）。関数、`read`、効果、`state`、デコレータ、名前空間、引数、`val` の名前には、書ける
+     *
+     * 別の案: 型になる宣言（`model`、`scalar`、`union`）だけを、断る。`classify` は、`by` の位置で読む `list` と `nullable` だけを、断る。RES-6（重複）として出す
+     */
+    @adr.proposed
+    D728;
+
+    /**
+     * 決定 D448 の、読み分け: 型の位置では、要素が一つの名前が、13 語のどれかなら、名前の解決を通さず、いつも、その型。`match` の `by` の後ろの、要素が一つの `list` / `nullable` は、いつも、標準の分類（`single` は、今までどおり SYNTAX）。要素が二つ以上の名前（`time.Slot`）は、先頭が名前空間の、ふつうの名前（名前空間の名前に、13 語を書ける）。分類の対象を書く位置（`classify … of` の後ろ、ケースの `as` の前）は、型の位置なので、13 語と同じ名前の op や状態を、対象にするときは、修飾して書く。型の位置の `void` と `never`、`<` のない形の語は、今までどおり SYNTAX（文面も、同じ）
+     *
+     * 別の案: 分類の対象の位置では、同じ名前の op や状態を、先に探す。名前空間の名前には、13 語を書けなくする
+     */
+    @adr.proposed
+    D729;
+
+    /**
+     * 決定 D448 の、エディタの色付け: 13 語は、型の位置の規則の中でだけ、核の型として塗る（`token.TypeNames` から作る、専用のパターン）。名前の位置（引数、`val`、関数の名前）は、塗らない。`:` の後ろは、レコードリテラルの値でも、型の位置として読むので、そこでは、値の名前でも塗られる。13 語をフィールド名に書いたとき（`string: string;`、`override string;`）は、scope を付けない（前は、予約語のフィールド名として `variable.other.property.hozo`）
+     *
+     * 別の案: フィールド名の位置の 13 語に、今までどおり、`variable.other.property.hozo` を付ける。どの位置でも、核の型として塗る
+     */
+    @adr.proposed
+    D730;
+
+    /**
+     * 決定 D448 で、`internal/sema` が `internal/syntax/token` を import する（13 語の並びの持ち主が、`token.TypeNames`）
+     *
+     * 別の案: 並びを、`ir` か `internal/syntax/ast` に置く
+     */
+    @adr.proposed
+    D731;
+
+    /**
+     * 配線の op の節の warning（決定 D451）の ID と形: 効果は EFF-4、読む状態は READS-3 の、二つ。「計算した分」は、その節を書かなかったものとして計算した、その op の効果（F）と、読む状態（R）: 本体が行き着くもの、運ばれたもの、付いたデコレータの本体と `halts` が足すもの。効果ごと（ユニオンは、展開した効果ごと）、状態ごと（`read` の宣言は、その宛先）に一つ。位置は、op（IR は、節の要素の位置を持たない。デコレータを付けた op では、デコレータの行から）。効果は、書き方ごとに別のもの（`docs/check.md`「節に書く要素」）なので、本体が `sendMail(…)` を呼び、節に、その宛先 `mails.post` を直に書けば、出る
+     *
+     * 別の案: 一つの ID にする。位置を、節の要素にする（IR に、要素の位置を足す）。宛先が同じなら、同じ効果と見て、出さない
+     */
+    @adr.proposed
+    D732;
+
+    /**
+     * 決定 D451 の対象は、配線の op の節だけ。本体のあるデコレータ（`decorator fn … { }`）の `reads` / `effects` の節に、本体が行わないものを書いても、出さない（決定の文面が、配線の op。運ばれたものは、付けた op の「計算した分」に入る）。呼び出しが循環している op（WIRE-7）にも、出さない
+     *
+     * 別の案: 本体のあるデコレータの節にも、同じ warning を出す
+     */
+    @adr.proposed
+    D733;
+
+    /**
+     * 決定 D451 で、規則の例 `tests/rules/STATE-5/ok_2.hozo` から、本体にないものを節に書く op（`extra`）を外し、`carried` の `reads rows` を、デコレータが運ぶ `reads seen` に変えた（通る例に、診断は置けない）。本体にないものを書いても、エラーにならず、warning だけが出ることは、`tests/rules/EFF-4/ng_1.hozo` と `tests/rules/READS-3/ng_1.hozo` が確かめる
+     *
+     * 別の案: 例を、そのまま残せるように、通る例にも、warning の注釈を許す
+     */
+    @adr.proposed
+    D734;
+
+    /**
+     * RES-8（語彙の名前空間に、仕様から足せない。決定 D456）の細部: 報告は、仕様の側の `namespace` のブロックごとに一つで、位置は、その名前（入れ子では、いちばん外側）。ブロックの中の宣言は、表には登録する（使う所に RES-1 を重ねない。語彙の宣言と同じ名前なら、RES-6 も出る）。閉じるのは、語彙のファイルが `namespace` で書いた名前空間と、その下: 語彙が宣言したのが、下の名前空間だけ（`acme.auth`）なら、上（`acme`）は、閉じない。グローバルは、対象外（語彙とのぶつかりは、今までどおり RES-6 / NS-3）
+     *
+     * 別の案: 宣言ごとに、一つずつ報告する。足した宣言を、表に登録しない（使う所が RES-1 になる）。語彙が、下の名前空間を宣言したら、いちばん上の名前空間から、閉じる
+     */
+    @adr.proposed
+    D735;
+
+    /**
+     * 付け直し（決定 D455、D462）の後の、語彙の型の置き場の単位: コーパス `design` と `view` は、`namespace = "browser.page"`、`out = "gen/page"`（Go のパッケージ名は、名前空間の最後の要素 `page` のままで、生成物の置き場も、import も、変わらない）。例外の、通信の上の名前は `browser.page.Aborted`
+     *
+     * 別の案: `namespace = "browser"`、`out = "gen/browser"`（`browser` と `browser.page` を、一つの単位で出す。`browser` の直下は、デコレータだけで、型がない）
+     *
+     * 持ち主: `tests/corpus/design/hozo.toml`、`tests/corpus/view/hozo.toml`
+     */
+    @adr.proposed
+    D736;
+
+    /**
+     * 同梱の語彙の、名前空間のブロックに、説明のコメントを足した（`/** ブラウザの語彙: … *／ namespace browser`、`/** ページの語彙: … *／ namespace page`、`/** 製品の要求（PRD）の語彙: … *／ namespace prd`）。基底 `go` が出す `doc.go` の、パッケージの説明が、それになる（前は「Package page は名前空間 page。」）
+     *
+     * 別の案: コメントを足さない
+     *
+     * 持ち主: `vocab/browser.hozo`、`vocab/prd.hozo`
+     * （元の行の、コメントを閉じる二字（* と /）は、コメントが、そこで終わるので、`*／` と書いた）
+     */
+    @adr.proposed
+    D737;
+
+    /**
+     * サンプル `order-app` の `@prd.promise` の移し先（決定 D456）: 名前空間 `pact`（`vocab/pact.hozo`、`@pact.promise`）。デコレータの名前 `promise` は、README が、何度も名指しするので、変えていない
+     *
+     * 別の案: 名前空間を `promise` にして、デコレータの名前を変える（`@promise.made` など）。`order-app` の、業務の名前空間の一つに置く
+     *
+     * 持ち主: `tests/samples/order-app/vocab/pact.hozo`
+     */
+    @adr.proposed
+    D738;
+
+    /**
+     * 設計のコーパスの `checkDigit`（決定 D463）: `server.hozo` の先頭の `namespace valid { … }` のブロックを、そのままの位置で、`namespace server { … }` に替えた（同じ名前空間を、二度書く形。後ろの行番号が、変わらない）。使う側は `@checkDigit`
+     *
+     * 別の案: `server` の、はじめのブロックの中に、移す（テストが名指しする行番号が、ずれる）
+     *
+     * 持ち主: `tests/corpus/design/server.hozo`、`tests/corpus/design/README.md` の表の 10
+     */
+    @adr.proposed
+    D739;
+
+    /**
+     * NS-3（語彙どうしが、同じ名前を、グローバルに宣言）の例: 標準の語彙が、グローバルに宣言を持たなくなった（`@localStorage` を `browser` の下に動かした）ので、二つのプラグインの語彙のファイル（`vocplug`、`vocplug2`）で、起こす。`internal/sema` の `TestDuplicatePosition` も、同じ
+     *
+     * 別の案: 標準の語彙に、グローバルの宣言を、一つ残す
+     *
+     * 持ち主: `tests/rules/NS-3`
+     */
+    @adr.proposed
+    D740;
+
+    /**
+     * GOVALID-5（標準でない `valid` の制約。決定 D463 で、残した）の、起こし方と文面: 仕様からは、`valid` に足せないので、単体テストの入力 `govalid5` は、fixture のプラグイン `morevalid` の語彙のファイルが、`valid` に足す形にした（場合は、同じ四つ）。メッセージの括弧は、「（valid の、標準の五つのほかの制約を確かめる形は、まだない）」に変えた（前は「利用者が valid に足した制約を…」）。`plugin/validvocab` の入力 `clean` は、設定なしで読む（単位に依らない）ので、プラグインの語彙を足せない: 仕様からは、制約の宣言と、二つの使い方を外し、単体テストが、読んだ後の IR に、`@valid.checkDigit` を足す（`addCustom`。確かめる場合は、同じ）
+     *
+     * 別の案: GOVALID-5 を欠番にする（ほかのプラグインの語彙が `valid` に足す場合を、決めていない点として、扱わない）。`clean` の入力を、設定つきで読めるように、fixture のテストを広げる
+     */
+    @adr.proposed
+    D741;
+
+    /**
+     * hozoc 自身の仕様の、名前空間の付け直し（決定 D468）の細部: 生成物の置き場は `internal/gen/hozo/compiler`（`hozo.plugin`、`hozo.ide` が、横に並ぶ形）。Go のパッケージ名は、名前空間の最後の要素の `compiler`。手書きのコードは、`compiler.Leaves` のように書く。仕様のファイルは、ルートの `cli.hozo` のまま。例外の名前の表示（`--format json` の `"error"`、`internal/plugin` のエラーの文面）は `hozo.compiler.Crashed` など。コマンドの名前 `hozoc` と、`cmd/hozoc` は、変えていない
+     *
+     * 別の案: 置き場を `internal/gen/hozoc` のままにし、import に名前を書く。仕様のファイルを `hozo/compiler.hozo` に移す。表示は、短い名前（`Crashed`）にする
+     */
+    @adr.proposed
+    D742;
+
+    /**
+     * hozoc の担い手は、四つ: `Agent`（AI。`@prd.actor.ai`）、`Engineer`（人）、`Ci`（ボット）、`Designer`（人。設計する人。IDE を、Hozo に写したときに、足した: `ide.hozo`）。担い手の分け方（していることで分ける。エディタは、入口で、担い手ではない。設計する人は、IDE を書くときに足す）は、利用者が、確かめた（決定 D474）。ユースケースへの結び方（決定 D472、D473 の後）: `verify`（検査する）と `confirmTests`（求めるテストが走ったかを確かめる）は、`Agent`、`Engineer`、`Ci`。`preview`（書き出す予定を見る）と `write`（書き出す）は、`Agent`、`Engineer`。`serve` は `Engineer`（決定 D474）。`Ci` を `verify` に入れた根拠は、`docs/testing.md`「CI」（このリポジトリの CI が、`hozoc build --no-emit` を走らせる）、`confirmTests` は `docs/cli.md`「tests」（利用者か CI）。`write` に `Ci` を入れなかったのは、こちらが、決定 D472 の理由に、例として書いた言い方（「CI は、検査する」「人と AI は、書き出す」）を、写したため（利用者の言葉では、ない。文書に、根拠は、ない）: このリポジトリの CI は、生成物の一致を確かめるために、書き出しも走らせている（`docs/testing.md`「生成物の一致」）。UI で読み、手直しする人（エンジニアでない人）は、入れていない
+     *
+     * 別の案: 担い手を、「利用者」の一つにまとめる。UI で読む人も入れる。`Ci` を `write` にも入れる。`Ci` は `confirmTests` だけ
+     *
+     * 持ち主: `cli.hozo` の `Actor`
+     */
+    @adr.proposed
+    D743;
+
+    /**
+     * hozoc の業務の流れ（決定 D475）の書き方: ファイルは、新しい `flows.hozo`。流れは四つ（`confirmHarness`、`checkChange`、`writeSpec`、`design`）で、名前は、こちらが付けた。流れに、担い手は、結んでいない（説明のコメントに書いた: `@prd.usecase.of` は、ユースケースの op のもの）。ユースケースのない段は、op の名前を、こしらえず、文書の段の名前を、コメントに書いた。`hozo.flows` と `hozo.toolchain` は、単位に入れていない（コードにも、テストの口にも、ならない）
+     *
+     * 別の案: 流れを `cli.hozo` に書く。流れにも、担い手を結ぶ印を足す。ない段を、空の op として宣言する。`go-design` を並べて、流れのテストの口を出す
+     */
+    @adr.proposed
+    D744;
+
+    /**
+     * 診断を、要求として写す一切れ（`diagnostics.hozo`。決定 D442、D468、D469）の書き方: 名前空間は `hozo.diagnostics`（こちらが付けた名前）。自前の印は、六つ（`severity`、`origin`、`owner`、`retired`、`carries`、`checkedBy`）。重さは、対象のない分類 `Severity` のケース（`Error`、`Warning`、`Silent`: 診断を出さない規則と、診断にならず、例外になる誤り）。分類は、hozoc 自身の診断が `Rule` 一つ、プラグインの診断は、プラグインごと。写したのは、代表の 24 個（RES-1、TYPE-4、WIRE-2、WIRE-8、EFF-4、THROWS-4、欠番の THROWS-1 と THROWS-2、CFG-7、CFG-24、CFG-26、MAN-2、MAN-4、TESTS-1、TESTS-2、PLG-1、PLG-4、HTTP-1、VALID-1、DB-1、GO-8、GOHTTP-16、GOVALID-5、欠番の GOSQL-1）。出どころの決定の番号は、文書か、決定の行から、確かに言えるものにだけ、付けた。欠番も、ケースとして残した。診断の文言と、位置は、写していない。`cli.hozo` には、手を入れていない（内部の op に結ぶと、自己生成が止まる: 「サンプルと、hozoc 自身の仕様」の 32）
+     *
+     * 別の案: 診断を、`cli.hozo` の `hozo.compiler` に置く。分類を、ID の系列（RES、TYPE、…）ごとに分ける。重さを、印三つ（`@error` など）で言う。欠番は、ケースにせず、説明にだけ書く。222 個を、すべて写す
+     *
+     * 持ち主: `diagnostics.hozo`
+     */
+    @adr.proposed
+    D745;
+
+    /**
+     * プラグインとのやり取りと、IR を、Hozo で写した一切れ（決定 D468）の書き方: ファイルは、新しい `ir.hozo`（名前空間 `hozo.ir`）と `plugin.hozo`（`hozo.plugin`）。どちらも、単位に入れていない（コードには、ならない）。持ち主は、文書のままで、ファイルの頭に、写しだと書いた。書けない形は、近い形に曲げず、項目ごと、コメントにした（印 `kind` と `direction`、`null` を出す二つの項目、`options`、`CaseSet`）。列挙だけは、`scalar` と `@valid.pattern` で書いた（`cli.hozo` の `OutputFormat` と、同じ形が、すでにあるため）。IR は、構造のすべての型と、union のすべてのアームを写し、項目の説明は、写していない。頼みごとは、四つの、中身のない op（`readVocabulary`、`emit`、`coverage`、`import`）。型の名前は、Go の型の名前（`ir/`）に合わせ、頼みごとの応答の、トランスパイラ一つの答えは `TranspilerResult`（`cli.hozo` と同じ名前。Go では `EmitResponse`）にした
+     *
+     * 別の案: 列挙も、コメントにする（`string` とだけ書く）。印の項目を、`string` で書く。IR は、骨だけを写す。一つのファイルにまとめる
+     *
+     * 持ち主: `ir.hozo`、`plugin.hozo`
+     */
+    @adr.proposed
+    D746;
+
+    /**
+     * 言語サーバーを、Hozo で写した一切れ（決定 D468）の書き方: ファイルは `lsp.hozo`。名前空間は三つで、どれも、こちらが付けた名前: 入口の `hozo.lsp`、入口から入る操作の `hozo.operation`（`docs/tools.md`「操作」の言葉）、相手（文面のエディタ）の `hozo.editor`（`hozo.toolchain` と同じ形の、外の仕組み）。入口の印は、`hozo.lsp` の中の、自前の `@entry` のデコレータ（`request`、`notification`）。操作は、五つの op（`diagnose`、`diagnoseWithPlugins`、`locate`、`describe`、`outline`）と `vocabularyText` で、どれも、担い手 `Engineer` に結んだ。`docs/tools.md` のユースケース（文面を書く、文面の中を移る、設定する）は、op にせず、操作の説明に、どのユースケースのものかを書いた。許し（プラグインを起動してよいか）は、状態 `pluginChecks` と、状態の分類 `Permission`。LSP の形は、`internal/lsp/protocol` が使う分を、項目の名前まで写し、項目の説明は、ほとんど、写していない。`flows.hozo` の `writeSpec` は、`hozo.compiler.serve` を呼ぶ形から、操作（`diagnose`、`locate`、`describe`）を呼ぶ形に、直した（引数と、結果の model が、変わった）
+     *
+     * 別の案: 操作を、`hozo.compiler` に足す（生成物が変わる）。入口と操作を、`hozo.lsp` 一つに置く。ユースケース（文面を書く、など）を、操作を呼ぶ op として書く。入口の印を、語彙にする
+     *
+     * 持ち主: `lsp.hozo`、`flows.hozo`
+     */
+    @adr.proposed
+    D747;
+
+    /**
+     * IDE と、MCP サーバーを、Hozo で写した一切れ（決定 D468）の書き方: ファイルは `ide.hozo`。名前空間は、画面の入口 `hozo.ide`、AI の道具の入口 `hozo.mcp`、チャットの AI（外の仕組み）`hozo.assistant`、操作の続き `hozo.operation`（どれも、こちらが付けた名前）。担い手 `Designer`（設計する人）を、`cli.hozo` の `Actor` に足した（決定 D474。生成物は、変わっていない）。操作は、`docs/tools.md`「操作」の表から、十個（`overview`、`trace`、`lifecycle`、`promises`、`compare`、`fill`、`amend`、`sourceOf`、`harness`、`guide`）で、担い手は、操作に結んだ（設計する人と AI の、両方に結んだものが、多い）。`lsp.hozo` の `diagnose` と `describe` にも、設計する人と AI を、足した。設計する人の 11 のユースケースは、op にせず、操作と、ページの説明に、どのユースケースのものかを書いた。画面は、代表の三つ（ノート、変更、欠けと決めごと）を、ページと操作まで書き、四つ（仕様の図、入口と手順、中身の状況、文面）は、ページの宣言だけ。経路は、仮のもの（穴 27）。AI の八つのユースケースは、`hozo.mcp` の、入口の op 八つ（道具の名前は、付けていない: `@tool` は、引数なし）。「人が見るものを確かめる」は、入口の手順（`trace`）の分だけ。形の決まっていない値は、項目のない model（穴 26）。`flows.hozo` の `design` は、コメントにしてあった段を、操作と、チャットの AI を呼ぶ形に書き直し、二つの op（`shape`、`realize`）に分けた（引数と、結果の model が、変わった）
+     *
+     * 別の案: 設計する人のユースケースを、op として書く。画面を、すべて、ページと操作まで書く。経路を書かず、ページにしない。操作を、`hozo.ide` の中に置く。担い手 `Designer` を、足さない
+     *
+     * 持ち主: `ide.hozo`、`flows.hozo`、`cli.hozo`
+     */
+    @adr.proposed
+    D748;
+
+    /**
+     * hozoc の要求は、六つで、名前は、言葉: `SingleSource`、`SharedDiagnostics`、`Deterministic`、`NamedOmission`、`SingleBinary`、`RequiredTestsRan`（文書は、要求に、番号を振っていない）。結んだ先（ユースケースの op。決定 D472 の後）: `verify` に `SharedDiagnostics`。`write` に `SingleSource`、`Deterministic`。`confirmTests` に `RequiredTestsRan`。`serve` に `SharedDiagnostics`。`preview` には、結んでいない。`SingleBinary` は、どこにも結ばない（全体についての要求。決定 D470）。内部の op `check` に `SharedDiagnostics`、`NamedOmission`
+     *
+     * 別の案: 番号の名前（`PRD_001`。サンプル `shop-server` の流儀）。`docs/requirements.md` のほかの見出し（「検査が求める完全さ」「レビューで見せる形」「ハーネス」）も、要求にする。`Deterministic` を、効果 `syncOutputs` にも結ぶ
+     *
+     * 持ち主: `cli.hozo` の `Requirement`
+     */
+    @adr.proposed
+    D749;
+
+    /**
+     * 持ち主の移し方（決定 D468 の 5）: `docs/requirements.md`「品質の要件」の四つ（配布、共有、決定性、診断）は、要求の文面を消して、`cli.hozo` の `Requirement` のケースを引き、理由と補足だけを残した。`docs/requirements.md`「ただ一つの正」と「書く人と、読む人」は、移していない（言語の、いちばん元の考えと、決定 176 の理由なので、そこで読めないと、文書が読みにくくなる）: `cli.hozo` を引く一文を、足しただけ。決定 373（必要なテストケースが、用意されていて、通っていること）も、文書の側は、変えていない
+     *
+     * 別の案: 「ただ一つの正」の要件の文も、`cli.hozo` を引く形にする。何も移さず、仕様の側のコメントを、文書を引く形にする
+     */
+    @adr.proposed
+    D750;
+
+    /**
+     * 入口とユースケースの分け方（決定 D472、D473）の細部。ユースケースは五つ: `verify`（検査する）、`preview`（書き出す予定を見る）、`write`（書き出す）、`confirmTests`（求めるテストが走ったかを確かめる）、`serve`（言語サーバーとして動く。葉）。入力は `EmitInput`（前の三つ）、`CoverageInput`、`ServeInput` で、フラグに当たる項目（`noEmit`、`dryRun`、`format`）を持たない: 表示の形式 `format` と、scalar `OutputFormat` も、`hozo.cli` に移した（葉の op は、`format` を使っていなかった）。書き出す予定 `EmitPlan` からも、`dryRun` と `noEmit` を外した。前の、内部の配線 `writeOutputs` は、なくし、`write` の本体にした。`build` の分類の名前は `Request`、ケースは `CheckOnly` / `Preview` / `Write`（今は、ない: 真偽の値の分類 `Flag` に直した。決定 D770）
+     *
+     * 別の案: ユースケースを、検査と、書き出しの、二つにして、`--dry-run` は、入口の側の、表示の違いにする。分類の名前を `Mode` にする
+     *
+     * 持ち主: `cli.hozo`
+     */
+    @adr.proposed
+    D751;
+
+    /**
+     * `preview`（`build --dry-run`）は、今の生成したファイルを、読まない（葉の op `plannedChanges` が、書く予定のパスを、結果にするだけ。`removed` は、空）。前の振る舞い（`--dry-run` は、消すファイルを決めない）を、変えないため
+     *
+     * 別の案: `read outputChanges` を呼んで、消すファイルも見せる（`--dry-run` の表示に `removed:` の行が出るようになる: CLI の振る舞いが変わる）
+     */
+    @adr.proposed
+    D752;
+
+    /**
+     * 仕様のファイルは、ルートの `cli.hozo` 一つのまま（二つの名前空間を、一つのファイルに書く）。`hozo.toml` の単位は二つ: `hozo.compiler` に `go`、`go-valid`。`hozo.cli` に `go`、`go-valid`、`go-cli`。生成物の置き場は `internal/gen/hozo/compiler` と `internal/gen/hozo/cli`。`go-cli` の出力のパッケージ（`internal/gen/hozo/cli/cli`）と、名前空間 `hozo.cli` のパッケージ（`internal/gen/hozo/cli`）が、どちらも `cli` という名前になるので、手書きのコードは、名前空間の方を `hozocli` という名前で import する。`hozo.compiler` の単位は、制約を持つ型がなくなったが、`go-valid` を並べたままにした
+     *
+     * 別の案: 仕様のファイルを、名前空間ごとに分ける（`hozo/cli.hozo`、`hozo/compiler.hozo`）。`hozo.compiler` の単位から `go-valid` を外す
+     *
+     * 持ち主: `hozo.toml`
+     */
+    @adr.proposed
+    D753;
+
+    /**
+     * `internal/app` の形: `App.Usecases()` が `compiler.New`、`App.Ops()` が、それを、コマンドの行の `New` に渡す（書いたときは、述語 `requestCases` も渡していた。分類 `Flag` に直して、なくした: 決定 D770）。`Presenter` は、検査だけかどうか（`noEmit`）と、表示の形式（`format`）を、コマンドの入力（`hozo.cli` の `BuildInput`）から読む（表示は、入口の側の仕事）。内部の配線 `writeOutputs` を呼んでいたテストは、ユースケース `write` と `preview` を呼ぶ形に、`dryRun` の予定を渡していたテストは、`plannedChanges` と `preview`、`verify` を呼ぶ形に、直した（確かめる中身は、同じ: 書かないこと、`written` と `removed` の中身、CFG-7、中断された `ctx`）
+     */
+    @adr.proposed
+    D754;
+
+    /**
+     * 付ける先を広げたとき（決定 D476）の、細部: (1) デコレータを、自分の宣言に付けること、二つのデコレータを、互いの宣言に付けることを、断らない（新しい診断は、ない。印を、宣言に残すだけで、たどる計算が、ない）。(2) デコレータの宣言に付けた印は、その宣言に付くだけで、そのデコレータを付けた先には、移らない。(3) 核の印（`@hint` など）は、今までどおり、`decorator` の直前に置くので、`for decorator` のデコレータは、核の印より前に書く（`@decided(…) @hint decorator …`。逆の順は、今までと同じ SYNTAX）。(4) 付ける先の `classify` は、後ろが `case`、`of`、名前のときだけ、なくした書き方（`classify … case`）として SYNTAX にする。引数の種類の `any classify` は、まだ、書けないまま。(5) 名前付きのデコレータ（別名）の宣言にも、付けられる。(6) IR の構造は、変えていない（宣言の `decorators` は、どの種類の宣言も、前から持つ）が、`Decorator.targets` の値が増えたので、版を 0.25 に上げた。(7) `diagnostics.hozo` の自前の印 `owner` を、分類の宣言にも付けられるようにし、プラグインごとの分類は、持ち主を、分類の宣言に、一度だけ書く形にした
+     *
+     * 別の案: (1) 自分に付けることを、error にする。(3) 核の印と、ふつうのデコレータの順を、問わない。(4) `for classify` の後ろが、`,` と `;` のほかなら、すべて、なくした書き方として読む。(6) 版を上げない。(7) ケースごとに書いたままにする
+     */
+    @adr.proposed
+    D755;
+
+    /**
+     * コメントの中の、デコレータのタグ（決定 D478）の、読み方の細部: タグの行は、行の頭が、`@` と、`.` を一つ以上含む `DecoratorRef`（最後の要素は、予約語でもよい）で、その直後が、空白か、行の終わりのもの。名前の直後が、ほかの字の行（`@http.post("/x") は…`、`@db.tableが…`）と、接頭語のない `@語` は、本文のまま。文章は、その行の残りと、続きの行を、前後の空白を落として、改行でつないだもの。文章のないタグは、SYNTAX（引数のないデコレータを、コメントの中に、置けない）。`namespace` と、`union` のアームの説明に書いたタグも、SYNTAX
+     *
+     * 別の案: 名前の直後が `(` の行も、タグとして読む（引数を、コメントの中に書ける）。文章のないタグを、引数のない適用として読む
+     */
+    @adr.proposed
+    D756;
+
+    /**
+     * 決定の記録の写し（決定 D477〜D480 の、最初の一切れ）の形: ファイルは `decisions/`。語彙の名前空間は `adr`（自前。決定 D479）、決定の分類は `hozo.decisions.Decision`（名前空間の名前は、こちらが付けた）。ケースの名前は `D<番号>`。確かめていない決定は、中身を言う名前（穴 39）。`@adr.decided` は、`@repeatable` にせず、一度の適用に、決定を並べる。付ける先は、op、model、状態、効果、`read`、例外、scalar、フィールド、`union`、`classify`、`decorator`、分類のケース（どの分類のものも）。タグと、`supersedes`、`proposed` の先は、対象のない分類のケース（`supersedes` は、決定 D534 で、なくした。状態の印は、5 つになった）。`@adr.said` は、利用者の言葉の、一部を、書かれたまま、抜いた（言い換えていない）。置き換えた側の 417 は、472 の先として要る分だけの、短い写し。結んだ先: 472・473 → `hozo.cli.build`、分類 `Flag`（書いたときは `Request`）と、内部の op `writeOrPreview`、`hozo.compiler` の五つのユースケース。474 → 分類 `Actor` と `serve`。470 → 要求 `SingleBinary`。475 → `hozo.flows` の四つの流れと `hozo.toolchain.runTests`。469 → `diagnostics.hozo` の、自前の印の宣言。479 → `adr` の、七つの印の宣言
+     *
+     * 別の案: 決定の分類を、名前空間ごとに分ける。`decided` を `@repeatable` にする。417 も、全文を写す。確かめていない決定に、仮の番号を振る
+     *
+     * 持ち主: `decisions/`
+     */
+    @adr.proposed
+    D757;
+
+    /**
+     * 自己生成の道具（`internal/tools/selfgen`）と、同じ組み立てのテスト（`tests/generated_test.go`）は、ルートの `*.hozo` を、すべて、一時のディレクトリに写す（前は、`cli.hozo` だけ）。`hozo.toml` の `sources` を、読んでは、いない（道具は、このモジュールのパッケージを import しない決まり: `docs/packages.md`「依存の向き」）。ルートに、`sources` にない `.hozo` を置いても、害はない（`hozo.toml` が、読むファイルを決める）
+     *
+     * 別の案: `hozo.toml` の `sources` を読んで、そのファイルだけを写す
+     */
+    @adr.proposed
+    D758;
+
+    /**
+     * コメントの中に書けるデコレータ（決定 D478 の「文字列を一つ取る」）: 引数が、ちょうど一つで、残りの引数でなく、型が `string` 一つ。省ける引数（`string?`）は、書ける。引数のないもの、二つ以上のもの、`string` でないもの、型を二つ以上書いたもの（`string \| int`）、残りの引数（`...texts: string`）、名前付きデコレータは、DEC-29（位置は、タグの名前。解決した後に出すので、付けられない先（DEC-1）より、先に出る）
+     *
+     * 別の案: 残りの引数（`...texts: string`）にも、文章を一つ、渡せるようにする。省ける引数を二つ目以降に持つものも、認める
+     */
+    @adr.proposed
+    D759;
+
+    /**
+     * 決定 D478 で、今の仕様のコメントのうち、タグとして読まれるようになる行（行の頭が `@名前.名前` で、直後が空白のもの）は、30 行（利用者に伝えた 43 は、直後が空白でないものを含む数）。どれも、プラグインのテストの入力（`plugins/go-sqlite/…/testdata`、`plugin/dbvocab/testdata`、サンプルの中のプラグイン `go-ratelimit` の `testdata`）で、名前を、バッククォートで囲んで直した（`/** @db.table が… *／` → ``/** `@db.table` が… *／``）。仕様を写した fixture 12 個は、置き直した（差分は、バッククォートだけ）。サンプルの期待する出力と、hozoc 自身の仕様には、当たる行が、なかった
+     *
+     * 別の案: 「印 @db.table が…」のように、語を前に置く
+     *
+     * 持ち主: 各 `testdata`
+     * （元の行の、コメントを閉じる二字（* と /）は、コメントが、そこで終わるので、`*／` と書いた）
+     */
+    @adr.proposed
+    D760;
+
+    /**
+     * 決定 D478 で、IR とやり取りの版は、上げなかった（0.25 のまま）: IR の形も、値の種類も、同じ。変わるのは、仕様の読み方（コメントの一部が、`Doc.body` ではなく、`decorators` に入る）で、`docs/ir.md`「版」の、上げる場合（構造、やり取りの形、プラグインが分岐に使う名前）に、当たらない
+     *
+     * 別の案: 仕様の読み方が変わったので、上げる（0.x の間は、どの変更でも上げる、を、広く取る）
+     */
+    @adr.proposed
+    D761;
+
+    /**
+     * コメントの中のタグの、エディタでの見え方（決定 D478）: 色は、宣言の前のデコレータと、同じ scope。文字列を取らないデコレータ（DEC-29 になるもの）でも、行の頭の形が合えば、同じ色が付く（色付けは、宣言を、見ない）。言語サーバーのホバーと、定義へ移ることは、宣言の前の適用と、同じ道
+     *
+     * 別の案: 言語のタグ（`@param` など）と、同じ色にする
+     */
+    @adr.proposed
+    D762;
+
+    /**
+     * リテラルの型（決定 D482）にできるのは、文字列、整数、小数、真偽。`duration` のリテラル（`5m`）は、型の位置に書けない（SYNTAX）
+     *
+     * 別の案: `duration` も、型にする
+     */
+    @adr.proposed
+    D763;
+
+    /**
+     * `scalar X extends "a"` は、書けない（今ある TYPE-9）。リテラルの型は、`Type` を書けるどの位置にも書ける（フィールド、引数、戻り値、union のアーム、`T?`、`T[]` の中、デコレータの引数の型）
+     *
+     * 別の案: 元がリテラルの型の `scalar` を許す。書ける位置を、フィールドとアームに絞る
+     */
+    @adr.proposed
+    D764;
+
+    /**
+     * 整数のリテラルの型 `1` と、小数のリテラルの型 `1.0` は、別の型（一つの union に、両方を並べられる）。整数の `1` は、小数の `1.0` の位置に渡せる（逆は、渡せない）
+     *
+     * 別の案: 同じ値と見て、UNION-2 にする。渡せなくする
+     */
+    @adr.proposed
+    D765;
+
+    /**
+     * リテラルの型についての診断の番号: 開いた型の対象に `as "abc"` を書けば CLS-11（新しい）。union の二つのアームが、等しいリテラルの型なら UNION-2（新しい）。`boolean` の対象に `as 1`、union にないリテラルを `as` に書けば、今ある CLS-6。リテラルの型の位置に、合わない値を渡せば、今ある TYPE-4 / TYPE-3。リテラルの型の値を `scalar` の位置に渡せば、今ある TYPE-1
+     *
+     * 別の案: どれも、新しい番号にする
+     */
+    @adr.proposed
+    D766;
+
+    /**
+     * `boolean?` を、リテラルの型で分類するとき（決定 D483）、値がない側は、`as true` と `as false` の後ろの `as else` で書く（`Classify.absent` は、そのケース）。`as none` は、今の条件（ほかのケースが `T? as T`）に当たらないので、CLS-8 のまま。`as true` と `as else` だけなら、残りは、`false` と、値がない、の両方
+     *
+     * 別の案: `boolean?` に `as none` も書けるようにする
+     */
+    @adr.proposed
+    D767;
+
+    /**
+     * リテラルの型で決まる絞り込みの名前（`CaseTyping.by`）: 対象が `boolean` のものは、新しい `literal`。リテラルの型をアームに持つ union は、今の `variant` のまま（アームの型と等しい型を `as` に書く、という今の決まりに、そのまま当たる）。`literal` の絞り込みでは、アームの中の対象の型は、今の決まりのまま、`as` に書いた型（`true`）で、残りのケースの対象の型は、もとの型のまま（残りが `false` だけでも）
+     *
+     * 別の案: union も `literal` にする。残りが一つの値なら、対象を、そのリテラルの型にする
+     */
+    @adr.proposed
+    D768;
+
+    /**
+     * Hozo 自身の仕様を、リテラルの型で書き直したとき（決定 D482）の書き方: 列挙のアームの名前は、値の頭を大文字にしたもの（`"utf-8"` は `Utf8`）。印 `kind` は、宣言の種類ごとの model が持ち、共通の `DeclBase` には、置かない。LSP のシンボルの種類の数（3、5、7、…）は、文書（`docs/lsp.md`）にないので、Go の定数（`internal/lsp/protocol`）から写した。重さは、文書の言う二つ（1、2）だけ（Go の定数には、3 と 4 もある）。`diagnostics.hozo` の重さは、対象のない分類のまま。決定 482 は、`hozo.ir.Type` と `hozo.ir.CoreName` に結んだ（代表の二つ）
+     *
+     * 別の案: アームの名前を、値と同じ綴りにする（小文字。予約語と当たるものがある）。`diagnostics.hozo` の重さを、行の中の、リテラルの型の union にする。決定 482 を、書き直した、すべての宣言に結ぶ
+     *
+     * 持ち主: `ir.hozo`、`plugin.hozo`、`lsp.hozo`、`ide.hozo`、`decisions/`
+     */
+    @adr.proposed
+    D769;
+
+    /**
+     * `hozo.cli.build` を、真偽の値の分類で書き直したとき（決定 D483）の書き方: 分類の名前は `Flag`、ケースは `On` / `Off`（483 の例のまま）。フラグの項目 `noEmit`、`dryRun` は、`boolean?` から、省略可能でない `boolean` にした（`boolean?` は、分類の対象にできない。付いていなければ、偽: `docs/plugin-go-cli.md`「語彙」。コマンドの行の振る舞いは、変わらない。Go の入力の型は、`*bool` から `bool` になる）。二つ目の分かれ道は、内部の op `writeOrPreview`（アームの本体に、`match` を書けない: 「サンプルと、hozoc 自身の仕様」の穴 40）。`@adr.decided` は、`Flag` に 472 と 483、`writeOrPreview` に 472 と 473。人が書く述語 `internal/app/request.go` と、そのテスト `internal/app/request_test.go`（`TestRequest`）は、なくした。代わりに、`internal/app/buildflags_test.go` の `TestBuildFlags` が、生成した本体に、ユースケースの代わりを渡して、フラグの四つの組が、表のとおりのユースケースに入ることを確かめる。`format` の `OutputFormat` は、scalar と `@valid.pattern` のまま（単位の出力先になる仕様では、基底 `go` が、リテラルの型をアームに持つ union を断る: GO-9）。`decisions/` の 472 の写しは、決定の行のまま（「述語で決まる分類で書く」）で、今の形は、その下の `//` のコメントで言う
+     *
+     * 別の案: フラグを `boolean?` のままにして、述語で決まる分類を残す。二つ目の分かれ道も、`build` に書けるように、先に、言語を直す（穴 40）。テストを足さない（生成した配線は、仕様の写しなので）
+     *
+     * 持ち主: `cli.hozo`
+     */
+    @adr.proposed
+    D770;
+
+    /**
+     * トランスパイラ `go` の、`literal` の分類（対象の型が `boolean`）の `match` は、二つに分ける形 `if <対象>` で、真の側が `if` の枝。ケースのない側は、分類の誤りの枝（`as true` だけの分類の、偽の値）。述語で決まる分類の判定関数では、`as true` のケースの述語を `if v`、`as false` を `if !v` で包む
+     *
+     * 別の案: `switch <対象> { case true: … case false: … }` にする（`return match` では、後ろに、届かない `return` が要る）
+     */
+    @adr.proposed
+    D771;
+
+    /**
+     * union に入れる規則（決定 D484）の、入れられる位置: 呼び出しの引数（op、`read`、効果、`throw`）、`return`、レコードリテラルのフィールド、型を書いた `val`（宣言、値を入れる文、集める文）、デコレータの引数。`match` のアームの本体をそろえる所と、型を書いていない `val` の型を導く所では、使わない（「サンプルと、hozoc 自身の仕様」の、アームの型が違う `match` の行は、残る）
+     *
+     * 別の案: `match` のアームの本体も、`return` の型の union に、まとめる（アームごとに、入るアームを持つ形が、IR に要る）
+     */
+    @adr.proposed
+    D772;
+
+    /**
+     * （並びと、省略可能の中には、広げる、と決まった: 決定 D515。実装は、まだ） 同じ規則は、重ねない: アームの型が union でも、その中のアームまでは、辿らない。`Dog[]` を `Pet[]` に、`Dog?` を `Pet?` には、渡せない。`Dog` を `Pet?` には、渡せる（`none` でない側に入る）
+     *
+     * 別の案: 入れ子の union を辿る。配列と `optional` の中にも広げる（要素ごとに包む式が要る）
+     */
+    @adr.proposed
+    D773;
+
+    /**
+     * アームが決まらないときの診断は、新しい TYPE-20（位置は、渡した値。当たったアームの名前を並べる）。数え方は、アームごとに、互換の規則 1〜13 で渡せるか。`union U { A: string; B: "x"; }` の位置の `"x"` も、`union N { I: int; F: float; }` の位置の `1` も、二つに当たるので、TYPE-20。レコードリテラルは、フィールドがあり、値が渡せる model のアームを数える（必須のフィールドが埋まっているかは、数えない: アームが決まった後の BIND-4）
+     *
+     * 別の案: 狭い方のアーム（リテラルの型、`int`）を選ぶ。宣言の順で、最初のアームを選ぶ。必須のフィールドが埋まっているアームだけを数える
+     */
+    @adr.proposed
+    D774;
+
+    /**
+     * union に入れた位置を、IR が持つ形: 値を置く位置（`val`、`assign`、`collect`、`return` の文、`Call.args` と `throw` の `args` の要素、`record` の `fields` の要素）の、省略できる項目 `arm`（`ArmRef`: union の FQN と、アームの名前）。デコレータの引数（`Application.args`）は、持たない。版は 0.27
+     *
+     * 別の案: 値の側を包む（`Atom` に `kind: "arm"` を足す: `return` と `val` の式が、呼び出しや `match` のとき、包めない）
+     */
+    @adr.proposed
+    D775;
+
+    /**
+     * union に入れる値（決定 D484）の、トランスパイラ `go` の形: IR の `arm` が指すアームが、マーカーを生やした構造体なら、式のまま。包む型なら `<Union><アーム名>{Value: <式>}`。`arm` を持つ文の式が、呼び出しか `match` なら、アームの型の途中の値 `v<n>` に受けてから、包む（`return 呼び出し` も、`return <呼び出し>` の形に、ならない）。文は、型を付ける形（`var x <union の型> = …`）。相乗りのプラグインは、配線を読まないので、変えていない
+     *
+     * 別の案: 包む関数を、union ごとに出す。構造体のアームも、包む型にそろえる
+     */
+    @adr.proposed
+    D776;
+
+    /**
+     * リテラルの型の値が、型に合うことを確かめる場所: **確かめる者を、置かない。合わない値を、Go の型で、作れなくする。** リテラルの型のフィールドは、構造体に、項目を持たない（コメントの行だけ）。リテラルの型のアームは、値を持たない、包む型 `type <Union><アーム名> struct{}`（`SeverityError{}`）。印で見分ける union は、ふつうの、model のアームの union（印の項目は、Go には、ない）。理由: `go-valid` を並べていない単位でも、人が書く葉が、合わない値を、作れない。残るのは、union の値がない（`nil`）ことだけで、今の union と同じ（型の `switch` の `default:` が、分類の誤りにする）
+     *
+     * 別の案: 項目を、対応する核の型の Go の型にして、`go-valid` の `Validate` で確かめる（並べていない単位では、確かめられない）。名前の付いた文字列の型と定数（`type Severity string`。合わない値を、変換で作れる）
+     */
+    @adr.proposed
+    D777;
+
+    /**
+     * リテラルの型のフィールドを、配線が読む式（`x.kind`）は、そのリテラルの式。レコードリテラルが、そのフィールドに書いた値は、Go に書かない。リテラルの型のアームに入れる式は、`<Union><アーム名>{}` で、アームの型の式は、書かない（呼び出しか `match` を受けた `v<n>` は、`_ = v<n>`）
+     *
+     * 別の案: 読むためのメソッド（`func (CoreType) Kind() string`）を、構造体に生やす
+     */
+    @adr.proposed
+    D778;
+
+    /**
+     * 対象の型が `boolean?` の、`literal` の分類の `match` は、式のない `switch`（三つに分ける形）: 真、偽、値がない、の順に見て、同じアームが受ける側を、一つの節にまとめ、最後の節は `default:`。述語で決まる分類の確かめは `if v != nil && *v` / `if v != nil && !*v`
+     *
+     * 別の案: 入れ子の `if`（`if x != nil { if *x { … } }`）
+     */
+    @adr.proposed
+    D779;
+
+    /**
+     * 基底 `go` の GO-9 は、なくさず、狭めた: Go の形のない位置（op・`read`・効果・デコレータの引数と戻り値、例外の引数、状態の型、`optional` と `array` の中、インデックスの model のキーと値）の、リテラルの型と、`literal` の絞り込みを持つ、状態の分類だけを断る。メッセージは、一つにした
+     *
+     * 別の案: 位置ごとに、Go の形を決めて、GO-9 を欠番にする
+     */
+    @adr.proposed
+    D780;
+
+    /**
+     * リテラルの型を、まだ扱えない所は、プラグインが、それぞれ、自分の診断で断る。`http`: 本文の項目（`@http.body`）のフィールドの型が、リテラルの型そのものなら、新しい HTTP-16（ヘッダとクエリは、今の HTTP-4）。`go-sqlite`: リテラルの型のフィールドを持つ model を中に持つ列は、新しい GOSQL-34（`@db.json` でも。リテラルの型そのものの列は、今の GOSQL-17。union は、今の GOSQL-3）。`go-cli`: 今の CLI-3。`valid`: リテラルの型のフィールドに付けた制約は、今の VALID-1。`go-valid`、`go-design`、`db` は、変えていない（リテラルの型のフィールドを、読まない）
+     *
+     * 別の案: 本文の項目も、読んで確かめる。しまい方と、フラグの形を、先に決めて、断らない。`@db.json` の中のリテラルの型のフィールドは、キーを出さないまま、通す（読み戻した値は、同じ）
+     */
+    @adr.proposed
+    D781;
+
+    /**
+     * 通信の上の、リテラルの型: JSON は、そのリテラルの値。読む側は、値が違えば、読めない値で、**リテラルの型のフィールドは、キーがなくても、読めない値**（要求の本文なら、400 `body: invalid JSON`）。数は、数として比べる（整数のリテラル `2` は、`2.0` とも同じ）
+     *
+     * 別の案: キーがなければ、通す（値は、一つしかない）。数を、書き方まで比べる
+     */
+    @adr.proposed
+    D782;
+
+    /**
+     * 通信の上の union の見分け方（決定 D399 に、足した。HTTP-5 の条件は、三つになった）: JSON が、オブジェクトでなければ、リテラルの型のアームを、値で。オブジェクトなら、model のアームを、**印**（model のアームの、すべてが持つ、同じ名前の、リテラルの型のフィールドで、値が、アームごとに違うもの。二つ以上あれば、最初のアームの、フィールドの順で、最初）で、印がなければ、今までどおり、決め手で。印があれば、決め手は、要らない。model のアームと、リテラルの型のアームが混ざる union も、出せる。リテラルの型のアームどうしの JSON の値が同じ（`1` と `1.0`）なら、HTTP-5
+     *
+     * 別の案: 印を、デコレータで名指しする。混ざる union は、断る
+     */
+    @adr.proposed
+    D783;
+
+    /**
+     * `go-http` の、リテラルの型の読み書き: 基底の構造体が持たない、リテラルの型のフィールドのキーと値は、新しい表 `httpConsts` が持ち、今の、union の読み書きの補助（`reflect`）が、書く位置（仕様のフィールドの順）に足し、読むときに確かめる。リテラルの型のアームと、印は、表 `httpUnions` の `value` と `tag`。補助を出す条件は、union か、リテラルの型のフィールドを持つ model が、通信に出ること（二つの表は、片方が空でも、両方出す）
+     *
+     * 別の案: model ごとに、`MarshalJSON` / `UnmarshalJSON` を出す（基底の型のパッケージに、相乗りが、メソッドを足すことになる）
+     */
+    @adr.proposed
+    D784;
+
+    /**
+     * WASM の機械語の置き場の上限（決定 D532）の値を、1 GiB にした（今の、このリポジトリのプラグイン九つで、合わせて 90 MB ほど。形が二つで、その倍）。設定も、環境変数も、置かない
+     *
+     * 別の案: 512 MB、4 GiB。`HOZO_CACHE_LIMIT` のような、変える口を置く
+     */
+    @adr.proposed
+    D785;
+
+    /**
+     * 上限は、`wasm/` と `wasm-stoppable/` の合計に、一つ。最後に使った時刻を知るために、置き場の下を、WASM の内容ごとのディレクトリに分け、使うたびに（一つの実行で一度）、ディレクトリの変更の時刻を、今にする（実行環境の置き場のファイルの名前は、hozoc から求められないため）。消すのは、ある WASM の内容を、一つの実行で、はじめて使った後で、その実行が使ったものは、消さない。前の形のディレクトリ（`wasm/wazero-…`）は、一つのものとして、同じ決まりで消える
+     *
+     * 別の案: 形ごとに、上限を分ける。ファイルの読んだ時刻（atime）を使う（OS と、マウントの設定で、当てにならない）。hozoc が、消すだけのコマンドを持つ
+     */
+    @adr.proposed
+    D786;
+
+    /**
+     * 要求の分類は、`go-design` のオプション `requirements`（分類の FQN の並び）で言う。並べた分類のケースの一つずつが、要求。
+     *
+     * @adr.context 文書は、この決め方を「利用者が確かめていない」として、docs/open.md の、確かめていない決定の表を指していたが、
+     *   その表に、行はなかった。553 で、その表をなくしたので、決定として足した。
+     */
+    @adr.proposed
+    D787;
+
+    /**
+     * 人か AI が書く判定の、単体テストで、判定のケースごとに求める例は、当たる値を一つ。当たらない値は、求めない
+     * （判定関数は、すべての述語を呼ぶので、その一つが、ほかのケースの述語が偽を返すことも確かめる）。
+     *
+     * @adr.context 文書は、「当たらない値も求めるかは、利用者が確かめていない」として、docs/open.md の、確かめていない決定の表を指していたが、
+     *   その表に、行はなかった。553 で、その表をなくしたので、決定として足した。
+     * @adr.alternative 当たらない値も、ケースごとに求める
+     */
+    @adr.proposed
+    D788;
+
+    /**
+     * 標準の語彙のプラグインも、ほかのプラグインと同じに、探索で見つける。配り方は、別にしない。
+     *
+     * @adr.context docs/open.md は、この配り方を「決めていないこと」に挙げ、今の形の出どころとして、同じ文書の、確かめていない決定の表を
+     *   指していたが、その表に、行はなかった。553 で、その表をなくしたので、今の形を、決定として足した。配り方を決めることは、未決の点のまま。
+     */
+    @adr.proposed
+    D789;
+
+    /**
+     * docs/open.md「スコープ外にした設計書の例」の表（2 行）を、decisions/ に移し、その見出しを、なくす。一行を、一つの決定にする: D791、D792。
+     * 状態の印は @adr.accepted（541 で docs/decisions.md から、決めたこととして移した行で、541 が移した、ほかの行と同じ）。
+     * 本文は、表の頭の文と、行の「例」の列。行の「理由」の列は @adr.context。
+     *
+     * @adr.context 決めたことが、未決の点の一覧（docs/open.md）に、置かれていた。決定の持ち主は、decisions/（541、553 と同じ理由）。
+     * @adr.consequence 文書、コーパス、テストのデータのコメントからの参照は、決定の番号（D791、D792）に、直す。541 の本文の中の、その見出しの名前は、書き直さない（535）。
+     * @adr.said その2つも出しちゃおう
+     */
+    @adr.proposed
+    D790;
+
+    /**
+     * 設計書の §8.1 の `redirectOn` / `redirectToLogin` と、それを使う §11.1 の `fetchMe` / `fetchOrders` は、今の段階では扱わず、コーパスからも外す。
+     * 段階 5（TS 向けの一次プラグイン）で、react-router / vue-router / Next / Nuxt などのプラグインの設計と一緒に決める。
+     *
+     * @adr.context ルーターのプラグインが提供するデコレータの話で、引数名 `to` の予約語との衝突もそのときに決める
+     */
+    @adr.accepted
+    D791;
+
+    /**
+     * 設計書の §4.2 の `cache` と、§11.1 の `@cache` は、今の段階では扱わず、コーパスからも外す。
+     * 段階 5（TS 向けの一次プラグイン）で、react-router / vue-router / Next / Nuxt などのプラグインの設計と一緒に決める。
+     *
+     * @adr.context キャッシュのプラグインの話
+     */
+    @adr.accepted
+    D792;
+  }
+}

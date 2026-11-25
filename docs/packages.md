@@ -58,6 +58,8 @@ tests/samples/<名前>/  サンプル（仕様と、手で書いた完成した�
 docs/                  設計文書
 ```
 
+この節の細部は、決定 D742、D753 が決めた。
+
 ## 依存の向き
 
 Go のパッケージごとの、このモジュールの中で import しているパッケージ（テストでないファイル）。この表が持ち主で、実際の import と同じであることを `tests/deps_test.go` が確かめる。import を足すときは、足してよい向きかを下の規則で確かめてから、この表にも足す。
@@ -134,6 +136,8 @@ Go のパッケージごとの、このモジュールの中で import してい
 - `internal/tools/selfgen` はこのモジュールのどのパッケージも import しない（生成物が壊れていても動くため。「自己生成の手順」）。
 - 外部のモジュールは、二つ: `github.com/BurntSushi/toml`（`internal/config` と `internal/plugin` が使う）と、WASM の実行環境 `github.com/tetratelabs/wazero`（`internal/plugin` だけが使う。それが要る `golang.org/x/sys` が、間接に入る。`docs/plugin-protocol.md`「起動」）。依存を最小にするため、言語サーバーの JSON-RPC も自前で書く。
 - `tests/samples/` のサンプルは別のモジュール（自分の `go.mod`）なので、この表にも上の規則にも入らない。サンプルだけが使う依存は、サンプルの `go.mod` に置く（`tests/samples/README.md`「置き方」）。サンプルが自分で持つプラグインも、プラグインの規則（使えるのは `ir`、`plugin`、`plugin/golang`、`plugin/govalid`、`runtime`）に従う。
+
+この節の細部は、決定 D696、D731 が決めた。
 
 ## パッケージ
 
@@ -781,3 +785,5 @@ Go のプラグインは、どれも同じ形: `main` パッケージが `plugin
 - 生成は不動点: 生成し直した直後にもう一度 `make generate` しても、何も変わらない。置き換えた後の `hozoc build` も同じ内容を書く。
 - リポジトリのルートで `go run ./cmd/hozoc build` を直に走らせれば、確かめずに置き場へ書く。生成器を変えている間は `make generate` を使う。
 - 置き場が壊れて 1 のビルドが通らないときは、`internal/gen/` を git で元に戻してからやり直す。`internal/tools/selfgen` 自身はこのモジュールのどのパッケージも import しないので、そのときも動く。
+
+この節の細部は、決定 D758 が決めた。

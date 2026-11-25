@@ -2,6 +2,8 @@
 
 小さな店のサーバー（ログイン、自分の情報、注文）を、サンプルを書きながら決めたこと（`tests/samples/README.md`「P の番号との対応」の P1〜P39）を**当てはめた後の形**で書いたもの。サンプルとは何か、置き方、テストの使い方は [`../README.md`](../README.md)。
 
+この文書の細部は、決定 D597 が決めた。
+
 P1〜P39 の言語の変更（`reads`、`as`、`throw`、`never`、`override`、`export`）と、ここに出てくる五つのトランスパイラ（`go`、`go-valid`、`go-sqlite`、`go-http` と、サンプルの中のプラグインの `go-ratelimit`。設計文書がある。`go-ratelimit` は、この README）は、実装が済んでいる。**その後の決定（決定 D91〜D122 と「設計書から離れた決定」S24: デコレータが出すコードは型に依らず、`store` の読み書きと、表と、列のしまい方は `db` の語彙のデコレータで、要求のどこから読むかと、項目がないときの扱いは `http` の語彙のデコレータで言う。フィールドの既定値は、言語にない）は、このサンプルと設計文書を先に書き、その後に実装した**（「まだないもの」に、書いたときになかったものと、今の状態）。**さらにその後の決定（同 124、132〜143 と S25〜S28: 節の区切りは `,` 一つ。状態に触れるのは、引数を持つ `read` と効果だけで、その中身は `db` の語彙のデコレータが宣言から作る。op は、それを呼ぶ配線か、状態に触れない葉。op のデコレータは、包むだけ）も、このサンプルと設計文書を先に書き、その後に実装を入れた**（書いたときになかったものと、今の状態は、同じ節の「R4 で、まだないもの」）。単位の `out`（`gen/`）の下のファイルはすべて、「`hozoc build` がこう出す」内容を人が書いたもので、トランスパイラを実装するときのブラックボックスのテストの仕様になる。コードはコンパイルでき、人が書いた部分（`app/`）と合わせて動く。 その後に足した、六つ目のトランスパイラ `go-design`（設計文書がある。テストを受け取る口だけを出す）は、「R6 のプラグインの部分で足したこと」。
 
 **生成するコードの規則の持ち主は、トランスパイラごとの設計文書**（「各トランスパイラの規則」）。この文書が持つのは、ファイルの出どころ、この仕様に固有の事実、サンプルの中のプラグイン `go-ratelimit` の規則、書いて分かったこと。期待する出力（`gen/`）は、設計文書の形のとおりに書いてある（文書と違うところは、残していない）。
@@ -123,6 +125,8 @@ R6 の、言語の部分（`docs/requirements.md`「R6 の、言語の部分」�
 - 期待する出力は、手で書いた。`go vet ./...` と `go test ./...` が、このモジュールで通る（サブテスト `go`）。
 - **`getMyPage` は、`val` を、六つ持つ**（`session`、`user`、`latest`、`orders`、`found`、`summaries`）。`disjoint` のアームから、外に値を出すには、アームの数だけ、空の `val` が要るので、数が増える。既定の上限（5）を超えて、WIRE-6 の warning になるので、`hozo.toml` の `max_bindings` を 6 にした。
 
+この節の細部は、決定 D586 が決めた。
+
 ### 例外を投げる効果で変えたこと
 
 効果が、仕様の例外を投げられるようにした（決定 D352）のと、`db` の語彙の `@db.conflict`（同 353）を、このサンプルで確かめる。期待する出力は、手で書いた。
@@ -152,6 +156,8 @@ R6 の、言語の部分（`docs/requirements.md`「R6 の、言語の部分」�
 | `gen/type/types.go` | `Order` の `DeliverOn *runtime.Date` と `DeliverFrom *runtime.TimeOfDay` | `docs/plugin-go.md`「型」「runtime パッケージ」 |
 | `gen/store/db.go` | 表 `orders` の二つの列（`TEXT`。`NOT NULL` なし）。`SELECT` と `INSERT` の列の並び。`dbArgsOrder` と `dbScanOrder` の `dbDate(…, dbNullable)` と `dbTime(…, dbNullable)`。補助の名前 `dbTime` を `dbDatetime` に（`dbDatetimeLayout`）。補助 `dbDate` と、新しい `dbTime` | `docs/plugin-go-sqlite.md`「しまい方」「補助」 |
 | `app/onsqlite/store_test.go` | 二つの列が、値がなければ `NULL`、あれば、決まった形の文字列で、読み戻すと、同じ値になること | 「人が書いたもの」 |
+
+この節の細部は、決定 D599 が決めた。
 
 ### インデックスの model で変えたこと
 
@@ -226,6 +232,8 @@ R6 の、プラグインの部分の、段 4（`docs/requirements.md`「R6 の�
 - 操作の op は、状態を持たない: ログインのトークンは、`signIn` の戻り値で受け取り、`order` と `viewOrders` の引数で渡す。
 - テストのパッケージ `flowstest` を import するのは、テストを支えるパッケージ `app/flowtest`（`testing` を import する）だけ。
 
+この節の細部は、決定 D644 が決めた。
+
 ### 走ったかの確かめで足したこと
 
 求めるテストが、走ったかを、カバレッジで突き合わせる決定（決定 D380）で、足したもの。仕様（`.hozo`、`hozo.toml`）と、人が書いたコード（`app/`）は、変えていない。
@@ -273,6 +281,8 @@ HOZO_PLUGIN_PATH="$PWD/../../../plugins" /tmp/hozoc tests --coverage /tmp/cover.
 - **単位 6（`http`）は、今も要る。** 「R6 のプラグインの部分で足したこと」は、理由を「操作の op と、フローは、それを `throws` に書くので」と言うが、型の置き場が要るのは、op の例外（`Op.signature.exceptions`）が使う型（`docs/config.md`「型の置き場」の表の 3）で、節を書くかどうかには、よらない。
 - 消した行の分、`server.hozo` の 60 行目から後ろの行番号は、前に詰まった。この README が引く `server.hozo:<行>` は、前から、ずれていて、直していない（`docs/open.md`「サンプルと、hozoc 自身の仕様」の、行番号の点）。
 
+この節の細部は、決定 D646 が決めた。
+
 ### メモリ版の `store` をなくしたこと
 
 決定 D388。`store` を、DB なしで出す単位（`gen/storemem`。トランスパイラは `go` だけ）と、その上に人が書いたものを、なくした。`store` の単位は、`gen/store`（`go`、`go-sqlite`）の一つ。
@@ -292,6 +302,8 @@ HOZO_PLUGIN_PATH="$PWD/../../../plugins" /tmp/hozoc tests --coverage /tmp/cover.
 - **移したテスト**: `TestStatesFromTwoImplementations`（一つの `store` の状態の単位を、状態ごとに、別の実装から取れる）は、`app/both_test.go` から `app/onsqlite/store_test.go` に移した。メモリの側は、`memstore` の代わりに、テストの中に書いた `memNotifications`（状態 `notifications` の単位の、三つのメソッド）。
 - **`store` の配線まで通す、DB なしのテストは、今は、ない。** `app/handlertest`、`app/storetest`、`app/flowtest` は、メモリの上の SQLite で走る（`app/onsqlite/compose_test.go` の `openDB`）。メモリ版の役目（DB なしで、`server` をテストする）は、インテグレーションテストの作り直しで、Hozo が作る、流れの端のにせものが受け持つ（`docs/ide-chain.md`「テストの規約」の「インテグレーションテストの作り直し」。にせものと、その上のテストは、次の節「テストのにせもので足したこと」で、入った）。`server` だけのテスト（`app/server_test.go`、`app/inner_test.go`）は、前から、`store` のどの出力も使わず、`server.StoreOps` を満たす型を、テストが書く。
 - **同じ名前空間を、複数の単位に書けること**（`docs/config.md`「単位の対象」）は、変わらない。このサンプルが、その例を持たなくなっただけ（出力の形は、`tests/corpus/units` などが確かめる）。
+
+この節の細部は、決定 D653 が決めた。
 
 ### テストのにせもので足したこと
 
@@ -338,6 +350,8 @@ HOZO_PLUGIN_PATH="$PWD/../../../plugins" /tmp/hozoc tests --coverage /tmp/cover.
 - **ほかの `gen/` のファイルは、変わらない。**
 - **この節より上の、インテグレーションテストの口の記述**（「インテグレーションテストの口で変えたこと」「走ったかの確かめで足したこと」の、`RunHTTP(t, handler, …)`、21 のテスト、`app/handlertest/httpcases.go`）は、書いたときの形で、今の形ではない。
 
+この節の細部は、決定 D665 が決めた。
+
 ### 本体のあるデコレータと、デコレータのテストで足したこと
 
 決定 D392〜D395。仕様の書き方（`decorator fn`）の持ち主は `docs/grammar.md`「decorator の宣言」「デコレータの本体」、出力の形の持ち主は `docs/plugin-go.md`「本体のあるデコレータ」「デコレータのテストの口」。
@@ -355,6 +369,8 @@ HOZO_PLUGIN_PATH="$PWD/../../../plugins" /tmp/hozoc tests --coverage /tmp/cover.
 
 - **`@rate.limited` は、本体のないまま**: プラグイン `go-ratelimit` が、継ぎ目として包む例。`@server.audited` は、本体のある例で、プラグインは、要らない。
 - **インテグレーションテストの、Hozo が作るケースは、変わらない**: `audited` の本体は、例外を投げない（葉 `recordAudit` は、`throws` を持たない）。
+
+この節の細部は、決定 D670 が決めた。
 
 ### 型のパッケージで変えたこと
 
@@ -386,6 +402,8 @@ HOZO_PLUGIN_PATH="$PWD/../../../plugins" /tmp/hozoc tests --coverage /tmp/cover.
 
 - **op の関数の型と、テストの口は、変わらない。** `throw e` は、`try` の中の出どころ（`mailer.send`）を、そのまま出どころにする（`docs/ide-chain.md`「インテグレーションテストの作り直し」の「Hozo が作る、例外のケース」）ので、口のメソッドは `NotificationFailedSend` のまま。計算した例外も、効果も、同じ。
 - 分類して受ける形（`catch (e by 分類)`）と、例外の分類の例は、`tests/samples/order-app` の `payment.prepay`、`notice.bestEffort`。
+
+この節の細部は、決定 D693 が決めた。
 
 ## 入力
 
@@ -573,6 +591,8 @@ GOTOOLCHAIN=local go vet ./... && GOTOOLCHAIN=local go test -race ./...
 GOTOOLCHAIN=local go run ./app/cmd/shop-sqlite   # http://localhost:8080。ユーザー alice@example.com / password123 を入れる
 ```
 
+この節の細部は、決定 D702 が決めた。
+
 ## 各トランスパイラの規則
 
 規則の持ち主は設計文書。下の五つの節は、文書への入口と、この仕様が規則のどこを使っているかだけを書く（「分かったこと」は、この節の名前で規則を引いている）。`go-ratelimit` の規則は、上の「サンプルの中のプラグイン」。
@@ -707,6 +727,8 @@ v1 の規則から変えたのは三つ: `r.Context()` を渡す（P29）、制�
   - `TestBodyBehindSeam`: 継ぎ目を持つ op の**中身だけ**を試す。継ぎ目を素通しにする `inner.Seams`（テストが書いた型 `through`）を渡すと、制限なしに、配線の本体の結果がそのまま返る。外側は、呼ばれるたびに継ぎ目を一度通る。
   - `TestSeamOwnsBeforeAndAfter`: 継ぎ目は、中身の前と後の両方を持つ（中身に渡す値と、返す値を、継ぎ目の実装が決める。基底の外側は、何も足さない）。
 - **`app/ops_test.go`**: **入口の `Ops` に並ぶのは `export` を付けた op だけ**（`TestOpsHoldExportedOpsOnly`。インターフェースの型のリフレクションで確かめる）: `server.Ops` のメソッドはちょうど八つ、内側の `inner.Ops` は二十のすべて、`server.Seams` は `LoginRateLimited` の一つ、`store.Seams` は `PlaceOrderDbTransaction` の一つ。`store.Ops` は十とも持ち、`server.StoreOps`（そのうちの九つ）を満たす。`read` と効果は、どの `Ops` にもない。内部の op を持たない出力（`store`、`type`、`rate`）に、内側のフォルダはない。内部の op を、入口の `New` が返す値から取り出せないことは、確かめない（約束していない。`docs/plugin-go.md`「内側のフォルダと入口」）。前の名前は `app/both_test.go`（「メモリ版の `store` をなくしたこと」）。
+
+この節の細部は、決定 D632 が決めた。
 
 ## 分かったこと
 

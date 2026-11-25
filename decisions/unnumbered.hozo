@@ -1,9 +1,9 @@
-// 決定の記録（番号のない、確かめていない決定）。名前空間 hozo.decisions。書き方は decisions/adr.hozo の頭のコメント。
+// 決定の記録（番号のない決定）。名前空間 hozo.decisions。書き方は decisions/adr.hozo の頭のコメント。
 // コードには、ならない（hozo.toml の単位の対象ではない）。
-// docs/open.md「聞かずに決めて、確かめていない決定」の行の写し。534 からの決定は、番号を振って d500.hozo などに入れる（D536）。
+// どれも、番号を振って移した決定に、置き換えた（D554）。534 からの決定は、番号を振って d500.hozo などに入れる（D536）。
 
 namespace hozo.decisions {
-  /** 番号を持たない、確かめていない決定。名前は、中身を言う */
+  /** 番号を持たない決定。名前は、中身を言う */
   classify DecisionUnnumbered of never {
     /**
      * ユースケース write（書き出す）の担い手に、Ci を入れない。
@@ -12,7 +12,7 @@ namespace hozo.decisions {
      * @adr.context 472 の理由に、例として書いた言い方（「CI は、検査する」「人と AI は、書き出す」）を、写した。文書に、根拠は、ない。
      * @adr.alternative Ci を、write にも入れる（CI が、ビルドの中でコードを書き出す使い方は、ありえる）
      */
-    @adr.proposed
+    @adr.superseded(Decision700.D743)
     WriteWithoutCi;
 
     /**
@@ -24,7 +24,7 @@ namespace hozo.decisions {
      * @adr.alternative 流れにも、担い手を結ぶ印を足す
      * @adr.alternative go-design を並べて、流れのテストの口を出す
      */
-    @adr.proposed
+    @adr.superseded(Decision700.D744)
     FlowsInOwnFile;
 
     /**
@@ -35,7 +35,7 @@ namespace hozo.decisions {
      * @adr.alternative 置き場を internal/gen/hozoc のままにする
      * @adr.alternative 仕様のファイルを hozo/compiler.hozo に移す
      */
-    @adr.proposed
+    @adr.superseded(Decision700.D742)
     GeneratedUnderHozo;
   }
 }

@@ -1,6 +1,5 @@
 // 決定の記録（200〜299）。名前空間 hozo.decisions。書き方は decisions/adr.hozo の頭のコメント。
 // コードには、ならない（hozo.toml の単位の対象ではない）。
-// docs/decisions.md「決めたこと」の行を、そのまま移したもの（本文は、行の「決めたこと」の列。持ち主は、行の「持ち主」の列）。
 
 namespace hozo.decisions {
   /** 決めたこと。200〜299 */

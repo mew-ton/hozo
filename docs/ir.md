@@ -211,6 +211,8 @@ interface CaseTyping {            // ケースの `対象 as T`、`対象 as els
 }
 ```
 
+この節の細部は、決定 D768 が決めた。
+
 ### decorator
 
 ```ts
@@ -272,6 +274,8 @@ interface CatchesClause {
   halts?: string;                 // mode が halts のときの効果。FQN か "$param:名前"
 }
 ```
+
+この節の細部は、決定 D589 が決めた。
 
 ### op
 
@@ -434,6 +438,8 @@ type Literal =
   | { kind: "boolean"; value: boolean }
   | { kind: "duration"; value: number };    // ナノ秒。Go の time.Duration と同じ単位
 ```
+
+この節の細部は、決定 D775 が決めた。
 
 ### デコレータの適用
 
@@ -612,6 +618,8 @@ interface ViewedSignature extends Signature {   // Signature は Sig(O, viewer)
 - `viewer` が同じなら、`config`・`files`・`entries` 以外は単位によらず同じ。
 - `entries` は、単位ごとに違いうる: 単位の対象の op と、通す出力が、単位で決まる（`docs/check.md`「入口ごとの、求めるケース」の「入口」「流れ」）。`Entry`・`EntrySource`・`EntryStep` のフィールドは、どれも、省かない（値がなければ、`""` か `[]`）。
 
+この節の細部は、決定 D687 が決めた。
+
 ### まとめた形
 
 プラグインへの要求（`docs/plugin-protocol.md`「emit」）は、一つの要求に、いくつもの出力を並べる（決定 D411）ので、`View` を、そのまま並べず、**出力に依らない部分**（`Spec`）と、**出力ごとの部分**（`OutputView`）に分けて送る。`View` は、この二つを合わせたもので、中身は、変わらない: トランスパイラが受け取るのは、今までどおり `View`（SDK が、合わせる）。
@@ -683,3 +691,5 @@ interface OutputView {            // 出力（単位と名前空間の組）ご�
 | 0.5 | `Decorator.targets` に `effect`（効果の宣言の `decorators` が空でなくなりうる）。`Decorator.reads`、`Decorator.effects`。`Param.rest` と、残りの引数の `Arg`（`list`）。`Op.carried`。`Signature.reads` / `Signature.effects` が、デコレータが運ぶものを含む。`Field.default` をなくした（フィールドの既定値を、言語からなくした。`docs/grammar.md`「決めたこと」）。`View` とやり取りの形は 0.4 と同じ |
 | 0.4 | `NamespaceConfig` に `index`、`base`、`options`、`seams`。`View.files` に語彙のファイル。`Program` の構造は 0.3 と同じ。`emit` の応答から `select` をなくした（`docs/plugin-protocol.md`「選択をなくしたこと」） |
 | 0.3 | `Type` に `never`。`Model.derivedFrom` をやめて `Model.extends`。`State.type`。`Classify.subject` に `op`、`cases[].as`、`decidedBy`。`Op.exported`、`Op.reads`。`Signature.reads`、`Signature.pure`。`Atom` に `state`。`Match.subject` の `state` をやめる（`value` の `atom` が `state`）。`Match.arms[].body` に `atom` と `throw`、`Match.arms[].narrowed` |
+
+この節の細部は、決定 D589、D595、D755、D761、D775 が決めた。

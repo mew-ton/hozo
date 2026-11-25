@@ -69,6 +69,8 @@ DecoratorRef  = [ QualifiedName "." ] DecoratorName ;
 
 `reads` `read` `as` `never` `throw` `override` `export` の七つは仮の綴りで、後で別の語に変えうる（「決めたこと」）。`is` と `omit` は予約語ではない（`model A is B omit …` をなくしたときに外した。「model」）。`const` も予約語ではない（配線の束縛を `val` に替えたときに外した。「配線」）。
 
+この節の細部は、決定 D729 が決めた。
+
 ### リテラル
 
 ```
@@ -176,6 +178,8 @@ Override    = [ DocComment ] { Decorator } "override" FieldName [ ":" ( Type | "
 - `Record<K, V>` は書けない（なくした書き方。「決めたこと」）。パーサーは、型の位置に、`Record` という名前と、その直後の `<` が来たら、インデックスの model を宣言して、その名前を書くことをメッセージで示して SYNTAX にする。`Record` は、予約語ではなく、ふつうの名前として宣言できる。
 - `model A is B omit f;` は書けない（なくした書き方。「決めたこと」）。パーサーは、`model` の名前の直後に `is` という識別子が来たら、`extends` と `override f: never;` で書くことをメッセージで示して SYNTAX にする。
 
+この節の細部は、決定 D601 が決めた。
+
 ### scalar
 
 ```
@@ -257,6 +261,8 @@ effect fn addUser(user: User): throws EmailTaken effects users.post;
   | 節の前に `:` のない形（`fn f() throws E`、`effect fn e() effects s.post`） | `fn f(): throws E`、`effect fn e(): effects s.post` |
   | `read fn r(): T on s;`、`effect fn e() on s.post;`（`on`） | `read fn r(): T reads s;`、`effect fn e(): effects s.post;` |
 
+この節の細部は、決定 D592、D595 が決めた。
+
 ### exception / effect / read
 
 ```
@@ -309,6 +315,8 @@ RowCase       = QualifiedName ;                             (* 分類の名前 "
   | `effects orders.put as Stage.Draft -> Stage.Accepted`、`as Stage.Draft, Stage.Accepted -> …`（行の遷移の矢印と、前のケース） | 前のケースは、行の引数の型で言い、`as` は、後のケースだけ: `effect fn accept(order: Order on Stage.Draft): effects orders.put as Stage.Accepted;` |
   | `effects orders.put as any -> Stage.Shipped`、`effects orders.post as any`（行の遷移の `any`） | 前がどのケースでもよければ、行の引数を絞り込まない。後を言わないなら、`as` を書かない（`put` で、後のケースを約束しないなら `as else`） |
 
+この節の細部は、決定 D592 が決めた。
+
 ### classify
 
 ```
@@ -338,6 +346,8 @@ ClassifySubject = "never" | "any" "exception" | Type { "," Type } ;
 - 対象のない分類は、`of` を省かず、`of never` と書く。ケースは、名前だけ（`CaseTyping` を書けば CLS-9）。その分類は、名前を並べるだけで、型にも、`match` にも、効果の遷移にも、書けない（書けない所と診断は `docs/check.md`「分類」の「対象のない分類」）。
 - ケースの前に、デコレータを書ける（`@prd.actor.human Customer;`）。順は、`DocComment` → デコレータ → ケースの名前。どの種類の分類のケースにも書け、付けられるデコレータは、宣言の `for` が、分類のケース（「decorator の宣言」の `CaseKind`）を並べたもの（検査 DEC-1）。
 - なくした書き方は、新しい書き方をメッセージで示して SYNTAX にする: ケースの位置の `default;`（名前のないケース。ケースには名前を付ける。値がない側や、union の残りのアームなら、残りのケース `<名前>: <対象> as else;`）、宣言の頭の `condition C of T;`（両側に名前を付けた `classify C of T { <成り立つ側>; <成り立たない側>; }` と書く）。
+
+この節の細部は、決定 D683 が決めた。
 
 ### decorator の宣言
 
@@ -419,6 +429,8 @@ DecoEffectsClause = "effects" EffectElem { "," EffectElem } ;
 - `Relation` の `effects` は、直前の `prevents` / `keeps` の目的語。`DecoEffectsClause` の頭の `effects` と字句は同じだが、`prevents` / `keeps` の直後かどうかで分かれる（`throws X prevents effects effects e` は、`Relation` の後ろに `DecoEffectsClause`）。
 - `RestParam` は**残りの引数**: 適用が、ほかの引数の後ろに位置で渡した 0 個以上の値を、まとめて受け取る（`decorator fn effects(...targets: any effect): effects targets;`）。型は、渡す値一つの型を書く。引数の並びの最後に一つだけ書け、省略可能にはできない（文法で閉じる）。節の中で名前を書けば、渡した値のすべてを指す。
 
+この節の細部は、決定 D588、D589、D598、D600、D755 が決めた。
+
 #### デコレータの本体
 
 決定 D392、D447。`decorator fn` の本体は、配線のブロックに、包んだ関数の呼び出しを足したもの。
@@ -452,6 +464,8 @@ export fn post(in: PostInput): PostOk { … }
 - **どの道も、包んだ関数を、ちょうど一度呼ぶか、例外を投げる**（同 DEC-20）。
 - **本体の中の名前は、デコレータを宣言した名前空間で、解決する**（`docs/resolve.md`「スコープ」）。包んだ関数の引数のほかの引数のうち、値の型のもの（`max: int`）は、本体の中で、値として読める。`any <種類>` の引数は、本体では、まだ、使えない（同 DEC-23）。
 - 本体の意味（付けた所で、広げたものとして計算する）の持ち主は、`docs/check.md`「デコレータの本体」。
+
+この節の細部は、決定 D684、D723 が決めた。
 
 ### op
 
@@ -521,6 +535,8 @@ CoreType    = "string" | "boolean" | "int" | "float" | "datetime" | "date" | "ti
 - `void` は `ReturnType` にだけ書ける。
 - `never` は、値が一つもない型。書ける所は、四つ: `ReturnType`、`Override` の型（「model」）、`classify` の対象（「classify」）、`CaseKind` の `of` の後ろ（「decorator の宣言」）。どれも、同じ意味から読む（`docs/types.md`「型の種類」の「never」）。
 - `match` の `by` の後ろの `list` / `nullable` は型ではなく、標準の分類の名前（「配線」）。要素が一つの `list` / `nullable` は、この位置でも、いつも、標準の分類（その名前の分類は、宣言できない）。`single` は、書けない（SYNTAX）。
+
+この節の細部は、決定 D729、D763 が決めた。
 
 ## 配線
 
@@ -625,6 +641,8 @@ CatchArms  = "{" MatchArm { MatchArm } [ ElseArm ] "}" ;      (* by を書いた
 - `throw` を書けるのは、アームの本体と、`catch` のブロックの最後の文（`CatchBlock`）だけ。ほかの文の位置や、`return` の式には書けない。`throw e` の `e` は、囲んでいる `catch` が受けた例外の名前（引数は、書けない）。
 - `match` の頭は、全体を、丸括弧で囲む（`for` と同じ並び: キーワード、丸括弧に入った頭、ブロック）。`val warranty = match (…) { … }` の、`}` の後ろの `;` は、省ける（`End`）。
 
+この節の細部は、決定 D584 が決めた。
+
 ## ドキュメンテーションコメント
 
 ```
@@ -644,6 +662,8 @@ DocComment の中身 = { 本文の行 } { タグの行 } ;
 - 説明は省略できる。
 - タグの形が崩れている行（名前がない、`@param` の名前が修飾されている、`@see` に説明がある）は構文エラーだが、宣言は捨てない。
 - `bind` には付けられない（「ファイルと宣言」の `Decl`）。
+
+この節の細部は、決定 D756 が決めた。
 
 ## 決めたこと
 
@@ -723,3 +743,5 @@ DocComment の中身 = { 本文の行 } { タグの行 } ;
 | キーが決まっていない構造は、model の本体のインデックスで書く（`model Attrs { [name: string]: string[]; }`）。`Record<K, V>` と、予約語 `Record` は、なくした（同 360） | 構造を持つ型は、どれも、名前を付けて宣言する（union と同じ）。「何を、何で引くのか」に、名前と、説明と、キーの名前が付く。大文字で始まる、言語の語が、なくなる |
 | 関数に付けるデコレータは、`decorator fn` と書き、後ろの形を、関数の宣言にそろえる。本体を書ける。包んだ関数は、最初の引数（型の位置に `fn`。名前は自由）で受け取り、その呼び出しが、包んだ op の中身を呼ぶ（同 447。前の、決まった書き方 `proceed()` は、なくした）。op だけに付けるデコレータの、`for` の形と、`for` を省いた形は、なくした（同 392〜394） | デコレータも、op を受け取って、同じ結果を返す、関数。中身が仕様にあるか、ないかで、葉の op と配線の op と同じに、分かれる。`for op` と、`fn` で、同じことを、二通りに言わない |
 | 例外を受ける文は `try { … } catch (e) { … }`。分類して受けるなら `catch (e by 分類) { ケース => 本体; }`。例外の分類は `classify C of any exception { K: any exception as E1 \| E2; }`。`try` と `catch` は、予約語（同 419、422） | 文の頭の語は、どれも予約語（`val`、`match`、`for`）。`catch` のブロックの最後にだけ `throw` の文を書けるのは、「受けて、記録して、投げ直す」を、`match` なしで書くため。途中の `throw` は、下の文が評価されないので、文法で閉じる |
+
+この節の細部は、決定 D624、D763 が決めた。

@@ -23,6 +23,8 @@ hozoc が同梱して常に読み込む語彙（`vocab/*.hozo`）と、その読
 
 語彙の名前空間も、単位の `namespace` に書ける（`docs/config.md`「単位の対象」）。語彙の型（`http` の例外、`browser.page.Route` など）を使う出力は、その語彙の名前空間に、同じ基底の単位を要る（`docs/config.md`「型の置き場」）。語彙のファイルの宣言は、単位の `in` によらず、いつも単位の対象の宣言（`docs/config.md`「in」）。デコレータだけの語彙（`valid`、`db`、`cli` など）は、型を持たないので、単位は要らない。
 
+この節の細部は、決定 D735 が決めた。
+
 ## 同梱する語彙
 
 | ファイル | 中身 | 出典 |
@@ -52,6 +54,8 @@ hozoc が同梱して常に読み込む語彙（`vocab/*.hozo`）と、その読
 
 - `db` は、出典のグローバルのデコレータ `db`（`@db state …`）をなくして `db.table` に置き換え、出典にないデコレータを足す。中身は「`db` の語彙」。
 - `http` は、要求のどこから読むかを言うフィールドのデコレータを、出典から変える。中身は「`http` の語彙」。
+
+この節の細部は、決定 D603、D613 が決めた。
 
 ### `db` の語彙
 
@@ -306,7 +310,7 @@ namespace flows {
 ## 同梱しない語彙
 
 - `cli`（`examples/hozoc.hozo` の `namespace cli { command / arg / flag / env / exitCode }`）: go-cli プラグインが `vocabulary` で提供する（`plugins/go-cli/cli.hozo`。宣言の全文と、出典から変えたところ（`arg` の位置、`flag` と `env` の省ける名前、足した `required` と `default`）の持ち主は `docs/plugin-go-cli.md`「語彙」）。`http` や `page` と同じく、意味をコードにするプラグインが語彙の持ち主になる。hozoc 自身は `hozo.toml` の単位の `transpilers = ["go", "go-valid", "go-cli"]` で読む。
-- `cache`（§4.2）: 今のスコープでは考えない（`docs/open.md`「スコープ外にした設計書の例」）。
+- `cache`（§4.2）: 今のスコープでは考えない（決定 D792）。
 
 ## 語彙の意味の実装
 
