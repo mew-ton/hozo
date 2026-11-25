@@ -79,6 +79,21 @@ func (p *pluginProject) waitCalls(n int) {
 	}
 }
 
+// waitFile は、プラグインのディレクトリに、ファイル name ができるのを待つ。
+func (p *pluginProject) waitFile(name string) {
+	p.t.Helper()
+	deadline := time.Now().Add(waitTimeout)
+	for {
+		if _, err := os.Stat(filepath.Join(p.dir, name)); err == nil {
+			return
+		}
+		if time.Now().After(deadline) {
+			p.t.Fatalf("プラグインが、%s を書かない", name)
+		}
+		time.Sleep(2 * time.Millisecond)
+	}
+}
+
 // gate は、これからのプラグインの起動を、release まで、待たせる。
 func (p *pluginProject) gate() {
 	_ = os.Remove(filepath.Join(p.dir, "open"))
@@ -467,6 +482,9 @@ func TestPluginCheckStopsStuckPlugin(t *testing.T) {
 	p.allowed(c)
 	p.open(c, pluginSpec)
 	p.waitCalls(1)
+	// 起動の記録（launches）は、プラグインが spin を読む前に、付く。spin を消すのは、回り始めた後:
+	// 先に消すと、一つ目が、回らずに、ふつうに答えて、止めるものが、なくなる
+	p.waitFile("spinning")
 
 	if err := os.Remove(spin); err != nil { // 次の起動は、ふつうに答える
 		t.Fatal(err)
