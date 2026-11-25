@@ -493,6 +493,20 @@ namespace hozo.decisions {
     D539;
 
     /**
+     * docs/README.md「書き方」から、docs/decisions.md の書き方（「決定と持ち主の一覧で、理由は持たない」）を、消す。
+     * 決めた理由は、決定に置く（534 からは decisions.hozo）、とだけ言う。
+     *
+     * @adr.context docs/decisions.md の行の多くは、理由を持っていて、文書と食い違っていた。docs/decisions.md は 533 で閉じ（533）、
+     *   もう書かないので、docs の側から、その書き方を指示するのは、変。533 までの行は、書き直さない。
+     * @adr.alternative 一文を、実際に合わせて「決定と、決めた時点の理由を持つ」に直す（こちらの勧め）
+     * @adr.alternative そのままにし、#174 で考える
+     * @adr.said なおす
+     * @adr.said というか,docs から消えるものの書き方をdocs で指示するのも変だ
+     */
+    @adr.accepted
+    D540;
+
+    /**
      * ユースケース write（書き出す）の担い手に、Ci を入れない。
      * 出どころは、docs/open.md「聞かずに決めて、確かめていない決定」の、hozoc の担い手の行。
      *
