@@ -177,7 +177,7 @@ func (q *httpRequest) query(name string, dst any, opts ...httpOption) {
 }
 
 // body は、本文（JSON のオブジェクト）のキー name の値を dst（フィールドへのポインタ）に読む（@http.body）。
-// キーがあれば、値が null でも、あるものと読む。
+// キーがないか、値が null なら、項目がない（missing）。
 func (q *httpRequest) body(name string, dst any, opts ...httpOption) {
 	if q.fail != "" {
 		return
@@ -193,7 +193,7 @@ func (q *httpRequest) body(name string, dst any, opts ...httpOption) {
 		}
 	}
 	raw, present := q.items[name]
-	if !present {
+	if !present || string(raw) == "null" {
 		q.missing("body", name, dst, opts)
 		return
 	}

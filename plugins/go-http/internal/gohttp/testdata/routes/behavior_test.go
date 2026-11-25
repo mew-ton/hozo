@@ -3,7 +3,7 @@
 //
 //   - 「入力の読み方」と「通信の形」の「要求」: 三つの場所（ヘッダ、クエリ、本文）の、項目の形（名前を書いたものと、省いたもの）と、
 //     全体の形。項目がないときの三つの扱い（@http.required は 400、@http.default はその値、どちらもなければ零値）を、三つの場所で。
-//     ヘッダの空の文字列は、ないもの。クエリの同じ名前が二度あれば最初の値。本文の項目は、キーがあれば、値が null でも、あるもの。
+//     ヘッダの空の文字列は、ないもの。クエリの同じ名前が二度あれば最初の値。本文の項目の値が null なら、ないもの（要求 NullIsAbsent）。
 //     読み方（文字列、整数、小数、真偽値。省略可能と scalar）は、補助が、実行時に、読む先の型で決める。
 //   - 「op を呼ぶ前の失敗」: 読めない要求は 400 `http.BadRequest` と決まった文言で、op を呼ばない。読めない要求が先で、次に制約の検査。
 //   - 「制約の検査」: validate = true のときだけ。違反の path は、通信の上の場所。validate = false なら、確かめずに op を呼ぶ。
@@ -212,6 +212,24 @@ func TestRouting(t *testing.T) {
 }
 
 // ヘッダと本文の項目: 名前を書いたものと省いたもの、項目がないときの三つの扱い。
+// TestNullIsAbsent は、要求 hozo.gohttp.Requirement.NullIsAbsent（plugins/go-http/go-http.hozo）: 本文の項目の値が null なら、
+// その項目を送らなかったものと読む。@http.required の項目は 400 の missing、@http.default の項目は、その値、どちらもなければ零値。
+func TestNullIsAbsent(t *testing.T) {
+	leaves, h := newAPI()
+	// @http.required の項目（labels）の null は、ないのと同じ: 400 で、op を呼ばない
+	expectJSON(t, call(t, h, "POST", "/items?dryRun=true", `{"labels":null}`, createHeaders...),
+		400, `{"error":"http.BadRequest","value":{"message":"body labels: missing","violations":[]}}`)
+	if len(leaves.calls) != 0 {
+		t.Fatalf("op が呼ばれた: %v", leaves.calls)
+	}
+	// @http.default の項目（copies、active）の null は、その値。どちらもない項目（memo、item）の null は、零値
+	expectJSON(t, call(t, h, "POST", "/items?dryRun=true", `{"labels":{},"copies":null,"active":null,"memo":null,"item":null}`, createHeaders...),
+		200, `{"name":"","quantity":0,"tags":null}`)
+	if c := leaves.create; c.Copies != 1 || !c.Active || c.Note != nil || !reflect.DeepEqual(c.Item, pkgtype.Item{}) || c.Weight != 2 {
+		t.Errorf("null の項目: 入力 = %+v, want copies は 1、active は true（null は、ないもの）、memo と item は零値、weight は 2（キーがない）", c)
+	}
+}
+
 func TestHeadersAndBodies(t *testing.T) {
 	leaves, h := newAPI()
 	// @http.required の項目だけを送る
@@ -243,13 +261,6 @@ func TestHeadersAndBodies(t *testing.T) {
 		Labels: map[string]pkgtype.Name{}, Weight: 0.5, Scale: 2, Active: false, Timeout: 1000, Wait: 2000, Owner: "me"}
 	if !reflect.DeepEqual(leaves.create, want) {
 		t.Errorf("入力 = %+v, want %+v", leaves.create, want)
-	}
-
-	// 本文の項目は、キーがあれば、値が null でも、あるものと読む: @http.default の値を入れず、@http.required でも誤りにしない
-	expectJSON(t, call(t, h, "POST", "/items?dryRun=true", `{"labels":null,"copies":null,"active":null,"memo":null,"item":null}`, createHeaders...),
-		200, `{"name":"","quantity":0,"tags":null}`)
-	if c := leaves.create; c.Labels != nil || c.Copies != 0 || c.Active || c.Note != nil || c.Weight != 2 {
-		t.Errorf("null の項目: 入力 = %+v, want labels は nil、copies は 0、active は false（null は、あるもの）、weight は 2（キーがない）", c)
 	}
 
 	// validate = false: 制約に合わない入力でも、確かめずに op を呼ぶ

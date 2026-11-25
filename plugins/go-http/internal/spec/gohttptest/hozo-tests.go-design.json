@@ -1,0 +1,6 @@
+{
+  "tests": [
+    {"name": "hozo.gohttp.Requirement.BodyLimit", "file": "internal/spec/gohttptest/design.go", "lines": [25, 25]},
+    {"name": "hozo.gohttp.Requirement.NullIsAbsent", "file": "internal/spec/gohttptest/design.go", "lines": [28, 28]}
+  ]
+}

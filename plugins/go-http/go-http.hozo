@@ -1,0 +1,45 @@
+// go-http 自身の要求（docs/plugin-go-http.md「go-http 自身の要求」、決定 D795）。名前空間 hozo.gohttp。
+// **写し。持ち主は、docs/plugin-go-http.md**（要求の説明が、振る舞いを決める見出しを名指しする）。食い違えば、文書が正しい。
+//
+// このディレクトリの hozo.toml の単位が、go-design で、要求ごとの、テストの入れ物の口（plugins/go-http/internal/spec/spectest の
+// Requirements と RunRequirements）を作る。満たすのは、go-http の単体テスト（plugins/go-http/internal/gohttp/requirements_test.go）。
+// go-http を使う人は、これらのテストを書かない。振る舞いを足すか変えるときは、先に、ここに要求を足す。
+
+/** go-http が、生成したハンドラについて、満たし続けること */
+namespace hozo.gohttp {
+  /** 要求: 生成したハンドラの振る舞い。どの宣言が、どの要求のためのものかは、@prd.ref が言う */
+  classify Requirement of never {
+    /**
+     * request body が上限（オプション maxBodyBytes。なければ 1 MiB）を超えた要求は、op を呼ばずに、413 と
+     * http.BadRequest の "body: too large" で断る。上限ちょうどの request body は、読む。
+     * 持ち主: docs/plugin-go-http.md「オプション」「入力の読み方」、docs/plugin-http.md「op を呼ぶ前の失敗」
+     */
+    BodyLimit;
+    /**
+     * request body の項目の値が null なら、その項目を送らなかったものと読む: http.required の項目は 400 の
+     * "body <名前>: missing"、http.default(v) の項目は v、どちらもなければ零値。
+     * 持ち主: docs/plugin-go-http.md「入力の読み方」、docs/plugin-http.md「要求」
+     */
+    NullIsAbsent;
+  }
+
+  /** 単位のオプション [emit.options.go-http]（docs/plugin-go-http.md「オプション」） */
+  @prd.ref(Requirement.BodyLimit)
+  model Options {
+    /** true なら、入力を読んだ後、op を呼ぶ前に、入力の制約を確かめる */
+    validate: boolean;
+    /** request body の上限（バイト）。正の整数。なければ 1048576 */
+    maxBodyBytes: int?;
+  }
+
+  /** 経路の入力の、request body の項目一つ（http.body の付いたフィールド）。項目がないときの扱いは、フィールドのデコレータが言う */
+  @prd.ref(Requirement.NullIsAbsent)
+  model BodyItem {
+    /** 項目の名前（request body の JSON のオブジェクトのキー） */
+    name: string;
+    /** デコレータ http.required が付いている */
+    required: boolean;
+    /** デコレータ http.default が付いている */
+    hasDefault: boolean;
+  }
+}

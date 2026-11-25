@@ -820,5 +820,46 @@ namespace hozo.decisions {
      */
     @adr.proposed
     D793;
+
+    /**
+     * request body の項目（`@http.body` のフィールド）の値が `null` なら、その項目を送らなかったものと読む。`@http.required` の
+     * 項目なら 400 の `body <名前>: missing`、`@http.default(v)` の項目なら v、どちらもなければ零値。項目の中の値（model の
+     * フィールド、配列の要素）の `null` は、今までどおり、「値の JSON」の読み方。
+     *
+     * @adr.context go-http は、キーがあれば、値が null でも、あるものと読んでいた（#164 の 2）。@http.required の項目に null を
+     * 送ると、400 にならず、零値のまま op に届いた。通信の形では、値のない項目は、キーを省く。
+     * 利用者は、四つの案（A: この決定。B: required だけ null を断る。C: null をいつも断る。D: 今のまま）から A を選んだ。
+     * @adr.consequence 変わるのは @http.required と @http.default の項目だけで、ほかの項目の振る舞いは、今と同じ。
+     * @adr.alternative @http.required の項目の null だけを 400 にする: @http.default の項目に null を送ると、既定の値が入らない
+     * @adr.alternative null を、いつも 400 body: invalid JSON にする: 省略可能な項目に null を送るクライアントが、壊れる
+     * @adr.said A. null はキーがないのと同じ (Recommended)
+     */
+    @adr.proposed
+    D794;
+
+    /**
+     * go-http の出力の振る舞いのうち、テストで確かめ続けるものは、要求として、仕様 `plugins/go-http/go-http.hozo`（名前空間
+     * `hozo.gohttp`）に書く。`plugins/go-http` は、自分の `hozo.toml` を持つ、一つの Hozo のプロジェクトにする（`plugin_dirs` は
+     * `..`、`[options.go]` の `module` は `github.com/mew-ton/hozo/plugins/go-http`）。要求ごとの、テストの入れ物の口は、その仕様から
+     * go-design が作り（出力先 `plugins/go-http/internal/spec`、`make generate` で作り直す）、go-http の単体テストが満たす。
+     * go-http を使う人は、これらのテストを書かない。仕様は、`docs/plugin-go-http.md` の写しで、振る舞いの持ち主は、文書の見出し。
+     *
+     * @adr.context #164 の 1 を、go-http の出力を直し、サンプルに、それを確かめるテストを足して進めたところ、利用者が、
+     * 振る舞いの決まりを Hozo の仕様に書き、そのテストを、仕様から作るよう求めた。形は、利用者が、三つの案（A: 要求として書き、
+     * go-design で口を作る。B: 生成したハンドラを op として書く。C: 先に issue にする）から A を、置き場は、三つの案
+     * （A: plugins/go-http の下。B: internal/gen の下。C: tests/ の下）から A を選んだ。仕様のファイルが、ルートの plugin_dirs の
+     * 下で sources から除かれると分かったとき、利用者は「プラグインのルートで hozo を使えばいい」と言った。
+     * 仕様を写しにしたことと、要求の名前、要求を満たすテストの形は、聞かずに決めた。
+     * @adr.consequence 要求を足せば、Requirements のメソッドが増え、go-http のテストを書くまで、コンパイルできない。
+     * 自己生成と tests/generated_test.go は、プロジェクトを二つ扱う。plugins/go-http の置き場は、リポジトリの中にあるので、
+     * 一時ディレクトリでは、置き場への道の上のディレクトリだけを本物にし、ほかをリンクする。
+     * @adr.alternative 生成したハンドラを op として書き、基底 go の単体テストの口で求める: 振る舞いの分かれが型とケースで書けるが、
+     * 書く量と、書けない穴が多い
+     * @adr.alternative 口を internal/gen の下に置く: プラグインのテストが internal/ を import する
+     * @adr.alternative 口を満たすテストを tests/ に置く: go-http の振る舞いのテストと、要求のテストが、別の場所に分かれる
+     * @adr.said go-http の仕様を hozo でちゃんと書いてあって、そのテストがそこから作られるべきだ　という話 go-http を使う側はそのテストをしなくていいんだよ
+     */
+    @adr.proposed
+    D795;
   }
 }

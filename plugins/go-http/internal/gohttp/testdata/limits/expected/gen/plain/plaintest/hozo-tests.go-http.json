@@ -1,0 +1,8 @@
+{
+  "tests": [
+    {"name": "plain.put/OK", "file": "gen/plain/plaintest/http.go", "lines": [83, 88]},
+    {"name": "plain.put/BadRequest", "file": "gen/plain/plaintest/http.go", "lines": [91, 96]},
+    {"name": "plain.whole/OK", "file": "gen/plain/plaintest/http.go", "lines": [114, 119]},
+    {"name": "plain.whole/BadRequest", "file": "gen/plain/plaintest/http.go", "lines": [122, 127]}
+  ]
+}

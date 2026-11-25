@@ -1,16 +1,19 @@
-// Command selfgen は `make generate` の中身: hozoc 自身の仕様 cli.hozo から internal/gen/hozo/compiler/** と internal/gen/hozo/cli/**
-// （hozo.toml の二つの単位の out。以下、「置き場」）を生成し直す（docs/packages.md「生成するもの」「自己生成の手順」）。
+// Command selfgen は `make generate` の中身: 二つのプロジェクトの生成物を生成し直す（docs/packages.md「生成するもの」「自己生成の手順」）。
+// リポジトリのルートの hozo.toml（hozoc 自身の仕様 cli.hozo から internal/gen/hozo/compiler/** と internal/gen/hozo/cli/**）と、
+// plugins/go-http/hozo.toml（go-http 自身の要求 go-http.hozo から plugins/go-http/internal/spec/**）。単位の out を、以下、「置き場」。
 //
-// 置き場は cmd/hozoc が import するパッケージなので、hozoc がそこへ直に書くと、プラグインの不具合で
+// ルートの置き場は cmd/hozoc が import するパッケージなので、hozoc がそこへ直に書くと、プラグインの不具合で
 // コンパイルできない Go が出たときに、hozoc 自身がビルドできなくなり、生成し直すこともできなくなる。そうならないように、
 // 置き場には、コンパイルできると確かめたものしか置かない:
 //
-//  1. 今のソース（今の置き場を含む）で hozoc をビルドする。使うプラグイン（plugins/ の go、go-valid、go-cli）を、WASM に
+//  1. 今のソース（今の置き場を含む）で hozoc をビルドする。使うプラグイン（plugins/ の go、go-valid、go-cli、go-design）を、WASM に
 //     ビルドして、それぞれのディレクトリの plugin.wasm に置く（docs/testing.md「プラグインの WASM」）。
 //  2. 一時ディレクトリに仕様と設定（cli.hozo、hozo.toml、go.mod、go.sum）を写し、プラグインの置き場 plugins と、3 の vet が
 //     要るディレクトリ（ir、plugin、runtime）をシンボリックリンクで足して、そこで hozoc build を走らせる。
 //     生成されるコードの import パスは、hozo.toml の [options.go] の module から決まる（docs/plugin-go.md「パッケージと import パス」）
 //     ので、リポジトリで生成したときと同じになる。go.mod は、3 の vet とビルドのために写す。
+//     plugins/go-http のプロジェクトは、別の一時ディレクトリに、リポジトリの中身を、置き場への道の上のディレクトリだけを
+//     本物にし、ほかをシンボリックリンクで足して（mirror）、その plugins/go-http で hozoc build を走らせる。
 //  3. 生成した置き場の中身を、その一時ディレクトリで vet に通し、次に、リポジトリの今のものの代わりに
 //     置いたつもりで（go の -overlay）、それを使うパッケージ（cmd/hozoc、internal/app）ごとビルドする。
 //  4. 通ったときだけ、リポジトリの置き場を生成したものに置き換える。通らなければ何も変えず、
@@ -45,9 +48,15 @@ var (
 	links = []string{"ir", "plugin", "plugins", "runtime"}
 	// plugins は、cli.hozo の出力に使うプラグイン（hozo.toml の単位の transpilers。plugins/ の下の名前）。生成の前に、WASM に
 	// ビルドする: マニフェストの wasm は plugin.wasm（docs/plugin-go.md「マニフェスト」）。
-	plugins = []string{"go", "go-valid", "go-cli"}
+	plugins = []string{"go", "go-valid", "go-cli", "go-design"}
 	// users は、生成物を置き換えたつもりでビルドするパッケージ: 生成物そのものと、それを import するもの。
 	users = []string{"./internal/gen/...", "./internal/app/...", "./cmd/hozoc"}
+
+	// goHTTP は、もう一つのプロジェクト plugins/go-http（docs/plugin-go-http.md「go-http 自身の要求」）: プロジェクトのルートと、
+	// 置き場と、置き換えたつもりでビルドするパッケージ。
+	goHTTPProject = filepath.Join("plugins", "go-http")
+	goHTTPDirs    = []string{filepath.Join("plugins", "go-http", "internal", "spec")}
+	goHTTPUsers   = []string{"./plugins/go-http/..."}
 )
 
 func main() {
@@ -139,20 +148,67 @@ func run(repo string, stdout, stderr io.Writer) error {
 	if err := commandEnv(work, env, io.Discard, stderr, hozoc, "build"); err != nil {
 		return fmt.Errorf("hozoc build が失敗した: %w", err)
 	}
+	// plugins/go-http のプロジェクト
+	work2 := filepath.Join(tmp, "work-go-http")
+	if err := mirror(repo, work2, ".", goHTTPDirs); err != nil {
+		return fmt.Errorf("シンボリックリンクを作れない: %w", err)
+	}
+	if err := commandEnv(filepath.Join(work2, goHTTPProject), env, io.Discard, stderr, hozoc, "build"); err != nil {
+		return fmt.Errorf("%s で hozoc build が失敗した: %w", filepath.ToSlash(goHTTPProject), err)
+	}
 
 	// 3. vet と、置き換えたつもりでのビルド
 	if err := verify(repo, genDirs, work, users, tmp, stderr); err != nil {
 		keep = true
-		return fmt.Errorf("生成したコードがコンパイルできないので、%s は置き換えていない（生成したものは %s に残した）: %w", places(), work, err)
+		return fmt.Errorf("生成したコードがコンパイルできないので、%s は置き換えていない（生成したものは %s に残した）: %w", places(genDirs), work, err)
+	}
+	if err := verify(repo, goHTTPDirs, work2, goHTTPUsers, tmp, stderr); err != nil {
+		keep = true
+		return fmt.Errorf("生成したコードがコンパイルできないので、%s は置き換えていない（生成したものは %s に残した）: %w", places(goHTTPDirs), work2, err)
 	}
 
 	// 4. 置き換える
-	for _, dir := range genDirs {
-		changed, err := replace(filepath.Join(repo, dir), filepath.Join(work, dir))
-		for _, c := range changed {
-			fmt.Fprintln(stdout, strings.Replace(c, ": ", ": "+filepath.ToSlash(dir)+"/", 1))
+	for _, set := range []struct {
+		work string
+		dirs []string
+	}{{work, genDirs}, {work2, goHTTPDirs}} {
+		for _, dir := range set.dirs {
+			changed, err := replace(filepath.Join(repo, dir), filepath.Join(set.work, dir))
+			for _, c := range changed {
+				fmt.Fprintln(stdout, strings.Replace(c, ": ", ": "+filepath.ToSlash(dir)+"/", 1))
+			}
+			if err != nil {
+				return err
+			}
 		}
-		if err != nil {
+	}
+	return nil
+}
+
+// mirror は、repo の dir（リポジトリのルートからの相対パス）を、work に足す: 置き場（outs。同じく相対パス）への道の上の
+// ディレクトリは、本物のディレクトリにして中を同じに足し、置き場そのものは足さない（hozoc が書く）。ほかは、シンボリックリンク。
+func mirror(repo, work, dir string, outs []string) error {
+	onPath := dir == "."
+	for _, out := range outs {
+		if out == dir {
+			return nil
+		}
+		if strings.HasPrefix(out, dir+string(filepath.Separator)) {
+			onPath = true
+		}
+	}
+	if !onPath {
+		return os.Symlink(filepath.Join(repo, dir), filepath.Join(work, dir))
+	}
+	if err := os.MkdirAll(filepath.Join(work, dir), 0o755); err != nil {
+		return err
+	}
+	entries, err := os.ReadDir(filepath.Join(repo, dir))
+	if err != nil {
+		return err
+	}
+	for _, e := range entries {
+		if err := mirror(repo, work, filepath.Join(dir, e.Name()), outs); err != nil {
 			return err
 		}
 	}
@@ -182,9 +238,9 @@ func specFiles(repo string) ([]string, error) {
 	return names, nil
 }
 
-func places() string {
+func places(dirs []string) string {
 	var out []string
-	for _, dir := range genDirs {
+	for _, dir := range dirs {
 		out = append(out, filepath.ToSlash(dir))
 	}
 	return strings.Join(out, " と ")

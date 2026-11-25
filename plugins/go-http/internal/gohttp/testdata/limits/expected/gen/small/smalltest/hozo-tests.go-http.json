@@ -1,0 +1,8 @@
+{
+  "tests": [
+    {"name": "small.put/OK", "file": "gen/small/smalltest/http.go", "lines": [83, 88]},
+    {"name": "small.put/BadRequest", "file": "gen/small/smalltest/http.go", "lines": [91, 96]},
+    {"name": "small.whole/OK", "file": "gen/small/smalltest/http.go", "lines": [114, 119]},
+    {"name": "small.whole/BadRequest", "file": "gen/small/smalltest/http.go", "lines": [122, 127]}
+  ]
+}

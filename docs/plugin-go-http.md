@@ -4,7 +4,7 @@
 
 `http` の語彙（`docs/vocab.md`「同梱する語彙」「`http` の語彙」）の付いた op を、`net/http` のハンドラにするトランスパイラ `go-http`。Go の基底 `go`（`docs/plugin-go.md`）と、検証の `go-valid`（`docs/plugin-go-valid.md`）に相乗りする。プラグインは `plugins/go-http/`。期待する出力の実物は、サンプル `tests/samples/shop-server/` の `gen/server/http.go`（ハンドラ）と `gen/server/servertest/http.go`（インテグレーションテストの口）。
 
-この文書は二つを決める: 生成する Go のコード（「出力」）と、入口ごとのインテグレーションテストを受け取る口（「インテグレーションテストの口」）。**通信の上の形**（要求と応答の形）と、`http` の語彙の使い方の検査は、言語に依らない決まりで、持ち主は `docs/plugin-http.md`「通信の形」「診断」。
+この文書は三つを決める: 生成する Go のコード（「出力」）と、入口ごとのインテグレーションテストを受け取る口（「インテグレーションテストの口」）と、go-http 自身の振る舞いを確かめるテストの決まり（「go-http 自身の要求」）。**通信の上の形**（要求と応答の形）と、`http` の語彙の使い方の検査は、言語に依らない決まりで、持ち主は `docs/plugin-http.md`「通信の形」「診断」。
 
 デコレータが出すコードは、型に依らない（`docs/requirements.md`「出力を推論しない」）: 経路ごと、フィールドごとに出すコードは、デコレータの引数だけから作り、どの型でも同じ形（同じ補助の呼び出し）にする。値で変わる振る舞い（値がなければ 204、文字列の読み方）は、共通の補助が、実行時に決める（「補助」）。要求に項目がないときの扱い（誤りにする、決まった値を入れる）は、デコレータ（`@http.required`、`@http.default`）が言い、補助に引数で渡す（「入力の読み方」）。型は、書いたものが食い違っていないかを確かめるのにだけ使う（`docs/plugin-http.md`「診断」と、この文書の「診断」）。
 
@@ -135,7 +135,7 @@ func NewHandler(ops Ops) http.Handler {
 
 - **ヘッダとクエリの項目**（文字列一つを読む）: 読む先がポインタ（省略可能）なら、値を置く先を作ってから読む。文字列はそのまま、整数は `strconv.ParseInt(v, 10, 64)`、小数は `strconv.ParseFloat(v, 64)`、真偽値は `strconv.ParseBool(v)`。読めなければ、文言 `<場所> <名前>: invalid <int / float / boolean>`（`query page: invalid int`）。クエリの同じ名前が二度あれば、最初の値。ヘッダの値は、そのまま読む（`Bearer ` などの前置きを外さない）。空の文字列のヘッダは、ないものと読む。
 - **項目がないとき**（ヘッダ、クエリ、本文の項目のどれも同じ）: 行に `httpRequired` があれば、読めない要求で、文言 `<場所> <名前>: missing`（`header Authorization: missing`、`body lines: missing`）。`httpDefault(v)` があれば、読む先を v にする（`reflect` で、読む先の型に変える）。どちらもなければ、読む先に何も書かない（1 で置いた零値のまま）。読む先の型は、見ない。
-- **本文の項目**（`req.body`）: 本文は JSON のオブジェクトで、初めて呼ばれたときに一度だけ読む。キーの値を、`encoding/json` で読む先に読む。キーがなければ、項目がない（上）。キーがあれば、値が `null` でも、あるものと読む。本文が JSON のオブジェクトとして読めない（空の本文、配列、本文の全体が `null` のときを含む）、キーの値の型が合わないときは、文言 `body: invalid JSON`。
+- **本文の項目**（`req.body`）: 本文は JSON のオブジェクトで、初めて呼ばれたときに一度だけ読む。キーの値を、`encoding/json` で読む先に読む。キーがないか、値が `null` なら、項目がない（上。`docs/plugin-http.md`「要求」）。本文が JSON のオブジェクトとして読めない（空の本文、配列、本文の全体が `null` のときを含む）、キーの値の型が合わないときは、文言 `body: invalid JSON`。
 - **本文の全体**（`req.bodyObj`）: 本文を、`encoding/json` で、読む先の model に読む。読めなければ `body: invalid JSON`。知らないキーは無視し、ないキーのフィールドは零値のままにする（`encoding/json` の既定）。
 - **ヘッダとクエリの全体**（`req.headerObj`、`req.queryObj`）: 読む先の model（Go の構造体）のフィールドごとに、その `json` タグの名前（仕様のフィールドの名前。基底が付ける）の項目を、項目の形と同じに読む。その項目には、`httpRequired` も `httpDefault` も渡らないので、なければ、零値のまま（付けていれば HTTP-11: `docs/plugin-http.md`「対象」）。
 - **request body の上限**: 本文は、`NewHandler` が包んだ `http.MaxBytesHandler` を通して読む。読む途中で上限を超えたら（`*http.MaxBytesError`）、読めない要求で、文言 `body: too large`、ステータス 413（ほかの読めない要求は 400）。`req.body` と `req.bodyObj` は、本文を、同じ補助 `read` で読む。
@@ -419,6 +419,30 @@ func RunHTTP(t *testing.T, leaves server.Leaves, c HTTPCases) {
 | `httpWantInternal(t, res)` | 500 と `internal` であることを確かめる | `@http.status` を持たない例外のテストがあるとき |
 | `httpWantFailure(t, res, status, name)` | 失敗の応答の本文の形と、`error` を確かめ、`value` を返す | 上の三つのどれかを出すとき |
 | `httpWantJSON(t, res, status)` | ステータスと、`Content-Type: application/json` を確かめ、本文を返す | いつも |
+
+## go-http 自身の要求
+
+go-http の出力の振る舞いのうち、テストで確かめ続けるものは、**要求**として、仕様 `plugins/go-http/go-http.hozo`（名前空間 `hozo.gohttp`）に書く。要求ごとの、テストの入れ物の口は、その仕様から go-design が作り（`docs/plugin-go-design.md`「要求の、テストの入れ物の口」）、go-http の単体テストが満たす。go-http を使う人（サンプル `shop-server` を含む）は、これらのテストを書かない。
+
+この節の細部は、決定 D795 が決めた。
+
+### 仕様と、口の置き場
+
+- **`plugins/go-http` は、それ自体で一つの Hozo のプロジェクト**: `plugins/go-http/hozo.toml` が、`sources = ["go-http.hozo"]`、`plugin_dirs = [".."]`（リポジトリの `plugins/`）と、単位を一つ持つ: 名前空間 `hozo.gohttp`、トランスパイラ `go` と `go-design`、出力先 `internal/spec`、`[emit.options.go-design]` の `requirements = ["hozo.gohttp.Requirement"]`。リポジトリのルートの `hozo.toml` には、入れない（ルートの `plugin_dirs` の下は、`sources` から除かれる: `docs/config.md`「置き場と探し方」）。
+- **Go のモジュールは、リポジトリのルートの `go.mod`**。`[options.go]` の `module` は、モジュールのパスに、このディレクトリまでのパスを足したもの（`github.com/mew-ton/hozo/plugins/go-http`）にし、生成物の import パスを、リポジトリの中のものに合わせる。
+- **生成物**は `plugins/go-http/internal/spec/**`: 型のパッケージ `gohttp`（仕様の model）と、テストのパッケージ `gohttptest`（`design.go` の `Requirements` と `RunRequirements`）。`make generate` で作り直す（`docs/packages.md`「生成するもの」「自己生成の手順」）。
+- 仕様は、この文書の**写し**: 振る舞いの持ち主は、この文書の見出しで、要求の説明が、それを名指しする。食い違えば、この文書が正しい（`docs/README.md`「書き方」）。
+- 単位のオプション（「オプション」）は、仕様の model `hozo.gohttp.Options` に写す。要求は、`@prd.ref` で、そのオプションか、振る舞いを決めるもの（`hozo.gohttp.BodyItem`: request body の項目一つ）に結ぶ（`docs/plugin-go-design.md`「指している設計」）。
+
+### 要求
+
+| 要求（`hozo.gohttp.Requirement` のケース） | 振る舞いの持ち主 | 満たすテスト |
+|---|---|---|
+| `BodyLimit` | 「オプション」の `maxBodyBytes` と、「入力の読み方」の request body の上限: 上限を超えた要求は、op を呼ばずに 413 と `body: too large`。上限ちょうどは、読む。オプションがなければ 1 MiB | 入力 `limits` の `TestBodyLimit` |
+| `NullIsAbsent` | 「入力の読み方」の本文の項目: 値が `null` のキーは、キーがないのと同じ（`@http.required` は 400 の `missing`、`@http.default(v)` は v、どちらもなければ零値） | 入力 `routes` の `TestNullIsAbsent` |
+
+- **満たす所**: `plugins/go-http/internal/gohttp/requirements_test.go` の `TestRequirements` が、`gohttptest.RunRequirements` に、要求ごとのメソッドを持つ値を渡す。メソッドは、上の表の入力の出力を、一時のモジュールに置き（`TestBehavior` と同じ組み立て）、その入力の `behavior_test.go` の、表のテストだけを走らせる。
+- **振る舞いを足すか変えるときは、先に要求を足す**: 要求を足せば、`Requirements` のメソッドが増え、テストを書くまで、`TestRequirements` がコンパイルできない（`docs/plugin-go-design.md`「口の形」）。
 
 ## 診断
 

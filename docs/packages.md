@@ -41,7 +41,7 @@ plugins/<name>/        プラグイン。一つのディレクトリが、一つ
 plugins/go/            Go の基底のプラグイン（main。中身は internal/gobase/）
 plugins/go-valid/      go-valid プラグイン（main。中身は internal/govalid/）
 plugins/go-sqlite/     go-sqlite プラグイン（main。中身は internal/gosqlite/）
-plugins/go-http/       go-http プラグイン（main。中身は internal/gohttp/）
+plugins/go-http/       go-http プラグイン（main。中身は internal/gohttp/）。それ自体が一つの Hozo のプロジェクト（hozo.toml と go-http.hozo: go-http 自身の要求）で、internal/spec/ はその生成物（型のパッケージ gohttp と、テストのパッケージ gohttptest の、要求のテストの入れ物の口。docs/plugin-go-http.md「go-http 自身の要求」）
 plugins/http/          語彙のプラグイン http（main。中身は、公開のライブラリ plugin/httpvocab）
 plugins/valid/         語彙のプラグイン valid（main。中身は、公開のライブラリ plugin/validvocab）
 plugins/db/            語彙のプラグイン db（main。中身は、公開のライブラリ plugin/dbvocab）
@@ -115,6 +115,8 @@ Go のパッケージごとの、このモジュールの中で import してい
 | `plugins/go-sqlite/internal/gosqlite` | `ir`、`plugin`、`plugin/dbvocab`、`plugin/golang` |
 | `plugins/go-http` | `plugin`、`plugins/go-http/internal/gohttp` |
 | `plugins/go-http/internal/gohttp` | `ir`、`plugin`、`plugin/golang`、`plugin/govalid`、`plugin/httpvocab` |
+| `plugins/go-http/internal/spec` | — |
+| `plugins/go-http/internal/spec/gohttptest` | — |
 | `plugins/http` | `plugin`、`plugin/httpvocab` |
 | `plugins/valid` | `plugin`、`plugin/validvocab` |
 | `plugins/db` | `plugin`、`plugin/dbvocab` |
@@ -767,6 +769,7 @@ Go のプラグインは、どれも同じ形: `main` パッケージが `plugin
 | `ir` と `plugin` の型 | `schema/ir.schema.json`（`Program` / `View` と、`$defs` にプロトコルの要求と応答） | `internal/tools/irschema`（`go generate ./schema/...`。構造体は reflect で写し、`kind` のユニオンと列挙は道具の表で持つ） |
 | `token.Keywords` | `editors/vscode/syntaxes/hozo.tmLanguage.json`（予約語の部分は `token.Keywords` から、それ以外は道具の中の表から） | `internal/tools/tmgrammar`（`go generate ./editors/...`） |
 | `cli.hozo`（と、それが指す、ルートの `*.hozo`） | `internal/gen/hozo/compiler/**`、`internal/gen/hozo/cli/**` | `internal/tools/selfgen`（`make generate`。下の「自己生成の手順」） |
+| `plugins/go-http/go-http.hozo`（go-http 自身の要求。`plugins/go-http/hozo.toml` のプロジェクト。`docs/plugin-go-http.md`「go-http 自身の要求」） | `plugins/go-http/internal/spec/**` | 同じ |
 | `plugins/` の下の `testdata/<名前>/` の `hozo.toml` と `.hozo` | `testdata/<名前>/views.json`（プラグインの単体テストの入力の `View`） | `tests/pluginviews_test.go` の `TestPluginViewFixtures`（`go test ./tests -run TestPluginViewFixtures -update`。遅れていれば、このテストが落ちる。`docs/testing.md`「単体テスト」） |
 
 生成物はコミットする。CI で生成し直して差分がないことを確かめる（`docs/testing.md`「生成物の一致」）。
@@ -775,15 +778,15 @@ Go のプラグインは、どれも同じ形: `main` パッケージが `plugin
 
 ### 自己生成の手順
 
-`internal/gen/hozo/compiler` と `internal/gen/hozo/cli`（以下、「置き場」）は `cmd/hozoc` が import するパッケージなので、hozoc がそこへ直に書くと、プラグインの不具合でコンパイルできない Go が出たときに hozoc 自身がビルドできなくなり、生成し直すこともできなくなる。そうならないように、`make generate`（`go run ./internal/tools/selfgen`）は、置き場に、コンパイルできると確かめたものしか置かない。
+自己生成は、二つのプロジェクトを生成し直す: リポジトリのルート（`hozo.toml`。出力先は `internal/gen/hozo/compiler` と `internal/gen/hozo/cli`）と、`plugins/go-http`（`plugins/go-http/hozo.toml`。出力先は `plugins/go-http/internal/spec`）。出力先（以下、「置き場」）のうち、前の二つは `cmd/hozoc` が import するパッケージなので、hozoc がそこへ直に書くと、プラグインの不具合でコンパイルできない Go が出たときに hozoc 自身がビルドできなくなり、生成し直すこともできなくなる。そうならないように、`make generate`（`go run ./internal/tools/selfgen`）は、置き場に、コンパイルできると確かめたものしか置かない。
 
-1. 今のソース（今の置き場を含む）で `hozoc` を一時ディレクトリにビルドする。使うプラグイン（`plugins/` の `go`、`go-valid`、`go-cli`）を、WASM にビルドして、それぞれのディレクトリの `plugin.wasm` に置く（`docs/testing.md`「プラグインの WASM」）。
-2. 別の一時ディレクトリに、リポジトリのルートの仕様のファイル（`*.hozo` と `decisions/*.hozo`: `hozo.toml` の `sources` が並べる、`cli.hozo` と、設計だけのファイル。ディレクトリの形は、そのまま写す。`cli.hozo` の宣言が、設計だけのファイルの宣言を指せるように、すべて写す）、`hozo.toml`、`go.mod`、`go.sum` を写し、プラグインの置き場 `plugins` と、3 の vet が要る `ir`、`plugin`、`runtime` をシンボリックリンクで足して、そこで 1 の `hozoc build` を走らせる（`tests/generated_test.go` と同じ組み立て。import パスは、`hozo.toml` の `[options.go]` の `module` から決まるので、同じになる。`go.mod` は、3 の vet とビルドのために写す）。プラグインの探索が見るプロジェクトの外の場所（`HOZO_PLUGIN_PATH`、ホーム）は空にして、生成物が実行する人の環境に左右されないようにする。WASM を、機械の言葉に直したものの置き場（`HOZO_CACHE_DIR`）は、ホームを空にする前の、もとの場所を渡す（生成のたびに、直し直さないように。答えは、変わらない）。
-3. 生成した置き場の中身を、その一時ディレクトリで `go vet` に通し、次に、リポジトリの今のものの代わりに置いたつもりで（`go build -overlay`。ディスクの上の置き場には触れない）、それを import するパッケージ（`cmd/hozoc`、`internal/app`）ごと `go build` する。
+1. 今のソース（今の置き場を含む）で `hozoc` を一時ディレクトリにビルドする。使うプラグイン（`plugins/` の `go`、`go-valid`、`go-cli`、`go-design`）を、WASM にビルドして、それぞれのディレクトリの `plugin.wasm` に置く（`docs/testing.md`「プラグインの WASM」）。
+2. 別の一時ディレクトリに、リポジトリのルートの仕様のファイル（`*.hozo` と `decisions/*.hozo`: `hozo.toml` の `sources` が並べる、`cli.hozo` と、設計だけのファイル。ディレクトリの形は、そのまま写す。`cli.hozo` の宣言が、設計だけのファイルの宣言を指せるように、すべて写す）、`hozo.toml`、`go.mod`、`go.sum` を写し、プラグインの置き場 `plugins` と、3 の vet が要る `ir`、`plugin`、`runtime` をシンボリックリンクで足して、そこで 1 の `hozoc build` を走らせる（`tests/generated_test.go` と同じ組み立て。import パスは、`hozo.toml` の `[options.go]` の `module` から決まるので、同じになる。`go.mod` は、3 の vet とビルドのために写す）。`plugins/go-http` のプロジェクトは、もう一つの一時ディレクトリに、リポジトリの中身を、置き場（`plugins/go-http/internal/spec`）への道の上のディレクトリだけを本物のディレクトリにし、ほかをシンボリックリンクで足して（置き場そのものは足さない）、その `plugins/go-http` で `hozoc build` を走らせる（`plugins` を丸ごとリンクすれば、hozoc が、確かめる前のものを、リポジトリに直に書く）。プラグインの探索が見るプロジェクトの外の場所（`HOZO_PLUGIN_PATH`、ホーム）は空にして、生成物が実行する人の環境に左右されないようにする。WASM を、機械の言葉に直したものの置き場（`HOZO_CACHE_DIR`）は、ホームを空にする前の、もとの場所を渡す（生成のたびに、直し直さないように。答えは、変わらない）。
+3. 生成した置き場の中身を、その一時ディレクトリで `go vet` に通し、次に、リポジトリの今のものの代わりに置いたつもりで（`go build -overlay`。ディスクの上の置き場には触れない）、それを import するパッケージ（`cmd/hozoc`、`internal/app`、`plugins/go-http` の下のパッケージ）ごと `go build` する。
 4. 3 が通ったときだけ、置き場の中身を生成したものに置き換える（なくなったファイルは消し、同じ内容のファイルには触れない）。通らなければ何も変えず、生成したものを残した一時ディレクトリの場所を示して失敗する。
 
 - 生成は不動点: 生成し直した直後にもう一度 `make generate` しても、何も変わらない。置き換えた後の `hozoc build` も同じ内容を書く。
 - リポジトリのルートで `go run ./cmd/hozoc build` を直に走らせれば、確かめずに置き場へ書く。生成器を変えている間は `make generate` を使う。
 - 置き場が壊れて 1 のビルドが通らないときは、`internal/gen/` を git で元に戻してからやり直す。`internal/tools/selfgen` 自身はこのモジュールのどのパッケージも import しないので、そのときも動く。
 
-この節の細部は、決定 D758 が決めた。
+この節の細部は、決定 D758、D795 が決めた。

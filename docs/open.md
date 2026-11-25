@@ -229,6 +229,7 @@
 | 点 | 要るもの | 持ち主 |
 |---|---|---|
 | サンプル `order-app` の、作るものの問い（分けて送ること、上限を超えた送料） | 判断 | `tests/samples/order-app/README.md`「利用者への問い」の Q3、Q8 |
+| `plugins/go-http` のプロジェクト（決定 D795）は、Go のモジュールのルート（リポジトリのルートの `go.mod`）の下にある。`plugin-go.md`「パッケージと import パス」は、モジュールのルートを、プロジェクトのルート（`hozo.toml` のあるディレクトリ）とし、`go.mod` を、そこに置くと言う。今は、`[options.go]` の `module` に、このディレクトリまでのパスを足して、import パスを合わせている。プロジェクトが、モジュールの下のディレクトリにあることを、決まりとして認めるか | 判断 | `plugin-go-http.md`「go-http 自身の要求」、`plugin-go.md`「パッケージと import パス」 |
 | サンプル `shop-server` に、引数を持つ例外を足すか | 判断 | この文書「`shop-server` の、引数を持つ例外」 |
 | 同じ名前空間を、二つの単位に出した出力が、コンパイルできて、一つの `server` の下で動くことを、確かめるサンプルが、なくなった（`shop-server` の、メモリ版の `store` を、なくしたため: 決定 D388）。設定と、出力の形は、`tests/corpus/units`、`internal/app` の `TestEmitUnits`、`plugins/go/internal/gobase/testdata/seams` が、今も確かめる。二つとも、テストの対象にする決まり（同 387）の当てはめを作るときに、動く例が、また要る | 判断 | `tests/samples/shop-server/README.md`「メモリ版の `store` をなくしたこと」 |
 | サンプル `order-app` の `@pact.promise`（op に付けた、約束の文。264 より前の形）を、要求のケース（`classify … of never`）と `@prd.ref` に、書き直すか。書き直すと、要求のテストの入れ物（決定 D377）が、要求の数だけ、要るようになる | 判断 | `ide-chain.md`「要求トレーサビリティマトリクス」 |
