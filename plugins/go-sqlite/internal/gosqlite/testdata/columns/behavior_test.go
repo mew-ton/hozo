@@ -408,3 +408,31 @@ func TestDateAndTime(t *testing.T) {
 		t.Errorf("時刻の列の順で最初の行が %q, %v（期待は b）", first, err)
 	}
 }
+
+// TestForeignKeysOn は、要求 hozo.gosqlite.Requirement.ForeignKeysOn（plugins/go-sqlite/go-sqlite.hozo）: Schema が外部キーを持つので、
+// PRAGMA foreign_keys が効いていない db では、CreateTables は、表を作らずにエラーを返す。効いていれば、表を作り、参照の違反を断る。
+func TestForeignKeysOn(t *testing.T) {
+	ctx := context.Background()
+	off, err := sql.Open("sqlite", "file::memory:")
+	if err != nil {
+		t.Fatal(err)
+	}
+	off.SetMaxOpenConns(1)
+	t.Cleanup(func() { off.Close() })
+	err = app.CreateTables(ctx, off)
+	if err == nil || !strings.Contains(err.Error(), "PRAGMA foreign_keys is off") {
+		t.Fatalf("外部キーが効いていない db で CreateTables = %v, want PRAGMA foreign_keys is off のエラー", err)
+	}
+	var n int
+	if err := off.QueryRowContext(ctx, `SELECT COUNT(*) FROM sqlite_master WHERE type = 'table'`).Scan(&n); err != nil {
+		t.Fatal(err)
+	}
+	if n != 0 {
+		t.Errorf("外部キーが効いていない db に、表を %d 個作った（期待は 0）", n)
+	}
+	// 効いていれば、表を作り、参照の違反を断る
+	db, ctx := openDB(t)
+	if err := app.NewLinksTable(db).CreateLink(ctx, app.Link{Id: "l0", Core: "nobody"}); err == nil || !strings.Contains(err.Error(), "FOREIGN KEY") {
+		t.Errorf("参照の違反 = %v, want FOREIGN KEY の違反", err)
+	}
+}

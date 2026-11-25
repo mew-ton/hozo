@@ -264,6 +264,18 @@ func columnList(m *model) string {
 	return strings.Join(names, ", ")
 }
 
+// hasRefs は、表の列のどれかが、外部キー（@db.ref。REFERENCES）を持つか（docs/plugin-go-sqlite.md「表」）。
+func (e *emitter) hasRefs() bool {
+	for _, t := range e.tables {
+		for _, c := range t.model.cols {
+			if c.ref != "" {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 // schema は Schema の SQL: 表の状態ごとの CREATE TABLE IF NOT EXISTS（docs/plugin-go-sqlite.md「表」）。列の定義は
 // `"<名前>" <型>[ NOT NULL][ PRIMARY KEY][ UNIQUE][ REFERENCES …]`。NOT NULL は、フィールドの型が省略可能でない、すべての列に付ける。
 func (e *emitter) schema() string {

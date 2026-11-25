@@ -288,10 +288,11 @@ func TestTransactionIsTheSeam(t *testing.T) {
 	}
 }
 
-// TestNestedTransactionJoins は、トランザクションの中から、もう一度 @db.transaction の継ぎ目を通ると（入れ子）、
-// 新しいトランザクションを始めずに、外側のものに加わること: 内側が成功した後で外側が失敗すれば、内側のしたことも残らない。
+// TestNestedTransactionInsideOuter は、トランザクションの中から、もう一度 @db.transaction の継ぎ目を通ると（入れ子）、
+// 新しいトランザクションを始めずに、外側のものの中で行うこと（内側は SAVEPOINT。docs/vocab.md「db の read と効果」の transaction）:
+// 内側が成功した後で外側が失敗すれば、内側のしたことも残らない。
 // この仕様に、入れ子になる op はないので、継ぎ目の実装（store.DbSeams）のメソッドを、テストが二重に呼ぶ。
-func TestNestedTransactionJoins(t *testing.T) {
+func TestNestedTransactionInsideOuter(t *testing.T) {
 	t.Parallel()
 	db, ctx := openDB(t), context.Background()
 	if err := store.CreateTables(ctx, db); err != nil {

@@ -714,7 +714,7 @@ func (f *testFile) helpers(entries []entry) string {
 	// 全体の形は、項目の形のメソッドで、項目を一つずつ足す
 	header, query = header || headerObj, query || queryObj
 
-	unions := len(f.g.unions) > 0 || len(f.g.consts) > 0
+	unions := f.g.codec()
 	var b strings.Builder
 	add := func(on bool, h helper) {
 		if !on {
@@ -746,7 +746,7 @@ func (f *testFile) helpers(entries []entry) string {
 	add(true, testHelperWantJSON)
 	if unions {
 		f.use("reflect")
-		b.WriteString(f.g.unionTable(f.im.Qualifier))
+		b.WriteString(f.g.unionTable(f.im))
 		add(true, helperUnionCodec)
 	}
 	return strings.TrimSuffix(b.String(), "\n")

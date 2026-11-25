@@ -152,7 +152,7 @@ effect fn deleteSession(token: type.Token): effects sessions.delete;
 - **`find`** は、一行に決まるものでなければならない（決まるかどうかの確かめ方は `docs/plugin-db.md`「read」）。
 - **`insert`** は宛先が `<状態>.post`、**`update`** は `<状態>.put`、**`delete`** は `<状態>.delete` の効果に付ける。`insert` と `update` の効果の引数は、表の model の行一つ。
 - **`conflict`** は、`insert` か `update` の効果に足す（決定 D353）。その効果が、表の一意の制約（`@db.key` と `@db.unique`）に当たったら、名指しした例外を投げる（`@db.insert @db.conflict(EmailTaken) effect fn createUser(user: User): throws EmailTaken effects users.post;`）。例外は、効果ごとに一つで、その効果の `throws` にあり、引数を持たないもの。引数を持つ例外を投げる効果と、制約ごとに例外を分ける効果は、デコレータを付けずに、人が書く。
-- **`transaction`** は、op に付ける。その op が DB にすることが、一つのトランザクションで起きる。op のデコレータなので、op の中身は決めず、中身の前後に処理を足すだけ（継ぎ目。`docs/config.md`「継ぎ目」）。どこまでがトランザクションに入るかと、入れ子の扱いは、語彙を読むトランスパイラが決める（`docs/plugin-go-sqlite.md`「トランザクション」）。
+- **`transaction`** は、op に付ける。その op が DB にすることが、一つのトランザクションで起きる。op のデコレータなので、op の中身は決めず、中身の前後に処理を足すだけ（継ぎ目。`docs/config.md`「継ぎ目」）。**約束は、呼ばれ方によらない**（決定 D800）: その op が失敗すれば、その op が DB にしたことは、どれも残らない。`transaction` の op の中から、別の `transaction` の op を呼んでも（入れ子）、同じ: 内側が失敗すれば、内側がしたことだけが消え、その失敗を外側が受けて（`catches … recovers`）成功すれば、外側の残りは確定する。確定するのは、いちばん外側の op が成功したとき。どこまでがトランザクションに入るかと、それをどう実現するか（SQLite では、入れ子の内側を SAVEPOINT にする）は、語彙を読むトランスパイラが決める（`docs/plugin-go-sqlite.md`「トランザクション」）。
 - 等しいかどうかでない比較、件数と位置、二つ以上の列での並べ方は、この語彙では言えない。その `read` か効果には `db` のデコレータを付けず、人が書く。
 
 ### `http` の語彙

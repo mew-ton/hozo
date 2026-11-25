@@ -1,0 +1,25 @@
+// request body の上限（docs/plugin-go-http.md「オプション」の maxBodyBytes、「入力の読み方」）。二つの名前空間は、同じ形で、
+// hozo.toml のオプションだけが違う。本文の項目の形（put）と、全体の形（whole）の、どちらも上限で断る。
+namespace small {
+  model Item { name: string; }
+
+  model PutInput { @http.body name: string; }
+  @http.post("/put")
+  export fn put(in: PutInput);
+
+  model WholeInput { @http.bodyObj item: Item; }
+  @http.post("/whole")
+  export fn whole(in: WholeInput);
+}
+
+namespace plain {
+  model Item { name: string; }
+
+  model PutInput { @http.body name: string; }
+  @http.post("/put")
+  export fn put(in: PutInput);
+
+  model WholeInput { @http.bodyObj item: Item; }
+  @http.post("/whole")
+  export fn whole(in: WholeInput);
+}

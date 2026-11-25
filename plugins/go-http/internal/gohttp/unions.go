@@ -95,9 +95,100 @@ func rawString(s string) string {
 	return "`" + s + "`"
 }
 
-// unionTable は、表 httpUnions と、表 httpConsts（docs/plugin-go-http.md「補助」の「union の読み書き」）。qualifier は、名前空間のパッケージの修飾
-// （Imports.Qualifier）。reflect の名前は、決まった名前（helperPackages）。
-func (g *generator) unionTable(qualifier func(namespace string) string) string {
+// wireScalar は、通信に出る、元が日時の核の型（datetime、date、time）の scalar 一つと、その元の核の型。
+type wireScalar struct {
+	decl *ir.Scalar
+	core ir.CoreName
+}
+
+// codec は、union の読み書きの補助（httpMarshal、httpUnmarshal と、三つの表）を出すか（docs/plugin-go-http.md「補助」の
+// 「union の読み書き」）: 通信に出る型の中に、union か、リテラルの型のフィールドを持つ model か、元が日時の核の型の scalar があるとき。
+func (g *generator) codec() bool {
+	return len(g.unions) > 0 || len(g.consts) > 0 || len(g.scalars) > 0
+}
+
+// wireScalars は、経路 routes の、本文（@http.body、@http.bodyObj のフィールド）、結果、@http.status を持つ例外の引数の型の中の、
+// 元が日時の核の型の scalar を、最初に現れた順に g.scalars に足す（optional、array、model のフィールドとインデックスの値、union の
+// アームの型を辿る。union の辿り方と同じ）。scalar は、宣言されたもの（何段の scalar を経ても）だけで、核の型そのものは載せない
+// （基底は、核の型を、JSON の読み書きを持つ Go の型で出す）。
+func (g *generator) wireScalars(routes []route) {
+	visited := map[string]bool{}
+	for i := range routes {
+		for _, in := range routes[i].inputs {
+			if in.place == inBody {
+				g.scalarsIn(in.field.Type, visited)
+			}
+		}
+		g.scalarsIn(routes[i].op.Returns, visited)
+	}
+	for _, st := range g.statuses(routes) {
+		for _, p := range st.exception.Params {
+			g.scalarsIn(p.Type, visited)
+		}
+	}
+}
+
+func (g *generator) scalarsIn(t ir.Type, visited map[string]bool) {
+	switch x := t.(type) {
+	case ir.OptionalType:
+		g.scalarsIn(x.Of, visited)
+	case ir.ArrayType:
+		g.scalarsIn(x.Of, visited)
+	case ir.CaseType:
+		g.scalarsIn(x.Of, visited)
+	case ir.RefType:
+		if visited[x.Target] {
+			return
+		}
+		visited[x.Target] = true
+		switch d := g.p.Lookup(x.Target).(type) {
+		case *ir.Scalar:
+			if core, ok := g.timeCore(d); ok {
+				g.scalars = append(g.scalars, wireScalar{decl: d, core: core})
+			}
+		case *ir.Union:
+			for _, a := range d.Arms {
+				g.scalarsIn(a.Type, visited)
+			}
+		case *ir.Model:
+			for _, f := range d.Fields {
+				g.scalarsIn(f.Type, visited)
+			}
+			if d.Index != nil {
+				g.scalarsIn(d.Index.Value, visited)
+			}
+		}
+	}
+}
+
+// timeCore は、scalar s の元の核の型（scalar の並びを辿った先）が、日時の核の型（datetime、date、time）なら、それ。
+func (g *generator) timeCore(s *ir.Scalar) (ir.CoreName, bool) {
+	seen := map[string]bool{}
+	for base := s.Base; ; {
+		switch x := base.(type) {
+		case ir.CoreType:
+			switch x.Name {
+			case ir.CoreDatetime, ir.CoreDate, ir.CoreTime:
+				return x.Name, true
+			}
+			return "", false
+		case ir.RefType:
+			next, ok := g.p.Lookup(x.Target).(*ir.Scalar)
+			if !ok || seen[x.Target] {
+				return "", false
+			}
+			seen[x.Target] = true
+			base = next.Base
+		default:
+			return "", false
+		}
+	}
+}
+
+// unionTable は、表 httpUnions、表 httpConsts、表 httpScalars（docs/plugin-go-http.md「補助」の「union の読み書き」）。im は、
+// このファイルの import（名前空間のパッケージの修飾と、日時の核の型の Go の型の import を記録する）。reflect の名前は、決まった名前（helperPackages）。
+func (g *generator) unionTable(im *golang.Imports) string {
+	qualifier := im.Qualifier
 	var b strings.Builder
 	b.WriteString("// httpUnions は、通信に出る union ごとの、アームの並び（union の宣言の順）。\n")
 	b.WriteString("var httpUnions = map[reflect.Type][]httpArm{\n")
@@ -135,6 +226,13 @@ func (g *generator) unionTable(qualifier func(namespace string) string) string {
 			fmt.Fprintf(&b, "{at: %d, key: %s, value: %s},\n", f.at, strconv.Quote(f.key), rawString(f.value))
 		}
 		b.WriteString("},\n")
+	}
+	b.WriteString("}\n\n")
+	b.WriteString("// httpScalars は、元が日時の核の型の scalar ごとの、元の型。通信の上では、元の型の JSON で読み書きする。\n")
+	b.WriteString("var httpScalars = map[reflect.Type]reflect.Type{\n")
+	for _, sc := range g.scalars {
+		ns := g.declNS[sc.decl.Name]
+		fmt.Fprintf(&b, "reflect.TypeFor[%s%s](): reflect.TypeFor[%s](),\n", qualifier(ns), golang.TypeName(sc.decl.Name, ns), golang.GoType(ir.CoreType{Name: sc.core}, im))
 	}
 	b.WriteString("}\n\n")
 	return b.String()
@@ -195,6 +293,15 @@ func httpDecode(data []byte, dst reflect.Value) error {
 	t := dst.Type()
 	if !httpHasUnion(t, map[reflect.Type]bool{}) {
 		return json.Unmarshal(data, dst.Addr().Interface())
+	}
+	if base, ok := httpScalars[t]; ok {
+		// 日時の scalar: 元の型の JSON で読んで、scalar の型に変える
+		x := reflect.New(base)
+		if err := json.Unmarshal(data, x.Interface()); err != nil {
+			return err
+		}
+		dst.Set(x.Elem().Convert(t))
+		return nil
 	}
 	null := string(bytes.TrimSpace(data)) == "null"
 	switch t.Kind() {
@@ -327,6 +434,10 @@ func httpEncode(v reflect.Value) ([]byte, error) {
 	if !httpHasUnion(t, map[reflect.Type]bool{}) {
 		return json.Marshal(v.Interface())
 	}
+	if base, ok := httpScalars[t]; ok {
+		// 日時の scalar: 元の型に変えて、元の型の JSON で書く
+		return json.Marshal(v.Convert(base).Interface())
+	}
 	switch t.Kind() {
 	case reflect.Interface, reflect.Pointer:
 		if v.IsNil() {
@@ -419,13 +530,16 @@ func httpEncode(v reflect.Value) ([]byte, error) {
 	return nil, errors.New("union: unsupported type " + t.String())
 }
 
-// httpHasUnion は、型 t の値の中に、union（か、実行時に型の決まる値）か、リテラルの型のフィールドを持つ model が現れうるか。
-// 現れない型は、encoding/json に、そのまま渡す。
+// httpHasUnion は、型 t の値の中に、union（か、実行時に型の決まる値）か、リテラルの型のフィールドを持つ model か、日時の scalar が
+// 現れうるか。現れない型は、encoding/json に、そのまま渡す。
 func httpHasUnion(t reflect.Type, seen map[reflect.Type]bool) bool {
 	if seen[t] {
 		return false
 	}
 	seen[t] = true
+	if httpScalars[t] != nil {
+		return true
+	}
 	switch t.Kind() {
 	case reflect.Interface:
 		return true

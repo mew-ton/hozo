@@ -1,7 +1,7 @@
 [options.go]
 module = "example.com/app"
 
-# plugins/go-http の単体テストの入力（docs/testing.md「単体テスト」）: GOHTTP-9（[emit.options.go-http] に、知らないキーか、型の違う値がある）。
+# plugins/go-http の単体テストの入力（docs/testing.md「単体テスト」）: GOHTTP-9（[emit.options.go-http] に、知らないキーか、型の違う値か、正の整数でない maxBodyBytes がある）。
 [[emit]]
 namespace   = "app"
 transpilers = ["go", "go-valid", "go-http"]
@@ -9,5 +9,6 @@ out         = "gen/app"
 
 [emit.options.go-http]
 validate = "yes"
+maxBodyBytes = 0
 timeout  = 3
 strict   = true

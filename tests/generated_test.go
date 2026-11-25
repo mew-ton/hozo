@@ -76,25 +76,7 @@ func TestGeneratedUpToDate(t *testing.T) {
 		t.Fatalf("hozoc build の終了コード %d\n%s%s", code, stdout.String(), stderr.String())
 	}
 
-	for _, generatedDir := range generatedDirs {
-		want := readTree(t, filepath.Join(repo, filepath.FromSlash(generatedDir)))
-		got := readTree(t, filepath.Join(root, filepath.FromSlash(generatedDir)))
-		if len(want) == 0 {
-			t.Fatalf("%s がコミットされていない", generatedDir)
-		}
-		for _, p := range sortedKeys(want, got) {
-			w, inWant := want[p]
-			g, inGot := got[p]
-			switch {
-			case !inGot:
-				t.Errorf("%s/%s はコミットされているが、cli.hozo からは生成されない（make generate で消える）", generatedDir, p)
-			case !inWant:
-				t.Errorf("%s/%s は cli.hozo から生成されるが、コミットされていない（make generate）", generatedDir, p)
-			case !bytes.Equal(w, g):
-				t.Errorf("%s/%s が cli.hozo から遅れている（make generate）:\n%s", generatedDir, p, firstDiff(string(w), string(g)))
-			}
-		}
-	}
+	compareGenerated(t, repo, root, generatedDirs, "cli.hozo")
 	// 置き場の外には、何も書き出さない
 	for p := range readTree(t, filepath.Join(root, "internal")) {
 		inPlace := false
@@ -105,6 +87,98 @@ func TestGeneratedUpToDate(t *testing.T) {
 			t.Errorf("置き場の外の internal/%s を書き出した", p)
 		}
 	}
+}
+
+// pluginProjects は、プラグインのプロジェクト（plugins/<名前>/hozo.toml。internal/tools/selfgen の pluginProjects と同じ）。
+// 置き場は plugins/<名前>/internal/spec（docs/plugin-go-http.md「go-http 自身の要求」、docs/plugin-go-sqlite.md「go-sqlite 自身の要求」）。
+var pluginProjects = []string{"go-http", "go-sqlite"}
+
+// TestGeneratedPluginSpecsUpToDate は、プラグインのプロジェクトごとに、コミットされた plugins/<名前>/internal/spec/** が、
+// そのプラグイン自身の要求の仕様 plugins/<名前>/<名前>.hozo から遅れていないこと（docs/testing.md「生成物の一致」）。
+// リポジトリの中身を一時ディレクトリに、置き場への道の上のディレクトリだけを本物にし、ほかをシンボリックリンクで足して（mirrorDir。
+// 置き場そのものは足さない）、その plugins/<名前> で hozoc build を走らせ、出た置き場の中身を、コミット済みのものとバイト単位で比べる。
+func TestGeneratedPluginSpecsUpToDate(t *testing.T) {
+	if _, err := exec.LookPath("go"); err != nil {
+		t.Skip("go がない")
+	}
+	repo, err := filepath.Abs("..")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range pluginProjects {
+		t.Run(name, func(t *testing.T) {
+			dirs := []string{"plugins/" + name + "/internal/spec"}
+			root := t.TempDir()
+			if err := mirrorDir(repo, root, ".", dirs); err != nil {
+				t.Skipf("シンボリックリンクを作れない: %v", err)
+			}
+			var stdout, stderr bytes.Buffer
+			if code := hozocMainIn(filepath.Join(root, "plugins", name), []string{"build"}, &stdout, &stderr); code != 0 {
+				t.Fatalf("plugins/%s で hozoc build の終了コード %d\n%s%s", name, code, stdout.String(), stderr.String())
+			}
+			compareGenerated(t, repo, root, dirs, "plugins/"+name+"/"+name+".hozo")
+		})
+	}
+}
+
+// compareGenerated は、root に生成した置き場 dirs の中身が、リポジトリ repo のコミット済みのものと、バイト単位で同じこと。
+// source は、メッセージに出す、生成の元の仕様。
+func compareGenerated(t *testing.T, repo, root string, dirs []string, source string) {
+	t.Helper()
+	for _, generatedDir := range dirs {
+		want := readTree(t, filepath.Join(repo, filepath.FromSlash(generatedDir)))
+		got := readTree(t, filepath.Join(root, filepath.FromSlash(generatedDir)))
+		if len(want) == 0 {
+			t.Fatalf("%s がコミットされていない", generatedDir)
+		}
+		for _, p := range sortedKeys(want, got) {
+			w, inWant := want[p]
+			g, inGot := got[p]
+			switch {
+			case !inGot:
+				t.Errorf("%s/%s はコミットされているが、%s からは生成されない（make generate で消える）", generatedDir, p, source)
+			case !inWant:
+				t.Errorf("%s/%s は %s から生成されるが、コミットされていない（make generate）", generatedDir, p, source)
+			case !bytes.Equal(w, g):
+				t.Errorf("%s/%s が %s から遅れている（make generate）:\n%s", generatedDir, p, source, firstDiff(string(w), string(g)))
+			}
+		}
+	}
+}
+
+// mirrorDir は、repo の dir（"/" 区切りの相対パス）を、root に足す: 置き場（outs）への道の上のディレクトリは、本物の
+// ディレクトリにして中を同じに足し、置き場そのものは足さない（hozoc build が書く）。ほかは、シンボリックリンク
+// （docs/packages.md「自己生成の手順」の 2。internal/tools/selfgen の mirror と同じ）。
+func mirrorDir(repo, root, dir string, outs []string) error {
+	onPath := dir == "."
+	for _, out := range outs {
+		if out == dir {
+			return nil
+		}
+		if dir == "." || strings.HasPrefix(out, dir+"/") {
+			onPath = true
+		}
+	}
+	if !onPath {
+		return os.Symlink(filepath.Join(repo, filepath.FromSlash(dir)), filepath.Join(root, filepath.FromSlash(dir)))
+	}
+	if err := os.MkdirAll(filepath.Join(root, filepath.FromSlash(dir)), 0o755); err != nil {
+		return err
+	}
+	entries, err := os.ReadDir(filepath.Join(repo, filepath.FromSlash(dir)))
+	if err != nil {
+		return err
+	}
+	for _, e := range entries {
+		next := e.Name()
+		if dir != "." {
+			next = dir + "/" + e.Name()
+		}
+		if err := mirrorDir(repo, root, next, outs); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // readTree は dir の下の普通のファイルを、dir からの相対パス（"/" 区切り）→ 内容で返す。dir がなければ空。

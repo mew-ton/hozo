@@ -407,7 +407,7 @@ export fn start(id: JobId): Job throws NoJob, NotQueued {
 - **F16 予約語が、業務の言葉と当たる。** `signed(by: …)` は SYNTAX（`by`）。→ `sender`。相手の「取り消す」は `void` と書けない → `psp.release`。
 - **F17 「あれば置き換え、なければ入れる」効果がない。** `nullable` の `put` は、形の表では「あるものを置き換える」。→ `storefront.rememberOrder` と、理由を出す効果（`sayTryLater` など）は、空のときにも呼ぶ `put` として宣言した。検査器は、配線の行をまたいで状態の場合を追わないので、何も言わない。
 - **F18 配線が、二つの値を一度に運べない。** → 運ぶためだけの model（`shipping.Sealed`、`shipping.Dispatched`、`shipping.Progress`、`inventory.Allocation`）。
-- **F19 トランザクションの範囲を、仕様は言えない。** `hooks.paymentEvent` の `@db.transaction` は、六つの名前空間の表と、外部の呼び出し（`payment.release`）と、メールを含む。どの状態が同じ DB にあるかを言う宣言はない。入れ子（`fulfilment.acceptAndBegin`、`ordering.place`）の意味は、語彙を読むトランスパイラが決める（`docs/vocab.md`「`db` の read と効果」）。
+- **F19 トランザクションの範囲を、仕様は言えない。** `hooks.paymentEvent` の `@db.transaction` は、六つの名前空間の表と、外部の呼び出し（`payment.release`）と、メールを含む。どの状態が同じ DB にあるかを言う宣言はない。入れ子（`fulfilment.acceptAndBegin`、`ordering.place`）の意味は、語彙の文書が決める（`docs/vocab.md`「`db` の read と効果」の `transaction`）。
 - **F20 誰にも呼ばれない op の例外には、受け手がない。** `payment.prepayExpiring` は `throws psp.HoldExpired, http.NetworkError, http.ServerError`。検査器は何も言わない。
 - **F21 「外から呼ばれる入口」と `export` は、別のもの。** 時計で動く op（`ordering.expireUnpaid`）と、画面の操作の op は、`export` を持たない内部の op。入口であることは、デコレータ（`@clock.tick`、`@browser.page.interaction`）にしかない。操作の op のうち、ページのどのアームでもできるもの（`backoffice.onLogout`、`onRegisterCarrier`）は、印もない。
 

@@ -23,6 +23,7 @@ var helperPackages = map[string]string{
 	"errors":            "errors",
 	"fmt":               "fmt",
 	"io":                "io",
+	"math":              "math",
 	"net/http":          "http",
 	"net/http/httptest": "httptest",
 	"net/url":           "url",
@@ -83,8 +84,9 @@ func httpDefault(v any) httpOption { return httpOption{value: v} }
 	// httpRequest の型。フィールド items（本文のオブジェクト）は、メソッド body を出すときだけ
 	helperRequestHead = helper{imports: []string{"net/http"}, text: `// httpRequest は、要求一つを、入力のフィールドに読む。読めなかった最初の理由を fail に持ち、その後は何も読まない。
 type httpRequest struct {
-	r     *http.Request
-	fail  string                     // 読めなかった理由（http.BadRequest の message）。読めていれば空
+	r      *http.Request
+	fail   string                     // 読めなかった理由（http.BadRequest の message）。読めていれば空
+	status int                        // 読めなかったときのステータス。0 なら 400（read だけが、413 を入れる）
 `}
 	helperRequestItems = helper{imports: []string{"encoding/json"}, text: `	items map[string]json.RawMessage // 本文のオブジェクト。body が、初めて呼ばれたときに読む
 `}
@@ -104,24 +106,24 @@ func (q *httpRequest) query(name string, dst any, opts ...httpOption) {
 }
 
 `}
-	helperBody = helper{imports: []string{"encoding/json", "io"}, text: `// body は、本文（JSON のオブジェクト）のキー name の値を dst（フィールドへのポインタ）に読む（@http.body）。
-// キーがあれば、値が null でも、あるものと読む。
+	helperBody = helper{imports: []string{"encoding/json"}, text: `// body は、本文（JSON のオブジェクト）のキー name の値を dst（フィールドへのポインタ）に読む（@http.body）。
+// キーがないか、値が null なら、項目がない（missing）。
 func (q *httpRequest) body(name string, dst any, opts ...httpOption) {
 	if q.fail != "" {
 		return
 	}
 	if q.items == nil {
-		data, err := io.ReadAll(q.r.Body)
-		if err == nil {
-			err = json.Unmarshal(data, &q.items)
+		data, ok := q.read()
+		if !ok {
+			return
 		}
-		if err != nil || q.items == nil {
+		if err := json.Unmarshal(data, &q.items); err != nil || q.items == nil {
 			q.fail = "body: invalid JSON"
 			return
 		}
 	}
 	raw, present := q.items[name]
-	if !present {
+	if !present || string(raw) == "null" {
 		q.missing("body", name, dst, opts)
 		return
 	}
@@ -153,18 +155,33 @@ func (q *httpRequest) queryObj(dst any) {
 }
 
 `}
-	helperBodyObj = helper{imports: []string{"encoding/json", "io"}, text: `// bodyObj は、本文の全体を、JSON の値一つとして dst（model のフィールドへのポインタ）に読む（@http.bodyObj）。
+	helperBodyObj = helper{imports: []string{"encoding/json"}, text: `// bodyObj は、本文の全体を、JSON の値一つとして dst（model のフィールドへのポインタ）に読む（@http.bodyObj）。
 func (q *httpRequest) bodyObj(dst any) {
 	if q.fail != "" {
 		return
 	}
-	data, err := io.ReadAll(q.r.Body)
-	if err == nil {
-		err = json.Unmarshal(data, dst)
+	data, ok := q.read()
+	if !ok {
+		return
 	}
-	if err != nil {
+	if err := json.Unmarshal(data, dst); err != nil {
 		q.fail = "body: invalid JSON"
 	}
+}
+
+`}
+	helperRead = helper{imports: []string{"errors", "io", "net/http"}, text: `// read は、本文の全体を読む。上限（NewHandler が包んだ http.MaxBytesHandler）を超えていれば、読めない要求
+// （"body: too large"、413）。ほかの理由で読めなければ "body: invalid JSON"。読めなければ false。
+func (q *httpRequest) read() ([]byte, bool) {
+	data, err := io.ReadAll(q.r.Body)
+	var tooLarge *http.MaxBytesError
+	switch {
+	case errors.As(err, &tooLarge):
+		q.fail, q.status = "body: too large", http.StatusRequestEntityTooLarge
+	case err != nil:
+		q.fail = "body: invalid JSON"
+	}
+	return data, err == nil
 }
 
 `}
@@ -184,8 +201,8 @@ func (q *httpRequest) missing(place, name string, dst any, opts []httpOption) {
 }
 
 `}
-	helperText = helper{imports: []string{"reflect", "strconv"}, text: `// text は、通信の上の文字列（ヘッダとクエリの値）一つを dst（フィールドへのポインタ）に読む。読み方は、実行時に、dst の指す型で決める:
-// ポインタ（省略可能）なら、値を置く先を作る。文字列はそのまま、整数、小数、真偽値は strconv で読む。
+	helperText = helper{imports: []string{"math", "reflect", "strconv"}, text: `// text は、通信の上の文字列（ヘッダとクエリの値）一つを dst（フィールドへのポインタ）に読む。読み方は、実行時に、dst の指す型で決める:
+// ポインタ（省略可能）なら、値を置く先を作る。文字列はそのまま、整数、小数、真偽値は strconv で読む。小数は、有限の値だけ（NaN と無限大は、読めない）。
 // 値がない（present が false）ときの扱いは、missing。
 func (q *httpRequest) text(place, name, text string, present bool, dst any, opts []httpOption) {
 	if q.fail != "" {
@@ -211,7 +228,7 @@ func (q *httpRequest) text(place, name, text string, present bool, dst any, opts
 		v.SetInt(x)
 	case reflect.Float64:
 		x, err := strconv.ParseFloat(text, 64)
-		if err != nil {
+		if err != nil || math.IsNaN(x) || math.IsInf(x, 0) {
 			q.fail = place + " " + name + ": invalid float"
 		}
 		v.SetFloat(x)
@@ -225,12 +242,17 @@ func (q *httpRequest) text(place, name, text string, present bool, dst any, opts
 }
 
 `}
-	helperOK = helper{imports: []string{"net/http"}, text: `// ok は、要求を読めたかどうか。読めなかったなら、400（http.BadRequest）を返して false。op は呼ばない。
+	helperOK = helper{imports: []string{"net/http"}, text: `// ok は、要求を読めたかどうか。読めなかったなら、400（request body が上限を超えたなら 413）の http.BadRequest を返して false。
+// op は呼ばない。
 func (q *httpRequest) ok(w http.ResponseWriter) bool {
 	if q.fail == "" {
 		return true
 	}
-	httpWriteJSON(w, http.StatusBadRequest, httpErrorBody{
+	status := http.StatusBadRequest
+	if q.status != 0 {
+		status = q.status
+	}
+	httpWriteJSON(w, status, httpErrorBody{
 		Error: "http.BadRequest",
 		Value: httpBadRequest{Message: q.fail, Violations: []httpViolation{}},
 	})
@@ -242,7 +264,7 @@ func (q *httpRequest) ok(w http.ResponseWriter) bool {
 	helperValidate = helper{imports: []string{"errors", "net/http", runtimePath, "strings"}, text: `// httpValidate は、読んだ入力 in の制約を確かめる。in が Validate を持つかどうかは、実行時に見る（持たなければ、確かめるものがない）。
 // 制約に合わなければ、400（http.BadRequest）と違反の一覧を返して false。op は呼ばない。
 // 違反の Path の先頭（入力の model のフィールド名）を、places の通りに通信の上の場所に置き換える。
-func httpValidate(w http.ResponseWriter, in any, places ...httpPlace) bool {
+func httpValidate(w http.ResponseWriter, r *http.Request, o httpOptions, in any, places ...httpPlace) bool {
 	v, has := in.(interface{ Validate() error })
 	if !has {
 		return true
@@ -253,7 +275,7 @@ func httpValidate(w http.ResponseWriter, in any, places ...httpPlace) bool {
 	}
 	var invalid *runtime.ValidationError
 	if !errors.As(err, &invalid) {
-		httpWriteError(w, err)
+		httpInternal(w, r, err, o)
 		return false
 	}
 	violations := make([]httpViolation, 0, len(invalid.Violations))
@@ -304,6 +326,30 @@ func httpWriteResult(w http.ResponseWriter, out any) {
 		out = reflect.MakeMap(v.Type()).Interface()
 	}
 	httpWriteJSON(w, http.StatusOK, out)
+}
+
+`}
+	// NewHandler の設定（HandlerOption が書く先）と、想定していない失敗の応答（500）。いつも出す
+	helperHandlerOptions = helper{imports: []string{"net/http"}, text: `// httpOptions は、NewHandler の設定（HandlerOption が書く先）。
+type httpOptions struct {
+	internal func(r *http.Request, err error) // WithInternalError の関数。なければ nil
+}
+
+// httpNewOptions は、NewHandler に渡された設定を、順に当てる。
+func httpNewOptions(opts []HandlerOption) httpOptions {
+	var o httpOptions
+	for _, opt := range opts {
+		opt(&o)
+	}
+	return o
+}
+
+// httpInternal は、想定していない失敗の応答: WithInternalError の関数があれば、それを、要求とエラーで呼んでから、500 で、中身を出さない。
+func httpInternal(w http.ResponseWriter, r *http.Request, err error, o httpOptions) {
+	if o.internal != nil {
+		o.internal(r, err)
+	}
+	httpWriteJSON(w, http.StatusInternalServerError, httpErrorBody{Error: "internal"})
 }
 
 `}

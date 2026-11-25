@@ -1,0 +1,17 @@
+[options.go]
+module = "example.com/app"
+
+# plugins/go-http の単体テストの入力（docs/plugin-go-http.md「go-http 自身の要求」の BodyLimit）: request body の上限。
+# small は、オプション maxBodyBytes で上限を 64 バイトにする。plain は、オプションを書かない（既定の 1 MiB）。
+[[emit]]
+namespace   = "small"
+transpilers = ["go", "go-valid", "go-http"]
+out         = "gen/small"
+
+[emit.options.go-http]
+maxBodyBytes = 64
+
+[[emit]]
+namespace   = "plain"
+transpilers = ["go", "go-valid", "go-http"]
+out         = "gen/plain"

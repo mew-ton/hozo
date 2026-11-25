@@ -12,6 +12,15 @@ import (
 	"github.com/mew-ton/hozo/runtime"
 )
 
+// HandlerOption は、NewHandler の設定。
+type HandlerOption func(*httpOptions)
+
+// WithInternalError は、ハンドラが 500（{"error":"internal"}）を返す前に、f を、その要求と、op が返したエラーで呼ぶ。
+// 応答は変えない（エラーの中身は、応答に出さない）。記録や通知は、f が決める。
+func WithInternalError(f func(r *http.Request, err error)) HandlerOption {
+	return func(o *httpOptions) { o.internal = f }
+}
+
 // NewHandler は ops を net/http のハンドラにする。@http.get / @http.post の付いた op ごとに経路を一つ持つ。
 //
 //	POST /flow/items      flow.add
@@ -19,7 +28,8 @@ import (
 //	POST /flow/notices    flow.announce
 //	POST /flow/renotices  flow.reannounce
 //	POST /flow/relay      flow.relay
-func NewHandler(ops Ops) http.Handler {
+func NewHandler(ops Ops, opts ...HandlerOption) http.Handler {
+	o := httpNewOptions(opts)
 	mux := http.NewServeMux()
 
 	// flow.add
@@ -31,7 +41,7 @@ func NewHandler(ops Ops) http.Handler {
 			return
 		}
 		if err := ops.Add(r.Context(), in); err != nil {
-			httpWriteError(w, err)
+			httpWriteError(w, r, err, o)
 			return
 		}
 		httpWriteResult(w, nil)
@@ -46,7 +56,7 @@ func NewHandler(ops Ops) http.Handler {
 			return
 		}
 		if err := ops.Shelve(r.Context(), in); err != nil {
-			httpWriteError(w, err)
+			httpWriteError(w, r, err, o)
 			return
 		}
 		httpWriteResult(w, nil)
@@ -61,7 +71,7 @@ func NewHandler(ops Ops) http.Handler {
 			return
 		}
 		if err := ops.Announce(r.Context(), in); err != nil {
-			httpWriteError(w, err)
+			httpWriteError(w, r, err, o)
 			return
 		}
 		httpWriteResult(w, nil)
@@ -76,7 +86,7 @@ func NewHandler(ops Ops) http.Handler {
 			return
 		}
 		if err := ops.Reannounce(r.Context(), in); err != nil {
-			httpWriteError(w, err)
+			httpWriteError(w, r, err, o)
 			return
 		}
 		httpWriteResult(w, nil)
@@ -85,13 +95,13 @@ func NewHandler(ops Ops) http.Handler {
 	// flow.relay
 	mux.HandleFunc("POST /flow/relay", func(w http.ResponseWriter, r *http.Request) {
 		if err := ops.Relay(r.Context()); err != nil {
-			httpWriteError(w, err)
+			httpWriteError(w, r, err, o)
 			return
 		}
 		httpWriteResult(w, nil)
 	})
 
-	return mux
+	return http.MaxBytesHandler(mux, 1048576)
 }
 
 // httpErrorBody は失敗の応答の本文。
@@ -120,8 +130,9 @@ type httpViolation struct {
 
 // httpRequest は、要求一つを、入力のフィールドに読む。読めなかった最初の理由を fail に持ち、その後は何も読まない。
 type httpRequest struct {
-	r    *http.Request
-	fail string // 読めなかった理由（http.BadRequest の message）。読めていれば空
+	r      *http.Request
+	fail   string // 読めなかった理由（http.BadRequest の message）。読めていれば空
+	status int    // 読めなかったときのステータス。0 なら 400（read だけが、413 を入れる）
 }
 
 // bodyObj は、本文の全体を、JSON の値一つとして dst（model のフィールドへのポインタ）に読む（@http.bodyObj）。
@@ -129,21 +140,40 @@ func (q *httpRequest) bodyObj(dst any) {
 	if q.fail != "" {
 		return
 	}
-	data, err := io.ReadAll(q.r.Body)
-	if err == nil {
-		err = json.Unmarshal(data, dst)
+	data, ok := q.read()
+	if !ok {
+		return
 	}
-	if err != nil {
+	if err := json.Unmarshal(data, dst); err != nil {
 		q.fail = "body: invalid JSON"
 	}
 }
 
-// ok は、要求を読めたかどうか。読めなかったなら、400（http.BadRequest）を返して false。op は呼ばない。
+// read は、本文の全体を読む。上限（NewHandler が包んだ http.MaxBytesHandler）を超えていれば、読めない要求
+// （"body: too large"、413）。ほかの理由で読めなければ "body: invalid JSON"。読めなければ false。
+func (q *httpRequest) read() ([]byte, bool) {
+	data, err := io.ReadAll(q.r.Body)
+	var tooLarge *http.MaxBytesError
+	switch {
+	case errors.As(err, &tooLarge):
+		q.fail, q.status = "body: too large", http.StatusRequestEntityTooLarge
+	case err != nil:
+		q.fail = "body: invalid JSON"
+	}
+	return data, err == nil
+}
+
+// ok は、要求を読めたかどうか。読めなかったなら、400（request body が上限を超えたなら 413）の http.BadRequest を返して false。
+// op は呼ばない。
 func (q *httpRequest) ok(w http.ResponseWriter) bool {
 	if q.fail == "" {
 		return true
 	}
-	httpWriteJSON(w, http.StatusBadRequest, httpErrorBody{
+	status := http.StatusBadRequest
+	if q.status != 0 {
+		status = q.status
+	}
+	httpWriteJSON(w, status, httpErrorBody{
 		Error: "http.BadRequest",
 		Value: httpBadRequest{Message: q.fail, Violations: []httpViolation{}},
 	})
@@ -178,16 +208,38 @@ func httpWriteResult(w http.ResponseWriter, out any) {
 	httpWriteJSON(w, http.StatusOK, out)
 }
 
+// httpOptions は、NewHandler の設定（HandlerOption が書く先）。
+type httpOptions struct {
+	internal func(r *http.Request, err error) // WithInternalError の関数。なければ nil
+}
+
+// httpNewOptions は、NewHandler に渡された設定を、順に当てる。
+func httpNewOptions(opts []HandlerOption) httpOptions {
+	var o httpOptions
+	for _, opt := range opts {
+		opt(&o)
+	}
+	return o
+}
+
+// httpInternal は、想定していない失敗の応答: WithInternalError の関数があれば、それを、要求とエラーで呼んでから、500 で、中身を出さない。
+func httpInternal(w http.ResponseWriter, r *http.Request, err error, o httpOptions) {
+	if o.internal != nil {
+		o.internal(r, err)
+	}
+	httpWriteJSON(w, http.StatusInternalServerError, httpErrorBody{Error: "internal"})
+}
+
 // httpWriteError は op が返したエラーを応答にする。@http.status を持つ例外は、そのステータスと例外の FQN（と運ぶ値）。
 // それ以外（ステータスを持たない例外、ctx のエラー、ほかのエラー）は 500 で、中身を出さない。
-func httpWriteError(w http.ResponseWriter, err error) {
+func httpWriteError(w http.ResponseWriter, r *http.Request, err error, o httpOptions) {
 	switch {
 	case httpThrown[Taken](w, err, 409):
 	case httpThrown[TooBig](w, err, 422):
 	case httpThrown[Jammed](w, err, 502):
 	case httpThrown[Shut](w, err, 503):
 	default:
-		httpWriteJSON(w, http.StatusInternalServerError, httpErrorBody{Error: "internal"})
+		httpInternal(w, r, err, o)
 	}
 }
 

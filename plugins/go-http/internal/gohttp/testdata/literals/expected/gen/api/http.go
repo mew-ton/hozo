@@ -16,13 +16,23 @@ import (
 	"github.com/mew-ton/hozo/runtime"
 )
 
+// HandlerOption は、NewHandler の設定。
+type HandlerOption func(*httpOptions)
+
+// WithInternalError は、ハンドラが 500（{"error":"internal"}）を返す前に、f を、その要求と、op が返したエラーで呼ぶ。
+// 応答は変えない（エラーの中身は、応答に出さない）。記録や通知は、f が決める。
+func WithInternalError(f func(r *http.Request, err error)) HandlerOption {
+	return func(o *httpOptions) { o.internal = f }
+}
+
 // NewHandler は ops を net/http のハンドラにする。@http.get / @http.post の付いた op ごとに経路を一つ持つ。
 //
 //	POST /report   api.putReport
 //	POST /parts    api.putParts
 //	GET /severity  api.severity
 //	GET /clash     api.clash
-func NewHandler(ops Ops) http.Handler {
+func NewHandler(ops Ops, opts ...HandlerOption) http.Handler {
+	o := httpNewOptions(opts)
 	mux := http.NewServeMux()
 
 	// api.putReport
@@ -35,7 +45,7 @@ func NewHandler(ops Ops) http.Handler {
 		}
 		out, err := ops.PutReport(r.Context(), in)
 		if err != nil {
-			httpWriteError(w, err)
+			httpWriteError(w, r, err, o)
 			return
 		}
 		httpWriteResult(w, out)
@@ -52,7 +62,7 @@ func NewHandler(ops Ops) http.Handler {
 		}
 		out, err := ops.PutParts(r.Context(), in)
 		if err != nil {
-			httpWriteError(w, err)
+			httpWriteError(w, r, err, o)
 			return
 		}
 		httpWriteResult(w, out)
@@ -62,7 +72,7 @@ func NewHandler(ops Ops) http.Handler {
 	mux.HandleFunc("GET /severity", func(w http.ResponseWriter, r *http.Request) {
 		out, err := ops.Severity(r.Context())
 		if err != nil {
-			httpWriteError(w, err)
+			httpWriteError(w, r, err, o)
 			return
 		}
 		httpWriteResult(w, out)
@@ -72,13 +82,13 @@ func NewHandler(ops Ops) http.Handler {
 	mux.HandleFunc("GET /clash", func(w http.ResponseWriter, r *http.Request) {
 		out, err := ops.Clash(r.Context())
 		if err != nil {
-			httpWriteError(w, err)
+			httpWriteError(w, r, err, o)
 			return
 		}
 		httpWriteResult(w, out)
 	})
 
-	return mux
+	return http.MaxBytesHandler(mux, 1048576)
 }
 
 // httpErrorBody は失敗の応答の本文。
@@ -119,29 +129,30 @@ func httpDefault(v any) httpOption { return httpOption{value: v} }
 
 // httpRequest は、要求一つを、入力のフィールドに読む。読めなかった最初の理由を fail に持ち、その後は何も読まない。
 type httpRequest struct {
-	r     *http.Request
-	fail  string                     // 読めなかった理由（http.BadRequest の message）。読めていれば空
-	items map[string]json.RawMessage // 本文のオブジェクト。body が、初めて呼ばれたときに読む
+	r      *http.Request
+	fail   string                     // 読めなかった理由（http.BadRequest の message）。読めていれば空
+	status int                        // 読めなかったときのステータス。0 なら 400（read だけが、413 を入れる）
+	items  map[string]json.RawMessage // 本文のオブジェクト。body が、初めて呼ばれたときに読む
 }
 
 // body は、本文（JSON のオブジェクト）のキー name の値を dst（フィールドへのポインタ）に読む（@http.body）。
-// キーがあれば、値が null でも、あるものと読む。
+// キーがないか、値が null なら、項目がない（missing）。
 func (q *httpRequest) body(name string, dst any, opts ...httpOption) {
 	if q.fail != "" {
 		return
 	}
 	if q.items == nil {
-		data, err := io.ReadAll(q.r.Body)
-		if err == nil {
-			err = json.Unmarshal(data, &q.items)
+		data, ok := q.read()
+		if !ok {
+			return
 		}
-		if err != nil || q.items == nil {
+		if err := json.Unmarshal(data, &q.items); err != nil || q.items == nil {
 			q.fail = "body: invalid JSON"
 			return
 		}
 	}
 	raw, present := q.items[name]
-	if !present {
+	if !present || string(raw) == "null" {
 		q.missing("body", name, dst, opts)
 		return
 	}
@@ -155,13 +166,27 @@ func (q *httpRequest) bodyObj(dst any) {
 	if q.fail != "" {
 		return
 	}
-	data, err := io.ReadAll(q.r.Body)
-	if err == nil {
-		err = httpUnmarshal(data, dst)
+	data, ok := q.read()
+	if !ok {
+		return
 	}
-	if err != nil {
+	if err := httpUnmarshal(data, dst); err != nil {
 		q.fail = "body: invalid JSON"
 	}
+}
+
+// read は、本文の全体を読む。上限（NewHandler が包んだ http.MaxBytesHandler）を超えていれば、読めない要求
+// （"body: too large"、413）。ほかの理由で読めなければ "body: invalid JSON"。読めなければ false。
+func (q *httpRequest) read() ([]byte, bool) {
+	data, err := io.ReadAll(q.r.Body)
+	var tooLarge *http.MaxBytesError
+	switch {
+	case errors.As(err, &tooLarge):
+		q.fail, q.status = "body: too large", http.StatusRequestEntityTooLarge
+	case err != nil:
+		q.fail = "body: invalid JSON"
+	}
+	return data, err == nil
 }
 
 // missing は、項目がなかったときの扱い。決めるのは、行に渡された opts だけで、dst の型は見ない:
@@ -179,12 +204,17 @@ func (q *httpRequest) missing(place, name string, dst any, opts []httpOption) {
 	}
 }
 
-// ok は、要求を読めたかどうか。読めなかったなら、400（http.BadRequest）を返して false。op は呼ばない。
+// ok は、要求を読めたかどうか。読めなかったなら、400（request body が上限を超えたなら 413）の http.BadRequest を返して false。
+// op は呼ばない。
 func (q *httpRequest) ok(w http.ResponseWriter) bool {
 	if q.fail == "" {
 		return true
 	}
-	httpWriteJSON(w, http.StatusBadRequest, httpErrorBody{
+	status := http.StatusBadRequest
+	if q.status != 0 {
+		status = q.status
+	}
+	httpWriteJSON(w, status, httpErrorBody{
 		Error: "http.BadRequest",
 		Value: httpBadRequest{Message: q.fail, Violations: []httpViolation{}},
 	})
@@ -237,6 +267,9 @@ var httpConsts = map[reflect.Type][]httpConst{
 	},
 }
 
+// httpScalars は、元が日時の核の型の scalar ごとの、元の型。通信の上では、元の型の JSON で読み書きする。
+var httpScalars = map[reflect.Type]reflect.Type{}
+
 // httpArm は、通信に出る union のアーム一つ: 値として持つ Go の型と、見分け方。keys は、決め手（そのアームだけが持つ、
 // 省略可能でないフィールドの、JSON のキー）。tag と value は、印のキーと、そのアームの印の JSON。tag がなく、value だけなら、
 // リテラルの型のアームで、value は、その値の JSON。wrap は、包む型（中身は、フィールド Value）。
@@ -275,6 +308,15 @@ func httpDecode(data []byte, dst reflect.Value) error {
 	t := dst.Type()
 	if !httpHasUnion(t, map[reflect.Type]bool{}) {
 		return json.Unmarshal(data, dst.Addr().Interface())
+	}
+	if base, ok := httpScalars[t]; ok {
+		// 日時の scalar: 元の型の JSON で読んで、scalar の型に変える
+		x := reflect.New(base)
+		if err := json.Unmarshal(data, x.Interface()); err != nil {
+			return err
+		}
+		dst.Set(x.Elem().Convert(t))
+		return nil
 	}
 	null := string(bytes.TrimSpace(data)) == "null"
 	switch t.Kind() {
@@ -407,6 +449,10 @@ func httpEncode(v reflect.Value) ([]byte, error) {
 	if !httpHasUnion(t, map[reflect.Type]bool{}) {
 		return json.Marshal(v.Interface())
 	}
+	if base, ok := httpScalars[t]; ok {
+		// 日時の scalar: 元の型に変えて、元の型の JSON で書く
+		return json.Marshal(v.Convert(base).Interface())
+	}
 	switch t.Kind() {
 	case reflect.Interface, reflect.Pointer:
 		if v.IsNil() {
@@ -499,13 +545,16 @@ func httpEncode(v reflect.Value) ([]byte, error) {
 	return nil, errors.New("union: unsupported type " + t.String())
 }
 
-// httpHasUnion は、型 t の値の中に、union（か、実行時に型の決まる値）か、リテラルの型のフィールドを持つ model が現れうるか。
-// 現れない型は、encoding/json に、そのまま渡す。
+// httpHasUnion は、型 t の値の中に、union（か、実行時に型の決まる値）か、リテラルの型のフィールドを持つ model か、日時の scalar が
+// 現れうるか。現れない型は、encoding/json に、そのまま渡す。
 func httpHasUnion(t reflect.Type, seen map[reflect.Type]bool) bool {
 	if seen[t] {
 		return false
 	}
 	seen[t] = true
+	if httpScalars[t] != nil {
+		return true
+	}
 	switch t.Kind() {
 	case reflect.Interface:
 		return true
@@ -576,13 +625,35 @@ func httpWriteResult(w http.ResponseWriter, out any) {
 	httpWriteJSON(w, http.StatusOK, out)
 }
 
+// httpOptions は、NewHandler の設定（HandlerOption が書く先）。
+type httpOptions struct {
+	internal func(r *http.Request, err error) // WithInternalError の関数。なければ nil
+}
+
+// httpNewOptions は、NewHandler に渡された設定を、順に当てる。
+func httpNewOptions(opts []HandlerOption) httpOptions {
+	var o httpOptions
+	for _, opt := range opts {
+		opt(&o)
+	}
+	return o
+}
+
+// httpInternal は、想定していない失敗の応答: WithInternalError の関数があれば、それを、要求とエラーで呼んでから、500 で、中身を出さない。
+func httpInternal(w http.ResponseWriter, r *http.Request, err error, o httpOptions) {
+	if o.internal != nil {
+		o.internal(r, err)
+	}
+	httpWriteJSON(w, http.StatusInternalServerError, httpErrorBody{Error: "internal"})
+}
+
 // httpWriteError は op が返したエラーを応答にする。@http.status を持つ例外は、そのステータスと例外の FQN（と運ぶ値）。
 // それ以外（ステータスを持たない例外、ctx のエラー、ほかのエラー）は 500 で、中身を出さない。
-func httpWriteError(w http.ResponseWriter, err error) {
+func httpWriteError(w http.ResponseWriter, r *http.Request, err error, o httpOptions) {
 	switch {
 	case httpThrown[Clash](w, err, 409):
 	default:
-		httpWriteJSON(w, http.StatusInternalServerError, httpErrorBody{Error: "internal"})
+		httpInternal(w, r, err, o)
 	}
 }
 
