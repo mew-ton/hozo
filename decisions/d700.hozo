@@ -928,27 +928,5 @@ namespace hozo.decisions {
      */
     @adr.proposed
     D799;
-
-    /**
-     * db.transaction の約束は、呼ばれ方によらない: その op が失敗すれば、その op が DB にしたことは、入れ子でも、どれも残らない。
-     * 入れ子の内側が失敗すれば、内側がしたことだけが消え、外側がその失敗を受けて成功すれば、外側の残りは確定する。確定するのは、
-     * いちばん外側。意味は語彙の文書（docs/vocab.md）が持ち、go-sqlite は、入れ子の内側を SAVEPOINT（名前は、いつも "hozo"）で出す。
-     * go-sqlite 自身の要求 hozo.gosqlite.Requirement.NestedRollback に書き、そこから作るテストで確かめる。docs/plugin-go-sqlite.md の
-     * 「入れ子の内側は、外側に加わるだけで、セーブポイントは、しない」を、置き換える。
-     *
-     * @adr.context 入れ子の内側の失敗を、途中のデコレータが吸収して外側が成功すると、内側が失敗までに書いたものが確定していた
-     * （#164 の 6）。利用者は、別のデコレータ（db.savepoint）にする案を問い、焦点は「トランザクションの入れ子を明示したとき、
-     * それが savepoint と思われるかどうか」だと言った。ほかの仕組み（Django の atomic、Rails の transaction、Spring の REQUIRED と
-     * NESTED）では、入れ子の意味が分かれるが、内側の失敗の途中の書き込みが黙って確定するのは、Rails の既定だけ。期待が分かれるので、
-     * 語彙の文書に意味を書くことにし、三つの案（A: この決定。B: 外側ごと取り消す。C: 引数で書き分ける）から、利用者が A を選んだ。
-     * SAVEPOINT の名前と、取り消しに、中断されない ctx を使うことは、聞かずに決めた。
-     * @adr.consequence 入れ子の内側の失敗を受けて成功する外側は、内側の書き込みを、確定しなくなる。
-     * @adr.alternative 入れ子の内側が失敗すれば、外側が受けても、いちばん外側を取り消す（Spring の REQUIRED に近い）
-     * @adr.alternative db.transaction(nested: …) で書き分ける: op を書く人が、呼ばれ方を知って選ぶことになる
-     * @adr.alternative db.savepoint を足す: 一つの op が、直にも入れ子でも呼ばれうるので、どちらを付けるかが、呼ばれ方で決まる
-     * @adr.said transaction をネストすることを明示的に指定するとき、それが savepoint と思われるかどうか？が焦点にあるかと思います。
-     */
-    @adr.proposed
-    D800;
   }
 }
