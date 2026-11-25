@@ -1,4 +1,4 @@
-# サンプル shop-server（tests/samples/README.md）: docs/decisions.md の P1〜P39 の後の形。
+# サンプル shop-server（tests/samples/README.md）: tests/samples/README.md「P の番号との対応」の P1〜P39 の後の形。
 # 名前空間は、仕様の七つ（type、store、server、mailer、design、client、flows）と、サンプルの中のプラグインの語彙 rate と、標準の語彙 http。
 # 単位は七つ。mailer と design には単位を置かない（コードを出さない）。
 # 単位の transpilers には、依存しているものもすべて書く（P18）。期待する出力は、それぞれの out のディレクトリ（README.md）。

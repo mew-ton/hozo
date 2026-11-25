@@ -23,7 +23,7 @@ namespaces = ["valid"]
 
 ## 対象
 
-仕様の、すべての名前空間の scalar と、model のフィールド（出力の単位がない名前空間のものも、含む。`docs/decisions.md`「決めたこと」429）に付いた、**標準の制約**: `@valid.min`、`@valid.max`、`@valid.length`、`@valid.pattern`、`@valid.format`。
+仕様の、すべての名前空間の scalar と、model のフィールド（出力の単位がない名前空間のものも、含む。決定 D429）に付いた、**標準の制約**: `@valid.min`、`@valid.max`、`@valid.length`、`@valid.pattern`、`@valid.format`。
 
 - **制約は、型に一度だけ書く、型の性質。** それ自体は、何も起こさない。いつ確かめるか（HTTP の要求を受けたとき、コマンドの引数を読んだとき）は、境界の語彙を出すトランスパイラが決める（Go は `docs/plugin-go-valid.md`「ほかの相乗りとの約束」）。
 - **標準でない `valid` の制約**（名前空間 `valid` に、ほかのプラグインの語彙のファイルが宣言したデコレータ。仕様からは、足せない: `docs/vocab.md`「語彙の名前空間」）は、このプラグインは、読まない: 診断にも、しない。確かめる中身を、人が書くもので、受け取る形を持つかは、言語のトランスパイラが決める（`go-valid` は GOVALID-5）。
@@ -44,7 +44,7 @@ namespaces = ["valid"]
 
 - 表の「付けられる先」に合わない制約は VALID-1。配列のフィールドに付けられるのは `length` だけで、インデックスの model（`docs/types.md`「インデックスの model」）を型に持つフィールドには、どの制約も付けられない（制約を付けるのは、値の型）。どちらも VALID-1。
 - 元の型が `int` の先に付けた `min` / `max` の `value` は、整数。整数でなければ VALID-2。`length` は、`min` か `max` の、少なくとも一方を書く。どちらもなければ VALID-2。
-- **違反の名前**は、違反を伝えるときに、どの制約に合わなかったかを言う名前（HTTP では、`http.BadRequest` の `violations` の `constraint`: `docs/plugin-http.md`「通信の形」）。デコレータの名前と同じ。**例外は一つ**: 配列のフィールドに付けた `length` の違反は、`count`（文字列の長さの違反 `length` と、言い分ける。`docs/decisions.md`「決めたこと」400）。
+- **違反の名前**は、違反を伝えるときに、どの制約に合わなかったかを言う名前（HTTP では、`http.BadRequest` の `violations` の `constraint`: `docs/plugin-http.md`「通信の形」）。デコレータの名前と同じ。**例外は一つ**: 配列のフィールドに付けた `length` の違反は、`count`（文字列の長さの違反 `length` と、言い分ける。決定 D400）。
 - **配列の要素に制約を掛ける道は、一つ**（同 401）: 要素の型を scalar にして、そちらに付ける（`@valid.length(min: 1, max: 20) scalar Tag extends string;` と `@valid.length(max: 10) tags: Tag[];`）。配列のフィールドに付けた `length` が、要素に掛かることは、ない。warning も、出さない。
 - **正規表現の文法は、RE2**（<https://github.com/google/re2/wiki/Syntax>。後読み、後方参照は、ない）。RE2 で解釈できない `regex` は VALID-3。RE2 に決める理由: 当たるかどうかが、言語の正規表現の実装の違いで変わらないように、文法を一つに決める。RE2 は、当てるのに掛かる時間が、値の長さに比例する。
 - 一つの先に、制約をいくつ付けてもよく、値は、すべてを通らなければならない。制約どうしの食い違い（`min` が `max` より大きい、など）は、確かめない。

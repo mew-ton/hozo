@@ -1156,7 +1156,7 @@ func TestRestArguments(t *testing.T) {
 }
 
 // TestRelationObject は Relation = ( "prevents" | "keeps" ) "effects"（docs/grammar.md「decorator の宣言」）:
-// 目的語は `effects` だけで、効果の名前は書けない（docs/grammar.md「決めたこと」、docs/decisions.md S9）。
+// 目的語は `effects` だけで、効果の名前は書けない（docs/grammar.md「決めたこと」、決定 S9）。
 func TestRelationObject(t *testing.T) {
 	tests := []struct{ name, src, want string }{
 		{"named effect on op", "fn f(): effects a throws X keeps a;", "目的語は「effects」だけ"},
@@ -2621,7 +2621,7 @@ func TestClassifyNeverAndCaseKind(t *testing.T) {
 			t.Errorf("Param %d = %+v", i, d.Params[i].Type)
 		}
 	}
-	// いちばん後ろの ? は、引数を省ける印（docs/decisions.md「決めたこと」354）: 対象の型は M で、引数は省ける。
+	// いちばん後ろの ? は、引数を省ける印（決定 D354）: 対象の型は M で、引数は省ける。
 	// 内側の ? は、型の一部
 	for _, tt := range []struct {
 		i        int
@@ -2682,7 +2682,7 @@ func TestDecoratorTargets(t *testing.T) {
 	if len(d.For) != 3 || d.For[0].Kind != ast.TargetModel || d.For[1].Kind != ast.TargetState || d.For[2].Kind != ast.TargetOp || d.Fn {
 		t.Errorf("For = %+v, Fn = %v", d.For, d.Fn)
 	}
-	// union、classify（分類そのもの）、decorator の宣言も、付ける先（docs/decisions.md「決めたこと」476）
+	// union、classify（分類そのもの）、decorator の宣言も、付ける先（決定 D476）
 	d = firstDecl[*ast.DecoratorDecl](t, "decorator decided for union, classify, decorator, case of never;")
 	if len(d.For) != 4 || d.For[0].Kind != ast.TargetUnion || d.For[1].Kind != ast.TargetClassify || d.For[2].Kind != ast.TargetDecorator || d.For[3].Kind != ast.TargetCase {
 		t.Errorf("For = %+v", d.For)

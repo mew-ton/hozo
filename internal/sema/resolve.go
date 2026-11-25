@@ -267,7 +267,7 @@ func (a *analyzer) resolveHead(qn ast.QualifiedName, sc *scope, acc accept, refs
 	}
 }
 
-// removedCoreTypes は、なくした核の型の名前と、今の語（docs/decisions.md「決めたこと」359）。今は、ふつうの名前なので、
+// removedCoreTypes は、なくした核の型の名前と、今の語（決定 D359）。今は、ふつうの名前なので、
 // 同じ名前の宣言があれば、それに解決する。なければ、RES-1 のメッセージに、今の語を足す。
 var removedCoreTypes = map[string]string{"Time": "datetime", "Duration": "duration"}
 

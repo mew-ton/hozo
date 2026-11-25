@@ -159,9 +159,11 @@ export fn signInAndOrder() {
 <details>
 <summary>決定の記録（ADR）</summary>
 
-決定は、名前を持つケース。背景と、採らなかった案は、コメントの中のタグ。ほかの決定との関係は、デコレータ。
+決定は、名前を持つケース。背景と、採らなかった案は、コメントの中のタグ。状態と、ほかの決定との関係は、デコレータ。
 
 > **480. コメントの中に、タグとして書けるのは、注記だけ**
+>
+> 状態: 採用
 >
 > 直す決定: 478
 >
@@ -174,9 +176,10 @@ export fn signInAndOrder() {
  * コメントの中に、タグとして書けるのは、注記だけ。
  *
  * @adr.context そうしないと、振る舞いを決めるデコレータが、コメントの中から、本当に、付く。
- * @adr.rejected 今のまま。
+ * @adr.alternative 今のまま。
  */
-@adr.amends(Decision.D478)
+@adr.accepted
+@adr.amends(Decision400.D478)
 D480;
 ```
 

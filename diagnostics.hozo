@@ -1,4 +1,4 @@
-// Hozo 自身の仕様（docs/decisions.md「決めたこと」442、468、469）。診断を、要求として持つ名前空間 hozo.diagnostics。
+// Hozo 自身の仕様（決定 D442、D468、D469）。診断を、要求として持つ名前空間 hozo.diagnostics。
 // **写し。持ち主は、文書**（規則の一覧は docs/requirements.md「検査の規則の一覧」、条件と重さは、それぞれの文書の「診断」の表。
 // ケースごとの @owner が、その文書と見出しを言う）。食い違えば、文書が正しい。どの単位の対象でもない: コードには、ならない。
 //
@@ -18,7 +18,7 @@
 //          （plugin.hozo の readVocabulary、emit）に、@prd.ref で結んだ: どのプラグインかは、分類の名前が言うだけ
 //   穴 34: 規則の例（通る例と、落ちる例）を、要求に結ぶ書き方が、ない
 //   穴 35: 文言の型（どの値を埋めるか）は、Data を持つ診断にしか、書けていない
-//   穴 10（兄弟の名前空間を、短く引けない）は、ここでも当たった。重さ（Severity）は、リテラルの型（docs/decisions.md「決めたこと」482）が
+//   穴 10（兄弟の名前空間を、短く引けない）は、ここでも当たった。重さ（Severity）は、リテラルの型（決定 D482）が
 //   入った後も、対象のない分類のケースのまま: 名前の付いた、リテラルの型の union を、印の引数の型にすると、リテラルを渡せない（TYPE-4）。
 //   Silent は、JSON の上の値でもない（診断の JSON の severity は "error" か "warning"）
 
@@ -39,27 +39,27 @@ namespace hozo.diagnostics {
    *
    * @param level 重さ
    */
-  @adr.decided(hozo.decisions.Decision.D469)
+  @adr.decided(hozo.decisions.Decision400.D469)
   @hint
   decorator severity(level: any case of Severity) for case of never;
 
   /**
-   * 出どころの決定（docs/decisions.md「決めたこと」の番号）。文書が、番号を言っているものにだけ、付けてある。
+   * 出どころの決定（decisions/ の決定の番号）。文書が、番号を言っているものにだけ、付けてある。
    *
    * @param decisions 決定の番号
    */
-  @adr.decided(hozo.decisions.Decision.D469)
+  @adr.decided(hozo.decisions.Decision400.D469)
   @hint
   decorator origin(...decisions: int) for case of never;
 
   /**
    * 持ち主の文書と、その見出し（条件と、重さを決めている所）。分類の宣言に付ければ、その分類のケースのすべての持ち主
-   * （プラグインごとの分類は、こう書く。分類の宣言に、印を付けられるようにしたのは docs/decisions.md「決めたこと」476）。
+   * （プラグインごとの分類は、こう書く。分類の宣言に、印を付けられるようにしたのは 決定 D476）。
    *
    * @param doc 文書の場所（リポジトリのルートから）
    * @param heading 見出し
    */
-  @adr.decided(hozo.decisions.Decision.D469)
+  @adr.decided(hozo.decisions.Decision400.D469)
   @hint
   @repeatable
   decorator owner(doc: string, heading: string) for classify, case of never;
@@ -69,7 +69,7 @@ namespace hozo.diagnostics {
    *
    * @param replacedBy 置き換えた先の ID（なければ、書かない）
    */
-  @adr.decided(hozo.decisions.Decision.D469)
+  @adr.decided(hozo.decisions.Decision400.D469)
   @hint
   decorator retired(...replacedBy: any case of never) for case of never;
 
@@ -78,7 +78,7 @@ namespace hozo.diagnostics {
    *
    * @param data 値の形
    */
-  @adr.decided(hozo.decisions.Decision.D469)
+  @adr.decided(hozo.decisions.Decision400.D469)
   @hint
   decorator carries(data: any model) for case of never;
 
@@ -88,7 +88,7 @@ namespace hozo.diagnostics {
    *
    * @param ops ユースケースの op
    */
-  @adr.decided(hozo.decisions.Decision.D469)
+  @adr.decided(hozo.decisions.Decision400.D469)
   @hint
   decorator checkedBy(...ops: any op) for case of never;
 

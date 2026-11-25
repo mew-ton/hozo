@@ -1568,7 +1568,7 @@ func TestEmitUnitsTargets(t *testing.T) {
 	}
 }
 
-// TestEmitArgumentDescendantOnly は docs/cli.md「書き出し」の 1（docs/decisions.md 50）: 引数の名前空間そのものがどの単位の
+// TestEmitArgumentDescendantOnly は docs/cli.md「書き出し」の 1（決定 D50）: 引数の名前空間そのものがどの単位の
 // 対象でなくても、その子孫を対象にする単位があれば、その出力が対象になる（UnknownNamespace ではない）。
 // 引数もその子孫もどの単位の対象でもなければ UnknownNamespace。
 func TestEmitArgumentDescendantOnly(t *testing.T) {

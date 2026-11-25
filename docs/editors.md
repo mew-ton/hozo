@@ -21,7 +21,7 @@ editors/vscode/
 - クライアントは `vscode-languageclient` で `hozoc lsp` を起動する。`hozoc` の場所は設定 `hozo.hozocPath`（既定は `PATH` の `hozoc`）。見つからなければ、エラーの通知と、設定を開くボタン。バイナリの同梱と取得は段階 4 の後。
 - `hozo:` スキーム（`docs/ir.md`「Program」の `Span.file`）の `TextDocumentContentProvider` を登録し、要求 `hozo/vocabulary` で内容を取る（`docs/lsp.md`「プロジェクト」）。
 - 設定 `hozo.trace.server`（LSP の通信のログ）。
-- **プラグインを起動してよいと、言語サーバーに言うのは、ワークスペースが信頼されていて、設定 `hozo.pluginChecks` が入のときだけ**（`docs/decisions.md`「決めたこと」412。口は `docs/lsp.md`「プラグインの診断」の「許し」）。
+- **プラグインを起動してよいと、言語サーバーに言うのは、ワークスペースが信頼されていて、設定 `hozo.pluginChecks` が入のときだけ**（決定 D412。口は `docs/lsp.md`「プラグインの診断」の「許し」）。
   - 設定 `hozo.pluginChecks`（既定は、入）: 信頼したワークスペースでも、エディタからの、プラグインの check を、切れる。
   - 起動のとき、`vscode.workspace.isTrusted` と、設定から決めて、`initializationOptions` に渡す。
   - 動いている間に、ワークスペースが信頼されたとき（`onDidGrantWorkspaceTrust`）と、設定 `hozo.pluginChecks` が変わったときは、`workspace/didChangeConfiguration` で、渡し直す（サーバーは、起動し直さない）。
@@ -51,7 +51,7 @@ editors/vscode/
 | `@repeatable`、`@entry`、`@hint` | `storage.modifier.hozo` | 核の印でデコレータではない（`docs/grammar.md`「予約語」）ので、デコレータより先に拾う |
 | 宣言の名前 | `entity.name.type.hozo`（model / scalar / union / exception / classify）、`entity.name.function.hozo`（`fn` / decorator）、`variable.other.hozo`（state） | 宣言の頭の予約語の直後の `Ident`（`exception` は、その後ろに引数の括弧が続いてもよい）。関数（op、`read`、効果）の名前は、`fn` の直後の `Ident`: `read fn userByEmail(…)` の `read` と `fn` は、どちらも、宣言の頭の予約語。`decorator` の直後は `DecoratorName` で、予約語でも（`decorator list(…)`、`decorator effects(…)`）宣言の名前として塗る。関数に付けるデコレータ（`decorator fn limited(…)`）は、`decorator` と `fn` が、どちらも、宣言の頭の予約語で、名前は、`fn` の直後。包んだ関数の引数（`decorator fn audited(next: fn)`。`docs/grammar.md`「デコレータの本体」）は、型の位置の `fn` を、予約語として塗り、名前（`next`）と、その呼び出し（`next()`）は、ほかの引数、ほかの呼び出しと同じ（特別な scope を付けない） |
 | 型の位置の名前 | `entity.name.type.hozo` | `:` の後、`extends` / `of` / `as` の後、`<` の中、`throws` / `catches` / `throw` の後、`by` の後（`match x by store.Registration`）、型の後ろの `on` の後（`Order on Stage.Draft | Stage.Accepted` の二つ。`|` は記号で、scope を付けない）の `QualifiedName` のうち、最後の要素が大文字で始まるもの（`as` の後ろの型の位置は、`;` か `{` まで続く: 行の遷移のケース（`as Stage.Cancelled`）と、状態の遷移のケース（`as HasItems -> Empty` の二つ）は、どれも、この規則で、型の位置の名前として塗る。状態の分類のケースの、`,` で続く次の `対象 as T` も、同じ位置の中で読む。§3.3 の命名規則。`:` は値の位置（名前で渡す引数、レコードリテラル）にも現れるので、小文字で始まる名前は型にしない。関数の `)` の後ろの `:`（`docs/grammar.md`「関数の宣言」）の、型の位置は、節の頭（`throws` / `reads` / `effects`）の手前で終わる。`of` の後ろの op や状態の名前、`as` の前の op や状態の名前、`reads` の後ろの `read` や状態の名前は小文字で始まるので、scope を付けない。`throws` / `catches` の並びの `,` は記号で、scope を付けない。`throw` の後ろの型の位置は、引数の `(` の手前で終わり、引数（`throw Invalid("weak")`）は値の位置として塗る） |
-| 文字列 | `string.quoted.double.hozo` | エスケープは `constant.character.escape.hozo` |
+| 文字列 | `string.quoted.double.hozo`（複数行の文字列 `"""…"""` は `string.quoted.triple.hozo`） | エスケープは `constant.character.escape.hozo`。複数行の文字列は、`"` より先に拾う |
 | 数値 | `constant.numeric.hozo` | `Int` / `Float` / `Duration`（単位も含む） |
 | リテラルの型（`docs/grammar.md`「型」の `LiteralType`: `severity: "error";`、`boolean as true`） | 上の、文字列、数値、`true` / `false` の scope のまま | リテラルのパターンが、型の位置の名前のパターンより先に拾う。型の名前（`entity.name.type.hozo`）としては、塗らない |
 | コメント | `comment.line.double-slash.hozo`、`comment.block.hozo` | |

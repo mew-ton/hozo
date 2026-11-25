@@ -208,7 +208,7 @@ func TestNoModule(t *testing.T) {
 	}
 }
 
-// TestReadsNothing は、プラグインが、ファイルも、環境変数も、読まないこと（docs/decisions.md「決めたこと」425、
+// TestReadsNothing は、プラグインが、ファイルも、環境変数も、読まないこと（決定 D425、
 // docs/plugin-go.md「パッケージと import パス」）: go.mod のない、空の作業ディレクトリで、環境変数を空にしても、出力が同じ。
 func TestReadsNothing(t *testing.T) {
 	views := loadViews(t, "statements")

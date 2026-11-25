@@ -390,7 +390,7 @@ type Atom =
   | { kind: "none"; span: Span }
   | { kind: "record"; fields: { name: string; value: Atom; arm?: ArmRef }[]; span: Span };   // { item } は { item: item } に展開済み
 
-// union（arms）の位置に、アームの型の値を入れた所（docs/types.md「互換」の規則 14、「union に入れる」。docs/decisions.md「決めたこと」484）。
+// union（arms）の位置に、アームの型の値を入れた所（docs/types.md「互換」の規則 14、「union に入れる」。決定 D484）。
 // 値を置く位置（val、assign、collect、return、Call.args と throw の args の要素、record の fields の要素）が、arm で持つ。
 // 入れていなければ、arm は、ない。プラグインは、どのアームに入るかを、型から計算し直さない。
 interface ArmRef {
@@ -460,7 +460,7 @@ type ArgValue =
   | { kind: "list"; items: ArgValue[] };
 ```
 
-`DeclBase.decorators` の並びは書かれた順（上から下）。`repeatable` なデコレータは、同じ `decorator` の `Application` が、付けた数だけ、書かれた順に並ぶ。§8.2「適用順は op に近いものから」なので、**最後の要素が最も内側で、最初に適用される**。入れ子の構造にはせず、この順序付きの列で表す（`docs/decisions.md`）。
+`DeclBase.decorators` の並びは書かれた順（上から下）。`repeatable` なデコレータは、同じ `decorator` の `Application` が、付けた数だけ、書かれた順に並ぶ。§8.2「適用順は op に近いものから」なので、**最後の要素が最も内側で、最初に適用される**。入れ子の構造にはせず、この順序付きの列で表す（`decisions/` の決定）。
 
 ### bind
 
@@ -614,7 +614,7 @@ interface ViewedSignature extends Signature {   // Signature は Sig(O, viewer)
 
 ### まとめた形
 
-プラグインへの要求（`docs/plugin-protocol.md`「emit」）は、一つの要求に、いくつもの出力を並べる（`docs/decisions.md`「決めたこと」411）ので、`View` を、そのまま並べず、**出力に依らない部分**（`Spec`）と、**出力ごとの部分**（`OutputView`）に分けて送る。`View` は、この二つを合わせたもので、中身は、変わらない: トランスパイラが受け取るのは、今までどおり `View`（SDK が、合わせる）。
+プラグインへの要求（`docs/plugin-protocol.md`「emit」）は、一つの要求に、いくつもの出力を並べる（決定 D411）ので、`View` を、そのまま並べず、**出力に依らない部分**（`Spec`）と、**出力ごとの部分**（`OutputView`）に分けて送る。`View` は、この二つを合わせたもので、中身は、変わらない: トランスパイラが受け取るのは、今までどおり `View`（SDK が、合わせる）。
 
 ```ts
 interface Spec {                  // 出力に依らない部分。要求に、一度だけ
@@ -647,30 +647,30 @@ interface OutputView {            // 出力（単位と名前空間の組）ご�
 
 ## 版
 
-`Program.version` と `View.version` は同じ値で、どちらかの構造か、プラグインとのやり取りの形（`docs/plugin-protocol.md`「要求と応答」）が変わったら上げる。IR が決めている名前のうち、プラグインが、その値で出力を分けるもの（核の型の名前、標準の分類のケースの名前）が変わったときも、上げる。今の版は `"0.27"`。構造もやり取りの形も同じで、値の意味だけが変わる決定では、上げない: 配線の op の `Op.carried` が空でないことがあり、その `Signature` が運ばれたものを含むこと（`docs/decisions.md`「決めたこと」149）は、0.6 の中にある。
+`Program.version` と `View.version` は同じ値で、どちらかの構造か、プラグインとのやり取りの形（`docs/plugin-protocol.md`「要求と応答」）が変わったら上げる。IR が決めている名前のうち、プラグインが、その値で出力を分けるもの（核の型の名前、標準の分類のケースの名前）が変わったときも、上げる。今の版は `"0.27"`。構造もやり取りの形も同じで、値の意味だけが変わる決定では、上げない: 配線の op の `Op.carried` が空でないことがあり、その `Signature` が運ばれたものを含むこと（決定 D149）は、0.6 の中にある。
 
-**版が覆うもの**（`docs/decisions.md`「決めたこと」435）: IR の構造と、やり取りの形のほかに、マニフェストの鍵（`docs/plugin-protocol.md`「マニフェスト」）と、同梱の語彙の宣言（`vocab/*.hozo`。`docs/vocab.md`）。鍵や宣言を足せば、小さい版を、なくすか、意味を変えれば、大きい版を上げる。この決まりが効くのは、1.0 から（下の「今は、0.x」）。
+**版が覆うもの**（決定 D435）: IR の構造と、やり取りの形のほかに、マニフェストの鍵（`docs/plugin-protocol.md`「マニフェスト」）と、同梱の語彙の宣言（`vocab/*.hozo`。`docs/vocab.md`）。鍵や宣言を足せば、小さい版を、なくすか、意味を変えれば、大きい版を上げる。この決まりが効くのは、1.0 から（下の「今は、0.x」）。
 
-**今は、0.x**（`docs/decisions.md`「決めたこと」467）: 1.0 は、最初に、外へ出す版が名乗る。それまでは、どの変更でも、版を上げ、hozoc とプラグインは、版を、ぴったり合わせる（`docs/plugin-protocol.md`「版の合わせ方」）。版が覆うものと、下の上げ方は、1.0 から効く。一度、作り直しが済んだ版を、未公開のまま、1.0 と名乗り（下の表の 1.0 の行）、0.24 に戻した。
+**今は、0.x**（決定 D467）: 1.0 は、最初に、外へ出す版が名乗る。それまでは、どの変更でも、版を上げ、hozoc とプラグインは、版を、ぴったり合わせる（`docs/plugin-protocol.md`「版の合わせ方」）。版が覆うものと、下の上げ方は、1.0 から効く。一度、作り直しが済んだ版を、未公開のまま、1.0 と名乗り（下の表の 1.0 の行）、0.24 に戻した。
 
-**上げ方**（`docs/decisions.md`「決めたこと」421。1.0 から効く）: 版は「大きい版.小さい版」。足すだけの変更（項目を足す。新しい種類の値を足す。頼みごとを足す）は、小さい版を上げる。壊す変更（項目をなくす。意味を変える。プラグインが値で出力を分ける名前を変える）のときだけ、大きい版を上げ、小さい版を 0 に戻す。古いプラグインが、新しい小さい版の hozoc で動く決まり（合わせ方と、知らない項目の扱い）の持ち主は `docs/plugin-protocol.md`「版の合わせ方」。0.x の間は、どの変更でも、すべてのプラグインを、同じ版に合わせ直していた。
+**上げ方**（決定 D421。1.0 から効く）: 版は「大きい版.小さい版」。足すだけの変更（項目を足す。新しい種類の値を足す。頼みごとを足す）は、小さい版を上げる。壊す変更（項目をなくす。意味を変える。プラグインが値で出力を分ける名前を変える）のときだけ、大きい版を上げ、小さい版を 0 に戻す。古いプラグインが、新しい小さい版の hozoc で動く決まり（合わせ方と、知らない項目の扱い）の持ち主は `docs/plugin-protocol.md`「版の合わせ方」。0.x の間は、どの変更でも、すべてのプラグインを、同じ版に合わせ直していた。
 
 | 版 | 変わったこと |
 |---|---|
-| 0.27 | 値を置く位置に、`arm`（`ArmRef`）を足した: `val`、`assign`、`collect`、`return` の文、`Call.args` と `throw` の `args` の要素、`record` の `fields` の要素。union（`arms`）の位置に、アームの型の値を入れた所が、どのアームに入るかを持つ（`docs/types.md`「union に入れる」、`docs/decisions.md`「決めたこと」484）。`View` と、やり取りの形は、0.26 と同じ |
-| 0.26 | `Type` に、リテラルの型（`kind: "literal"`）を足した。`CaseTyping.by` に、`literal` を足した（`docs/types.md`「リテラルの型」「型で決まる絞り込み」、`docs/decisions.md`「決めたこと」482、483）。`View` と、やり取りの形は、0.25 と同じ |
-| 0.25 | `Decorator.targets` に、`union`、`classify`、`decorator` を足した: `union` の宣言、`classify` の宣言、デコレータの宣言の `decorators` が、空でなくなりうる（`docs/grammar.md`「decorator の宣言」、`docs/decisions.md`「決めたこと」476）。構造は、0.24 と同じ（宣言の `decorators` は、どの種類の宣言も、前から持っている）。`View` とやり取りの形も、同じ |
-| 0.24 | 版の数字を、1.0 から戻した（`docs/decisions.md`「決めたこと」467）。合わせ方は、ぴったり、に戻した。1.0 と名乗っていた間に、版を上げずに入れた変更を含む: 同梱の語彙 `proc` をなくした（同 434）。語彙の名前空間を、付け直した（`page` を `browser.page` に、`localStorage` を `browser.localStorage` に、`actor`、`usecase`、`business` を `prd` の下に。同 455、462）。語彙の名前空間を、閉じた（RES-8。同 456、463）。IR の構造と、要求と応答の形は、1.0 と名乗っていた版と同じ |
-| 1.0 | （未公開のまま、名乗った版。0.24 が、置き換えた）プラグインの作り直し（`docs/requirements.md`「作り直しの段」）が済んだ版。マニフェストの `[[transpiler]]` に `interprets`（解釈するデコレータ。`docs/plugin-protocol.md`「マニフェスト」）を足した。hozoc が、設定のどのトランスパイラも解釈しないデコレータに、warning を出す（CFG-26。`docs/config.md`「解釈するトランスパイラ」、`docs/decisions.md`「決めたこと」420、432）。版の合わせ方を、ぴったりから、「大きい版が同じで、プラグインの小さい版が、hozoc 以下」に変えた（同 421）。IR の構造と、要求と応答の形は、0.23 と同じ |
-| 0.23 | やり取りの形: 語彙のプラグインへの頼みごと direction `read` を足した（`spec` を受け取り、`errors` と `warnings` を返す。`docs/plugin-protocol.md`「語彙のプラグイン」「read」、`docs/decisions.md`「決めたこと」410、416）。マニフェストの `[read]` と、`[[transpiler]]` の `requires_vocabulary`。`go-http` の診断のうち、言語に依らないものを、語彙のプラグイン `http` の HTTP-* に移した（`docs/plugin-go-http.md`「診断」の「欠番」）。IR の構造は、変えていない |
-| 0.22 | やり取りの形: プラグインの起動を、プラグインごとに一回にまとめた。`emit` の要求は、`spec`（`Spec`）と `outputs`（頼むトランスパイラの名前の並びと、`OutputView`）、応答は、出力ごと、トランスパイラごとの答えの並び（「まとめた形」、`docs/plugin-protocol.md`「emit」）。検査のための頼みごと direction `check` と、マニフェストの `[check]` をなくした（同「検査のための頼みごとを、なくしたこと」）。`coverage` の要求に `outputs`（出力の設定の並び）。起動のときに足していた環境変数 `HOZO_PROJECT_ROOT` と `HOZO_PLUGIN_DIR` をなくした（同「起動」）。`Program` の構造と、`View` の中身は、0.21 と同じ（`docs/decisions.md`「決めたこと」411、416、421、425） |
-| 0.21 | `View.entries`（`Entry`、`EntrySource`、`EntryStep`）を足した: 入口ごとの、求めるケースを、本体が求めて、プラグインに渡す（`docs/check.md`「入口ごとの、求めるケース」、`docs/decisions.md`「決めたこと」409） |
-| 0.20 | 配線の文（`Statement`）に `try`（`Catch`）と `throw` を足した。`Match.subject` に `caught`。アームの本体の `throw` に `caught`（`throw e`）。`Classify.subject` に `exception`、`Classify.cases[]` に `exceptions` と `rest`（例外の分類）（`docs/check.md`「例外を受ける」「例外の分類」。`docs/decisions.md`「決めたこと」419、422）。`View` とやり取りの形は 0.19 のまま |
-| 0.19 | `Decorator.external` をなくし、`Decorator.outerThrows`（節 `outer throws`）と、`Decorator.entry`、`Decorator.hint`（核の印 `@entry`、`@hint`）を足した（`docs/grammar.md`「decorator の宣言」。`docs/decisions.md`「決めたこと」407、408、420） |
-| 0.18 | `Decorator.fn` と `Decorator.body` を足した（関数に付けるデコレータ `decorator fn` と、その本体。`docs/grammar.md`「decorator の宣言」「デコレータの本体」、`docs/decisions.md`「決めたこと」392〜394）。`Callee` に `proceed` を足した（デコレータの本体の `proceed()`）。`View` とやり取りの形は 0.17 と同じ |
-| 0.17 | やり取りに、direction `coverage` を足した（`docs/plugin-protocol.md`「coverage」、`docs/decisions.md`「決めたこと」380）。マニフェストの `[coverage]`。`emit` の応答の `files` のうち、名前が `hozo-tests.<トランスパイラの名前>.json` のものを、テストの対応表として読み、形を確かめる（同「テストの対応表」、PLG-4）。`Program` と `View` の構造、`emit` / `check` / `import` の要求と応答の形は、0.16 と同じ |
-| 0.16 | `RowTransition.from` をなくした: 効果の前のケースは、行の引数の型（`case`）が言う（`docs/check.md`「行の遷移」、`docs/decisions.md`「決めたこと」369）。値の分類と op の分類の `match` のアームの `narrowed` の型は、いつも `case`（型を書いたケースのアームと、`else` のアームでも。`docs/types.md`「アームの中の対象の型」、同 370）。`View` とやり取りの形は 0.15 と同じ |
-| 0.15 | 標準の分類 `nullable` のケースの名前が、`Empty` / `HasItems` から、`None` / `Some` になった（`docs/check.md`「分類」の「標準の分類」、`docs/decisions.md`「決めたこと」362）。変わるのは、`Match.classify` が `"nullable"` の `MatchArm.cases` と、形が `nullable` の状態を宛先にする `TransitionTarget` の `from` / `to` に載る、名前の値。構造は、0.14 と同じ。値だけの変更で版を上げるのは、基底が、この名前でアームを選ぶため: 前の版の名前を待つプラグインは、アームを見つけられない |
+| 0.27 | 値を置く位置に、`arm`（`ArmRef`）を足した: `val`、`assign`、`collect`、`return` の文、`Call.args` と `throw` の `args` の要素、`record` の `fields` の要素。union（`arms`）の位置に、アームの型の値を入れた所が、どのアームに入るかを持つ（`docs/types.md`「union に入れる」、決定 D484）。`View` と、やり取りの形は、0.26 と同じ |
+| 0.26 | `Type` に、リテラルの型（`kind: "literal"`）を足した。`CaseTyping.by` に、`literal` を足した（`docs/types.md`「リテラルの型」「型で決まる絞り込み」、決定 D482、D483）。`View` と、やり取りの形は、0.25 と同じ |
+| 0.25 | `Decorator.targets` に、`union`、`classify`、`decorator` を足した: `union` の宣言、`classify` の宣言、デコレータの宣言の `decorators` が、空でなくなりうる（`docs/grammar.md`「decorator の宣言」、決定 D476）。構造は、0.24 と同じ（宣言の `decorators` は、どの種類の宣言も、前から持っている）。`View` とやり取りの形も、同じ |
+| 0.24 | 版の数字を、1.0 から戻した（決定 D467）。合わせ方は、ぴったり、に戻した。1.0 と名乗っていた間に、版を上げずに入れた変更を含む: 同梱の語彙 `proc` をなくした（同 434）。語彙の名前空間を、付け直した（`page` を `browser.page` に、`localStorage` を `browser.localStorage` に、`actor`、`usecase`、`business` を `prd` の下に。同 455、462）。語彙の名前空間を、閉じた（RES-8。同 456、463）。IR の構造と、要求と応答の形は、1.0 と名乗っていた版と同じ |
+| 1.0 | （未公開のまま、名乗った版。0.24 が、置き換えた）プラグインの作り直し（`docs/requirements.md`「作り直しの段」）が済んだ版。マニフェストの `[[transpiler]]` に `interprets`（解釈するデコレータ。`docs/plugin-protocol.md`「マニフェスト」）を足した。hozoc が、設定のどのトランスパイラも解釈しないデコレータに、warning を出す（CFG-26。`docs/config.md`「解釈するトランスパイラ」、決定 D420、D432）。版の合わせ方を、ぴったりから、「大きい版が同じで、プラグインの小さい版が、hozoc 以下」に変えた（同 421）。IR の構造と、要求と応答の形は、0.23 と同じ |
+| 0.23 | やり取りの形: 語彙のプラグインへの頼みごと direction `read` を足した（`spec` を受け取り、`errors` と `warnings` を返す。`docs/plugin-protocol.md`「語彙のプラグイン」「read」、決定 D410、D416）。マニフェストの `[read]` と、`[[transpiler]]` の `requires_vocabulary`。`go-http` の診断のうち、言語に依らないものを、語彙のプラグイン `http` の HTTP-* に移した（`docs/plugin-go-http.md`「診断」の「欠番」）。IR の構造は、変えていない |
+| 0.22 | やり取りの形: プラグインの起動を、プラグインごとに一回にまとめた。`emit` の要求は、`spec`（`Spec`）と `outputs`（頼むトランスパイラの名前の並びと、`OutputView`）、応答は、出力ごと、トランスパイラごとの答えの並び（「まとめた形」、`docs/plugin-protocol.md`「emit」）。検査のための頼みごと direction `check` と、マニフェストの `[check]` をなくした（同「検査のための頼みごとを、なくしたこと」）。`coverage` の要求に `outputs`（出力の設定の並び）。起動のときに足していた環境変数 `HOZO_PROJECT_ROOT` と `HOZO_PLUGIN_DIR` をなくした（同「起動」）。`Program` の構造と、`View` の中身は、0.21 と同じ（決定 D411、D416、D421、D425） |
+| 0.21 | `View.entries`（`Entry`、`EntrySource`、`EntryStep`）を足した: 入口ごとの、求めるケースを、本体が求めて、プラグインに渡す（`docs/check.md`「入口ごとの、求めるケース」、決定 D409） |
+| 0.20 | 配線の文（`Statement`）に `try`（`Catch`）と `throw` を足した。`Match.subject` に `caught`。アームの本体の `throw` に `caught`（`throw e`）。`Classify.subject` に `exception`、`Classify.cases[]` に `exceptions` と `rest`（例外の分類）（`docs/check.md`「例外を受ける」「例外の分類」。決定 D419、D422）。`View` とやり取りの形は 0.19 のまま |
+| 0.19 | `Decorator.external` をなくし、`Decorator.outerThrows`（節 `outer throws`）と、`Decorator.entry`、`Decorator.hint`（核の印 `@entry`、`@hint`）を足した（`docs/grammar.md`「decorator の宣言」。決定 D407、D408、D420） |
+| 0.18 | `Decorator.fn` と `Decorator.body` を足した（関数に付けるデコレータ `decorator fn` と、その本体。`docs/grammar.md`「decorator の宣言」「デコレータの本体」、決定 D392〜D394）。`Callee` に `proceed` を足した（デコレータの本体の `proceed()`）。`View` とやり取りの形は 0.17 と同じ |
+| 0.17 | やり取りに、direction `coverage` を足した（`docs/plugin-protocol.md`「coverage」、決定 D380）。マニフェストの `[coverage]`。`emit` の応答の `files` のうち、名前が `hozo-tests.<トランスパイラの名前>.json` のものを、テストの対応表として読み、形を確かめる（同「テストの対応表」、PLG-4）。`Program` と `View` の構造、`emit` / `check` / `import` の要求と応答の形は、0.16 と同じ |
+| 0.16 | `RowTransition.from` をなくした: 効果の前のケースは、行の引数の型（`case`）が言う（`docs/check.md`「行の遷移」、決定 D369）。値の分類と op の分類の `match` のアームの `narrowed` の型は、いつも `case`（型を書いたケースのアームと、`else` のアームでも。`docs/types.md`「アームの中の対象の型」、同 370）。`View` とやり取りの形は 0.15 と同じ |
+| 0.15 | 標準の分類 `nullable` のケースの名前が、`Empty` / `HasItems` から、`None` / `Some` になった（`docs/check.md`「分類」の「標準の分類」、決定 D362）。変わるのは、`Match.classify` が `"nullable"` の `MatchArm.cases` と、形が `nullable` の状態を宛先にする `TransitionTarget` の `from` / `to` に載る、名前の値。構造は、0.14 と同じ。値だけの変更で版を上げるのは、基底が、この名前でアームを選ぶため: 前の版の名前を待つプラグインは、アームを見つけられない |
 | 0.14 | 型の種類 `record` をなくし、`Model.index`（インデックスの model: キーの名前、キーの型、値の型）を足した。`Record<K, V>` は、インデックスの model を宣言して、その名前（`ref`）で書く（`docs/grammar.md`「model」、`docs/types.md`「インデックスの model」） |
 | 0.13 | 核の型の名前（`Type` の `core` の `name`）: `Time` を `datetime` に、`Duration` を `duration` に替え、`date` と `time` を足した（`docs/grammar.md`「型」）。デコレータの宣言の、付ける先の並びの区切りが `,` になったこと（`docs/grammar.md`「decorator の宣言」）は、綴りだけで、`Decorator.targets` の形は、変わらない |
 | 0.12 | `Effect.throws`（効果が投げうる例外。`docs/check.md`「read と効果」）。効果の呼び出しと、運ばれた効果が、`Signature.exceptions` に例外を足しうる。`View` とやり取りの形は 0.11 と同じ |

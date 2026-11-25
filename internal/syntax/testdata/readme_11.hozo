@@ -1,5 +1,5 @@
 // 設計書 §11.2 ページとルーティング。
-// §11.1 の fetchMe / fetchOrders（`@redirectToLogin` / `@cache`）はスコープ外（docs/decisions.md「スコープ外にした設計書の例」）なので外した。
+// §11.1 の fetchMe / fetchOrders（`@redirectToLogin` / `@cache`）はスコープ外（`docs/open.md`「スコープ外にした設計書の例」）なので外した。
 // `status?: server.OrderStatus` は `status: server.OrderStatus?` に直し、
 // ユニオンのアームの中のフィールドの末尾に `;` を足した（docs/grammar.md「model」）。
 // `page: PosInt = 1` の既定値は外した（フィールドの既定値は書けない。docs/grammar.md「決めたこと」）。

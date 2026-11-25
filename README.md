@@ -159,9 +159,11 @@ export fn signInAndOrder() {
 <details>
 <summary>Architecture decision records (ADR)</summary>
 
-A decision is a named case. Its context and its rejected options are tags in the comment, and its relation to another decision is a decorator.
+A decision is a named case. Its context and its rejected options are tags in the comment, and its status and its relation to another decision are decorators.
 
 > **480. Only an annotation can be written as a tag inside a comment**
+>
+> Status: Accepted
 >
 > Amends: 478
 >
@@ -174,9 +176,10 @@ A decision is a named case. Its context and its rejected options are tags in the
  * Only an annotation can be written as a tag inside a comment.
  *
  * @adr.context Otherwise a decorator that decides behaviour would take effect from inside a comment.
- * @adr.rejected Leave it as it is.
+ * @adr.alternative Leave it as it is.
  */
-@adr.amends(Decision.D478)
+@adr.accepted
+@adr.amends(Decision400.D478)
 D480;
 ```
 

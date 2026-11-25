@@ -139,3 +139,20 @@ func TestVerifyAndReplace(t *testing.T) {
 		t.Errorf("二度目: changed = %v err = %v", changed, err)
 	}
 }
+
+// TestSpecFiles は、写す仕様のファイルが、ルートの *.hozo と decisions/*.hozo で、ほかのディレクトリの .hozo を含まないこと
+// （docs/packages.md「自己生成の手順」の 2）。
+func TestSpecFiles(t *testing.T) {
+	repo := t.TempDir()
+	for _, name := range []string{"cli.hozo", "ir.hozo", "decisions/adr.hozo", "decisions/d000.hozo", "tests/x.hozo", "vocab/v.hozo", "decisions/note.md"} {
+		writeFile(t, filepath.Join(repo, name), "")
+	}
+	got, err := specFiles(repo)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []string{"cli.hozo", "decisions/adr.hozo", "decisions/d000.hozo", "ir.hozo"}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("specFiles = %v, want %v", got, want)
+	}
+}

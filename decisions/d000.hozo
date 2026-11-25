@@ -1,0 +1,787 @@
+// 決定の記録（1〜99）。名前空間 hozo.decisions。書き方は decisions/adr.hozo の頭のコメント。
+// コードには、ならない（hozo.toml の単位の対象ではない）。
+// docs/decisions.md「決めたこと」の行を、そのまま移したもの（本文は、行の「決めたこと」の列。持ち主は、行の「持ち主」の列）。
+
+namespace hozo.decisions {
+  /** 決めたこと。1〜99 */
+  classify Decision000 of never {
+    /**
+     * 本体は Go。IDE の対応は、その IDE の拡張が要求する言語で書く。初期は VS Code 拡張だけ
+     *
+     * 持ち主: `docs/requirements.md`「実装言語」
+     */
+    @adr.accepted
+    D1;
+
+    /**
+     * 当面の展開先は Go と TS。プラグインは展開先の言語で書き、SDK も Go と TS
+     *
+     * 持ち主: `docs/requirements.md`「プラグインの書き方」
+     */
+    @adr.accepted
+    D2;
+
+    /**
+     * IR の構造と JSON の形の持ち主は `docs/ir.md`。`ir` パッケージはそれを写し、スキーマと TS の型は生成
+     *
+     * 持ち主: `docs/requirements.md`「プラグインの書き方」
+     */
+    @adr.accepted
+    D3;
+
+    /**
+     * hozoc 自身を `cli.hozo` で書き、骨組みを生成する
+     *
+     * 持ち主: `docs/requirements.md`「自己展開」
+     */
+    @adr.accepted
+    D4;
+
+    /**
+     * 言語サーバーは `hozoc lsp`。別のバイナリにしない
+     *
+     * 持ち主: `docs/requirements.md`「言語サーバー」
+     */
+    @adr.accepted
+    D5;
+
+    /**
+     * （68 が置き換えた。言語ごとの出力の担い手は、hozoc 本体ではなく基底のトランスパイラ。最初の言語が Go で、TS が段階 5 であることは変わらない）
+     */
+    @adr.superseded(Decision000.D68)
+    D6;
+
+    /**
+     * 予約語と文脈キーワードの分け方
+     *
+     * 持ち主: `docs/grammar.md`「予約語」「決めたこと」
+     */
+    @adr.accepted
+    D7;
+
+    /**
+     * 省略可能は型の `?` だけで表し、名前に付ける `x?: T` は書けない
+     *
+     * 持ち主: `docs/grammar.md`「決めたこと」
+     */
+    @adr.accepted
+    D8;
+
+    /**
+     * 識別子は ASCII。`Duration` の単位は `ms` `s` `m` `h` `d`。`Time` のリテラルはない
+     *
+     * 持ち主: `docs/grammar.md`「決めたこと」
+     */
+    @adr.accepted
+    D9;
+
+    /**
+     * 付く先のないドキュメンテーションコメント、名前付き引数の後の位置引数はエラー（「`omit` のない `is`」は、`is … omit` をなくした S22 で要らなくなった）
+     *
+     * 持ち主: `docs/grammar.md`「決めたこと」
+     */
+    @adr.accepted
+    D10;
+
+    /**
+     * `@external` は宣言ではなく核の印
+     *
+     * 持ち主: `docs/grammar.md`「決めたこと」
+     */
+    @adr.accepted
+    D11;
+
+    /**
+     * その場で書く model はユニオンのアームと例外の値にだけ置ける
+     *
+     * 持ち主: `docs/grammar.md`「決めたこと」
+     */
+    @adr.accepted
+    D12;
+
+    /**
+     * `return` は本体の最後の文にだけ書ける
+     *
+     * 持ち主: `docs/check.md`「配線」WIRE-3
+     */
+    @adr.accepted
+    D13;
+
+    /**
+     * IR の参照はすべて FQN。その場の model は `<親>.<名前>` の model に合成
+     *
+     * 持ち主: `docs/ir.md`「原則」「正規化」
+     */
+    @adr.accepted
+    D14;
+
+    /**
+     * 例外・効果・`bind` の計算結果を IR に置く
+     *
+     * 持ち主: `docs/ir.md`「原則」
+     */
+    @adr.accepted
+    D15;
+
+    /**
+     * デコレータの適用は入れ子にせず順序付きの列
+     *
+     * 持ち主: `docs/ir.md`「デコレータの適用」
+     */
+    @adr.accepted
+    D16;
+
+    /**
+     * 「その名前空間から見た IR」は `Program` 全体に見る側の `Signature` を足したもの
+     *
+     * 持ち主: `docs/ir.md`「その名前空間から見た IR」
+     */
+    @adr.accepted
+    D17;
+
+    /**
+     * 名前の先頭のセグメントの探し方の順序
+     *
+     * 持ち主: `docs/resolve.md`「手続き」
+     */
+    @adr.accepted
+    D18;
+
+    /**
+     * 標準の語彙（`valid` `http` `db` `localStorage` `page` `fs` `proc`）は hozoc に同梱し、常に読む。`cli` の語彙は hozoc には同梱せず、go-cli が `vocabulary` で提供する
+     *
+     * 持ち主: `docs/vocab.md`「読み込み」「同梱する語彙」「同梱しない語彙」
+     */
+    @adr.accepted
+    D19;
+
+    /**
+     * `proc.stdio` は引数を持たず `@external` でもない
+     *
+     * 持ち主: `docs/vocab.md`「同梱する語彙」
+     */
+    @adr.accepted
+    D20;
+
+    /**
+     * 入っているプラグインは `[hozo].plugin_dirs` → `HOZO_PLUGIN_PATH` → `~/.hozo/plugins` の順で探す。単位の `transpilers` の名前は、入っているすべてのプラグインのトランスパイラから探す
+     *
+     * 持ち主: `docs/plugin-protocol.md`「探索」
+     */
+    @adr.accepted
+    D21;
+
+    /**
+     * マニフェストに `protocol` `vocabulary` `[check]` を足す。`command` は配列も可。要求は `ir` でなく `view` を持ち `protocol` を足す。応答に `errors` を持つ。`[emit]` と `language` の代わりに `[[transpiler]]`（`name` / `language` / `unsupported`）を持ち、`emit` の要求は `transpiler` を持つ
+     *
+     * 持ち主: `docs/plugin-protocol.md`「マニフェスト」「要求と応答」
+     */
+    @adr.accepted
+    D22;
+
+    /**
+     * 語彙に固有の検査（PAGE-1 / PAGE-2）はプラグインの `check` が行う
+     *
+     * 持ち主: `docs/plugin-protocol.md`「check」
+     */
+    @adr.accepted
+    D23;
+
+    /**
+     * トランスパイラは、単位と、その単位が出力する名前空間の組ごとに常に一回呼ぶ。`check` はプラグインと名前空間の組ごとに一回。並列にしない
+     *
+     * 持ち主: `docs/plugin-protocol.md`「起動」
+     */
+    @adr.accepted
+    D24;
+
+    /**
+     * `[hozo]` に `sources` `plugin_dirs` `max_bindings`
+     *
+     * 持ち主: `docs/config.md`「形」
+     */
+    @adr.accepted
+    D25;
+
+    /**
+     * TOML は `github.com/BurntSushi/toml`。ほかに外部のモジュールは使わない
+     *
+     * 持ち主: `docs/packages.md`「依存の向き」
+     */
+    @adr.accepted
+    D26;
+
+    /**
+     * （72 と 73 が置き換えた。「宣言一つにつき型一つ、束ねるのは構造体、未設定は `*runtime.MissingError`、`context` を取らない」という、本体に組み込んでいた Go の出力の形）
+     */
+    @adr.superseded(Decision000.D72, Decision000.D73)
+    D27;
+
+    /**
+     * （77 と 78 が置き換えた。「出力の対象はトランスパイラが `emit` の応答の `select` で返す。包む関数を生成するのは `wraps` で引き受けたデコレータの適用だけ」）。マニフェストの `decorate` / `entry` / `stop` を持たないことは変わらない
+     */
+    @adr.superseded(Decision000.D77, Decision000.D78)
+    D28;
+
+    /**
+     * 絞り込まれた型（`C.Case<T>`）は Go では `T` に消す
+     *
+     * 持ち主: `docs/plugin-go.md`「型」
+     */
+    @adr.accepted
+    D29;
+
+    /**
+     * 生成したコードは `github.com/mew-ton/hozo/runtime` を import する
+     *
+     * 持ち主: `docs/plugin-go.md`「runtime パッケージ」
+     */
+    @adr.accepted
+    D30;
+
+    /**
+     * （67 が置き換えた。「別の言語の型と、どの出力にもない型は複製する」をやめた）。出力どうしの import の循環がエラーであること（今は GO-3）は変わらない
+     *
+     * 持ち主: 67、`docs/plugin-go.md`「パッケージと import パス」
+     */
+    @adr.superseded(Decision000.D67)
+    D31;
+
+    /**
+     * Go の識別子は先頭だけ大文字にする
+     *
+     * 持ち主: `docs/plugin-go.md`「名前」
+     */
+    @adr.accepted
+    D32;
+
+    /**
+     * （79 が置き換えた。「別の名前空間への呼び出しの `bind` の位置は `Deps` の実装者が埋める」）
+     */
+    @adr.superseded(Decision000.D79)
+    D33;
+
+    /**
+     * `go-cli` の `Main` は `package main` ではなく、`Presenter` で表示を差し替えられる（「`@proc.stdio` の付いた op は `select` の `stops` に入れる」は、77 でなくなった。その op は、基底が、人が実装する葉として出す）
+     *
+     * 持ち主: `docs/plugin-go-cli.md`「マニフェスト」「出力」
+     */
+    @adr.accepted
+    D34;
+
+    /**
+     * 終了コード 64（使い方）、70（内部・プラグインの異常）
+     *
+     * 持ち主: `docs/diagnostics.md`「終了コード」
+     */
+    @adr.accepted
+    D35;
+
+    /**
+     * `cli.hozo` では `emit` を配線にし、`outputs` に `@fs.files` を付けず、`lsp` と `format` と `UnknownNamespace` と、入力の `pluginPath`（`HOZO_PLUGIN_PATH`）を足す
+     *
+     * 持ち主: `docs/cli.md`「cli.hozo」
+     */
+    @adr.accepted
+    D36;
+
+    /**
+     * `emit` は前回の出力を、単位と名前空間の組ごとの `<Dir(U, N)>/.hozoc-outputs.json` に記録して古いものを消す。記録に従って消すのは Dir(U, N) の下のファイルだけ
+     *
+     * 持ち主: `docs/cli.md`「emit」
+     */
+    @adr.accepted
+    D37;
+
+    /**
+     * LSP は JSON-RPC を自前で実装し、`hozo.toml` がなければ設定なしで動いて `LSP-1` を出す
+     *
+     * 持ち主: `docs/lsp.md`「通信」「プロジェクト」
+     */
+    @adr.accepted
+    D38;
+
+    /**
+     * WIRE-6 の閾値は既定 5。NAME-1 は warning
+     *
+     * 持ち主: `docs/check.md`「配線」「名前空間」
+     */
+    @adr.accepted
+    D39;
+
+    /**
+     * 規則のテストは `// ERROR: ID` のコメントで期待を書く
+     *
+     * 持ち主: `docs/testing.md`「規則ごとのテスト」
+     */
+    @adr.accepted
+    D40;
+
+    /**
+     * 設計書の例のコーパスで写せなかった箇所は、そのコーパスの `README.md` に一覧する
+     *
+     * 持ち主: `docs/testing.md`「コーパス」
+     */
+    @adr.accepted
+    D41;
+
+    /**
+     * 既定値のリテラルは `scalar` の元の型に対して検査する
+     *
+     * 持ち主: `docs/types.md`「既定値」
+     */
+    @adr.accepted
+    D42;
+
+    /**
+     * 単位 U での名前空間 N の出力先 Dir(U, N) は、`U.out` に `U.namespace` から N までのセグメントをパスにして足す。`View` は単位と名前空間の組ごとに作り、出力のあるすべての名前空間の単位ごとの設定と Dir、単位の `in` に合ったファイル（`files`）を持たせる
+     *
+     * 持ち主: `docs/config.md`「単位の対象」、`docs/ir.md`「その名前空間から見た IR」
+     */
+    @adr.accepted
+    D43;
+
+    /**
+     * THROWS-1 と Sig は `external` の例外を同じく数えず、`@throws` は `external` の例外も書ける
+     *
+     * 持ち主: `docs/check.md`「throws」「名前空間」
+     */
+    @adr.accepted
+    D44;
+
+    /**
+     * プラグインは protoc と同じ信頼モデル。隔離も、応答以外のファイルの変化の検出も行わない
+     *
+     * 持ち主: `docs/plugin-protocol.md`「信頼の前提」
+     */
+    @adr.accepted
+    D45;
+
+    /**
+     * （19 と同じ決定。19 にまとめた。番号は使い回さない）
+     *
+     * 持ち主: 19
+     */
+    @adr.accepted
+    D46;
+
+    /**
+     * （73 が置き換えた。「状態はパッケージの変数 `States` に置く」。状態の単位が問い合わせと命令を持つことは、73 に残る）
+     */
+    @adr.superseded(Decision000.D73)
+    D47;
+
+    /**
+     * 予約語はフィールド名の位置に書ける。ほかの位置では予約語のまま
+     *
+     * 持ち主: `docs/grammar.md`「識別子」「決めたこと」
+     */
+    @adr.accepted
+    D48;
+
+    /**
+     * 語彙を読むのと `check` を呼ぶのは、使うプラグイン（そのトランスパイラがどれかの単位に書かれたもの）だけ。マニフェストは入っているすべてのプラグインについて読み、MAN-3 / MAN-4 は使っていなくても、MAN-2 は使うプラグインにだけ報告する
+     *
+     * 持ち主: `docs/plugin-protocol.md`「探索」、`docs/vocab.md`「読み込み」
+     */
+    @adr.accepted
+    D49;
+
+    /**
+     * `hozoc emit` の引数は名前空間のまま。その名前空間と子孫を出力するすべての単位の分を書き出す
+     *
+     * 持ち主: `docs/cli.md`「emit」
+     */
+    @adr.accepted
+    D50;
+
+    /**
+     * 二つの単位の出力先は、`out` どうしを比べて、同じでも入れ子でもいけない（CFG-17）。単位の対象の名前空間が `in` に合うファイルに宣言を持たなければ、その単位はその名前空間を出力しない
+     *
+     * 持ち主: `docs/config.md`「単位の対象」「in」
+     */
+    @adr.accepted
+    D51;
+
+    /**
+     * 規則の ID は使い回さない。なくなった規則の番号は欠番にする（CFG-1〜CFG-4、CFG-8、CFG-9、CFG-11、REL-3、REL-6、MAN-1、PLG-3、NS-4、GOEMIT-1〜GOEMIT-6、GOEMIT-INTERNAL）
+     *
+     * 持ち主: 欠番の一覧は `docs/requirements.md`「検査の規則の一覧」。それぞれの経緯は `docs/config.md`「診断」、`docs/check.md`「throws」「名前空間」、`docs/plugin-protocol.md`「診断」、`docs/plugin-go.md`「診断」
+     */
+    @adr.accepted
+    D52;
+
+    /**
+     * （73 が置き換えた。「`States` のどこまでを埋めるかと、準備の形は、トランスパイラが目的に応じて決める」）。保存先の相乗りが、状態の単位のどのメソッドを実装するか、準備（表を作る）をどう渡すかを自分で決めることは変わらない
+     *
+     * 持ち主: 73、`docs/plugin-go-sqlite.md`「状態ごとの型」
+     */
+    @adr.superseded(Decision000.D73)
+    D53;
+
+    /**
+     * 書き戻しは変えた宣言の範囲だけを書き換える。できなければファイル全体を作り直してよい
+     *
+     * 持ち主: `docs/requirements.md`「決まったこと」
+     */
+    @adr.accepted
+    D54;
+
+    /**
+     * 単位の `out` はルートの下のディレクトリで、トランスパイラの `files` の `path` はその起動の Dir(U, N) の下でなければならない（CFG-7、PLG-1）
+     *
+     * 持ち主: `docs/config.md`「形」、`docs/plugin-protocol.md`「emit」
+     */
+    @adr.accepted
+    D55;
+
+    /**
+     * hozoc はプラグインの応答の必須の項目と型を確かめ、知らない項目は無視する
+     *
+     * 持ち主: `docs/plugin-protocol.md`「応答の形」
+     */
+    @adr.accepted
+    D56;
+
+    /**
+     * プラグインの探索が見るプロジェクトの外の場所（`HOZO_PLUGIN_PATH`、ホーム）は、探索が自分で読まず、`hozoc` が入力として渡す
+     *
+     * 持ち主: `docs/plugin-protocol.md`「探索」、`docs/cli.md`「cli.hozo」
+     */
+    @adr.accepted
+    D57;
+
+    /**
+     * `make generate` は一時ディレクトリに生成し、コンパイルできると確かめてから `internal/gen/hozoc` を置き換える
+     *
+     * 持ち主: `docs/packages.md`「自己生成の手順」
+     */
+    @adr.accepted
+    D58;
+
+    /**
+     * トランスパイラは、ブラックボックスのテスト（サンプルの期待する出力との、バイト単位の比較）を先に書いてから作る
+     *
+     * 持ち主: `docs/testing.md`「トランスパイラのテスト」
+     */
+    @adr.accepted
+    D59;
+
+    /**
+     * op が純粋かどうかを、仕様から割り出して `Signature.pure` に置く。純粋なのは、デコレータがなく、状態を読まず、効果を持たず、配線なら呼び出し先もすべて純粋な op。op そのものの性質で、見る側の名前空間にも設定にもよらない
+     *
+     * 持ち主: `docs/check.md`「純粋」
+     */
+    @adr.accepted
+    D60;
+
+    /**
+     * 書き方の指針は規則にせず、一か所に置く: DB の状態は別の名前空間に切り出す、場合には業務の名前を付けた分類を宣言する、語彙のデコレータは共有の型のフィールドに書いてよい、外部の入出力をする op にはその仕組みの語彙のデコレータを付ける
+     *
+     * 持ち主: `docs/requirements.md`「書き方の指針」
+     */
+    @adr.accepted
+    D61;
+
+    /**
+     * `reads` `as` `never` `throw` `override` `export` は予約語にする。綴りは仮で、後で変えうる。`is` と `omit` は予約語から外す
+     *
+     * 持ち主: `docs/grammar.md`「予約語」「決めたこと」
+     */
+    @adr.accepted
+    D62;
+
+    /**
+     * 「互換」の規則の番号は使い回さない（規則 8 は欠番）
+     *
+     * 持ち主: `docs/types.md`「互換」
+     */
+    @adr.accepted
+    D63;
+
+    /**
+     * S15〜S23 で IR の構造が変わるので、版を 0.3 に上げる
+     *
+     * 持ち主: `docs/ir.md`「版」
+     */
+    @adr.accepted
+    D64;
+
+    /**
+     * （69 が置き換えた。組み込みの Go の出力を基底のプラグインに置き換えるまでの、移行の間の扱い。置き換えたので、なくなった）
+     */
+    @adr.superseded(Decision000.D69)
+    D65;
+
+    /**
+     * S15〜S23 のための規則の ID: 新しいものは NS-5、READS-1、READS-2、THROWS-3、WIRE-9、CLS-4〜CLS-6、MATCH-8、TYPE-14〜TYPE-16、GOEMIT-6。NS-4 は欠番。TYPE-10、STATE-3、RES-5 は、同じ規則を今の書き方に合わせて書き直した
+     *
+     * 持ち主: `docs/check.md`「診断」、`docs/types.md`「診断」、`docs/resolve.md`「診断」。GOEMIT-6 は、80 で欠番にした
+     */
+    @adr.accepted
+    D66;
+
+    /**
+     * 型（model、scalar、union、exception）は、基底ごとに一度だけ出力し、使う側は import する。使う側に複製しない。出力のある名前空間は、自分の型をすべて出す。使う宣言の名前空間が、同じ基底の出力を持たなければエラー（CFG-22）で、足す単位をメッセージに示す。型の置き場は、自分の単位を先に、次に設定の順で最初の単位（P7、P8）
+     *
+     * 持ち主: `docs/config.md`「型の置き場」
+     */
+    @adr.accepted
+    D67;
+
+    /**
+     * トランスパイラを、言語ごとの基底（`go`、`ts`）と、それに相乗りするもの（`go-http`、`go-sqlite` など）に分ける。型や op の形を出すのは hozoc 本体ではなく基底で、本体は特定の言語を知らない。相乗りは、依存するトランスパイラをマニフェストの `requires` で宣言する（一方向。オプションによらない）。単位は基底をちょうど一つ持ち（CFG-20）、依存しているものもすべて `transpilers` に書く（足りなければ CFG-19。書く順にはよらない）。単位の言語は、基底の `language`（P9、P17、P18）
+     *
+     * 持ち主: `docs/config.md`「基底と相乗り」、`docs/plugin-protocol.md`「マニフェスト」
+     */
+    @adr.accepted
+    D68;
+
+    /**
+     * Go の基底は、語彙を知らなくても仕様だけから決まるものをすべて出す: 出力する名前空間の型と状態の単位のすべて、単位の対象の op のすべて（選択はない。`in` が絞るのは op だけ）、配線の本体、`never` を返す op の中身、`New` と `Ops`。制約を確かめる関数と、型を写す op の中身は出さない（P10、P11、P12 の残り、P27 の残り）
+     *
+     * 持ち主: `docs/plugin-go.md`「この文書が決めること」「出力の対象」
+     */
+    @adr.accepted
+    D69;
+
+    /**
+     * 単位ごとに、トランスパイラへオプションを渡せる（`[emit.options.<トランスパイラ>]`）。名前が単位の `transpilers` になければ CFG-21。中身を確かめるのはトランスパイラで、`View.config.options` で渡す（P16）
+     *
+     * 持ち主: `docs/config.md`「オプション」、`docs/plugin-protocol.md`「emit」
+     */
+    @adr.accepted
+    D70;
+
+    /**
+     * 制約（`@valid.*`）は型に一度だけ書き、それ自体は何も起こさない。確かめる関数を出すのは標準の検証のトランスパイラ `go-valid` で、いつ確かめるかは、境界を持つ相乗り（`go-http` は `validate = true` のとき、`go-cli` はいつも）が決め、失敗をその語彙の形で伝える（P15）
+     *
+     * 持ち主: `docs/plugin-go-valid.md`「この文書が決めること」、`docs/plugin-go-http.md`「制約の検査」「op を呼ぶ前の失敗」
+     */
+    @adr.accepted
+    D71;
+
+    /**
+     * Go の基底の op のメソッドは、標準の `context.Context` を最初の引数に取る。純粋な op は取らない。純粋で例外のない op は `error` を返さない。形は op の宣言だけで決まり、どの名前空間から見ても同じ。引数の並びを決めるのは基底だけ（P29、P30 の残り、P32）。状態は、名前で読む値として `Get` で読む
+     *
+     * 持ち主: `docs/plugin-go.md`「op の形」「状態の参照」
+     */
+    @adr.accepted
+    D72;
+
+    /**
+     * Go の基底は、人やプラグインが実装するもの（葉の op、状態の単位、別の名前空間の op、分類の述語）を、どれもインターフェースにし、実装を `New` の位置引数で受け取る。関数のフィールドの構造体、パッケージの変数 `States`、`*runtime.MissingError` をやめる。別の名前空間の口は、相手の出力の `Ops` がそのまま満たす（P31、P32）
+     *
+     * 持ち主: `docs/plugin-go.md`「実装を受け取る口」
+     */
+    @adr.accepted
+    D73;
+
+    /**
+     * Go の基底が外に見せる `Ops` には、`export` の付いた op だけが並ぶ。内部の op を持つ出力は、すべての op を持つ内側のフォルダ `inner` と、`export` の op だけを再公開する入口に分け、テストは内側を参照する。内部の op を持たない出力は分けない（P33 の残り、P35）
+     *
+     * 持ち主: `docs/plugin-go.md`「内側のフォルダと入口」「Ops」
+     */
+    @adr.accepted
+    D74;
+
+    /**
+     * 型を写す op の中身（フィールドの写し忘れ）は、このツールでは確かめない（P34）
+     *
+     * 持ち主: `docs/plugin-go.md`「この文書が決めること」
+     */
+    @adr.accepted
+    D75;
+
+    /**
+     * 単位の `namespace` には、宣言を持つどの名前空間も書ける（型だけの名前空間、語彙の名前空間を含む）。語彙の型を使うなら、その名前空間に単位を置く。語彙のファイルは `in` によらず単位の対象。CFG-8 は欠番
+     *
+     * 持ち主: `docs/config.md`「単位の対象」「in」「型の置き場」
+     */
+    @adr.accepted
+    D76;
+
+    /**
+     * プロトコルから `select` をなくし、版を 0.4 に上げる。何を出すかは基底が `View` だけから決め、相乗りは、基底の応答ではなく、`View` と公開の SDK（`plugin/golang`、`plugin/govalid`）から基底の形を知る。起動は互いに独立。`View.config` に `index`、`base`、`options` を足す。PLG-3 は欠番
+     *
+     * 持ち主: `docs/plugin-protocol.md`「起動」「相乗りが基底の形を知る方法」「選択をなくしたこと」、`docs/ir.md`「版」
+     */
+    @adr.accepted
+    D77;
+
+    /**
+     * （84〜86 が置き換えた。「Go の基底は、デコレータについて何も生成しない（包む関数も、それを受け取る口も）。配線の op に `catches` を持つデコレータが付いていれば warning」）。デコレータの意味を、それを読むトランスパイラが形にすることは変わらない
+     */
+    @adr.superseded(Decision000.D84, Decision000.D85, Decision000.D86)
+    D78;
+
+    /**
+     * `bind` で埋まる位置は、呼ぶ先が別の名前空間でも、Go の基底が生成する配線が埋める。別の名前空間の口のメソッドは、相手の op の引数をそのまま持つ
+     *
+     * 持ち主: `docs/plugin-go.md`「bind で埋まる位置」
+     */
+    @adr.accepted
+    D79;
+
+    /**
+     * 出力をプラグインに移したことによる規則の ID: 新しいものは CFG-19〜CFG-22、GO-1〜GO-6、GO-INTERNAL、GOVALID-1〜GOVALID-7、GOSQL-1〜GOSQL-6、GOHTTP-1〜GOHTTP-10、CLI-6〜CLI-8。CFG-8、CFG-11、PLG-3、GOEMIT-1〜GOEMIT-6、GOEMIT-INTERNAL は欠番。MAN-4 から、`language` の名前の一覧をなくした
+     *
+     * 持ち主: `docs/config.md`「診断」、`docs/plugin-protocol.md`「診断」、それぞれのプラグインの文書の「診断」
+     */
+    @adr.accepted
+    D80;
+
+    /**
+     * サンプルのテストは、`check` / `files` / `go` / `transpilers/<名前>` / `transpilers/all`。代役（`pick`）と `shared` と `pending` をなくす。コーパスの `emit` のゴールデンは、基底 `go` の出力として作り直し（`design`、`state`、`units`、`view`）、`select` のコーパスは消す
+     *
+     * 持ち主: `docs/testing.md`「コーパス」「トランスパイラのテスト」、`tests/samples/README.md`
+     */
+    @adr.accepted
+    D81;
+
+    /**
+     * `http` の語彙に、op を呼ぶ前の失敗の例外 `BadRequest`（と、運ぶ値の model）を足す。`@http.get` / `@http.post` の `throws` には、まだ入れない。HTTP の通信の上の形の持ち主は `go-http` の文書
+     *
+     * 持ち主: `docs/vocab.md`「同梱する語彙」、`docs/plugin-go-http.md`「通信の形」
+     */
+    @adr.accepted
+    D82;
+
+    /**
+     * hozoc 自身は `go` + `go-valid` + `go-cli` で生成し、`proc` の例外の型のために `proc` の単位を置く。`cli.hozo` の `check` / `emit` / `lsp` に `export` を付け、`Select` と `Wrap` をなくす
+     *
+     * 持ち主: `docs/cli.md`「cli.hozo」「手で書くもの」
+     */
+    @adr.accepted
+    D83;
+
+    /**
+     * デコレータの適用が何を出力するかは、それを読むトランスパイラが決める（入口を作る、実装を出す、材料にする、継ぎ目を要る）。基底は、デコレータの宣言の節（`throws` / `catches … recovers` など）を見て決まった形を生成することはしない。単位のどのトランスパイラも読まないデコレータには、何も出さない（継ぎ目も、呼び出しも、warning も）: 何も生成しないデコレータは、その言語のために用意されたものではないデコレータと区別がつかない。プロジェクトが宣言したデコレータも、読むプラグインを置かない限り印（P37。78 を置き換えた）
+     *
+     * 持ち主: `docs/plugin-go.md`「デコレータ」、`docs/config.md`「継ぎ目」
+     */
+    @adr.accepted
+    D84;
+
+    /**
+     * トランスパイラは、マニフェストの `[[transpiler]]` の `seams` で、デコレータが継ぎ目（op の中身の前後に何でも置ける口）を要ると宣言できる。基底は、単位の対象の op のうち、そのデコレータの付いたものを二層（中身と外側）で出し、継ぎ目の中身は、宣言したトランスパイラが op ごとに出す。宣言は静的で（設定とマニフェストだけで決まる）、`View.config.seams` で渡す（版は 0.4 のまま。まだ実装のない版に足した）。同じ単位の二つのトランスパイラが同じデコレータを宣言すれば CFG-23（新しい ID）。MAN-4 に `seams` の誤りを足す。付いていないデコレータの宣言は、何も起こさない。プロジェクトが宣言したデコレータの継ぎ目は、プロジェクトの中のプラグインが宣言する。継ぎ目は、op を持つ名前空間の、その単位の出力にだけ掛かる（P38）
+     *
+     * 持ち主: `docs/config.md`「継ぎ目」「診断」、`docs/plugin-protocol.md`「マニフェスト」、`docs/ir.md`「その名前空間から見た IR」
+     */
+    @adr.accepted
+    D85;
+
+    /**
+     * Go の継ぎ目の形: インターフェース `Seams`（継ぎ目を持つ op とデコレータの組ごとに、op の引数と `body` を取るメソッド `<Op><Decorator>`）と、`New` の最後の位置引数 `seams`。外側は `ops` の公開のメソッド。基底が出す中身（配線、`never` を返す op）は非公開のメソッド `<op>Body`、葉の中身は口のメソッドのまま（名前を変えない）。複数の継ぎ目は、デコレータの適用順（DEC-9）で入れ子にする。別の名前空間の op の継ぎ目は、呼ぶ側には出さない。基底の warning（`catches` を持つデコレータ）はやめる
+     *
+     * 持ち主: `docs/plugin-go.md`「継ぎ目」
+     */
+    @adr.accepted
+    D86;
+
+    /**
+     * 原則として、デコレータは op の入力と出力の値を変えない。規則ではなく書き方の指針で、検査しない（P39）
+     *
+     * 持ち主: `docs/requirements.md`「書き方の指針」
+     */
+    @adr.accepted
+    D87;
+
+    /**
+     * デコレータの出力は、実装より先に定義し、テストの側（サンプルの期待する出力とハーネス）を先に直す（P36。59 の当てはめ）。サンプル `shop-server` に、継ぎ目の例（サンプルの中のプラグイン `go-ratelimit` と、その語彙 `rate`）を入れ、期待する出力を文書の形にそろえる。`TestSamples` は最後の形で書き、まだ通せないサブテストは、足りないものを名指しして飛ばす
+     *
+     * 持ち主: `docs/testing.md`「トランスパイラのテスト」、`tests/samples/README.md`「テスト」
+     */
+    @adr.accepted
+    D88;
+
+    /**
+     * R2 の仕上げで足した規則: （a）Go の import の名前は、基底が決まった名前で使う識別子を避ける: 定義のパッケージに宣言する非公開の名前 `ops`、`ptr` は、どのファイルでも（名前空間 `ops` は `ops2`）。関数の本体の中の `o`、`ctx`、`err`、`m` は、基底のファイルで。途中の値 `v<n>`、`k<n>` は、import の名前に当たる番号を飛ばす。`New` の引数は `ops` を避ける（`ops_`）。（b）定義のパッケージの公開の名前の一覧は `golang.PublicNames` 一つで、基底（GO-2）と相乗り（GOSQL-4、GOHTTP-10、サンプルの GORATE-2）が共有する。（c）`Validate` を呼ぶ相乗りは、入力の model が別の名前空間のもので、その型の置き場の単位が `go-valid` を並べていなければ、コンパイルできない出力の代わりに診断を返す: 新しい ID は GOHTTP-11 と CLI-9（80 の一覧に足す）。置き場の単位の `transpilers` は `View.namespaces` にあるので、プロトコルは変えない。確かめ方は、`go-valid` の GOVALID-3 と共有する `govalid.Unlisted`
+     *
+     * 持ち主: `docs/plugin-go.md`「パッケージと import パス」「New」、`docs/packages.md`「`plugin/golang`（公開）」「`plugin/govalid`（公開）」、`docs/plugin-go-http.md`「制約の検査」「診断」、`docs/plugin-go-cli.md`「引数の解釈」「診断」
+     */
+    @adr.accepted
+    @adr.amends(Decision000.D80)
+    D89;
+
+    /**
+     * 分類のケースは排他で、全体を覆うことを、述語を書く人が担保する。どのケースにも当たらない状態は、仕様の上ではないものとして扱う。そのため、判定の誤りを返す先がない配線（純粋で、例外を持たない配線）が述語で決まる分類で `match` するときは、`error` を返す形に変えず、判定の誤りで `panic` する。`nil` の実装を渡したとき（73）と同じ扱い
+     *
+     * 持ち主: `docs/plugin-go.md`「分類」
+     */
+    @adr.accepted
+    D90;
+
+    /**
+     * プラグインは、型や、仕様の書かれ方から、出力を推論しない。機械的に生成するものは仕様がデコレータで言い、プラグインはデコレータの引数だけから出力を決める。型は、書かれたものが食い違っていないかを確かめるのにだけ使い、食い違いはトランスパイラの error。デコレータのない宣言には何も生成せず、warning も出さない。仕様の書き方の指針ではなく、プラグインの規則
+     *
+     * 持ち主: `docs/requirements.md`「出力を推論しない」
+     */
+    @adr.superseded(Decision100.D103)
+    D91;
+
+    /**
+     * 読む op は、`@db.find(表, "列")` / `@db.list(表, "列")` / `@db.list(表)` で、表を状態の名前で、列を文字列で名指しする。デコレータが `reads` を運ぶので、op は `reads` を書かない。`go-sqlite` の、引数の型と等しい型のフィールドを列に結ぶ規則と、`reads`・効果の宛先・戻り値の型から SQL を選ぶ五つの規則は、やめた
+     *
+     * 持ち主: `docs/vocab.md`「`db` の読み書きのデコレータ」、`docs/plugin-go-sqlite.md`「op の中身」
+     */
+    @adr.superseded(Decision100.D135)
+    D92;
+
+    /**
+     * 書く方は、効果の宣言が、表に何をするかを `@db.insert(表)` / `@db.update(表)` / `@db.delete(表, "列")` で言う。表は、効果の宛先から読まずに、デコレータの引数でもう一度名指しする（出力を決めるのはデコレータの引数だけ。一つの効果が複数の状態に触れ、表がその一部であることがある: 状態の分類の遷移）。`@db.update` が書き換える行は、model の `@db.key` のフィールドで選ぶ
+     *
+     * 持ち主: 同上
+     */
+    @adr.superseded(Decision100.D137)
+    D93;
+
+    /**
+     * op は、行う効果を `@db.effects(e₁, …)` で並べる。デコレータが `effects` を運ぶので、op は `effects` を書かない。二つ以上なら、書いた順の、一つのトランザクション（すべてか、何もなしか）。n 番目の効果が、op の n 番目の引数を受け取る: `insert` / `update` の効果は表の model の行、`delete` の効果は名指しした列の型の値
+     *
+     * 持ち主: `docs/plugin-go-sqlite.md`「op の中身」「トランザクション」
+     */
+    @adr.accepted
+    D94;
+
+    /**
+     * 列は、デコレータごとに一つ（引数 `column: string`。`list` では省ける）。複数の列の条件は、要るサンプルが出るまで決めない（そのときは型を `string \| string[]` に広げ、今の書き方はそのまま通る）。引数の名前は、予約語の `by` を避けて `column`
+     *
+     * 持ち主: `docs/vocab.md`「`db` の読み書きのデコレータ」
+     */
+    @adr.superseded(Decision100.D135)
+    D95;
+
+    /**
+     * 列と比べる引数の型は、列の型と等しくなければならない。列の型が union なら、引数はその一部でよい（`T?` は T と「値がない」の union と数える: `T?` の列は `T` の引数を受け取り、値のない行は合わない）。向きは一方だけで、列より広い引数はトランスパイラの error。値を、名指しした列と比べるところ（`find`、`list`、`delete` の条件）のすべてに掛かる、ただ一つの規則。「省略可能な引数は、値がなければ問い合わせない」という規則は、なくした: 値がないときにどうするかは、呼ぶ側の配線が、呼ぶ前に決める
+     *
+     * 持ち主: `docs/plugin-go-sqlite.md`「列と引数の型」
+     */
+    @adr.accepted
+    D96;
+
+    /**
+     * `db` のデコレータで書いたものの整合は、`go-sqlite` が確かめる: 表は `@db` の状態か、列は表の model にあるか、引数と戻り値は合うか（`find` は `M?`、`list` は `M[]`）、効果のデコレータの名前と表は効果の宛先に合うか（`insert` と `post`、`update` と `put`、`delete` と `delete`）、op の引数は並べた効果に合うか、並べた効果は `insert` / `update` / `delete` のどれかを持つか。`db` のデコレータのない op は中身を出さず、warning もない（「規則に当たらない op」の warning は、やめた）。状態の形で決まる問い合わせ（`IsEmpty`、`Get`）は残す: 形は言語の約束
+     *
+     * 持ち主: `docs/plugin-go-sqlite.md`「状態ごとの型」「op の中身」「診断」
+     */
+    @adr.accepted
+    D97;
+
+    /**
+     * 言語に足すもの: デコレータの対象 `effect`。デコレータの宣言の節 `reads` / `effects`（op が直に読む状態と直に持つ効果は、自分で書いたものと、デコレータが運ぶものを合わせたもの。呼び出し元へは、今までどおり伝わる。純粋さは変わらない。運ぶ節を持つデコレータを付けられるのは葉の op だけ）。残りの引数（`...名前: 型`）。予約語のデコレータ名（宣言と適用）。S8 の読み直し: 葉の op が**自分で書ける**効果は高々一つ（EFF-3）で、デコレータが運ぶ効果は数えない（順序は、デコレータの引数に書いてある）
+     *
+     * 持ち主: `docs/grammar.md`「識別子」「decorator の宣言」「決めたこと」、`docs/check.md`「デコレータが運ぶ reads と effects」、`docs/types.md`「デコレータの引数」、`docs/resolve.md`「手続き」
+     */
+    @adr.accepted
+    D98;
+
+    /**
+     * 98 で IR の構造が変わるので、版を 0.5 に上げる: `Decorator.targets` の `effect`、`Decorator.reads` / `Decorator.effects`、`Param.rest`、`Op.carried`。`Op.reads` / `Op.effects` は書かれたもののままにし、運ばれたものは `Op.carried` に分けて置く。合わせたものは `Signature` にある
+     *
+     * 持ち主: `docs/ir.md`「decorator」「op」「版」
+     */
+    @adr.accepted
+    D99;
+  }
+}

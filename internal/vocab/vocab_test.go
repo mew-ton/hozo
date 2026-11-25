@@ -51,7 +51,7 @@ func TestFiles(t *testing.T) {
 				t.Errorf("%s: missing %q", f.Path, w)
 			}
 		}
-		// docs/vocab.md「同梱する語彙」: x?: T は書かない。cache は同梱しない。語彙 proc（stdio）は、なくした（docs/decisions.md「決めたこと」434）。
+		// docs/vocab.md「同梱する語彙」: x?: T は書かない。cache は同梱しない。語彙 proc（stdio）は、なくした（決定 D434）。
 		if regexp.MustCompile(`\w\?:`).MatchString(s) {
 			t.Errorf("%s: uses x?: T", f.Path)
 		}

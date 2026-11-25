@@ -29,7 +29,7 @@ fn cancelOrder(in: CancelInput): Order
 
 // §7.3 の `fn placeOrder(in: OrderInput): Order effects createOrder | notifyUser
 // throws NotificationFailed keeps createOrder prevents notifyUser;` は書けない: 葉の op が直に持てる効果は一つまで
-// （docs/decisions.md「設計書から離れた決定」S8）で、prevents / keeps の目的語は effects だけ（同 S9）。
+// （決定 S8）で、prevents / keeps の目的語は effects だけ（同 S9）。
 // 効果ごとの葉の op を配線でつなぐ。NotificationFailed のとき createOrder は kept、notifyUser は prevented と計算される。
 fn saveOrder(in: OrderInput): Order
   effects createOrder;

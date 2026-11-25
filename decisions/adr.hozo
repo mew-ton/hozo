@@ -1,0 +1,121 @@
+// 決定の記録（ADR）の語彙 adr。決定そのものは、同じディレクトリの d000.hozo〜、s.hozo、unnumbered.hozo。
+// 決定の持ち主は、このディレクトリのケース（決定ごとに、一つ）。docs/decisions.md は、なくした（D541）。
+// 名前空間 adr も、hozo.decisions も、hozo.toml の単位の対象ではない: コードには、ならない。
+//
+// ファイルと分類（D541）: 番号の百の位ごとに、ファイルを一つ、分類を一つ。d000.hozo（1〜99、分類 Decision000）、d100.hozo（Decision100）、…。
+//   決定を指すときは、hozo.decisions.Decision400.D479 の形（同じ名前空間の中では Decision400.D479）。
+//   設計書から離れた決定は s.hozo（分類 DecisionS、S1〜S30）。番号のない、確かめていない決定は unnumbered.hozo（DecisionUnnumbered）。
+//
+// 書き方（D477、D479、D534）:
+//   決めたこと          → ケースの説明の本文
+//   理由                → @adr.context
+//   決めたことで起きること → @adr.consequence
+//   採らなかった案      → @adr.alternative（一つずつ）
+//   決めた人の言葉      → @adr.said
+//   状態                → 印を、ちょうど一つ: @adr.proposed、@adr.accepted、@adr.rejected、@adr.deprecated、@adr.superseded(…)
+//   置き換えられた決定  → 古い決定の側に、印 @adr.superseded(新しい決定)
+//   一部を直す決定      → 新しい決定の側に、印 @adr.amends(…)
+//   形を決めた宣言      → その宣言の側に、印 @adr.decided(…)
+//
+// 533 までの決定と、S1〜S30 は、docs/decisions.md の行を、そのまま本文にした（タグに分けていない）。本文の中の「決めたこと」N、
+// 「設計書から離れた決定」SN は、ここの DN、SN のこと。本文は、移した後も、書き直さない。
+// 本文の最後の「持ち主: …」は、もとの表の持ち主の列。持ち主がコードで自明なもの（その .hozo の宣言が、@adr.decided でその決定を指す。
+// 持ち主が、置き換えた決定だけで、その決定の @adr.superseded(…) が、同じ決定を指す）は、書かない（D544、D545、D547）。
+// 決定の足し方と、状態の替え方は、CLAUDE.md「決定は、decisions/ に足す」。
+// 書けなかった所の持ち主は docs/open.md「サンプルと、hozoc 自身の仕様」（「穴 30」「穴 36」などは、その番号）。
+
+/**
+ * 決定の記録（ADR）の語彙（D479。状態の印は D534）。
+ * 同梱の語彙では、ない: まず、Hozo 自身の仕様の中に、自前のものとして宣言し、使ってから、同梱の語彙に移すかを決める。
+ * どれも、解釈されなくてよい印（@hint）。文章を一つ取る四つは、説明のコメントの中に、タグとして書ける（D478、D480）。
+ */
+namespace adr {
+  /**
+   * 状況と、理由: なぜ、決める必要があったか。なぜ、こう決めたか
+   *
+   * @param text 文章
+   */
+  @adr.decided(hozo.decisions.Decision400.D479)
+  @hint
+  decorator context(text: string) for case of never;
+
+  /**
+   * 結果: 決めたことで、何が起きるか。何を、受け入れるか
+   *
+   * @param text 文章
+   */
+  @adr.decided(hozo.decisions.Decision400.D479)
+  @hint
+  decorator consequence(text: string) for case of never;
+
+  /**
+   * 採らなかった案と、採らなかった理由。案ごとに、一つ
+   *
+   * @param text 文章
+   */
+  @adr.decided(hozo.decisions.Decision400.D479, hozo.decisions.Decision500.D534)
+  @hint
+  @repeatable
+  decorator alternative(text: string) for case of never;
+
+  /**
+   * 決めた人の言葉
+   *
+   * @param text 言葉（書かれたまま）
+   */
+  @adr.decided(hozo.decisions.Decision400.D479)
+  @hint
+  @repeatable
+  decorator said(text: string) for case of never;
+
+  /**
+   * この決定が、一部を直す決定（一部だけを、置き換える。条件を足す）。直された決定は、直された部分のほかは、効いたまま。
+   * どの部分かは、説明の本文に書く
+   *
+   * @param decisions 一部を直す決定
+   */
+  @adr.decided(hozo.decisions.Decision400.D481)
+  @hint
+  decorator amends(...decisions: any case of never) for case of never;
+
+  /**
+   * この宣言の形を、決めた決定。宣言の側に付ける
+   *
+   * @param decisions 形を決めた決定
+   */
+  @adr.decided(hozo.decisions.Decision400.D479)
+  @hint
+  decorator decided(...decisions: any case of never)
+    for op, model, state, effect, read, exception, scalar, field, union, classify, decorator, case;
+
+  // 状態（D534）。どの決定にも、ちょうど一つ付ける。
+
+  /** 状態: 提案。出したが、まだ、利用者が認めていない。会話から生まれた決定と、聞かずに決めた決定は、これで入れる */
+  @adr.decided(hozo.decisions.Decision400.D479, hozo.decisions.Decision500.D534)
+  @hint
+  decorator proposed for case of never;
+
+  /** 状態: 採用。利用者が認め、効いている */
+  @adr.decided(hozo.decisions.Decision500.D534)
+  @hint
+  decorator accepted for case of never;
+
+  /** 状態: 却下。提案したが、利用者が採らなかった。ケースは消さず、番号も使い回さない */
+  @adr.decided(hozo.decisions.Decision500.D534)
+  @hint
+  decorator rejected for case of never;
+
+  /** 状態: 廃止。もう効いていない。置き換える決定は、ない */
+  @adr.decided(hozo.decisions.Decision500.D534)
+  @hint
+  decorator deprecated for case of never;
+
+  /**
+   * 状態: 置き換え済み。もう効いていない。古い決定の側に付け、置き換えた新しい決定を指す
+   *
+   * @param decisions 置き換えた決定
+   */
+  @adr.decided(hozo.decisions.Decision500.D534, hozo.decisions.Decision500.D537)
+  @hint
+  decorator superseded(...decisions: any case of never) for case of never;
+}

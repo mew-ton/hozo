@@ -11,7 +11,7 @@ import (
 )
 
 // このファイルは、プラグインの診断が、hozoc build --no-emit で出ることを、本物のプラグインで確かめる（docs/cli.md「検査」の 4、
-// docs/plugin-protocol.md「語彙のプラグイン」「起動」「read」「emit」、docs/decisions.md「決めたこと」404、410、416）。
+// docs/plugin-protocol.md「語彙のプラグイン」「起動」「read」「emit」、決定 D404、D410、D416）。
 //
 // 検査は、プラグインに emit を頼み、その答えの診断を使う。SDK が、要求の並びを回すことは、plugin の TestRunEmitBatch、hozoc が、
 // プラグインごとに一回、受け持つ出力を並べて頼むことは、internal/project の TestPluginAnswersPerOutput。ここは、その二つが、
@@ -181,7 +181,7 @@ func wantVocabularyDiagnostics(t *testing.T, out, code string, lines []string) {
 }
 
 // TestVocabularyDiagnosticsWithoutUnits は、語彙のプラグインが、出力の単位がなくても、働くこと（docs/plugin-protocol.md
-// 「語彙のプラグイン」、docs/decisions.md「決めたこと」410）: 単位を一つも持たない設定の仕様が、通信に出せない union を、経路に
+// 「語彙のプラグイン」、決定 D410）: 単位を一つも持たない設定の仕様が、通信に出せない union を、経路に
 // 使っていれば（HTTP-5。docs/plugin-http.md「通信の形」の「union」）、hozoc build --no-emit が、本物の語彙のプラグイン http の診断を、
 // 位置と一緒に出して、0 でない終了コードで終わる。
 func TestVocabularyDiagnosticsWithoutUnits(t *testing.T) {
@@ -234,7 +234,7 @@ func TestVocabularyDiagnosticsBeforeEmit(t *testing.T) {
 }
 
 // TestValidVocabularyDiagnostics は、語彙のプラグイン valid が、制約の使い方の誤り（VALID-1。docs/plugin-valid.md「診断」）を、
-// 出力の単位がなくても、位置と一緒に出すこと（docs/decisions.md「決めたこと」429）。同じ仕様に、go-valid の単位を足しても、
+// 出力の単位がなくても、位置と一緒に出すこと（決定 D429）。同じ仕様に、go-valid の単位を足しても、
 // 診断は、一度だけ出る: 語彙のプラグインが error を返したら、emit は、頼まない（go-valid は、同じ診断を、自分では返さない。
 // docs/plugin-go-valid.md「診断」）。hozoc build も、同じ診断で止まり、何も書き出さない。
 func TestValidVocabularyDiagnostics(t *testing.T) {
@@ -284,7 +284,7 @@ func TestValidVocabularyDiagnostics(t *testing.T) {
 }
 
 // TestDBVocabularyDiagnostics は、語彙のプラグイン db が、db のデコレータと宣言の食い違い（DB-6。docs/plugin-db.md「診断」）を、
-// 出力の単位がなくても、位置と一緒に出すこと（docs/decisions.md「決めたこと」429）。同じ仕様に、go-sqlite の単位を足しても、
+// 出力の単位がなくても、位置と一緒に出すこと（決定 D429）。同じ仕様に、go-sqlite の単位を足しても、
 // 診断は、一度だけ出る: 語彙のプラグインが error を返したら、emit は、頼まない（go-sqlite は、同じ診断を、自分では返さない。
 // docs/plugin-go-sqlite.md「診断」）。hozoc build も、同じ診断で止まり、何も書き出さない。
 func TestDBVocabularyDiagnostics(t *testing.T) {

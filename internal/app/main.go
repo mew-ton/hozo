@@ -24,7 +24,7 @@ func Main(ctx context.Context, a *App, args []string, env func(string) string, s
 }
 
 // Renamed は、引数 args の先頭が、なくしたコマンドの名前（check、emit）なら、新しい書き方を示す文と true を返す
-// （docs/cli.md「build」の「古い名前」、docs/decisions.md「決めたこと」417）。示すのは、残りの引数を付けたもの:
+// （docs/cli.md「build」の「古い名前」、決定 D417）。示すのは、残りの引数を付けたもの:
 // check には hozoc build --no-emit、emit には hozoc build。
 func Renamed(args []string) (string, bool) {
 	if len(args) == 0 {

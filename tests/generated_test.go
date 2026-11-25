@@ -20,7 +20,7 @@ var generatedDirs = []string{"internal/gen/hozo/compiler", "internal/gen/hozo/cl
 // （docs/testing.md「生成物の一致」、docs/requirements.md「段階」の 3）。`go test ./...` だけで分かるように、
 // CI の `make generate && git diff --exit-code` と同じことをここでも確かめる。
 //
-// リポジトリを一時ディレクトリに写し（cli.hozo、hozo.toml、go.mod、go.sum は複製。プラグインの置き場 plugins/ と、
+// リポジトリを一時ディレクトリに写し（ルートの *.hozo と decisions/*.hozo、hozo.toml、go.mod、go.sum は複製。プラグインの置き場 plugins/ と、
 // ir/、plugin/、runtime/ はシンボリックリンク。プラグインの WASM は、TestMain がビルドしたもの）、そこで hozoc build を走らせ、出た置き場の中身を
 // コミット済みのものとバイト単位で比べる。go.mod が同じ module なので import パスも同じになる。
 // 差があれば `make generate` で生成し直してコミットする。
@@ -36,18 +36,28 @@ func TestGeneratedUpToDate(t *testing.T) {
 		t.Fatalf("リポジトリのルートが見つからない: %v", err)
 	}
 	root := t.TempDir()
-	// 仕様のファイルは、ルートの *.hozo を、すべて（cli.hozo の宣言が、設計だけのファイルの宣言を指す。docs/packages.md「自己生成の手順」の 2）
-	specs, err := filepath.Glob(filepath.Join(repo, "*.hozo"))
-	if err != nil || len(specs) == 0 {
-		t.Fatalf("ルートの仕様のファイルが見つからない: %v", err)
-	}
+	// 仕様のファイルは、ルートの *.hozo と decisions/*.hozo を、すべて（cli.hozo の宣言が、設計だけのファイルの宣言を指す。
+	// docs/packages.md「自己生成の手順」の 2）
 	names := []string{"hozo.toml", "go.mod", "go.sum"}
-	for _, s := range specs {
-		names = append(names, filepath.Base(s))
+	for _, pattern := range []string{"*.hozo", filepath.Join("decisions", "*.hozo")} {
+		specs, err := filepath.Glob(filepath.Join(repo, pattern))
+		if err != nil || len(specs) == 0 {
+			t.Fatalf("仕様のファイル %s が見つからない: %v", pattern, err)
+		}
+		for _, s := range specs {
+			rel, err := filepath.Rel(repo, s)
+			if err != nil {
+				t.Fatal(err)
+			}
+			names = append(names, rel)
+		}
 	}
 	for _, name := range names {
 		data, err := os.ReadFile(filepath.Join(repo, name))
 		if err != nil {
+			t.Fatal(err)
+		}
+		if err := os.MkdirAll(filepath.Dir(filepath.Join(root, name)), 0o755); err != nil {
 			t.Fatal(err)
 		}
 		if err := os.WriteFile(filepath.Join(root, name), data, 0o644); err != nil {

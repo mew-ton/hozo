@@ -1,0 +1,281 @@
+// 決定の記録（設計書から離れた決定 S1〜S30）。名前空間 hozo.decisions。書き方は decisions/adr.hozo の頭のコメント。
+// コードには、ならない（hozo.toml の単位の対象ではない）。
+// docs/decisions.md「設計書から離れた決定」の行を、そのまま移したもの。設計書は、出発点のアイデアの集まりで、仕様ではない（docs/README.md「設計書という呼び名」）。
+
+namespace hozo.decisions {
+  /** 設計書（出発点のアイデアの集まり）の節にあった案から、離れた決定 */
+  classify DecisionS of never {
+    /**
+     * 基底の状態の形は `list` / `nullable` / `single` の三つで、列数の範囲で決まる。`post` / `put` / `delete` は列数の相対的な変化を表す組み込みの効果。`list` と `nullable` は組み込みの分類 `Empty` / `HasItems` を持つ
+     *
+     * 元の節: §5.2
+     * 持ち主: `docs/check.md`「状態の形」
+     */
+    @adr.accepted
+    S1;
+
+    /**
+     * 空になりうる状態は `nullable<T>` と書く。空にするのは `delete`（「`single<T?>` は書けない」は S21 が置き換えた: `single<T?>` は `nullable<T>` と同じ型）
+     *
+     * 元の節: §5.2、§6.2（`removeToken` の例）、§16（「single の `clear`」「`maybe<T>`」の廃案を覆す）
+     * 持ち主: `docs/grammar.md`「決めたこと」、`docs/check.md`「状態の形」
+     */
+    @adr.accepted
+    S2;
+
+    /**
+     * `classify` は一つ以上の基底の状態を対象にできる（状態の分類）
+     *
+     * 元の節: §6.3、§10.1
+     * 持ち主: `docs/check.md`「状態の形」、`docs/grammar.md`「classify」
+     */
+    @adr.accepted
+    S3;
+
+    /**
+     * 一つの効果が変えるのは一つの状態の一つの変化。宛先は組み込みの効果か、分類の遷移（`effect e on C: A -> B`）
+     *
+     * 元の節: §6.2
+     * 持ち主: `docs/check.md`「状態の形」、`docs/grammar.md`「exception / effect」
+     */
+    @adr.accepted
+    S4;
+
+    /**
+     * 配線は状態の場合で分岐できる（`match s by list`、`match by C`）。`by list` / `by nullable` の対象は、S21 で値に広げた（状態は名前で書いた値）
+     *
+     * 元の節: §9、§10.2
+     * 持ち主: `docs/grammar.md`「配線」
+     */
+    @adr.accepted
+    S5;
+
+    /**
+     * 状態の述語は判定関数に訳され、配線の `match` と、テストでの効果の結果の判定が呼ぶ。効果の観測のうち分類の場合で言える範囲は Hozo の中に入る
+     *
+     * 元の節: §10.3、§12.1、§12.2
+     * 持ち主: `docs/plugin-go.md`「状態の単位」「分類」。テストのアサーションの形は段階 6 で決める
+     */
+    @adr.accepted
+    S6;
+
+    /**
+     * 検査器は遷移を行をまたいで追わない。例外と状態の場合を結びつける書き方は持たない
+     *
+     * 元の節: —
+     * 持ち主: `docs/check.md`「状態の形」
+     */
+    @adr.accepted
+    S7;
+
+    /**
+     * 葉の op が直に持つ効果は高々一つ。複数の効果を持つ処理は配線で書く（効果は伝播する）
+     *
+     * 元の節: §5.2（削除の連鎖）、§7.3（`placeOrder` の例）
+     * 持ち主: `docs/check.md`「状態と効果」EFF-3
+     */
+    @adr.accepted
+    S8;
+
+    /**
+     * `prevents` / `keeps` の目的語は `effects` だけ。効果を名前で書き分ける形はない
+     *
+     * 元の節: §7.3
+     * 持ち主: `docs/grammar.md`「decorator の宣言」「決めたこと」
+     */
+    @adr.accepted
+    S9;
+
+    /**
+     * デコレータは名前空間に付けられない（「名前空間にも付けられる」とした決定を取り消した）。印は中の宣言に付ける
+     *
+     * 元の節: —（§3.1、§8.2 は変えない）
+     * 持ち主: `docs/grammar.md`「ファイルと宣言」「決めたこと」
+     */
+    @adr.accepted
+    S10;
+
+    /**
+     * 出力するものは、設定だけで決まる: 基底は、出力する名前空間の型のすべてと、単位の対象の op のすべてを出し、起点から辿れるものだけに絞らない（「トランスパイラが選んだ宣言だけを出す」とした決定を、69 で置き換えた）。どのトランスパイラも読まないデコレータは印で何も生成しない。設計書の「プラグインがなくても、これだけで生成できる」「対応するプラグインがなければ人が実装する包む関数を出す」「どのプラグインの対象にもならない宣言は既定の出力のまま」をやめる
+     *
+     * 元の節: §4.3
+     * 持ち主: `docs/plugin-go.md`「出力の対象」「デコレータ」、`docs/config.md`「in」
+     */
+    @adr.accepted
+    S11;
+
+    /**
+     * どの単位（`hozo.toml` の `[[emit]]`。S14）の対象でもない名前空間は出力しない。仕様はコードを生成しない部分（人の操作、外部のシステム）を含んでよく、設定なしでも検査できる
+     *
+     * 元の節: §1、§4.5
+     * 持ち主: `docs/config.md`「単位の対象」、`docs/requirements.md`「モデルが先」
+     */
+    @adr.accepted
+    S12;
+
+    /**
+     * Hozo の価値はエンジニアでなくても設計できること。UML に当たる記述を検査できる仕様として持ち、将来は UI で編集する
+     *
+     * 元の節: §1、§14
+     * 持ち主: `docs/requirements.md`「価値と位置づけ」
+     */
+    @adr.accepted
+    S13;
+
+    /**
+     * `hozo.toml` は、名前空間ごとのテーブル（`language` / `plugins` / `out` と、子への継承）をやめ、出力の単位 `[[emit]]`（`in` / `namespace` / `transpilers` / `out`）の一覧にする。プラグインは入れるもので、一つ以上のトランスパイラを提供し、設定はトランスパイラを名前で選ぶ。言語はトランスパイラが持ち、一つの単位の中でそろえる。単位は `namespace` とその子孫を対象にし、別の単位が書いた子孫は外れる。同じ名前空間を複数の単位に書け、単位は互いに独立に出力する
+     *
+     * 元の節: §4.5（`hozo.toml` の例、継承、使えない名前空間の名前）、§4.6（マニフェストの `language` と `[emit]`、要求）
+     * 持ち主: `docs/config.md`「形」「単位」「基底と相乗り」「単位の対象」「in」、`docs/plugin-protocol.md`「マニフェスト」「探索」
+     */
+    @adr.accepted
+    S14;
+
+    /**
+     * 状態を読むのは op で、`computed` のような別の宣言は足さない。op は、読む状態を `reads` で宣言する（`effects` と対になる。葉の op が書けるのは自分の名前空間の状態だけ）。配線の op の `reads` は、`effects` と同じく呼び出し先から伝わり、書かなくてよく、書いて計算と食い違えばエラー
+     *
+     * 元の節: §5.1、§7.1、§7.2
+     * 持ち主: `docs/check.md`「reads」、`docs/grammar.md`「op」
+     */
+    @adr.accepted
+    S15;
+
+    /**
+     * op を分類できる（その op が返した値の分類）。分類のケースに、そのケースで対象が何の型になるかを書ける（`対象 as T`）。アームの中で対象はその型になる。ケースが値の型だけで決まる分類は、述語を持たない
+     *
+     * 元の節: §10.1、§10.2、§10.3
+     * 持ち主: `docs/check.md`「分類」、`docs/types.md`「絞り込み」、`docs/grammar.md`「classify」
+     */
+    @adr.accepted
+    S16;
+
+    /**
+     * 状態は、持ち主の名前空間の配線の中で、名前で値として参照できる。同じ名前の引数や束縛があれば、そちらが優先。`bind` は「書かなくても埋まる」方として残る
+     *
+     * 元の節: §5.1、§5.3、§9
+     * 持ち主: `docs/check.md`「状態の参照」、`docs/resolve.md`「位置ごとに受け付ける種類」
+     */
+    @adr.accepted
+    S17;
+
+    /**
+     * 分類はどの名前空間にも置け、値の分類と op の分類はどの名前空間からも使える（NS-4 は欠番）。複数の担い手が共有する型は、どの担い手にも属さない名前空間に置ける
+     *
+     * 元の節: §3.2、§10.1
+     * 持ち主: `docs/check.md`「置き場」
+     */
+    @adr.accepted
+    S18;
+
+    /**
+     * 決して値を返さない op を宣言できる（`op unauthorized(): never throws Unauthorized;`）。例外を一つ投げる葉で、どの型のアームにも、どの型の `return` にも書ける
+     *
+     * 元の節: §7.1、§9、§10.2
+     * 持ち主: `docs/check.md`「never を返す op」、`docs/types.md`「式の型」
+     */
+    @adr.accepted
+    S19;
+
+    /**
+     * `match` のアームの本体に、例外（`throw E`。値を運ばない例外だけ）と、値（`Atom`）を書ける
+     *
+     * 元の節: §10.2（「各アームの本体は呼び出し一つか `none`」）
+     * 持ち主: `docs/grammar.md`「配線」、`docs/check.md`「throw」、`docs/types.md`「match の型」
+     */
+    @adr.accepted
+    S20;
+
+    /**
+     * 形と型を揃える: `list<T>` は `T[]`、`nullable<T>` は `T?`、`single<T>` は `T` の別の書き方で、状態の形は型から決まる。`nullable` と `list` の組み込みの分類は、形の型についての標準の分類で、状態に限らず値に使える（`T?` の値をその場で絞り込める）。S2 の「`single<T?>` は書けない」と、S5 の「対象は基底の状態」を置き換える
+     *
+     * 元の節: §5.2、§9、§10.1、§10.2
+     * 持ち主: `docs/types.md`「形の書き方」、`docs/check.md`「状態の形」「標準の分類」
+     */
+    @adr.accepted
+    @adr.amends(DecisionS.S2, DecisionS.S5)
+    S21;
+
+    /**
+     * `model A is B omit …` をやめ、`model A extends B { … }` で継承する。継承した型でできるのは、デコレータを足す、フィールドを足す、元のフィールドをなくす、元のフィールドの型を「元の型をアームに持つ union」に広げる、「元の型を継承した型」に差し替えることだけ。元のフィールドに触れるときは `override` を書く。継承した型は元とは別の型で、model から model への暗黙の射影はなくす。写すのは、人が書く葉の op
+     *
+     * 元の節: §5.2（`model PublicUser is User omit hash;`）、§7.1（「出力は宣言した型に自動で射影される」）
+     * 持ち主: `docs/types.md`「継承した model」「互換」、`docs/grammar.md`「model」
+     */
+    @adr.accepted
+    S22;
+
+    /**
+     * 別の名前空間から呼べる op には `export` を付ける。付けていない op は内部で、別の名前空間から呼べばエラー。対象は op だけで、型・例外・分類・効果・デコレータは今までどおり、修飾すればどこからでも参照できる
+     *
+     * 元の節: §3.2、§7.1
+     * 持ち主: `docs/check.md`「export」
+     */
+    @adr.accepted
+    S23;
+
+    /**
+     * フィールドの既定値（`page: PosInt = 1`）を、言語からなくす。共有の型に書いた既定値は、その型を使うすべての名前空間（ブラウザも、サーバーも）が入れることになる。値がないときに誰が何を入れるかは振る舞いなので、型ではなく、境界のデコレータ（`@http.default(<リテラル>)`、`@cli.default(<リテラル>)`）と、それを読むプラグインが言う（「決めたこと」115）。フィールドに `=` を書けば構文エラーで、TYPE-13 と GOVALID-2 は欠番
+     *
+     * 元の節: §11.2（`page: PosInt = 1`）と、「既定値は型の側に持たせる」という記述
+     * 持ち主: `docs/grammar.md`「model」「決めたこと」、`docs/vocab.md`「`http` の語彙」、`docs/plugin-go-cli.md`「語彙」
+     */
+    @adr.accepted
+    S24;
+
+    /**
+     * op の節と、デコレータの宣言の節（`throws`、`catches`、`effects`、`reads`）に並べるものの区切りは、`,` 一つ。`throws A \| B`、`effects a \| b` は、書かない。節は「起こりうるものの集まり」で、書き方は「どれか」と「どれも」を分けない（「決めたこと」124）
+     *
+     * 元の節: §7.1〜§7.3、§8.1、§8.2 の `throws A \| B` と `catches A \| B`、§4.2 の語彙の宣言、`examples/hozoc.hozo`
+     * 持ち主: `docs/grammar.md`「op」「decorator の宣言」「決めたこと」
+     */
+    @adr.accepted
+    S25;
+
+    /**
+     * `read`、`effect`、`exception` を、同じ形で、引数を付けて宣言し（`read r(email: Email): User? on users;`、`effect e(order: Order) on orders.post;`、`exception X(wait: Duration);`）、配線から、op と同じ形で使う（`r(email)`、`e(order);`、`throw X(wait)`）。`exception X: T;`（運ぶ値を `:` の後ろに書く形）は、なくす。S20 の「`throw E` は、値を運ばない例外だけ」を置き換える。S15 の「状態を読むための別の宣言は足さない」を置き換える: `read` の宣言がある（「決めたこと」133）
+     *
+     * 元の節: §5.1、§6.1（例外の宣言）、§6.2（効果の宣言）、§7.1、§9、§10.2
+     * 持ち主: `docs/grammar.md`「exception / effect / read」「配線」、`docs/check.md`「状態に触れるもの」「throw」
+     */
+    @adr.accepted
+    @adr.amends(DecisionS.S20, DecisionS.S15)
+    S26;
+
+    /**
+     * 状態に触れるのは、`read` と効果だけ。op は、それを呼ぶ配線か、状態に触れない葉で、葉の op は `reads` / `effects` の節を書けない。`read` と効果を呼べるのは、宣言した名前空間の配線だけ。名前を付けない形は、配線の中の、状態を名前で読むことと、組み込みの効果を直に呼ぶこと（`users.post(user);`）。S8 の「葉の op が直に持つ効果は高々一つ」は、なくなる（葉は効果を持たない。EFF-3 は欠番）。S15 の「葉の op が、読む状態を `reads` で宣言する」を置き換える（「決めたこと」133）
+     *
+     * 元の節: §5.1、§5.2、§7.1〜§7.3（葉の op の `effects` の例）
+     * 持ち主: `docs/check.md`「状態に触れるもの」、`docs/grammar.md`「op」
+     */
+    @adr.accepted
+    @adr.amends(DecisionS.S15, DecisionS.S8)
+    S27;
+
+    /**
+     * デコレータの宣言に、核の印 `@repeatable` を足す: 付けたデコレータは、一つの宣言に何度でも付けられる（「決めたこと」133）
+     *
+     * 元の節: §8.2
+     * 持ち主: `docs/grammar.md`「decorator の宣言」
+     */
+    @adr.accepted
+    S28;
+
+    /**
+     * 分類を閉じる: `classify` の `default;`、`condition` の宣言、`match` の `default =>` のアーム、アームのケースを `\|` で並べる書き方を、なくす。ケースは、どれも名前を持ち、宣言したケースの外の値は、分類の誤り。`match` には、並べなかったケースのすべてを受ける `else` のアームを足し、ケースの並びの区切りは `,`（「決めたこと」154〜158）
+     *
+     * 元の節: §10.1（`default;`、`condition`）、§10.2（`default =>`、`A \| B =>`）、§10.3
+     * 持ち主: `docs/check.md`「閉じた分類」「ケースの判定」「アームが受けるケース」、`docs/grammar.md`「classify」「配線」
+     */
+    @adr.accepted
+    S29;
+
+    /**
+     * 効果は、宛先（どこに、何の操作で書くか）とは別に、受け取った行の状態をどう変えるかを言える（行の遷移: `effect e(o: T) on s.put as C.A -> C.B`）。値の分類は、表の一行の状態を言う。`put` は、`as` がなければ行のケースを変えない。S4 の「一つの効果が変えるのは一つの状態の一つの変化。宛先は組み込みの効果か、分類の遷移」は、そのまま: 行の遷移は、組み込みの効果の宛先に足すもので、宛先を増やさない。S7 の「検査器は遷移を行をまたいで追わない」も、そのまま: 呼ぶ側の検査は、渡した値について確かめる（「決めたこと」163〜167）
+     *
+     * 元の節: §6.2（効果は、状態への操作だけを言う）、§10.1（値の分類は、`match` で読むためのもの）
+     * 持ち主: `docs/check.md`「行の遷移」、`docs/grammar.md`「exception / effect / read」
+     */
+    @adr.accepted
+    S30;
+  }
+}

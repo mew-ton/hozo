@@ -9,7 +9,7 @@ import (
 	"github.com/mew-ton/hozo/ir"
 )
 
-// 状態を分類で表す決定（docs/decisions.md「設計書から離れた決定」S1〜S5）の、解決と正規化。
+// 状態を分類で表す決定（決定 S1〜S5）の、解決と正規化。
 // 期待値は docs/ir.md「state / exception / effect」「classify」「配線」と docs/check.md「状態の形」から。
 
 const stateSource = `

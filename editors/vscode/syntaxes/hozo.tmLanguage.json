@@ -141,15 +141,33 @@
       "match": "//.*$"
     },
     "string": {
-      "name": "string.quoted.double.hozo",
-      "begin": "\"",
-      "end": "\"",
+      "comment": "TextBlock（複数行の文字列）を Quoted より先に拾う（docs/grammar.md「リテラル」）",
       "patterns": [
         {
-          "name": "constant.character.escape.hozo",
-          "match": "\\\\(?:[\"\\\\ntr]|u\\{[0-9A-Fa-f]+\\})"
+          "name": "string.quoted.triple.hozo",
+          "begin": "\"\"\"",
+          "end": "\"\"\"",
+          "patterns": [
+            {
+              "include": "#string-escape"
+            }
+          ]
+        },
+        {
+          "name": "string.quoted.double.hozo",
+          "begin": "\"",
+          "end": "\"",
+          "patterns": [
+            {
+              "include": "#string-escape"
+            }
+          ]
         }
       ]
+    },
+    "string-escape": {
+      "name": "constant.character.escape.hozo",
+      "match": "\\\\(?:[\"\\\\ntr]|u\\{[0-9A-Fa-f]+\\})"
     },
     "number": {
       "comment": "Int / Float / Duration（docs/grammar.md「リテラル」）。Duration は単位を含む",

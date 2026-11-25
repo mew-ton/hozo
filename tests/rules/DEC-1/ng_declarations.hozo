@@ -1,4 +1,4 @@
-// DEC-1（docs/check.md「デコレータ」、docs/decisions.md「決めたこと」476）: union / classify / decorator の宣言に付けられるのは、
+// DEC-1（docs/check.md「デコレータ」、決定 D476）: union / classify / decorator の宣言に付けられるのは、
 // 付ける先に、その種類を書いたデコレータだけ。関数に付けるデコレータ（decorator fn）は、付けられない。
 // 付ける先が union / classify / decorator だけのデコレータは、ほかの宣言と、分類のケースには、付けられない
 namespace a {

@@ -1,6 +1,6 @@
 # コーパス `state`
 
-状態を分類で表す決定（`docs/decisions.md`「設計書から離れた決定」S1〜S6、S8）の構文を、一つの名前空間で一か所ずつ使うプロジェクト（`docs/testing.md`「コーパス」）。`hozoc build --no-emit` が error なしで通ること、IR（`docs/ir.md`）に載る形、Go の基底 `go` の出力（`docs/plugin-go.md`）の形を確かめる。
+状態を分類で表す決定（決定 S1〜S6、S8）の構文を、一つの名前空間で一か所ずつ使うプロジェクト（`docs/testing.md`「コーパス」）。`hozoc build --no-emit` が error なしで通ること、IR（`docs/ir.md`）に載る形、Go の基底 `go` の出力（`docs/plugin-go.md`）の形を確かめる。
 
 | ファイル | 中身 |
 |---|---|

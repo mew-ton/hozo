@@ -430,7 +430,7 @@ export fn start(id: JobId): Job throws NoJob, NotQueued {
 ### 検査器
 
 - **F33 検査器が error にしたのは、言語の限りを確かめた実験だけ。** F1、F8、F9、F12、F16、F22、F26、F30 の書き方は、このサンプルの外で確かめた。サンプルの約 4,300 行は、まだ書いていない名前空間を引いたとき（RES-1）のほかは、書いたまま通った。順番の誤り（請求の確定より先に、送り状を買う）は、通る。
-- **F34 書く量をいちばん増やしたのは THROWS-1。** `staffApi.buyLabel` の `throws` は 13、`storefront.placeOrder` は 12。同じ並びを、`fulfilment.dispatch`、`staffApi.buyLabel`、`backoffice.onBuyLabel` の `@recover` で、三度書く。例外のユニオンでまとめることは、していない（G8）。 → 配線の op は、`throws` を書かなくてよくなり（`docs/decisions.md`「決めたこと」379）、`staffApi.buyLabel`、`storefront.placeOrder`、`fulfilment.dispatch` の節は、消した（「配線の op の `throws` を消したこと」）。同じ並びを書くのは、`backoffice.onBuyLabel` の `@recover` の一度だけ。
+- **F34 書く量をいちばん増やしたのは THROWS-1。** `staffApi.buyLabel` の `throws` は 13、`storefront.placeOrder` は 12。同じ並びを、`fulfilment.dispatch`、`staffApi.buyLabel`、`backoffice.onBuyLabel` の `@recover` で、三度書く。例外のユニオンでまとめることは、していない（G8）。 → 配線の op は、`throws` を書かなくてよくなり（決定 D379）、`staffApi.buyLabel`、`storefront.placeOrder`、`fulfilment.dispatch` の節は、消した（「配線の op の `throws` を消したこと」）。同じ並びを書くのは、`backoffice.onBuyLabel` の `@recover` の一度だけ。
 - **F35 DEC-16 は、画面で役に立った。** `@recover` の相手を、その op が投げない例外にすると warning。
 - **F36 op が値を返すかどうかが、呼ぶ側の都合で決まった。** 確かめるためだけに呼ぶ op は、値を返せない（WIRE-2 と WIRE-8）。→ `staff.asPacker`、`inventory.pick`、`payment.settle` を、値を返さない op に直した。
 - **F37 `hozoc build --no-emit` は、親のディレクトリの `hozo.toml` を拾う。** サンプルに `hozo.toml` を置く前は、リポジトリ直下の設定で検査され、「0 errors」と出た（`docs/config.md`「置き場と探し方」のとおりの振る舞い）。
@@ -548,7 +548,7 @@ export fn start(id: JobId): Job throws NoJob, NotQueued {
 
 ### Q1 表の一行の進み具合を、遷移として書けるようにするか
 
-**決まった: 書ける。** 効果が、宛先（`effects 状態.操作`）の後ろの `as` で、受け取った行のケースをどう変えるかを言う（行の遷移。`docs/check.md`「行の遷移」、`docs/decisions.md`「決めたこと」163〜173）。このサンプルの書き直しは「難しい問題」の「行の遷移で書いた進み具合」、分かったことは F1 と F50〜F58。事実ごとの表で持つ書き方（`parcels`、`labels`）は、そのまま使っている。
+**決まった: 書ける。** 効果が、宛先（`effects 状態.操作`）の後ろの `as` で、受け取った行のケースをどう変えるかを言う（行の遷移。`docs/check.md`「行の遷移」、決定 D163〜D173）。このサンプルの書き直しは「難しい問題」の「行の遷移で書いた進み具合」、分かったことは F1 と F50〜F58。事実ごとの表で持つ書き方（`parcels`、`labels`）は、そのまま使っている。
 
 残っている問い（どれも、決めていない）:
 
@@ -709,16 +709,16 @@ R6 の、言語の部分（`docs/requirements.md`「R6 の、言語の部分」�
 | `payment.prepayExpiring` | 期限の近い支払いを、一回の動きで、すべて扱う: read `nextExpiringHold(…): Payment?` を、並びを返す `holdsExpiringBefore(…): Payment[]` に替え、`for` で、一つずつ、`prepayHeld` を呼ぶ。`prepay` は、想定した失敗を、受けて、支払いに残す（`try` / `catch (e by PrepayFailure)`、効果 `notePrepayFailure`、項目 `prepayFailedAt`、`prepayFailure`）。`prepayExpiring`、`prepayHeld`、`prepay` の `throws` は、なくなった |
 | `shopApi.statusOf` | 四つの読みを、`disjoint` に並べる。名前を並べた、空の `val` |
 
-- **`payment.prepayExpiring` は、失敗を、状態に残す形にしてから、繰り返しにした**（`docs/decisions.md`「決めたこと」345）。そのまま繰り返しにすると、一つの支払いで、外の仕組みが失敗したとき、残りの支払いが、その回では、扱われない（`docs/wiring-trial.md` の W5）。`prepay` は、本体で、想定した失敗を受けて、支払いに残す: `try { … } catch (e by PrepayFailure) { Expected => notePrepayFailure(payment, now); Unexpected => throw e; }`（`docs/decisions.md`「決めたこと」419、422）。前は、デコレータ `payment.noteFailure`（`catches … halts …`）を、例外ごとに三度付けていた: そこでは、効果は、引数を受け取れず、どの行に書くかを、デコレータの中身（継ぎ目）が決めていた。受ける文にして、効果 `notePrepayFailure` に、行（`payment`）と時刻（`now`）を、配線が渡すので、どの支払いに残すかが、仕様に書かれる。`noteFailure` は、なくした。例外の分類 `PrepayFailure` が、想定した失敗（`Expected`）と、そうでないもの（`Unexpected`）を分ける。繰り返しの中身は、想定した失敗を出さなくなり、一つが失敗しても、残りは、続く。残した失敗は、次に時計が動いたときに、もう一度、試される。想定していない失敗は、ここまで届き、繰り返しを、止める。
+- **`payment.prepayExpiring` は、失敗を、状態に残す形にしてから、繰り返しにした**（決定 D345）。そのまま繰り返しにすると、一つの支払いで、外の仕組みが失敗したとき、残りの支払いが、その回では、扱われない（`docs/wiring-trial.md` の W5）。`prepay` は、本体で、想定した失敗を受けて、支払いに残す: `try { … } catch (e by PrepayFailure) { Expected => notePrepayFailure(payment, now); Unexpected => throw e; }`（決定 D419、D422）。前は、デコレータ `payment.noteFailure`（`catches … halts …`）を、例外ごとに三度付けていた: そこでは、効果は、引数を受け取れず、どの行に書くかを、デコレータの中身（継ぎ目）が決めていた。受ける文にして、効果 `notePrepayFailure` に、行（`payment`）と時刻（`now`）を、配線が渡すので、どの支払いに残すかが、仕様に書かれる。`noteFailure` は、なくした。例外の分類 `PrepayFailure` が、想定した失敗（`Expected`）と、そうでないもの（`Unexpected`）を分ける。繰り返しの中身は、想定した失敗を出さなくなり、一つが失敗しても、残りは、続く。残した失敗は、次に時計が動いたときに、もう一度、試される。想定していない失敗は、ここまで届き、繰り返しを、止める。
 - **`notice.bestEffort` に、本体を書いた**（同 419、422）: `catches mailer.Undelivered ignores` の節を、`try { next(); } catch (e by Delivery) { Undelivered => none; Other => throw e; }` にした。受ける例外は、例外の分類 `notice.Delivery` が言う。
 - `ordering.expireUnpaid` は、外の仕組みを呼ばず、`@db.transaction` を持つ: 途中で失敗したら、それまでの分も、戻る。
-- **`Record<K, V>` をなくした**（`docs/decisions.md`「決めたこと」360）のに合わせて、二つの画面（`storefront`、`backoffice`）の、URL のクエリの状態を、`state query: single<browser.page.Query>;` にした。`browser.page.Query` は、標準の語彙 `browser.page` が宣言する、インデックスの model（`docs/vocab.md`）。
-- **標準の分類 `nullable` のケースの名前を、`None` / `Some` に替えた**（`docs/decisions.md`「決めたこと」362）のに合わせて、二つの画面（`storefront`、`backoffice`）の、形が `nullable` の状態の遷移（`effects token as None -> Some`、`effects offer as None -> Some`）と、`match (… by nullable)` のアームを、書き直した。形が `list` の所（`Empty` / `HasItems`）は、変えていない。
-- **絞り込んだ型を `T on C.K` と書き、行の遷移の、前のケースを、行の引数の型で言う**（`docs/decisions.md`「決めたこと」368〜370）のに合わせて、絞り込んだ型（`C.K<T>`）と、行の遷移を持つ 24 の効果を、書き直した（`effect fn startJob(job: Job, …): effects jobs.put as Progress.Queued -> Progress.InProduction;` を、`effect fn startJob(job: Job on Progress.Queued, …): effects jobs.put as Progress.InProduction;` に）。`post` の効果の「前」（`as Packing.Unpacked -> Packing.Packed`）と、`as any` は、なくなった（F57、F53）。配線で変えたのは、`payment.markSecured` の一か所（F59）。
+- **`Record<K, V>` をなくした**（決定 D360）のに合わせて、二つの画面（`storefront`、`backoffice`）の、URL のクエリの状態を、`state query: single<browser.page.Query>;` にした。`browser.page.Query` は、標準の語彙 `browser.page` が宣言する、インデックスの model（`docs/vocab.md`）。
+- **標準の分類 `nullable` のケースの名前を、`None` / `Some` に替えた**（決定 D362）のに合わせて、二つの画面（`storefront`、`backoffice`）の、形が `nullable` の状態の遷移（`effects token as None -> Some`、`effects offer as None -> Some`）と、`match (… by nullable)` のアームを、書き直した。形が `list` の所（`Empty` / `HasItems`）は、変えていない。
+- **絞り込んだ型を `T on C.K` と書き、行の遷移の、前のケースを、行の引数の型で言う**（決定 D368〜D370）のに合わせて、絞り込んだ型（`C.K<T>`）と、行の遷移を持つ 24 の効果を、書き直した（`effect fn startJob(job: Job, …): effects jobs.put as Progress.Queued -> Progress.InProduction;` を、`effect fn startJob(job: Job on Progress.Queued, …): effects jobs.put as Progress.InProduction;` に）。`post` の効果の「前」（`as Packing.Unpacked -> Packing.Packed`）と、`as any` は、なくなった（F57、F53）。配線で変えたのは、`payment.markSecured` の一か所（F59）。
 
 ## 配線の op の `throws` を消したこと
 
-配線の op は、`throws` の節を書かなくてよい（`docs/decisions.md`「決めたこと」379。決まりの持ち主は `docs/check.md`「状態に触れるもの」の「節に書く要素」）。このサンプルの、配線の op の `throws` の節を、99 の op から消した。op の例外（`Signature.exceptions`）は、どの op も、消す前と同じ。
+配線の op は、`throws` の節を書かなくてよい（決定 D379。決まりの持ち主は `docs/check.md`「状態に触れるもの」の「節に書く要素」）。このサンプルの、配線の op の `throws` の節を、99 の op から消した。op の例外（`Signature.exceptions`）は、どの op も、消す前と同じ。
 
 | 置き場 | 節を消した op の数 |
 |---|---|
@@ -726,7 +726,7 @@ R6 の、言語の部分（`docs/requirements.md`「R6 の、言語の部分」�
 | `domain/` | 69（`carrier.hozo` 8、`download.hozo` 2、`fulfilment.hozo` 10、`inventory.hozo` 4、`ordering.hozo` 10、`payment.hozo` 10、`production.hozo` 3、`shipping.hozo` 14、`staff.hozo` 8） |
 | `web/` | 8（`backoffice.hozo` 3、`storefront.hozo` 5） |
 
-- **節を残した配線の op は、`payment.capture` の一つ。** 例外と効果の関係（`throws psp.HoldExpired prevents effects`）を、書いて言っている op で、残した節は、その一つだけ。はじめは、関係を付けない節（`throws http.NetworkError, http.ServerError`）も、一緒に残していた（節を書いた配線の op は、計算した例外を、節が覆わなければ、エラーだった）。節を、その関数が足すものにした決定（`docs/decisions.md`「決めたこと」381）で、その節を消した: 二つの例外は、`psp.capture` の呼び出しから伝わってくるもので、書かなくても、`capture` の例外に入る（`docs/check.md`「状態に触れるもの」の「節に書く要素」）。
+- **節を残した配線の op は、`payment.capture` の一つ。** 例外と効果の関係（`throws psp.HoldExpired prevents effects`）を、書いて言っている op で、残した節は、その一つだけ。はじめは、関係を付けない節（`throws http.NetworkError, http.ServerError`）も、一緒に残していた（節を書いた配線の op は、計算した例外を、節が覆わなければ、エラーだった）。節を、その関数が足すものにした決定（決定 D381）で、その節を消した: 二つの例外は、`psp.capture` の呼び出しから伝わってくるもので、書かなくても、`capture` の例外に入る（`docs/check.md`「状態に触れるもの」の「節に書く要素」）。
 - **ほかに `throws` を書いているのは、定義する所だけ**: 葉の op（12）と、デコレータの宣言（`outside.failsAs`、`webhook.signed`）。
 - 「分かったこと」の F34（書く量をいちばん増やしたのは THROWS-1）は、消す前の記録。THROWS-1 は、その後、欠番になった（同 381）。
 

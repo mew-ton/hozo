@@ -633,7 +633,7 @@ func shift(p protocol.Position, n int) protocol.Position {
 	return p
 }
 
-// TestStateClassification は、状態を分類で表す決定（docs/decisions.md「設計書から離れた決定」）の構文に対する、
+// TestStateClassification は、状態を分類で表す決定（decisions/s.hozo の決定）の構文に対する、
 // 診断の一致・ホバーの見出し（docs/lsp.md「ホバー」）・定義へジャンプ・ドキュメントのシンボル。
 // コーパスは tests/corpus/state（README.md）。
 func TestStateClassification(t *testing.T) {
@@ -1864,7 +1864,7 @@ func TestLiteralTypeHover(t *testing.T) {
 }
 
 // TestDeclarationTargets は、union、classify（分類そのもの）、デコレータの宣言に付けたデコレータ（docs/grammar.md「decorator の宣言」、
-// docs/decisions.md「決めたこと」476）の、ホバーと、定義への移動: ほかの宣言に付けたときと、同じ。
+// 決定 D476）の、ホバーと、定義への移動: ほかの宣言に付けたときと、同じ。
 func TestDeclarationTargets(t *testing.T) {
 	root := t.TempDir()
 	text := `namespace notes {

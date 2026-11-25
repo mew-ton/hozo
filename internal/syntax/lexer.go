@@ -71,6 +71,8 @@ func (l *lexer) next() {
 		l.lexName()
 	case isDigit(l.peekByte(0)), l.peekByte(0) == '-' && isDigit(l.peekByte(1)):
 		l.lexNumber()
+	case l.hasPrefix(`"""`):
+		l.lexTextBlock()
 	case l.peekByte(0) == '"':
 		l.lexString()
 	default:
@@ -237,12 +239,79 @@ func (l *lexer) lexString() {
 	l.illegal(start, l.pos, "文字列が閉じていない")
 }
 
-// unquote は引用符で囲まれた字句からエスケープを戻した値を返す（docs/grammar.md「リテラル」の Escape）。
+// lexTextBlock は複数行の文字列 TextBlock を読む（docs/grammar.md「リテラル」）。
+// 字句は、エスケープしない最初の """ で終わる。行の形と字下げの正しさは unquoteTextBlock が確かめる。
+func (l *lexer) lexTextBlock() {
+	start := l.pos
+	l.pos += 3 // 開きの """
+	for l.pos < len(l.src) {
+		switch {
+		case l.hasPrefix(`"""`):
+			l.pos += 3
+			if _, err := unquote(string(l.src[start:l.pos])); err != nil {
+				l.illegal(start, l.pos, "%s", err.Error())
+				return
+			}
+			l.emit(token.String, start, l.pos)
+			return
+		case l.src[l.pos] == '\\':
+			l.pos += 2
+		default:
+			l.pos++
+		}
+	}
+	l.pos = len(l.src)
+	l.illegal(start, l.pos, "複数行の文字列が閉じていない")
+}
+
+// unquote は引用符で囲まれた字句からエスケープを戻した値を返す（docs/grammar.md「リテラル」の Quoted と TextBlock）。
 func unquote(text string) (string, error) {
+	if strings.HasPrefix(text, `"""`) {
+		return unquoteTextBlock(text)
+	}
 	if len(text) < 2 || text[0] != '"' || text[len(text)-1] != '"' {
 		return "", fmt.Errorf("文字列が閉じていない")
 	}
-	body := text[1 : len(text)-1]
+	return unescape(text[1 : len(text)-1])
+}
+
+// unquoteTextBlock は TextBlock の字句から値を作る: 閉じの """ の前の空白を字下げとして各行から取り除き、
+// 行を改行でつなぎ、エスケープを戻す（docs/grammar.md「リテラル」）。
+func unquoteTextBlock(text string) (string, error) {
+	if len(text) < 6 || !strings.HasSuffix(text, `"""`) {
+		return "", fmt.Errorf("複数行の文字列が閉じていない")
+	}
+	body := strings.ReplaceAll(text[3:len(text)-3], "\r\n", "\n")
+	nl := strings.IndexByte(body, '\n')
+	if nl < 0 || !isBlank(body[:nl]) {
+		return "", fmt.Errorf(`開きの """ の後ろは、空白だけで、行が終わらなければならない`)
+	}
+	lines := strings.Split(body[nl+1:], "\n")
+	indent := lines[len(lines)-1]
+	if !isBlank(indent) {
+		return "", fmt.Errorf(`閉じの """ は、前に空白だけを置いて、自分の行に書く（行の途中の """ は \""" と書く）`)
+	}
+	content := lines[:len(lines)-1]
+	for i, line := range content {
+		switch {
+		case isBlank(line):
+			content[i] = ""
+		case strings.HasPrefix(line, indent):
+			content[i] = line[len(indent):]
+		default:
+			return "", fmt.Errorf("複数行の文字列の %d 行目が、閉じの \"\"\" の字下げ（%q）で始まらない", i+1, indent)
+		}
+	}
+	return unescape(strings.Join(content, "\n"))
+}
+
+// isBlank は s がスペースとタブだけからなるかを返す。
+func isBlank(s string) bool {
+	return strings.Trim(s, " \t") == ""
+}
+
+// unescape は文字列の中身のエスケープを戻す（docs/grammar.md「リテラル」の Escape）。
+func unescape(body string) (string, error) {
 	var b strings.Builder
 	for i := 0; i < len(body); i++ {
 		c := body[i]
