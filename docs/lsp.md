@@ -55,6 +55,8 @@ capabilities: `textDocumentSync: { openClose: true, change: Full, save: { includ
 | LSP-1 | warning | `hozo.toml` が見つからない。設定の検査は行っていない（「プロジェクト」）。ユーザーの各 `.hozo` の 1 行 1 列に出す |
 | LSP-2 | warning | プラグインの check が、最後まで走らなかった（プラグインの異常終了、形の違う応答。`docs/plugin-protocol.md`「応答の形」）。プラグインの診断は、出ていない。`hozo.toml` の 1 行 1 列に出す。メッセージに、その誤りを入れる |
 
+この節の細部は、決定 D680 が決めた。
+
 ### プラグインの診断
 
 決定 D405、D412。プラグインの診断（`docs/cli.md`「検査」の 4）は、プラグインを起動する（頼むのは、`hozoc build --no-emit` と同じ: 語彙のプラグインへの `read` と、トランスパイラへの `emit`。使うのは、応答の診断だけで、ファイルは、書かない: `docs/plugin-protocol.md`「語彙のプラグイン」「起動」）ので、解析より、桁が違って遅い: サンプル `shop-server` で、解析が 5 ミリ秒、プラグインを足すと、13.7 秒（実測。同「起動」の「速さ」。言語サーバーは、途中で止められる形で、動かすので、`hozoc build --no-emit` の 3.7 秒より、遅い）。なので、解析と、分ける。この見出しは、プラグインを起動して、診断を求めることを、「プラグインの check」と呼ぶ。
@@ -83,6 +85,8 @@ capabilities: `textDocumentSync: { openClose: true, change: Full, save: { includ
 
 決めていないこと（`docs/open.md`「文書と道具」）: 打つのを止めてから、少し後に、走らせる形。プラグインの check の速さ。既定を、許す、に変えるか。
 
+この節の細部は、決定 D677、D678、D679、D681、D699 が決めた。
+
 #### 許し
 
 決定 D412、D426。プラグインを起動してよいかは、クライアントが、言う。この形は、プラグインが、利用者と同じ権限で動いていた間に、決めた: エディタで、ファイルを開いただけで、プロジェクトの中のマニフェストが決めたコードが、動かないようにするため。今は、プラグインは、サンドボックスの中で動く（`docs/plugin-protocol.md`「信頼の前提」）が、この形は、変えていない（同 426）。既定を変えるかは、決めていない（`docs/open.md`「文書と道具」）。
@@ -98,6 +102,8 @@ capabilities: `textDocumentSync: { openClose: true, change: Full, save: { includ
 - **許しが、なくなったとき**: 走っている check を、やめさせ、待たせている check を、捨てる。覚えている答えも、捨てて、診断を、hozoc 自身のものだけで、出し直す（プラグインの診断と、LSP-2 が、消える）。その後に届いた、裏の check の答えは、使わない。
 - **VS Code 拡張**が、いつ、許すかは、`docs/editors.md`「VS Code 拡張」。
 - **ほかのクライアント**から `hozoc lsp` を使うときは、プロジェクトを信頼しているときに、起動の設定で、`initializationOptions` に `{ "pluginChecks": true }` を渡す。渡さなければ、プラグインの診断は、出ない（`hozoc build --no-emit` では、出る）。
+
+この節の細部は、決定 D681 が決めた。
 
 ## 定義へジャンプ
 
@@ -138,6 +144,8 @@ capabilities: `textDocumentSync: { openClose: true, change: Full, save: { includ
 
 解決できなければ `null`。
 
+この節の細部は、決定 D559、D762 が決めた。
+
 ## ホバー
 
 Markdown の `MarkupContent`。順に:
@@ -152,6 +160,8 @@ Markdown の `MarkupContent`。順に:
 2. `description.body`。
 3. op なら `throws:` と `effects:` の一覧（`Signature`）。例外ごとの効果の状態（`relations`）が `unknown` でないものを添える。効果は、宣言なら見ている名前空間から見た名前、直に書いた効果なら `状態.操作`。続けて、`Signature.reads` が空でなければ `reads:` の一覧（基底の状態）、`Signature.pure` が真なら `純粋` の一行。どれも、計算した結果（`docs/check.md`「計算」）で、配線の op が、`throws`、`reads`、`effects` の節を書いていなくても、出る: 節を書かなくてよい op（同「状態に触れるもの」の「節に書く要素」）の関数の型を、見る所。
 4. デコレータの適用なら、適用先ではなくデコレータの宣言の 1〜2 と、固定した引数。
+
+この節の細部は、決定 D587、D594、D727 が決めた。
 
 ## ドキュメントのシンボル
 
@@ -177,3 +187,5 @@ Markdown の `MarkupContent`。順に:
 - **参照の検索**: 宣言から、それを参照しているトークンすべて。
 - **コードアクション**: 診断の `Data` から作る。MATCH-2 → 足りないアームを足す。RES-1 で候補があれば置き換える。NS-5 → 同じプロジェクトの op なら `export` を足す。 配線の op の節（`throws`、`reads`、`effects`）を直すコードアクションは、ない: 節と、計算した分を、照合する診断が、なくなった（決定 D381。THROWS-1、READS-2 は欠番）。
 - **semantic tokens**: 型の位置の名前と値の位置の名前を区別して色を付ける（TextMate では命名規則に頼るしかない部分）。
+
+この節の細部は、決定 D652 が決めた。

@@ -17,6 +17,8 @@
 - 文法で閉じている規則（`—` のもの）は、構文エラーになる例を `ng_*.hozo` に置き、`// ERROR: SYNTAX` で確かめる。
 - なくした書き方（`docs/grammar.md` の、新しい書き方をメッセージで示して SYNTAX にするもの: `throws A | B`、`exception X: T`、引数の括弧のない `effect fn e: effects s.post`、`exception X()`、`throw X()`、`model A is B`、フィールドの既定値、分類の `default;`、`condition`、`default =>` のアーム、ケースの並びの `|`、配線の `const`、丸括弧のない `match` の頭、デコレータの宣言の `classify … case`、頭に `fn` のない関数の宣言、`op fn`、節の前に `:` のない関数の型（`fn f() throws E`）、`:` の後ろに何もない関数の型、`read fn` と `effect fn` の `on`、状態の遷移の、宛先の後ろの `:`、デコレータの宣言の、付ける先の並びの `|`、`Record<K, V>`、絞り込んだ型の `C.K<T>`、行の遷移の矢印（`as 前 -> 後`）と `any` とケースの並び）は、`tests/rules/SYNTAX/` に `ng_*.hozo` を一つずつ置く。メッセージの文言は、`internal/syntax` の単体テストが確かめる。
 
+この節の細部は、決定 D626、D721、D734 が決めた。
+
 ## コーパス
 
 `tests/corpus/<名前>/` に、設計書の例を集めたプロジェクト（`hozo.toml` と `.hozo`）を置く。
@@ -46,6 +48,8 @@
 
 hozoc 自身（リポジトリ直下の `cli.hozo` と `hozo.toml`）はコーパスには入れない。`hozoc build --no-emit` が error なしで通ることを `tests/selfcheck_test.go` で確かめ、`emit` の結果は「生成物の一致」で確かめる。
 
+この節の細部は、決定 D721 が決めた。
+
 ## 言語サーバーと check の一致
 
 各コーパス（`tests/corpus/` の下のすべて。足せば自動で入る）について、`internal/project.LoadWith` を一度呼び（プラグインの探索には、コーパスの `emit` と同じく、リポジトリの `plugins/` を渡す）、`hozoc build --no-emit` の診断（プラグインの診断の分を除く: 言語サーバーは、解析では、プラグインを起動せず、後から足す。`docs/lsp.md`「プラグインの診断」。足した後の診断が、プラグインの診断の分を含めて、`hozoc build --no-emit` と同じであることは、同じパッケージの `TestPluginDiagnosticsOnOpen` が、にせもののプラグインで確かめる）と `internal/lsp` が `publishDiagnostics` で送る診断（LSP の形から戻したもの）が同じ集合であることを確かめる（`internal/lsp` の `TestCheckAgreement`。位置のエンコーディングは utf-16 と utf-8 の両方）。`LSP-1` だけは言語サーバーにしか出ないので除く。診断のないコーパスでは「どちらも空」を確かめることになるので、設計書のコーパスに warning を一つ足したものでも確かめる。
@@ -73,6 +77,8 @@ CI で `go generate ./...` と `make generate`（`cli.hozo` からの自己生�
 - **にせもののプラグイン**: hozoc の側（起動、要求の形、応答の読み方）を確かめるテスト（`internal/app`、`internal/project`、`internal/lsp`）は、本物のプラグインではなく、`internal/fakeplugin` の、にせものを使う。SDK を通さずに、`docs/plugin-protocol.md`「emit」の、まとめた要求を読み、プラグインのディレクトリのファイルで決めた応答（トランスパイラ一つの答えのひな形。形の違う応答も）を返し、起動の回数と、受け取った頼みごとを、記録する。にせものも、WASM で、本物と同じ起動を通る（「プラグインの WASM」）。
   - にせものは、振る舞いを決めるファイルと、記録を、読み書きする。サンドボックスは、プラグインに、ファイルを見せない（`docs/plugin-protocol.md`「起動」）ので、テストだけが呼べる口（`internal/plugin` の `MountForTest`）で、にせものの置き場のディレクトリ一つだけを、にせものに見せる。この口は、テストのプロセスでなければ、panic する。マニフェストからも、設定からも、コマンドからも、届かない。
   - 振る舞いを決めるファイルが、一つもなければ（見せるディレクトリがなくても）、にせものは、ファイルを返さない答えを返す。実装のないプラグインの代役（`tests/samples/README.md`「飛ばす条件」）と、コーパスの、何も出さないプラグインは、これを使う。
+
+この節の細部は、決定 D704 が決めた。
 
 ## 予約語の一致
 
@@ -112,6 +118,8 @@ hozoc が起動するのは、WASM だけ（`docs/plugin-protocol.md`「マニ�
 - `go run ./cmd/hozoc build --no-emit`（リポジトリのルート。`CLAUDE.md`「確かめ方」の三つ目）は、WASM を作らない: 上のどれかが置いたものを使う。なければ、`Crashed` で、ファイルがないことを言う。テストを走らせずに、作るなら、`make plugins`（`plugins/` の六つ）。
 - 機械の言葉に直したもの（`docs/plugin-protocol.md`「起動」）は、テストも、実行する人の、ふだんの置き場を使う（答えは、変わらない。`make generate` も、ホームを空に向けるが、置き場は、もとの場所を渡す）。
 
+この節の細部は、決定 D701、D705 が決めた。
+
 ## 単体テスト
 
 - `internal/syntax`: 文法の各非終端記号について、受理する例と拒否する例。回復の後に読めた宣言が残ること。
@@ -142,6 +150,8 @@ hozoc が起動するのは、WASM だけ（`docs/plugin-protocol.md`「マニ�
 - `internal/tools/selfgen`: コンパイルできない生成物を置き場に置かないこと（`docs/packages.md`「自己生成の手順」）。
 - `plugins/go-cli`: CLI-* の各条件と、引数の解釈の各規則（`docs/plugin-go-cli.md`「引数の解釈」）。
 - `internal/lsp`: `hozo.toml` のないワークスペースで LSP-1 が出ること。プラグインの診断（`docs/lsp.md`「プラグインの診断」。`plugincheck_test.go`。プラグインは、にせもの（`internal/fakeplugin`）で、待たせる・進ませるを、テストが決める）: クライアントが、許していなければ（既定。許しとして読めない `initializationOptions` を含む）、開いても、保存しても、外でファイルが変わっても、起動しないこと。動いている間に、許しがなくなれば、プラグインの診断が消え（走っている check の答えも、出ない）、その後は、起動しないこと。与えられれば、走ること（同 「許し」）。以下は、許されているとき: 開いたときと、保存したときに、裏で走り、終わったら、足されて出ること。解析（`initialized`、`didChange`）では、起動しないこと。走っている間も、ホバーと解析が、待たされないこと。古い答えが、出ないこと。中身が変われば消え、戻れば、起動し直さずに、また出ること。error があれば、起動しないこと。ファイルの監視の知らせで、走ること（同じ中身なら、走らないこと）。異常終了で、LSP-2 が出て、動き続けること。終わるときに、走っている check を、待つこと。ほかのテストのサーバーは、リポジトリの `plugins/` の代役（マニフェストと語彙は同じで、起動するのは、診断を返さない `sh`）を見る。
+
+この節の細部は、決定 D632、D664、D706 が決めた。
 
 ## CI
 

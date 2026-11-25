@@ -2,6 +2,8 @@
 
 ## この文書が決めること
 
+この文書の細部は、決定 D603、D703 が決めた。
+
 `hozoc` のサブコマンドの振る舞いと、hozoc 自身の仕様 `cli.hozo`（`docs/requirements.md`「自己展開」）。骨組みは `cli.hozo` から三つのトランスパイラが生成する: 型と op の形と配線は基底 `go`（`docs/plugin-go.md`）、入力の制約を確かめる関数は `go-valid`（`docs/plugin-go-valid.md`）、引数の解釈と表示と終了コードは `go-cli`（`docs/plugin-go-cli.md`）。ここで決めるのは葉の op の中身。hozoc 本体は、コードを出力しない（`docs/plugin-protocol.md`「この文書が決めること」）。
 
 ## cli.hozo
@@ -617,6 +619,8 @@ out         = "internal/gen/hozo/cli"
 
 `write` の `throws MalformedOutput prevents effects` は、ファイルをすべて集めて、パスと衝突を確かめてから書き始めるため（下の「書き出し」）。`write` の `Crashed` は、`check` が、プラグインを起動するところから来る。`write` の本体で、例外を投げる `collectOutputs` が、効果 `syncOutputs` より上の行にあることから、検査器が確かめる（REL-4）。
 
+この節の細部は、決定 D649、D694、D742、D751 が決めた。
+
 ## build
 
 `hozoc build [--no-emit] [--dry-run] [--format text|json] [--config <パス>] [<名前空間>…]`。仕様を検査し、プラグインから受け取ったファイルを書き出す（決定 D417）。TypeScript の `tsc` と `tsc --noEmit` と、同じ形。
@@ -633,6 +637,8 @@ out         = "internal/gen/hozo/cli"
 - 名前空間の引数は、`--no-emit` でも、集めて確かめるファイルの範囲を選ぶ（「書き出し」の 1。`UnknownNamespace` も、同じ）。
 - **`hozo.toml` がないとき**: `build --no-emit` は、設定なしで検査する（「検査」の 1）。`build` は、書き出す単位がないので、CFG-7 で `ConfigInvalid`（「書き出し」の 0）。
 - **古い名前**: `hozoc check` と `hozoc emit` は、なくした。その名前で呼ばれたら、何もせずに、新しい書き方を標準エラーに示して、使い方の誤りの終了コード（64。`docs/diagnostics.md`「終了コード」）で終わる。示すのは、残りの引数を付けたもの: `hozoc check --format json` には `hozoc build --no-emit --format json`、`hozoc emit --dry-run server` には `hozoc build --dry-run server`。
+
+この節の細部は、決定 D694、D751、D770 が決めた。
 
 ### 検査
 
@@ -665,6 +671,8 @@ out         = "internal/gen/hozo/cli"
 -書き出しの対象を絞っても、プラグインには、すべての出力を頼む（`check` の 4 が、すべての出力の診断を要る）。絞るのは、集めて、書き出すファイルだけ。対象でない出力の、`path` の誤り（PLG-1 / PLG-2 / PLG-4）と、衝突（CFG-5）は、見ない。
 - `BuildResult.warnings` は `check` の warning（トランスパイラの warning を含む）。
 - 書く順序はパスの辞書順。途中で失敗したら、そこまでに書いたものは残る（原子性は持たない。`Crashed` は 2 で起きるので、書き出しには入っていない）。
+
+この節の細部は、決定 D752 が決めた。
 
 ## tests
 
@@ -721,3 +729,5 @@ out         = "internal/gen/hozo/cli"
 - 内部の op（`check`、`collectOutputs`、`verifyOutputs`、`plannedChanges`、`matchTests`、`runEmit`）のテストは、内側のパッケージ `internal/gen/hozo/compiler/inner` の `New` の戻り値から呼ぶ。`build` が、フラグの組から、入るユースケースを分けること（「build」の表）は、生成した本体に、呼ばれたことを覚える、ユースケースの代わりを渡して、フラグの四つの組で確かめる（`internal/app/buildflags_test.go` の `TestBuildFlags`）。
 - `Presenter`（`cli.Presenter` の実装）: コマンドの入力（`hozo.cli` の `BuildInput` / `TestsInput`）の `format` に応じて text か JSON（表示は、コマンドの行の側の仕事なので、フラグ `format` と `noEmit` を、ここで、コマンドの入力から読む。ユースケースの結果は、検査だけでも、`BuildResult`）（`docs/diagnostics.md`「表示」。診断の text と json の形は `internal/diag` が持ち、`Presenter` は `cli.hozo` の model `Diagnostic` をその形に写して呼ぶ）。結果は標準出力、例外は標準エラー（`docs/plugin-go-cli.md`「実行と表示」）。text の `CheckResult` は診断の一覧と件数、`EmitResult` は warning の一覧（あれば）に続けて `written: <path>` / `removed: <path>` を一行ずつ、`TestsResult` は warning の一覧（あれば）に続けて `ran: <トランスパイラの名前>: <テストの名前>` を一行ずつと、最後に件数（`3 tests ran`）、診断を運ぶ例外はその一覧と件数、それ以外の例外は `hozoc: <Failure.Err のメッセージ>`。json の `CheckResult` は `{"warnings": [...]}`、`EmitResult` は `{"warnings": [...], "written": [...], "removed": [...]}`、`TestsResult` は `{"warnings": [...], "ran": [...]}`、例外は `{"error": "<FQN>", "value": {...}}` で、診断を運ぶ例外の `value` は `docs/diagnostics.md`「json」の形（`{"diagnostics", "errors", "warnings"}`）、それ以外は `cli.JSONPresenter` と同じ。診断の要素は `docs/diagnostics.md`「json」と同じ形。診断を運ぶ例外の `value` を書くのは `Presenter` で、キー `diagnostics` は `docs/diagnostics.md`「json」のもの（`internal/diag` の `Report`）: 例外の引数の名前から作るのではない（`cli.JSONPresenter` なら、引数の名前をキーにしたオブジェクトで、件数の `errors` / `warnings` を持たない。`docs/plugin-go-cli.md`「実行と表示」）。引数の名前が同じ `diagnostics` なので、二つの形は、キー `diagnostics` で重なる。
 - `hozo.toml` がないとき、`check` と、ユースケース `verify` は、設定なしで検査し、`preview`、`write`、`confirmTests` は CFG-7 を一つ作って `ConfigInvalid` にする（`docs/config.md`「置き場と探し方」）。
+
+この節の細部は、決定 D649、D742、D753、D754、D770 が決めた。

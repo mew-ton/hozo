@@ -32,11 +32,15 @@ namespaces = ["db"]
 - 表の model でない model のフィールドに付いた `@db.key`、`@db.unique`、`@db.ref` は、読まない（確かめない）。
 - `db` のデコレータを、付けられない宣言に付けたとき（`@db.find` を op に、など）は、hozoc が先に DEC-1 を返す（`docs/check.md`「デコレータ」）。
 
+この節の細部は、決定 D714 が決めた。
+
 ## 表
 
 - 表の状態ごとに、表一つ。**表の model** M は、状態の要素の型（`State.element`。`@db.table state orders: list<type.Order>;` なら `type.Order`）で、列は、M のフィールド（フィールドごとに列一つ。名前は、フィールドの名前）。要素の型が、model でないか、インデックスの model（フィールドを持たない。`docs/types.md`「インデックスの model」）なら DB-1。
 - 表の状態の形は `list` だけ。`nullable` と `single` の状態に `@db.table` が付いていれば DB-2（一行だけの表の形を、まだ決めていない）。
 - 列が、値を持たなくてよいかは、フィールドの型の `?`（`docs/vocab.md`「`db` の表と、しまい方」）。
+
+この節の細部は、決定 D602 が決めた。
 
 ## しまい方
 
@@ -96,6 +100,8 @@ namespaces = ["db"]
 - **`@db.update` は、行の遷移（`Effect.row`。`docs/check.md`「行の遷移」）の後のケースが、行の引数の型の言う、前のケースの並びにないとき、付けられない**（DB-17）: `effect fn start(order: Order on Stage.Accepted): effects orders.put as Stage.InProduction;` に渡る行は、`Accepted` にあると分かっている行。`@db.update` は、その行を、そのまま書く（`docs/vocab.md`「`db` の read と効果」）ので、書いた後の行も `Accepted` のままで、宣言した `InProduction` にならない。行を `InProduction` にする書き方（どの列を、何に変えるか）は、宣言から決まらないので、その効果は、人が書く。付けられるのは、行の引数を、その分類で絞り込んでいない形（`effect fn forceShip(order: Order): effects orders.put as Stage.Shipped;`）、後のケースが、前のケースの並びにある形、`as else` の形。
 - **`@db.delete` は、行の遷移を持つ効果に、付けられない**: 行の遷移を持つ効果は、行を引数に取る（STATE-7）。`@db.delete` の引数は、列の条件で、行の引数の名前の列は、ない（DB-4）。**未決: 行を受け取る `@db.delete`**（キーが、引数の行と同じ行を消す）。決まるまで、今の規則のまま。
 
+この節の細部は、決定 D623 が決めた。
+
 ## 列と引数の型
 
 値を、名前の同じ列と比べるところ（`read` と、`@db.delete` の効果の、引数の条件）のすべてに掛かる、ただ一つの規則（決定 D96）:
@@ -144,3 +150,5 @@ namespaces = ["db"]
 - **メッセージの型は、言語の綴り**（`docs/grammar.md`「型」。絞り込んだ型は `T on C.K`）。
 - **DB-* は、`go-sqlite` の診断（GOSQL-*）のうち、言語にも保存先にも依らないものを、移したもの。** 番号の対応は `docs/plugin-go-sqlite.md`「診断」の「欠番」。
 - 仕様が、検査の前提を欠くとき（要求に `spec` がない）は、診断にせず、異常終了する（`Crashed`。`docs/plugin-protocol.md`「起動」）。
+
+この節の細部は、決定 D713、D715 が決めた。

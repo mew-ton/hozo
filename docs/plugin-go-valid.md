@@ -31,6 +31,10 @@ interprets = [
 - `requires_vocabulary`（`docs/plugin-protocol.md`「マニフェスト `hozo-plugin.toml`」）: 語彙のプラグイン `valid` が入っていなければ CFG-25。制約の使い方の検査（VALID-*）を通った仕様だけを、受け取るため（「診断」）。`go-valid` を `requires` に書く相乗り（`go-http`、`go-cli`）は、自分では書かない: 単位に `go-valid` が並ぶ（CFG-19）ので、同じ CFG-25 が掛かる。
 - オプションはない。`[emit.options.go-valid]` にキーがあれば GOVALID-7。
 
+この節の細部は、決定 D712 が決めた。
+
+この節の細部は、決定 D719 が決めた。
+
 ## Validate を持つ型
 
 `Validate` を持つかどうかは、仕様だけから決まる（設定によらない）。規則の写しは `govalid.HasValidate`。
@@ -51,6 +55,8 @@ interprets = [
 - アームの型が、`ref` でなく（`optional`、`array`）、または、インデックスの model か、別の union への `ref` で、その中（4 と同じに、通して見たもの。union なら、そのアームも）に `Validate` を持つ型があれば、GOVALID-4（その形のアームを、確かめる形が、まだない）。
 - 結果の型にも出る（入力にしか使わない型かどうかは見ない）。
 - その場で書いた model（union のアームの `{ … }`。`docs/ir.md`「正規化」）は、普通の model として数える。例外は、その場の model を持たない: 運ぶ値は、引数（`docs/grammar.md`「exception / effect / read」）。`View` が見る側のために合成した model（`docs/plugin-go.md`「出力の対象」）は、Go の型にならないので、数えない。
+
+この節の細部は、決定 D602 が決めた。
 
 ## 出力
 
@@ -115,6 +121,8 @@ func (m User) Validate() error {
 - 省略可能な array と、省略可能な、インデックスの model は、Go でポインタにならない（`docs/plugin-go.md`「型」）ので、`nil` を確かめずに、上の二つの行のまま回す。
 - 包まれた型は、入れ子にできる（`T?[]`、値の型が `T[]` のインデックスの model、値の型が別のインデックスの model であるもの）。入れ子の番号は、配列とインデックスの model で通しに振る（`x0` の中の `k1`、`x1`）。
 
+この節の細部は、決定 D675 が決めた。
+
 ### 制約
 
 どの制約が、何に付けられ、どの値を通すかの持ち主は `docs/plugin-valid.md`「制約」「形式」。ここは、その条件を、Go の式にしたもの。
@@ -165,6 +173,8 @@ func CheckFormat(name, v string) bool                   // valid.format の四�
 - **`go-valid` は、VALID-* の検査を通っていない仕様を受け取ったら、診断にせず、異常終了する**（`Crashed`。`docs/plugin-protocol.md`「起動」）。hozoc からは、起きない: 語彙のプラグイン `valid` が error を返せば、`emit` は頼まれず、入っていなければ CFG-25（「マニフェスト」）。
 - 基底のオプション `module` がないとき（同じ単位の基底が GO-8 を返し、何も書き出されない。`docs/plugin-go.md`「診断」）は、ファイルを返さず、GO-8 も重ねて返さない。置き場を求められないので、GOVALID-3 は確かめない。ほかの診断は、そのときも返す。
 - 生成器の不具合（`View` が欠けている、生成したコードを `go/format` で整形できない）は、診断にせず、異常終了する（`Crashed`。`docs/plugin-protocol.md`「起動」）。
+
+この節の細部は、決定 D711、D741 が決めた。
 
 ### 欠番
 

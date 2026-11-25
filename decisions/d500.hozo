@@ -568,17 +568,24 @@ namespace hozo.decisions {
     /**
      * docs/open.md「聞かずに決めて、確かめていない決定」の行（232 行）を、decisions/ に移し、その見出しを、なくす。
      * 一行を、一つの決定にし、入れるときに、番号を振る（536）: D555〜D786。状態の印は、どれも @adr.proposed。
-     * 本文の形は、541 の当てはめ: 「決めたこと」の列を本文に、「別の案」の列（「—」でなければ）と「持ち主」の列を、本文の後ろに足す。
-     * D554 の書き直しのほかは、行の文章のまま。
+     * 本文の形は、541 の当てはめ: 「決めたこと」の列を本文に、「別の案」の列（「—」でなければ）を、本文の後ろに足す。D554 の書き直しのほかは、行の文章のまま。
+     * 「持ち主」の列は、本文に移さない。列が名指しした文書の見出しの側が、「この節の細部は、決定 DN が決めた。」と、決定を名指しする
+     * （文書の全体を名指ししていたら、「この文書の細部は、…」）。見出しが、もう決定を名指ししていれば、足さない。
+     * 列が、文書の見出しでないもの（ほかの決定、.hozo、hozo.toml、Go のファイル、ディレクトリ）を名指ししていたら、その分だけを、本文の後ろの「持ち主: …」に残す。
+     * 名指ししたファイルの宣言が、@adr.decided で、その決定を指していれば、それも残さない（545 と同じ線）。
      *
      * @adr.context 決定の持ち主が、二つ（decisions/ と、docs/open.md の表）あると、同じ決定が、二か所で、別々に直り、ぶれる。
      *   533 で、その表に足すのはやめたが、今ある行を移すことは、残っていた（表の頭の「今ある行を移すかは #174」）。
      *   docs/open.md は、未決の点の一覧で、決定の置き場ではない。
+     *   見出しの名前は、変わりうる。書き直さない決定の本文が、見出しを名指しすると、見出しが変わったとき、誤ったまま残る。
+     *   写す側（文書）が、写すもと（決定）を、番号で名指しすれば、番号は使い回さないので、変わらない。
      * @adr.consequence 文書から、その見出しへの参照は、移した決定の番号（決定 DN）に、直す。
      *   移した 541 までの決定の本文の中の、その見出しの名前は、書き直さない（535）。
      * @adr.alternative 番号を振らず、decisions/unnumbered.hozo に、中身を言う名前で移す（232 の名前を付け、確かめた後に、付け直すことになる）
      * @adr.alternative docs/open.md に残し、decisions/unnumbered.hozo の写し三つを消す（決定が、decisions/ の外に残る）
+     * @adr.alternative 「持ち主」の列も、本文の後ろに足す（541 と同じ形。見出しが変わると、本文が、誤ったまま残る）
      * @adr.said 番号を振って移す (Recommended)
+     * @adr.said 勧めの形で、持ち主の行を外そう
      */
     @adr.proposed
     D553;
@@ -588,10 +595,12 @@ namespace hozo.decisions {
      * 行は、表の順に、番号を振った。541 までの百の位と同じく、D555〜D599 は d500.hozo、D600〜D699 は d600.hozo（分類 Decision600）、
      * D700〜D786 は d700.hozo（分類 Decision700）。
      * 一つの決定だけで読めるように、行の位置に頼る書き方を、名指しに書き直した: 「同 N」（決定の番号）は「決定 DN」、
-     * 「持ち主」の列の「同上」「同じ」と、頭の「同「…」」は、前の行の持ち主の文書、「上の行の続き」は「決定 D674 の続き」、
+     * 「上の行の続き」は「決定 D674 の続き」、
      * 「この表の「`hozo.cli.build` を、真偽の値の分類で書き直したとき」の行」は「決定 D770」、「この文書「…」」は「`docs/open.md`「…」」、
      * 「上の「同 26」」「上の「同 27」」は「穴 26」「穴 27」（docs/open.md「サンプルと、hozoc 自身の仕様」の番号）。
-     * docs/ の中からの書き方だった `ファイル.md` は、`docs/ファイル.md` にした。コメントを閉じる二字は、541 と同じく、`*／` と書いた。
+     * docs/ の中からの書き方だった `ファイル.md` は、`docs/ファイル.md` にした。
+     * 「持ち主」の列の「同上」「同じ」と、頭の「同「…」」は、決定を名指しする見出しを選ぶときに、前の行の持ち主の文書と読んだ。
+     * ただし、前の行の文書に、その見出しがなかった五つ（D627 は `docs/plugin-go.md`「葉の op」、D634〜D637 は `docs/plugin-go-http.md`）は、本文から、文書を選んだ。コメントを閉じる二字は、541 と同じく、`*／` と書いた。
      * 文書が、その見出しを指していたのに、表に行がなかった三つは、決定として足した（D787〜D789）。
      * decisions/unnumbered.hozo の三つは、移した行の写しなので、@adr.superseded(移した決定) にした: GeneratedUnderHozo は D742、
      * WriteWithoutCi は D743、FlowsInOwnFile は D744。それを指していた @adr.decided(…) は、移した決定を指すように、直した。
@@ -648,8 +657,6 @@ namespace hozo.decisions {
      * 言語サーバー: `else` のアームの頭は、定義へ飛べず、ホバーも出ない
      *
      * 別の案: 受けるケースを並べたホバーを出す
-     *
-     * 持ち主: `docs/lsp.md`「定義へジャンプ」の、`match` のケース名の行
      */
     @adr.proposed
     D559;
@@ -658,8 +665,6 @@ namespace hozo.decisions {
      * 道具の設計の案（186 の前提のほか）: 担い手、仕事の流れ、ユースケース、道具の境目（IDE の文面の部分は言語サーバーのクライアント、IDE の中の AI と外のエージェントは同じ MCP サーバーを使う、IDE は中身のコードを編集しない、ほか）、操作の表、手法ごとの画面の候補、作る順（MCP サーバーが先、チャットと変更の画面を、画面での編集より先）
      *
      * 別の案: 見出しごとに、別の分け方
-     *
-     * 持ち主: `docs/tools.md`
      */
     @adr.proposed
     D560;
@@ -668,8 +673,6 @@ namespace hozo.decisions {
      * IDE の作りの案（187、188 のほか）: 画面は `hozoc` が配る（`hozoc ide`）、見せるものの計算は `hozoc` の側、やり取りの形はスキーマで決めて TS の型を生成する、色付けは今の TextMate の文法、置き場は `ide/web` と `ide/desktop`
      *
      * 別の案: 殻が画面のファイルを持つ。画面の側で計算する
-     *
-     * 持ち主: `docs/tools.md`「IDE の形」
      */
     @adr.proposed
     D561;
@@ -678,8 +681,6 @@ namespace hozo.decisions {
      * IDE の設計の段 1 の案: 七つの筋書き（はじめて読む、約束を追う、AI に頼む、抜けを決める、小さく直す、中身を知る、何もないところから起こす）と、主人公（プロダクトの責任者）。手法への写しの結果（UML と、そのほかの、20 の手法。調べの記録）
      *
      * 別の案: 筋書きの足し引き、主人公
-     *
-     * 持ち主: `docs/ide-scenarios.md`、`docs/ide-methods.md`
      */
     @adr.proposed
     D562;
@@ -688,8 +689,6 @@ namespace hozo.decisions {
      * IDE の設計の段 2 の案: 筋書きが要る情報と操作の一覧と、それぞれが、今どこから得られるかの分け（宣言、検査、導く、語彙、ない、外）
      *
      * 別の案: 情報と操作の足し引き、分け
-     *
-     * 持ち主: `docs/ide-needs.md`
      */
     @adr.proposed
     D563;
@@ -698,8 +697,6 @@ namespace hozo.decisions {
      * IDE の設計の段 3 の案（192〜200、204〜381 のほか）: ノートが持つのは配置と自由な図形だけ。三つの作り方（全体、コンテキスト、空）と、はじめて開いたときに IDE が作るノート。領域の種類ごとの図形と線、塊の一覧、259 より前の標準の図形の行き先、宣言の線と導いた線の分け、重ね、ノートのほかの場、二つの強度の呼び名（中身の強度、設計を守る強度）、「仕様の図」という呼び名、効果と read の図形の名前（書き込み、読み出し）、仕様の図で直せるデコレータの範囲（節と、節の欄に出る宣言に付いたもの）、アウトラインの並べ方、見失った図形を関連付け直す道
      *
      * 別の案: 図形と塊の足し引き、線の分け、作り方
-     *
-     * 持ち主: `docs/ide-screens.md`
      */
     @adr.proposed
     D564;
@@ -708,8 +705,6 @@ namespace hozo.decisions {
      * 筋書き 8（ハーネスが、どこまで守れるかを、中身を書く前に知る）と、それに当たる情報と操作の行。207〜213 から起こした
      *
      * 別の案: 歩みの中身
-     *
-     * 持ち主: `docs/ide-scenarios.md`「筋書き 8」、`docs/ide-needs.md`「ハーネスの強度」「ハーネスのための操作」
      */
     @adr.proposed
     D565;
@@ -718,8 +713,6 @@ namespace hozo.decisions {
      * ハーネスのプレビューを、サンプルに当てるときの、仮の決め: 節ごとの、中身の強度の段の決め方。「直に依る設計」の取り方（入口、例外、例外のとき変わらないもの、向き、約束、語彙のデコレータ）。覆えるかの決め方。中身が作られる節に乗った設計を、「覆える」に数えること
      *
      * 別の案: 取り方と、決め方
-     *
-     * 持ち主: `docs/ide-harness-trial.md`「当て方」
      */
     @adr.proposed
     D566;
@@ -728,8 +721,6 @@ namespace hozo.decisions {
      * 作図から、仕様、ハーネスへの対応の表（手法の部品ごとに、仕様に反映されるもの、指す節、生まれるハーネス）。今の言語と、今あるプラグインから起こした
      *
      * 別の案: 部品の取り方、反映の先、ハーネスの言い方
-     *
-     * 持ち主: `docs/ide-chain.md`「対応」
      */
     @adr.proposed
     D567;
@@ -738,16 +729,12 @@ namespace hozo.decisions {
      * 仕様の側から見た、漏れの一覧（設計する部品がある要素、ない要素、仕様にも書けない中身、の分け）
      *
      * 別の案: 分け方と、近い設計の当て方
-     *
-     * 持ち主: `docs/ide-chain.md`「仕様の側から見た、漏れ」
      */
     @adr.proposed
     D568;
 
     /**
      * ユースケース図の、案の部分: 「含む」は、ユースケースの op が、別のユースケースの op を呼ぶこと。システムの境界は、名前空間
-     *
-     * 持ち主: `docs/ide-chain.md`「ユースケース図」
      */
     @adr.proposed
     D569;
@@ -756,8 +743,6 @@ namespace hozo.decisions {
      * 設計を守る強度で、例外は、表のますとして、投げる op に数える。呼び先から伝わるだけの例外は、数えない
      *
      * 別の案: 宣言した op すべてに数える。数えない
-     *
-     * 持ち主: `docs/ide-chain.md`「例外」
      */
     @adr.proposed
     D570;
@@ -766,8 +751,6 @@ namespace hozo.decisions {
      * 状態の表の設計: 行は、分かれる op と、分かれ道を通らない効果。ますは、進む（進む先と、後のケース）、例外、何もしない、空き。後のケースは、呼び出し先から辿れる効果の、行の遷移から出す。列の頭に、ケースの決まり方を出す。まとめて決めたますの一つを、ほかと違う中身にしたら、そのケースだけを、`else` から抜く
      *
      * 別の案: 行に入口を使う。効果を行にする
-     *
-     * 持ち主: `docs/ide-chain.md`「状態の表」
      */
     @adr.proposed
     D571;
@@ -776,8 +759,6 @@ namespace hozo.decisions {
      * 図形のプラグインの案（199、201 のほか。細部は、後で決める: 203）: IDE と `hozoc` とプラグインの分け方（プラグインは、文面を自分では書き換えない）、意味は宣言で見た目はコードという分け、IDE がどの図形にも同じに付けるもの、縮めて見るときはアイコンと名前だけ、語彙を提供するプラグインが、その語彙の図形も提供すること、標準の図形を同梱すること、`hozoc` に要るもの
      *
      * 別の案: 分け方、定義の項目
-     *
-     * 持ち主: `docs/ide-shapes.md`
      */
     @adr.proposed
     D572;
@@ -787,7 +768,7 @@ namespace hozo.decisions {
      *
      * 別の案: 見本の作り直し
      *
-     * 持ち主: `docs/ide-mock.md`、`ide-mock/notes.html`
+     * 持ち主: `docs/ide-mock/notes.html`
      */
     @adr.proposed
     D573;
@@ -796,32 +777,24 @@ namespace hozo.decisions {
      * IDE の設計の段 5 の案: 動きの要件（ノート、追従、規模、配ること、作ること）、枠組みを選ぶ七つの規準と、その重さの順、六つの候補の比べ
      *
      * 別の案: 要件と規準の足し引き、重さの順
-     *
-     * 持ち主: `docs/ide-stack.md`
      */
     @adr.proposed
     D574;
 
     /**
      * 配線の op の、`generated` の対の中で、`slot` の外は、作り直す（決定 D287 から、読み取った）。実装は、まだない
-     *
-     * 持ち主: `docs/requirements.md`「もとの考えと、Hozo が守るもの」
      */
     @adr.proposed
     D575;
 
     /**
      * `slot` の対が、開きか、閉じの、片方だけのときは、エラーにして、止める（`generated` の対を決めた、決定 D293 に、合わせた）。実装は、まだない
-     *
-     * 持ち主: `docs/requirements.md`「もとの考えと、Hozo が守るもの」
      */
     @adr.proposed
     D576;
 
     /**
      * `disjoint` で、あるアームが入れる `val` を、同じまとまりの、別のアームは、読めず、入れられない（決定 D295 の、「入れ替えても、結果が変わらない」から、導いた）
-     *
-     * 持ち主: `docs/ide-chain.md`「アクティビティ図」
      */
     @adr.proposed
     D577;
@@ -830,8 +803,6 @@ namespace hozo.decisions {
      * `for` が重なっているとき、`collect` による代入が済むのは、`val` の宣言から見て、いちばん外側の `for` を抜けたとき（決定 D320 の、「`for` を抜けて、はじめて、完了する」を、重なった `for` に当てた）
      *
      * 別の案: 内側の `for` を抜けたとき
-     *
-     * 持ち主: `docs/ide-chain.md`「アクティビティ図」
      */
     @adr.proposed
     D578;
@@ -840,8 +811,6 @@ namespace hozo.decisions {
      * 対象のない分類を、書けない所に書いたときの診断は、今ある ID を使う（型と、効果の遷移の宛先は RES-4。`match` は MATCH-7。行の遷移は STATE-7）。新しい ID は、ケースの `as` の CLS-9 だけ
      *
      * 別の案: 一つの新しい ID に、まとめる
-     *
-     * 持ち主: `docs/check.md`「分類」の「対象のない分類」
      */
     @adr.proposed
     D579;
@@ -850,8 +819,6 @@ namespace hozo.decisions {
      * 集める文は、`for` の中の、`disjoint` のアームにも書け、別々のアームが、同じ `val` に集めてよい。並びの順は、文を辿る順
      *
      * 別の案: 別々のアームが、同じ `val` に集めたら、エラー
-     *
-     * 持ち主: `docs/check.md`「繰り返し」の「集める」
      */
     @adr.proposed
     D580;
@@ -860,16 +827,12 @@ namespace hozo.decisions {
      * `disjoint` の、行で見る検査（DISJ-3）の細かい所: op の引数は、絞り込んだ型（`T on C.K`）も、行と見る。並びでない状態への効果は、いつも、通らない。リテラルと、レコードリテラルは、どの値とも、同じでない。`disjoint for` で通るのは、その `for` の変数から始まる値を渡したときだけ（中の `for` の変数は、通らない）
      *
      * 別の案: op の引数も、等しい型だけを、行と見る
-     *
-     * 持ち主: `docs/check.md`「disjoint」の「検査」
      */
     @adr.proposed
     D581;
 
     /**
      * 例外と効果の組の計算の、細かい順（`for` に囲まれた呼び出しの、六つの場合）と、成功したときの効果（`for` の中の呼び出しの分は、`unknown`）
-     *
-     * 持ち主: `docs/check.md`「Sig(O, v)」
      */
     @adr.proposed
     D582;
@@ -878,16 +841,12 @@ namespace hozo.decisions {
      * 型を書いた `val` は、レコードリテラルと、`match` の、当てはめる先になる（`val x: T = { … }`）。型を書かない、集める先の `val` の要素の型は、集める式の型のうち、ほかのすべてが渡せる型
      *
      * 別の案: 集める式の型は、すべて、等しいこと
-     *
-     * 持ち主: `docs/types.md`「val の型」
      */
     @adr.proposed
     D583;
 
     /**
      * ブロックのアームの `}` の後ろに、`;` を書いてもよい（`Arm = Block End`）。`for` の変数には、「読まれていない」の警告（WIRE-8）を、掛けない
-     *
-     * 持ち主: `docs/grammar.md`「配線」、`docs/check.md`「配線」
      */
     @adr.proposed
     D584;
@@ -896,8 +855,6 @@ namespace hozo.decisions {
      * 基底 `go` の、新しい文の、細かい形（`disjoint` の形は、決めた: 決定 D344）。値を入れる文は `x, err = <呼び出し>` で、`err` が見えていなければ、直前に `var err error`。集める先は、`nil` のスライスに `append`。変数を読まない `for` は `for range`。`val x = 値` は、型を書いた `val` で、値と Go の型が違うときだけ、`var x T = 値`（ほかは、今までどおり `x := 値`）
      *
      * 別の案: 値を入れる文は、いつも `v<n>` に受けてから入れる
-     *
-     * 持ち主: `docs/plugin-go.md`「文」
      */
     @adr.proposed
     D585;
@@ -906,8 +863,6 @@ namespace hozo.decisions {
      * サンプル `shop-server` は、`val` の数の上限（WIRE-6）を、6 にした（`max_bindings = 6`）: `server.getMyPage` が、`disjoint` のアームから値を出すための、空の `val` を含めて、六つ持つ
      *
      * 別の案: 既定（5）のままにして、`getMyPage` を、二つの op に分ける
-     *
-     * 持ち主: `tests/samples/shop-server/README.md`「R6 で変えたこと」
      */
     @adr.proposed
     D586;
@@ -916,16 +871,12 @@ namespace hozo.decisions {
      * ホバーの、デコレータの見出しは、分類のケースを、もとの形で書く（`for case of any`、`any case of never`、`for case of Actor`。省略の `case` では、出さない）
      *
      * 別の案: 書かれたとおりに出す（`case` と書いたら `case`）
-     *
-     * 持ち主: `docs/lsp.md`「ホバー」
      */
     @adr.proposed
     D587;
 
     /**
      * デコレータの宣言の、分類のケース（決定 D346）の、細かい所: `classify` を、付ける先や、引数の種類に書いたときのメッセージは、分類そのものが、まだ書けないことと、なくした書き方の、新しい書き方の、両方を示す
-     *
-     * 持ち主: `docs/grammar.md`「decorator の宣言」
      */
     @adr.proposed
     D588;
@@ -934,8 +885,6 @@ namespace hozo.decisions {
      * 分類のケースの、`of` の後ろ（決定 D349）の、細かい所: 型で絞る形（`case of Order`）に当たるのは、値の分類で、対象の型が、書いた型と、等しいもの。`of` の後ろに、op や状態の名前を書けば、RES-4（新しい ID は、足さない）。IR は、`CaseKind.subject` を、型にして、版を 0.11 に上げた。`Actor case`（346）は、`main` に入ったことがないので、なくした書き方のメッセージを、持たない
      *
      * 別の案: 型で絞る形は、渡せる型なら、当たる
-     *
-     * 持ち主: `docs/grammar.md`「decorator の宣言」、`docs/types.md`「デコレータの引数」、`docs/ir.md`「decorator」「版」
      */
     @adr.proposed
     D589;
@@ -944,8 +893,6 @@ namespace hozo.decisions {
      * 関数の戻り値の規則（決定 D348）は、新しい ID の TYPE-18 にして、意味の解析が出す。位置は、書いた戻り値の型（省いた `read fn` は、名前）。`read` の「結果の型に、`void` と `never` は書けない」は、構文エラーから、この規則に移した
      *
      * 別の案: 文法で閉じたままにする（構文エラー）
-     *
-     * 持ち主: `docs/types.md`「診断」
      */
     @adr.proposed
     D590;
@@ -962,8 +909,6 @@ namespace hozo.decisions {
 
     /**
      * 関数の末尾の形（決定 D350、D351）の、なくした書き方: 節の前に `:` のない形（`fn f() throws E`）、`read fn` と `effect fn` の `on`、状態の遷移の、宛先の後ろの `:` は、新しい綴りをメッセージで示す、構文エラー。`:` の後ろに、戻り値も節もない形（`fn f():;`）と、`read fn` と `effect fn` に書いた `throws` も、専用のメッセージの、構文エラー
-     *
-     * 持ち主: `docs/grammar.md`「関数の宣言」「exception / effect / read」
      */
     @adr.proposed
     D592;
@@ -972,16 +917,12 @@ namespace hozo.decisions {
      * 生成するコードの、効果のコメント（定数の末尾の一行と、命令のメソッド）は、仕様の宣言の綴りを写す所なので、`on` を `effects` に、状態の遷移の `:` を `as` に、替えた。語彙のプラグイン `db` の DB-3（前は、`go-sqlite` の GOSQL-7）のメッセージも、「`reads` の状態」と言う。コメントとメッセージのほかの出力は、変えていない
      *
      * 別の案: 出力のコメントは、変えない
-     *
-     * 持ち主: `docs/plugin-go.md`「effect」「コメント」、`docs/plugin-go-sqlite.md`「診断」
      */
     @adr.proposed
     D593;
 
     /**
      * ホバーの見出しと、アウトラインの詳細は、新しい綴りで出す（`effect fn e(…): effects s.post`、`read fn r(…): T reads s`）。op の見出しは、今までどおり、節を出さない（`fn f(…): T`。戻り値がなければ、`fn f(…)`）。色付けは、`effects` の節の中の `as` を、型の位置として読む
-     *
-     * 持ち主: `docs/lsp.md`「ホバー」、`docs/editors.md`「TextMate の文法」
      */
     @adr.proposed
     D594;
@@ -990,8 +931,6 @@ namespace hozo.decisions {
      * 効果の `throws`（決定 D352）の、細かい所: 節は、`effects` の前に、一つだけ。関係の節（`prevents effects`、`keeps effects`）は、書けない（構文エラー。いつも「起きていない」なので）。同じ例外を二度書けば REL-1。効果の `@throws` のタグは、その効果の `throws` にあること（DOC-1）。IR は `Effect.throws`（例外の FQN の並び）で、版を 0.12 に上げた
      *
      * 別の案: 節を、op と同じに、いくつでも書ける。`@throws` のタグは、確かめない
-     *
-     * 持ち主: `docs/grammar.md`「関数の宣言」、`docs/check.md`「read と効果」「診断」、`docs/ir.md`「版」
      */
     @adr.proposed
     D595;
@@ -1000,8 +939,6 @@ namespace hozo.decisions {
      * 基底 `go` は、例外を投げる効果の、状態の単位のメソッドのコメントに、`throws <例外>` を出す（`（効果 store.createUser、throws type.EmailTaken、effects store.users.post）`）。メソッドの形は、変えない
      *
      * 別の案: コメントも、変えない
-     *
-     * 持ち主: `docs/plugin-go.md`「コメント」の「状態の単位のメソッド」
      */
     @adr.proposed
     D596;
@@ -1010,8 +947,6 @@ namespace hozo.decisions {
      * サンプル `shop-server` の、`type.EmailTaken` には、`@http.status` を付けない（投げる `store.addUser` は、HTTP の入口から呼ばれない: 起動とテストが呼ぶ）
      *
      * 別の案: `@http.status(409)` を付ける
-     *
-     * 持ち主: `tests/samples/shop-server/README.md`
      */
     @adr.proposed
     D597;
@@ -1020,8 +955,6 @@ namespace hozo.decisions {
      * `any case of <型>?`（決定 D354）の、細かい所: 型で絞る形の対象に、省略可能な型（いちばん外が `?` か `nullable<…>`）を書いたときは、構文エラー（新しい ID は、足さない）で、メッセージが、名前で絞る形（`case of 分類の名前`）を示す。残りの引数（`...xs: any case of Order?`）の `?` も、ほかの種類と同じに、構文エラー。ホバーの見出しは、省ける引数を、`any case of Order?` と出す（対象は `Order`）
      *
      * 別の案: 意味の解析の、型の規則（TYPE-n）にする
-     *
-     * 持ち主: `docs/grammar.md`「decorator の宣言」
      */
     @adr.proposed
     D598;
@@ -1030,8 +963,6 @@ namespace hozo.decisions {
      * サンプル `shop-server` に、`date` と `time` を確かめるためだけのフィールドを、二つ足した（`type.Order` の `deliverOn: date?` と `deliverFrom: time?`。どの op も、値を入れない）。`go-http` の通信の上の形は、サンプルには足さず、`runtime` の単体テスト（JSON の読み書き）で確かめた
      *
      * 別の案: 値を入れる op と、HTTP の入力まで、サンプルに足す
-     *
-     * 持ち主: `tests/samples/shop-server/README.md`「日時の型で変えたこと」
      */
     @adr.proposed
     D599;

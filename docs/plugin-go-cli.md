@@ -33,6 +33,8 @@ interprets = [
 - オプションはない。`[emit.options.go-cli]` にキーがあれば CLI-8。
 - `wasm` の `plugin.wasm` の作り方は、ほかの Go のプラグインと同じ（`docs/plugin-go.md`「マニフェスト」）。
 
+この節の細部は、決定 D719 が決めた。
+
 ## 語彙
 
 `plugins/go-cli/cli.hozo` の宣言は次のとおり（説明のコメントは略した）。出典は `examples/hozoc.hozo` の `namespace cli` で、変えたのは `arg`、`flag`、`env` の引数（決定 D109）、足したのは `required` と `default`（同 114、115）。
@@ -103,6 +105,8 @@ type JSONPresenter struct{}
 - 型についての決まり（CLI-3、CLI-4、CLI-11、CLI-13）は、書いたものの整合の検査で、出力を変えない（どの型でも、同じ補助の呼び出しになる。「コマンドごとの関数」）。
 
 CLI-* は emit の応答の `errors` で返す。検査だけの実行（`hozoc build --no-emit`）も、同じ応答の診断を使う（`docs/plugin-protocol.md`「起動」「emit」）ので、どれも error の診断になる。
+
+この節の細部は、決定 D781 が決めた。
 
 ## 引数の解釈
 

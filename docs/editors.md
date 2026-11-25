@@ -2,6 +2,8 @@
 
 ## この文書が決めること
 
+この文書の細部は、決定 D727、D762 が決めた。
+
 VS Code 拡張（`editors/vscode/`）の中身と、TextMate の文法。要件の持ち主は `docs/requirements.md`「シンタックスハイライト」「言語サーバー」。
 
 ## VS Code 拡張
@@ -27,6 +29,8 @@ editors/vscode/
   - 動いている間に、ワークスペースが信頼されたとき（`onDidGrantWorkspaceTrust`）と、設定 `hozo.pluginChecks` が変わったときは、`workspace/didChangeConfiguration` で、渡し直す（サーバーは、起動し直さない）。
   - `package.json` の `capabilities.untrustedWorkspaces` は `limited`: 信頼していないワークスペースでは、シンタックスハイライトと、hozoc 自身の診断・定義へジャンプ・ホバーは働き、プラグインの診断は、出ない。設定 `hozo.hozocPath` は、`restrictedConfigurations` に入れる: 信頼していないワークスペースの設定（`.vscode/settings.json`）が、起動する実行ファイルを、決められない。
 - 言語の知識（キーワード、検査）は持たない。
+
+この節の細部は、決定 D682 が決めた。
 
 ## TextMate の文法
 
@@ -61,6 +65,8 @@ editors/vscode/
 - `is`、`omit`、`condition` は予約語ではない（`docs/grammar.md`「予約語」）ので、どのパターンにも現れない。
 - 文法のテストは `editors/vscode/test/`。`vscode-textmate` + `vscode-oniguruma` で、コーパス・標準の語彙・`cli.hozo` を字句に分け、選んだ字句の scope がこの表の通りであることを `npm test` で確かめる。
 - 型の位置と値の位置の区別は TextMate では位置の規則でしか付けられない。残りは命名規則（§3.3）に頼り、正確な区別は段階 4 の後の semantic tokens に任せる（`docs/lsp.md`）。
+
+この節の細部は、決定 D594、D730 が決めた。
 
 ## ほかのエディタ
 
