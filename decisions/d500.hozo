@@ -447,5 +447,31 @@ namespace hozo.decisions {
      */
     @adr.proposed
     D543;
+
+    /**
+     * 移した決定の本文の最後の「持ち主: …」は、持ち主がコードで自明なら、省いてよい。
+     * 541 の「持ち主の列は、本文の最後に足す」と、535 の「本文は、書き直さない」の、一部を直す。
+     *
+     * @adr.context 形を決めた宣言に @adr.decided が付いていれば、持ち主は、宣言から辿れる。決定の側にも書くと、二か所になる。
+     * @adr.alternative 移した決定は、そのまま残し、これから足す決定で、持ち主を書かない（こちらの勧め）
+     * @adr.said 持ち主がコードで自明なら省略していい気がする
+     * @adr.said １
+     */
+    @adr.accepted
+    @adr.amends(Decision500.D541, Decision500.D535)
+    D544;
+
+    /**
+     * 544 の「コードで自明」の線: 持ち主に並ぶ .hozo のファイルのうち、そのファイルの宣言が @adr.decided でその決定を指すものだけを、
+     * 持ち主の行から省く。ほかの持ち主（文書の見出し、hozo.toml、指していない .hozo）は、残す。行が空になれば、行ごと省く。
+     * 当てはめたのは、470、472、473、474（cli.hozo）、475（flows.hozo）、481（decisions.hozo。今の decisions/adr.hozo の amends の宣言が指す）。
+     * 434、468、469 の cli.hozo は、cli.hozo の宣言が、その決定を指していないので、残した。
+     *
+     * @adr.context 持ち主が、文書とコードの両方のときに、文書の分まで消すと、文書の持ち主が、どこからも辿れなくなる。
+     * @adr.alternative 持ち主に .hozo を含む行は、行ごと省く
+     * @adr.alternative @adr.decided で指されている決定は、持ち主の行ごと省く（文書の持ち主も、消える）
+     */
+    @adr.proposed
+    D545;
   }
 }
