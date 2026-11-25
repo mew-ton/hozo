@@ -84,6 +84,9 @@ func (e *emitter) build(im *golang.Imports) string {
 	im.Add("context", "context")
 	im.Add("database/sql", "sql")
 	im.Add(runtimePath, "runtime")
+	if e.hasRefs() {
+		im.Add("errors", "errors") // CreateTables が、外部キーが効いていないときに返すエラー
+	}
 	for _, n := range im.Names() {
 		f.imports[n] = true
 	}
@@ -99,7 +102,12 @@ func (e *emitter) build(im *golang.Imports) string {
 	f.printf("// Schema は @db.table の状態の表を作る SQL（SQLite）。状態ごとに表一つ、その model のフィールドごとに列一つ。\n")
 	f.printf("const Schema = `%s`\n\n", e.schema())
 	f.printf("// CreateTables は db に、@db.table の状態の表を作る（Schema を実行する）。すでにある表には触れない。\n")
-	f.printf("func CreateTables(ctx context.Context, db *sql.DB) error {\n\t_, err := db.ExecContext(ctx, Schema)\n\treturn err\n}\n\n")
+	if e.hasRefs() {
+		// 外部キー（docs/plugin-go-sqlite.md「表」）: 効いていなければ、表を作らずにエラー
+		f.printf("%s", foreignKeysText)
+	} else {
+		f.printf("func CreateTables(ctx context.Context, db *sql.DB) error {\n\t_, err := db.ExecContext(ctx, Schema)\n\treturn err\n}\n\n")
+	}
 	f.printf("%s\n", connText)
 	for _, u := range e.units {
 		f.unit(u)
@@ -116,6 +124,23 @@ func (e *emitter) build(im *golang.Imports) string {
 	f.helpers()
 	return f.b.String()
 }
+
+// foreignKeysText は、Schema が外部キー（REFERENCES）を持つときの CreateTables の、コメントの二行目からの残り
+// （docs/plugin-go-sqlite.md「表」「メソッドの形とコメント」）。
+const foreignKeysText = `// Schema は外部キーを持つので、先に、db の接続で PRAGMA foreign_keys が効いているかを確かめ、効いていなければ、表を作らずにエラーを返す（接続ごとの設定なので、ドライバの DSN で効かせる）。
+func CreateTables(ctx context.Context, db *sql.DB) error {
+	var on bool
+	if err := db.QueryRowContext(ctx, "PRAGMA foreign_keys").Scan(&on); err != nil {
+		return err
+	}
+	if !on {
+		return errors.New("db: PRAGMA foreign_keys is off; enable it in the driver's DSN so that every connection checks REFERENCES")
+	}
+	_, err := db.ExecContext(ctx, Schema)
+	return err
+}
+
+`
 
 // connText は Querier と Conn（docs/plugin-go-sqlite.md「トランザクション」）。いつも出す。
 const connText = `// Querier は *sql.DB と *sql.Tx が共に持つ、文の実行。

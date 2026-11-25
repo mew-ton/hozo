@@ -45,7 +45,15 @@ CREATE TABLE IF NOT EXISTS "notifications" (
 `
 
 // CreateTables は db に、@db.table の状態の表を作る（Schema を実行する）。すでにある表には触れない。
+// Schema は外部キーを持つので、先に、db の接続で PRAGMA foreign_keys が効いているかを確かめ、効いていなければ、表を作らずにエラーを返す（接続ごとの設定なので、ドライバの DSN で効かせる）。
 func CreateTables(ctx context.Context, db *sql.DB) error {
+	var on bool
+	if err := db.QueryRowContext(ctx, "PRAGMA foreign_keys").Scan(&on); err != nil {
+		return err
+	}
+	if !on {
+		return errors.New("db: PRAGMA foreign_keys is off; enable it in the driver's DSN so that every connection checks REFERENCES")
+	}
 	_, err := db.ExecContext(ctx, Schema)
 	return err
 }

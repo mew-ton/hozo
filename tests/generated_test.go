@@ -89,15 +89,15 @@ func TestGeneratedUpToDate(t *testing.T) {
 	}
 }
 
-// goHTTPGeneratedDirs は、plugins/go-http のプロジェクト（plugins/go-http/hozo.toml）の生成物の置き場
-// （docs/plugin-go-http.md「go-http 自身の要求」）。
-var goHTTPGeneratedDirs = []string{"plugins/go-http/internal/spec"}
+// pluginProjects は、プラグインのプロジェクト（plugins/<名前>/hozo.toml。internal/tools/selfgen の pluginProjects と同じ）。
+// 置き場は plugins/<名前>/internal/spec（docs/plugin-go-http.md「go-http 自身の要求」、docs/plugin-go-sqlite.md「go-sqlite 自身の要求」）。
+var pluginProjects = []string{"go-http", "go-sqlite"}
 
-// TestGeneratedGoHTTPUpToDate は、コミットされた plugins/go-http/internal/spec/** が、go-http 自身の要求の仕様
-// plugins/go-http/go-http.hozo から遅れていないこと（docs/testing.md「生成物の一致」）。リポジトリの中身を一時ディレクトリに、
-// 置き場への道の上のディレクトリだけを本物にし、ほかをシンボリックリンクで足して（mirrorDir。置き場そのものは足さない）、その
-// plugins/go-http で hozoc build を走らせ、出た置き場の中身を、コミット済みのものとバイト単位で比べる。
-func TestGeneratedGoHTTPUpToDate(t *testing.T) {
+// TestGeneratedPluginSpecsUpToDate は、プラグインのプロジェクトごとに、コミットされた plugins/<名前>/internal/spec/** が、
+// そのプラグイン自身の要求の仕様 plugins/<名前>/<名前>.hozo から遅れていないこと（docs/testing.md「生成物の一致」）。
+// リポジトリの中身を一時ディレクトリに、置き場への道の上のディレクトリだけを本物にし、ほかをシンボリックリンクで足して（mirrorDir。
+// 置き場そのものは足さない）、その plugins/<名前> で hozoc build を走らせ、出た置き場の中身を、コミット済みのものとバイト単位で比べる。
+func TestGeneratedPluginSpecsUpToDate(t *testing.T) {
 	if _, err := exec.LookPath("go"); err != nil {
 		t.Skip("go がない")
 	}
@@ -105,15 +105,20 @@ func TestGeneratedGoHTTPUpToDate(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	root := t.TempDir()
-	if err := mirrorDir(repo, root, ".", goHTTPGeneratedDirs); err != nil {
-		t.Skipf("シンボリックリンクを作れない: %v", err)
+	for _, name := range pluginProjects {
+		t.Run(name, func(t *testing.T) {
+			dirs := []string{"plugins/" + name + "/internal/spec"}
+			root := t.TempDir()
+			if err := mirrorDir(repo, root, ".", dirs); err != nil {
+				t.Skipf("シンボリックリンクを作れない: %v", err)
+			}
+			var stdout, stderr bytes.Buffer
+			if code := hozocMainIn(filepath.Join(root, "plugins", name), []string{"build"}, &stdout, &stderr); code != 0 {
+				t.Fatalf("plugins/%s で hozoc build の終了コード %d\n%s%s", name, code, stdout.String(), stderr.String())
+			}
+			compareGenerated(t, repo, root, dirs, "plugins/"+name+"/"+name+".hozo")
+		})
 	}
-	var stdout, stderr bytes.Buffer
-	if code := hozocMainIn(filepath.Join(root, "plugins", "go-http"), []string{"build"}, &stdout, &stderr); code != 0 {
-		t.Fatalf("plugins/go-http で hozoc build の終了コード %d\n%s%s", code, stdout.String(), stderr.String())
-	}
-	compareGenerated(t, repo, root, goHTTPGeneratedDirs, "plugins/go-http/go-http.hozo")
 }
 
 // compareGenerated は、root に生成した置き場 dirs の中身が、リポジトリ repo のコミット済みのものと、バイト単位で同じこと。

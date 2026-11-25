@@ -1,0 +1,5 @@
+{
+  "tests": [
+    {"name": "hozo.gosqlite.Requirement.ForeignKeysOn", "file": "internal/spec/gosqlitetest/design.go", "lines": [20, 20]}
+  ]
+}

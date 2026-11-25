@@ -908,5 +908,25 @@ namespace hozo.decisions {
      */
     @adr.proposed
     D798;
+
+    /**
+     * go-sqlite の CreateTables は、Schema が外部キー（REFERENCES）を持つとき、先に db の接続で PRAGMA foreign_keys を読み、
+     * 効いていなければ、表を作らずにエラーを返す。効かせるのは、使う側（ドライバの DSN）。go-sqlite も、go-http と同じく、
+     * 自分の hozo.toml を持つ一つの Hozo のプロジェクトにし、go-sqlite 自身の要求 hozo.gosqlite.Requirement.ForeignKeysOn に書いて、
+     * そこから作るテストで確かめる（D795 と同じ形）。自己生成は、プラグインのプロジェクトを並べて扱う。
+     *
+     * @adr.context go-sqlite は REFERENCES を出すが、SQLite は既定で外部キーを確かめない（#164 の 5）。PRAGMA foreign_keys は
+     * 接続ごとの設定で、database/sql は接続をプールするので、生成したコードが一度実行しても、ほかの接続には効かない。
+     * 利用者は、三つの案（A: この決定。B: 文を実行するたびに効かせる。C: 今のまま）について、「PRAGMA foreign_keys を自動付与するか？
+     * というオプションにするか、Aかのいずれか」と言った。自動で付ける形は、プールのすべての接続に掛けるために、DB の開き方
+     * （driver.Connector を包む sql.OpenDB）を、生成したコードが引き受けることになるので、A にした。
+     * エラーの文言と、要求の名前は、聞かずに決めた。
+     * @adr.consequence DSN で外部キーを効かせていない使う側は、CreateTables が失敗するようになる。
+     * @adr.alternative オプションで、自動で効かせる: 生成したコードが、DB を開く関数（connector を包む）を持ち、使う側の sql.Open を替える
+     * @adr.alternative 文ごとに、接続を取り出して PRAGMA を掛ける: 文ごとに一往復増え、Conn の形が変わる
+     * @adr.said PRAGMA foreign_keys を自動付与するか？というオプションにするか、Aかのいずれか
+     */
+    @adr.proposed
+    D799;
   }
 }

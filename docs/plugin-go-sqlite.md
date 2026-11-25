@@ -55,7 +55,7 @@ N の `@db.table` の付いた基底の状態（**表の状態**）が一つも�
 | 名前 | 中身 |
 |---|---|
 | `const Schema` | 表ごとの `CREATE TABLE IF NOT EXISTS` を並べた SQL |
-| `func CreateTables(ctx context.Context, db *sql.DB) error` | `Schema` を、受け取った `ctx` で実行する（`db.ExecContext(ctx, Schema)`）。するのは表を作ることだけ。すでにある表には触れない |
+| `func CreateTables(ctx context.Context, db *sql.DB) error` | `Schema` を、受け取った `ctx` で実行する（`db.ExecContext(ctx, Schema)`）。するのは表を作ることだけ。すでにある表には触れない。`Schema` が外部キー（`REFERENCES`）を持つときは、先に、外部キーが効いているかを確かめる（「表」） |
 | `type Querier interface`、`func Conn(ctx context.Context, db *sql.DB) Querier` | 文を実行する先: `ctx` がトランザクションを運んでいればそれ、なければ `db`（「トランザクション」）。いつも出す |
 | `type <状態>Table struct{ db *sql.DB }` | 表の状態ごとに一つ。その状態の単位の実装。値の型で、同じ `db` から作った値は同じ表を読み書きする |
 | `func New<状態>Table(db *sql.DB) <状態>Table` | 上の型を作る |
@@ -82,7 +82,23 @@ const Schema = `CREATE TABLE IF NOT EXISTS "sessions" (
 `
 ```
 
-- 外部キーが効くかどうか（SQLite の既定では効かない）、表の作り直し（移行）は、このトランスパイラの外。
+- **外部キーは、効いていなければ、表を作らない**（決定 D799）: SQLite は、既定では外部キーを確かめず、`PRAGMA foreign_keys` は接続ごとの設定なので、プールの接続のすべてに効かせるのは、使う側（ドライバの DSN。`modernc.org/sqlite` なら `?_pragma=foreign_keys(1)`）。このトランスパイラは、ドライバを import しないので、効かせはしない。`Schema` が `REFERENCES` を持つときだけ、`CreateTables` は、先に `db` の接続で `PRAGMA foreign_keys` を読み、効いていなければ、表を作らずに、エラー `db: PRAGMA foreign_keys is off; enable it in the driver's DSN so that every connection checks REFERENCES` を返す（DSN で効かせれば、どの接続も同じなので、一つを確かめれば足りる）。`REFERENCES` がなければ、確かめない。
+
+```go
+func CreateTables(ctx context.Context, db *sql.DB) error {
+	var on bool
+	if err := db.QueryRowContext(ctx, "PRAGMA foreign_keys").Scan(&on); err != nil {
+		return err
+	}
+	if !on {
+		return errors.New("db: PRAGMA foreign_keys is off; enable it in the driver's DSN so that every connection checks REFERENCES")
+	}
+	_, err := db.ExecContext(ctx, Schema)
+	return err
+}
+```
+
+- 表の作り直し（移行）は、このトランスパイラの外。
 
 ### しまい方
 
@@ -453,7 +469,7 @@ func dbConflict(err, conflict error) error {
 | 宣言 | コメント |
 |---|---|
 | `Schema` | `// Schema は @db.table の状態の表を作る SQL（SQLite）。状態ごとに表一つ、その model のフィールドごとに列一つ。` |
-| `CreateTables` | `// CreateTables は db に、@db.table の状態の表を作る（Schema を実行する）。すでにある表には触れない。` |
+| `CreateTables` | `// CreateTables は db に、@db.table の状態の表を作る（Schema を実行する）。すでにある表には触れない。`。`Schema` が `REFERENCES` を持つときは、二行目に `// Schema は外部キーを持つので、先に、db の接続で PRAGMA foreign_keys が効いているかを確かめ、効いていなければ、表を作らずにエラーを返す（接続ごとの設定なので、ドライバの DSN で効かせる）。` |
 | `Querier`、`Conn`、`DbSeams`、`NewDbSeams`、`dbTransaction` | 「トランザクション」のコードの通り |
 | `<状態>Table` | `// <状態>Table は状態 <FQN> の単位（<状態>State）の、表 "<表>" の上の実装。` と `// メソッドは、形で決まる問い合わせ（IsEmpty、Get）と、この単位の read と効果のうち、db の語彙のデコレータを付けたもの（<句>）。`。句は、すべてに付いていれば（`read` も効果も一つもないときを含む）`この単位では、すべて`、そうでなければ `付けていないもの: <read と効果の名前を、単位の並びで「、」で>`。単位が `Post` を持つなら、`（IsEmpty、Get）` の後ろに `と命令（Post）` を足す |
 | `New<状態>Table` | `// New<状態>Table は db の表 "<表>" の上の <状態>Table を返す。表は CreateTables が作る。` |
@@ -496,6 +512,16 @@ func dbConflict(err, conflict error) error {
 補助のコメントは、サンプルの通り。
 
 この節の細部は、決定 D623 が決めた。
+
+## go-sqlite 自身の要求
+
+go-sqlite の出力の振る舞いのうち、テストで確かめ続けるものは、要求として、仕様 `plugins/go-sqlite/go-sqlite.hozo`（名前空間 `hozo.gosqlite`）に書く。形は go-http と同じ（`docs/plugin-go-http.md`「go-http 自身の要求」）: `plugins/go-sqlite` は、自分の `hozo.toml` を持つ一つの Hozo のプロジェクトで（`module` は `github.com/mew-ton/hozo/plugins/go-sqlite`）、要求ごとの、テストの入れ物の口（`plugins/go-sqlite/internal/spec/gosqlitetest` の `Requirements` と `RunRequirements`）は go-design が作り、`plugins/go-sqlite/internal/gosqlite/requirements_test.go` の `TestRequirements` が満たす。go-sqlite を使う人は、これらのテストを書かない。仕様は、この文書の写し。
+
+| 要求（`hozo.gosqlite.Requirement` のケース） | 振る舞いの持ち主 | 満たすテスト |
+|---|---|---|
+| `ForeignKeysOn` | 「表」の外部キー: `Schema` が `REFERENCES` を持つとき、`PRAGMA foreign_keys` が効いていない `db` では、`CreateTables` は表を作らずにエラー。効いていれば、表を作り、参照の違反を断る。`REFERENCES` がなければ、確かめない | 入力 `columns` の `TestForeignKeysOn` |
+
+この節の細部は、決定 D799 が決めた。
 
 ## 診断
 

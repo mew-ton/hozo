@@ -1,0 +1,30 @@
+// go-sqlite 自身の要求（docs/plugin-go-sqlite.md「go-sqlite 自身の要求」、決定 D799）。名前空間 hozo.gosqlite。
+// **写し。持ち主は、docs/plugin-go-sqlite.md**（要求の説明が、振る舞いを決める見出しを名指しする）。食い違えば、文書が正しい。
+//
+// このディレクトリの hozo.toml の単位が、go-design で、要求ごとの、テストの入れ物の口（plugins/go-sqlite/internal/spec/gosqlitetest の
+// Requirements と RunRequirements）を作る。満たすのは、go-sqlite の単体テスト（plugins/go-sqlite/internal/gosqlite/requirements_test.go）。
+// go-sqlite を使う人は、これらのテストを書かない。振る舞いを足すか変えるときは、先に、ここに要求を足す。
+
+/** go-sqlite が、生成した表のコードについて、満たし続けること */
+namespace hozo.gosqlite {
+  /** 要求: 生成した表のコードの振る舞い。どの宣言が、どの要求のためのものかは、@prd.ref が言う */
+  classify Requirement of never {
+    /**
+     * Schema が外部キー（REFERENCES）を持つとき、PRAGMA foreign_keys が効いていない db では、CreateTables は、表を作らずにエラーを返す。
+     * 効いていれば、表を作り、参照の違反を断る。REFERENCES がなければ、確かめない。
+     * 持ち主: docs/plugin-go-sqlite.md「表」
+     */
+    ForeignKeysOn;
+  }
+
+  /** 表の列の参照一つ（db.ref の付いたフィールド）: 指す先の表と列 */
+  @prd.ref(Requirement.ForeignKeysOn)
+  model Reference {
+    /** 参照する列の表 */
+    table: string;
+    /** 指す先の表 */
+    target: string;
+    /** 指す先の列 */
+    column: string;
+  }
+}

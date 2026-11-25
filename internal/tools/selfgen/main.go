@@ -1,6 +1,7 @@
-// Command selfgen は `make generate` の中身: 二つのプロジェクトの生成物を生成し直す（docs/packages.md「生成するもの」「自己生成の手順」）。
+// Command selfgen は `make generate` の中身: プロジェクトの生成物を生成し直す（docs/packages.md「生成するもの」「自己生成の手順」）。
 // リポジトリのルートの hozo.toml（hozoc 自身の仕様 cli.hozo から internal/gen/hozo/compiler/** と internal/gen/hozo/cli/**）と、
-// plugins/go-http/hozo.toml（go-http 自身の要求 go-http.hozo から plugins/go-http/internal/spec/**）。単位の out を、以下、「置き場」。
+// プラグインのプロジェクト plugins/<名前>/hozo.toml（そのプラグイン自身の要求から plugins/<名前>/internal/spec/**。pluginProjects）。
+// 単位の out を、以下、「置き場」。
 //
 // ルートの置き場は cmd/hozoc が import するパッケージなので、hozoc がそこへ直に書くと、プラグインの不具合で
 // コンパイルできない Go が出たときに、hozoc 自身がビルドできなくなり、生成し直すこともできなくなる。そうならないように、
@@ -12,8 +13,8 @@
 //     要るディレクトリ（ir、plugin、runtime）をシンボリックリンクで足して、そこで hozoc build を走らせる。
 //     生成されるコードの import パスは、hozo.toml の [options.go] の module から決まる（docs/plugin-go.md「パッケージと import パス」）
 //     ので、リポジトリで生成したときと同じになる。go.mod は、3 の vet とビルドのために写す。
-//     plugins/go-http のプロジェクトは、別の一時ディレクトリに、リポジトリの中身を、置き場への道の上のディレクトリだけを
-//     本物にし、ほかをシンボリックリンクで足して（mirror）、その plugins/go-http で hozoc build を走らせる。
+//     プラグインのプロジェクトは、プロジェクトごとに、別の一時ディレクトリに、リポジトリの中身を、置き場への道の上のディレクトリ
+//     だけを本物にし、ほかをシンボリックリンクで足して（mirror）、その plugins/<名前> で hozoc build を走らせる。
 //  3. 生成した置き場の中身を、その一時ディレクトリで vet に通し、次に、リポジトリの今のものの代わりに
 //     置いたつもりで（go の -overlay）、それを使うパッケージ（cmd/hozoc、internal/app）ごとビルドする。
 //  4. 通ったときだけ、リポジトリの置き場を生成したものに置き換える。通らなければ何も変えず、
@@ -52,11 +53,10 @@ var (
 	// users は、生成物を置き換えたつもりでビルドするパッケージ: 生成物そのものと、それを import するもの。
 	users = []string{"./internal/gen/...", "./internal/app/...", "./cmd/hozoc"}
 
-	// goHTTP は、もう一つのプロジェクト plugins/go-http（docs/plugin-go-http.md「go-http 自身の要求」）: プロジェクトのルートと、
-	// 置き場と、置き換えたつもりでビルドするパッケージ。
-	goHTTPProject = filepath.Join("plugins", "go-http")
-	goHTTPDirs    = []string{filepath.Join("plugins", "go-http", "internal", "spec")}
-	goHTTPUsers   = []string{"./plugins/go-http/..."}
+	// pluginProjects は、プラグインのプロジェクト（plugins/ の下の名前。docs/plugin-go-http.md「go-http 自身の要求」、
+	// docs/plugin-go-sqlite.md「go-sqlite 自身の要求」）。置き場は plugins/<名前>/internal/spec で、置き換えたつもりでビルドするのは
+	// plugins/<名前>/... 。
+	pluginProjects = []string{"go-http", "go-sqlite"}
 )
 
 func main() {
@@ -148,30 +148,35 @@ func run(repo string, stdout, stderr io.Writer) error {
 	if err := commandEnv(work, env, io.Discard, stderr, hozoc, "build"); err != nil {
 		return fmt.Errorf("hozoc build が失敗した: %w", err)
 	}
-	// plugins/go-http のプロジェクト
-	work2 := filepath.Join(tmp, "work-go-http")
-	if err := mirror(repo, work2, ".", goHTTPDirs); err != nil {
-		return fmt.Errorf("シンボリックリンクを作れない: %w", err)
+	// プラグインのプロジェクト
+	type project struct {
+		work  string
+		dirs  []string
+		users []string
 	}
-	if err := commandEnv(filepath.Join(work2, goHTTPProject), env, io.Discard, stderr, hozoc, "build"); err != nil {
-		return fmt.Errorf("%s で hozoc build が失敗した: %w", filepath.ToSlash(goHTTPProject), err)
+	sets := []project{{work, genDirs, users}}
+	for _, name := range pluginProjects {
+		root := filepath.Join("plugins", name)
+		set := project{filepath.Join(tmp, "work-"+name), []string{filepath.Join(root, "internal", "spec")}, []string{"./plugins/" + name + "/..."}}
+		if err := mirror(repo, set.work, ".", set.dirs); err != nil {
+			return fmt.Errorf("シンボリックリンクを作れない: %w", err)
+		}
+		if err := commandEnv(filepath.Join(set.work, root), env, io.Discard, stderr, hozoc, "build"); err != nil {
+			return fmt.Errorf("%s で hozoc build が失敗した: %w", filepath.ToSlash(root), err)
+		}
+		sets = append(sets, set)
 	}
 
 	// 3. vet と、置き換えたつもりでのビルド
-	if err := verify(repo, genDirs, work, users, tmp, stderr); err != nil {
-		keep = true
-		return fmt.Errorf("生成したコードがコンパイルできないので、%s は置き換えていない（生成したものは %s に残した）: %w", places(genDirs), work, err)
-	}
-	if err := verify(repo, goHTTPDirs, work2, goHTTPUsers, tmp, stderr); err != nil {
-		keep = true
-		return fmt.Errorf("生成したコードがコンパイルできないので、%s は置き換えていない（生成したものは %s に残した）: %w", places(goHTTPDirs), work2, err)
+	for _, set := range sets {
+		if err := verify(repo, set.dirs, set.work, set.users, tmp, stderr); err != nil {
+			keep = true
+			return fmt.Errorf("生成したコードがコンパイルできないので、%s は置き換えていない（生成したものは %s に残した）: %w", places(set.dirs), set.work, err)
+		}
 	}
 
 	// 4. 置き換える
-	for _, set := range []struct {
-		work string
-		dirs []string
-	}{{work, genDirs}, {work2, goHTTPDirs}} {
+	for _, set := range sets {
 		for _, dir := range set.dirs {
 			changed, err := replace(filepath.Join(repo, dir), filepath.Join(set.work, dir))
 			for _, c := range changed {
