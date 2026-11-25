@@ -1,0 +1,29 @@
+// DEC-25（docs/check.md「デコレータ」）: 包んだ関数の呼び出しを try のブロックに持ち、その後ろに文がある。never を返す op は、
+// いつも、例外を投げるので、try のブロックの後ろの文は、評価されない。catch のブロックが「返らない」なら（never を返す op に
+// 付けるには、そう要る: DEC-27）、try の文の後ろの文も、評価されない
+namespace a {
+  exception Denied;
+  fn record();
+  decorator fn inTry(next: fn) {
+    try {
+      next();
+      record();
+    } catch (e) {
+      record();
+      throw e;
+    }
+  }
+  decorator fn afterTry(next: fn) {
+    try {
+      next();
+    } catch (e) {
+      record();
+      throw e;
+    }
+    record();
+  }
+  @inTry                                   // ERROR: DEC-25
+  fn denied(): never throws Denied;
+  @afterTry                                // ERROR: DEC-25
+  fn refused(): never throws Denied;
+}

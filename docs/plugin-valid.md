@@ -43,7 +43,7 @@ namespaces = ["valid"]
 | `format(name)` | 元の型が `string` | 名前 `name` の形式（「形式」）の文字列 | `format` |
 
 - 表の「付けられる先」に合わない制約は VALID-1。配列のフィールドに付けられるのは `length` だけで、インデックスの model（`docs/types.md`「インデックスの model」）を型に持つフィールドには、どの制約も付けられない（制約を付けるのは、値の型）。どちらも VALID-1。
-- 元の型が `int` の先に付けた `min` / `max` の `value` は、整数。整数でなければ VALID-2。`length` は、`min` か `max` の、少なくとも一方を書く。どちらもなければ VALID-2。
+- 元の型が `int` の先に付けた `min` / `max` の `value` は、整数（整数のリテラルの範囲: 64 ビット符号付き。`docs/types.md`「診断」の LIT-1）。小数のリテラルでも、値が、その範囲の整数なら、よい（`1.0`）。整数でないか、範囲の外なら VALID-2。値は、丸めずに読む（2^53 を超える整数も、そのまま比べる）。`length` は、`min` か `max` の、少なくとも一方を書く。どちらもなければ VALID-2。
 - **違反の名前**は、違反を伝えるときに、どの制約に合わなかったかを言う名前（HTTP では、`http.BadRequest` の `violations` の `constraint`: `docs/plugin-http.md`「通信の形」）。デコレータの名前と同じ。**例外は一つ**: 配列のフィールドに付けた `length` の違反は、`count`（文字列の長さの違反 `length` と、言い分ける。決定 D400）。
 - **配列の要素に制約を掛ける道は、一つ**（同 401）: 要素の型を scalar にして、そちらに付ける（`@valid.length(min: 1, max: 20) scalar Tag extends string;` と `@valid.length(max: 10) tags: Tag[];`）。配列のフィールドに付けた `length` が、要素に掛かることは、ない。warning も、出さない。
 - **正規表現の文法は、RE2**（<https://github.com/google/re2/wiki/Syntax>。後読み、後方参照は、ない）。RE2 で解釈できない `regex` は VALID-3。RE2 に決める理由: 当たるかどうかが、言語の正規表現の実装の違いで変わらないように、文法を一つに決める。RE2 は、当てるのに掛かる時間が、値の長さに比例する。
@@ -77,7 +77,7 @@ Go の実装は `runtime.CheckFormat`（`docs/plugin-go-valid.md`「runtime」�
 | ID | 重さ | 意味 |
 |---|---|---|
 | VALID-1 | error | 制約が、付けた先に合わない（「制約」の表の「付けられる先」）: `min` / `max` の先の元の型が `int` でも `float` でもない、`length` / `pattern` / `format` の先の元の型が `string` でない、配列のフィールドに `length` のほかの制約が付いている、インデックスの model を型に持つフィールドに制約が付いている |
-| VALID-2 | error | 制約の引数が、足りないか、先に合わない: 元の型が `int` の先に付けた `min` / `max` の `value` が整数でない、`length` に `min` も `max` もない |
+| VALID-2 | error | 制約の引数が、足りないか、先に合わない: 元の型が `int` の先に付けた `min` / `max` の `value` が整数でない（64 ビット符号付きの範囲の外を含む）、`length` に `min` も `max` もない |
 | VALID-3 | error | `pattern` の `regex` を、RE2 で解釈できない。メッセージに、正規表現と、解釈できない理由を示す |
 | VALID-4 | error | `format` の `name` が、「形式」の四つのどれでもない。メッセージに、名前と、四つの名前を示す |
 

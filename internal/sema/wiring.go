@@ -141,8 +141,11 @@ type disjointFrame struct {
 	arm int
 	// assigned は、このアームで、代入が済んだ val。
 	assigned []*binding
-	// by は、val ごとの、値を入れたアームの番号（別のアームが入れる val に、入れたら WIRE-11）。
+	// by は、val ごとの、値を入れたアームの番号（別のアームが入れる val に、入れたら WIRE-11、集めたら WIRE-14）。
 	by map[*binding]int
+	// collectedBy は、val ごとの、集める文を書いたアームの番号の集まり（別のアームが集める val に、入れたら WIRE-11）。
+	// 別のアームが集める val に、集めるのは、よい（docs/check.md「繰り返し」の「集める」）。
+	collectedBy map[*binding]map[int]bool
 }
 
 // lowerWiring は配線の本体（docs/ir.md「配線」）。WIRE-2 / WIRE-3 / WIRE-4 / WIRE-8〜WIRE-14 と式の型。
@@ -735,6 +738,10 @@ func (a *analyzer) lowerAssign(w *wiring, s *ast.AssignStmt) (ir.Statement, bool
 				bad = "同じ disjoint の、別のアームが、もう、値を入れている"
 				break
 			}
+			if otherArm(f.collectedBy[b], f.arm) {
+				bad = "同じ disjoint の、別のアームが、集めている"
+				break
+			}
 		}
 	}
 	if bad != "" {
@@ -770,10 +777,20 @@ func (a *analyzer) lowerCollect(w *wiring, s *ast.CollectStmt) (ir.Statement, bo
 		bad = "集める文は、for の中にだけ書ける"
 	case b.isParam, b.isLoopVar, !b.empty:
 		bad = "集められるのは、空で宣言した val だけ"
+	case b.partial:
+		bad = "try か catch の、片方だけが、値を入れた val には、集められない"
 	case !b.unassigned:
 		bad = "もう、代入が済んでいる（一つの val に集められるのは、一つの for の中からだけ）"
 	case len(w.loops) <= b.loops:
 		bad = "集める先の val は、for の外で宣言する"
+	}
+	if bad == "" {
+		for _, f := range w.arms {
+			if arm, ok := f.by[b]; ok && arm != f.arm {
+				bad = "同じ disjoint の、別のアームが、値を入れている"
+				break
+			}
+		}
 	}
 	if bad != "" {
 		a.errorf("WIRE-14", s.Name.Span, "%s に集められない: %s", name, bad).Related = []diag.Related{related(b.span, "宣言")}
@@ -819,6 +836,12 @@ func (a *analyzer) lowerCollect(w *wiring, s *ast.CollectStmt) (ir.Statement, bo
 	} else if b.declType == nil {
 		b.collectTypes = append(b.collectTypes, collectedType{typ: t, span: s.Value.NodeSpan()})
 	}
+	for _, f := range w.arms {
+		if f.collectedBy[b] == nil {
+			f.collectedBy[b] = map[int]bool{}
+		}
+		f.collectedBy[b][f.arm] = true
+	}
 	if !b.collected {
 		b.collected, b.filled = true, true
 		loop := w.loops[b.loops]
@@ -828,6 +851,16 @@ func (a *analyzer) lowerCollect(w *wiring, s *ast.CollectStmt) (ir.Statement, bo
 		return nil, false
 	}
 	return ir.CollectStmt{Name: name, Expr: expr, Arm: into, Span: a.irSpan(s.Span)}, true
+}
+
+// otherArm は、arms に、arm でないアームがあるか。
+func otherArm(arms map[int]bool, arm int) bool {
+	for x := range arms {
+		if x != arm {
+			return true
+		}
+	}
+	return false
 }
 
 // finishCollect は、型を書かない、集める先の val の型を、集めた式の型から導く（docs/types.md「val の型」の 2）:
@@ -866,7 +899,7 @@ func (a *analyzer) finishCollect(b *binding) {
 // lowerDisjoint は `disjoint { アーム … }`（docs/check.md「disjoint」）。どのアームも、disjoint の前の、代入の済んだ集まりから始める。
 // アームどうしの検査（DISJ-1〜DISJ-3）は、Signature が要るので、internal/check が行う。
 func (a *analyzer) lowerDisjoint(w *wiring, s *ast.DisjointStmt) ir.Statement {
-	f := &disjointFrame{by: map[*binding]int{}}
+	f := &disjointFrame{by: map[*binding]int{}, collectedBy: map[*binding]map[int]bool{}}
 	w.arms = append(w.arms, f)
 	w.depth++
 	out := ir.DisjointStmt{Span: a.irSpan(s.Span)}
@@ -1105,7 +1138,8 @@ func (a *analyzer) evalCall(w *wiring, c *ast.Call, arm *armContext) (exprType, 
 }
 
 // bindArgs は位置で渡した値を、呼び出し先の引数名に対応付け、型を照合する（docs/types.md「呼び出しの引数」）。
-// 渡した値の数が引数の数を超えれば TYPE-4（位置は、超えた最初の値）。足りない必須の引数（BIND-4）は internal/check が見る。
+// 渡した値の数が引数の数を超えれば TYPE-4（位置は、超えた最初の値）。足りない必須の引数と、引数に渡したレコードリテラルの
+// 必須のフィールド（BIND-4）は internal/check が見る。
 func (a *analyzer) bindArgs(target callTarget, args []evaluatedArg, arm *armContext) []ir.CallArg {
 	var out []ir.CallArg
 	for i, arg := range args {
@@ -1216,7 +1250,9 @@ func (a *analyzer) checkArg(what string, p ir.OpParam, arg evaluatedArg, arm *ar
 	if p.Type == nil {
 		return nil
 	}
+	a.callArgs++
 	fail, into := a.assignInto(arg.typ, p.Type, arg.span, false)
+	a.callArgs--
 	if fail == assignOK || fail == failAmbiguous {
 		return into
 	}

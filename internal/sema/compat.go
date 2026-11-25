@@ -202,11 +202,13 @@ func (a *analyzer) assignType(s, t ir.Type) bool {
 		return ok && a.assignType(sv.Of, tv.Of)
 		// 7 は欠番（Record<K, V> どうしの規則だった。インデックスの model は、名前で比べる: 規則 1）
 	case ir.RefType:
-		// 11. scalar の値は元の型の位置に渡せる。model の値は、別の model の位置には渡せない
+		// 11. scalar の値は元の型の位置に渡せる。元の型が scalar なら、規則を再帰的に使う（WorkEmail を Email に。
+		// 継承の鎖を、核の型まで一気に辿らない）。継承が循環か未解決（scalarBaseOf が nil）なら、渡せない。
+		// model の値は、別の model の位置には渡せない
 		// （フィールドが同じでも、一方がもう一方を継承していても。docs/types.md「互換」の「渡せないもの」）
-		if sc := a.scalarSym(sv.Target); sc != nil {
-			if base := a.scalarBaseOf(sc); base != nil {
-				return a.assignType(base, t)
+		if sc := a.scalarSym(sv.Target); sc != nil && a.scalarBaseOf(sc) != nil {
+			if decl, ok := a.lower(sc).(*ir.Scalar); ok {
+				return a.assignType(decl.Base, t)
 			}
 		}
 	}
@@ -214,12 +216,21 @@ func (a *analyzer) assignType(s, t ir.Type) bool {
 }
 
 // fitRecord は docs/types.md「当てはまる（レコードリテラルを model T に）」。TYPE-5 / TYPE-6 と、各値の互換を確かめる。
-// 必須のフィールドが埋まっているか（BIND-4）は bind を要するので internal/check が行う。
+// 必須のフィールドが埋まっているか（BIND-4）は、呼び出しの引数の中なら、bind を要するので internal/check が行い、
+// 外（return、val、値を入れる文、集める文、match のアームの本体）なら、ここが、いちばん外のリテラルで行う
+// （docs/check.md「必須の入力」の「呼び出しの引数の外の、レコードリテラル」。bind は効かない）。
 // フィールドの値は、規則 14 の位置で、入ったアームを、IR のフィールド（recordFieldVal.out）に書く。
 // dry は、union のアームを数えるための、試し（docs/types.md「union に入れる」の「アームの決め方」）: 診断を出さず、IR に書かない。
 // 二度あるフィールド（TYPE-6）と、アームの決まらない値（TYPE-20）は、どの model に当てはめても同じなので、試しでは、当てはまる方に数える
 // （アームが決まった後の、本番の当てはめが、報告する）。
 func (a *analyzer) fitRecord(r *recordVal, m *ir.Model, dry bool) bool {
+	if !dry {
+		a.records++
+		defer func() { a.records-- }()
+		if a.records == 1 && a.callArgs == 0 {
+			defer a.checkRequiredFields(r, m)
+		}
+	}
 	ok := true
 	seen := map[string]bool{}
 	for i := range r.fields {
@@ -256,6 +267,63 @@ func (a *analyzer) fitRecord(r *recordVal, m *ir.Model, dry bool) bool {
 		}
 	}
 	return ok
+}
+
+// checkRequiredFields は、呼び出しの引数の外のレコードリテラル r を model m に当てはめたときの BIND-4（docs/check.md
+// 「必須の入力」）。位置は r。Data.missing に、r のフィールドの名前から始まる、足りないパスの列。
+func (a *analyzer) checkRequiredFields(r *recordVal, m *ir.Model) {
+	missing := a.missingFields(nil, r, m, nil)
+	if len(missing) == 0 {
+		return
+	}
+	names := make([]string, len(missing))
+	for i, p := range missing {
+		names[i] = strings.Join(p, ".")
+	}
+	d := a.errorf("BIND-4", r.span, "%s に当てはめたレコードリテラルで、必須のフィールド %s が埋まっていない", m.Name, strings.Join(names, "、"))
+	d.Data = map[string]any{"missing": missing}
+}
+
+// missingFields は、r を m に当てはめたとき、埋まっていない必須のフィールド（optional でない）のパス。値がレコードリテラルの
+// フィールドは、当てはめる先の model（union のアームに入るなら、そのアームの model）で、再帰的に確かめる。
+func (a *analyzer) missingFields(path []string, r *recordVal, m *ir.Model, missing [][]string) [][]string {
+	for _, mf := range m.Fields {
+		fpath := append(append([]string(nil), path...), mf.Name)
+		var given *recordFieldVal
+		for i := range r.fields {
+			if r.fields[i].name == mf.Name {
+				given = &r.fields[i]
+				break
+			}
+		}
+		if given == nil {
+			if _, opt := mf.Type.(ir.OptionalType); !opt {
+				missing = append(missing, fpath)
+			}
+			continue
+		}
+		if given.typ.kind != etRecord {
+			continue
+		}
+		if fm := a.placedModel(given.typ, mf.Type, given.valueSpan); fm != nil {
+			missing = a.missingFields(fpath, given.typ.rec, fm, missing)
+		}
+	}
+	return missing
+}
+
+// placedModel は、レコードリテラル s を型 t の位置に置いたときの、当てはめる先の model。union のアームに入るなら、
+// そのアームの model（docs/types.md「union に入れる」）。当てはまらなければ nil。
+func (a *analyzer) placedModel(s exprType, t ir.Type, span source.Span) *ir.Model {
+	if fail, arm := a.assignInto(s, t, span, true); fail == assignOK && arm != nil {
+		for _, ua := range a.unionArms(stripOptional(t)).Arms {
+			if ua.Name == arm.Arm {
+				return a.modelOf(stripOptional(ua.Type))
+			}
+		}
+		return nil
+	}
+	return a.modelOf(stripOptional(t))
 }
 
 // recordVal は評価したレコードリテラル。

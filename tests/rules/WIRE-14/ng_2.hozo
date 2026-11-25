@@ -1,0 +1,30 @@
+// WIRE-14（docs/check.md「繰り返し」の「集める」の 4。決定 D549）: 同じ disjoint の、別のアームが値を入れる val と、
+// try か catch の片方だけが入れた val には、集められない
+namespace a {
+  model M { id: string; }
+  exception E;
+  fn one(m: M): M;
+  fn get(): M[] throws E;
+  fn use(ms: M[]);
+  fn partial(ms: M[]) {
+    val xs: M[];                       // WARN: WIRE-8
+    try {
+      xs = get();
+    } catch (e) {
+      use(ms);
+    }
+    for (val m of ms) {
+      xs collect one(m);               // ERROR: WIRE-14
+    }
+  }
+  fn arms(ms: M[]) {
+    val xs: M[];
+    disjoint {
+      xs = ms;
+      for (val m of ms) {
+        xs collect one(m);             // ERROR: WIRE-14
+      }
+    }
+    use(xs);
+  }
+}

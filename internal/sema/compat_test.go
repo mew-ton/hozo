@@ -409,6 +409,19 @@ func TestCompatRule11ScalarBase(t *testing.T) {
 	if !a.assignType(mail2, ir.String()) {
 		t.Error("継承を辿った元の型に渡せる")
 	}
+	// 規則 11 は再帰的に使う（「互換」の頭）: Mail2 の base は Email で、Email は Email に渡せる（規則 1）
+	if !a.assignType(mail2, email) {
+		t.Error("多段の scalar は、途中の scalar に渡せる")
+	}
+	if !a.assignType(mail2, ir.Optional(email)) {
+		t.Error("多段の scalar は、途中の scalar の optional に渡せる")
+	}
+	if a.assignType(email, mail2) {
+		t.Error("元の scalar は、継承した scalar に渡せない")
+	}
+	if a.assignType(mail2, token) {
+		t.Error("多段の scalar を、継承の鎖にない scalar に渡せない")
+	}
 	if a.assignType(token, email) {
 		t.Error("scalar を別の scalar に渡せない")
 	}

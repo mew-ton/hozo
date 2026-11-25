@@ -1,0 +1,14 @@
+// DISJ-3（docs/check.md「disjoint」の「検査」の、行を受け取る引数）: 行の引数を絞り込んだ効果（`Order on Life.Draft`）も、
+// 行を受け取る。違う値を渡していれば、通る（「行の遷移」の「結びつき」の 3 と、同じ決まり）
+namespace a {
+  model Order { id: string; draft: boolean; }
+  state orders: list<Order>;
+  classify Life of Order { Draft; Placed; }
+  effect fn place(order: Order on Life.Draft): effects orders.put as Life.Placed;
+  fn f(a: Order on Life.Draft, b: Order on Life.Draft) {
+    disjoint {
+      place(a);
+      place(b);
+    }
+  }
+}

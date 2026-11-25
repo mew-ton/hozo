@@ -1,0 +1,20 @@
+// BIND-4（docs/check.md「必須の入力」の「呼び出しの引数の外の、レコードリテラル」。決定 D548）: 必須のフィールドが埋まった、
+// 呼び出しの引数の外のレコードリテラル。省略可能なフィールドは、埋めなくてよい
+namespace a {
+  model U { id: string; name: string; note: string?; }
+  model W { u: U; tag: string; }
+  fn mk(): U {
+    return { id: "x", name: "n" };
+  }
+  fn mkW(): W {
+    return { u: { id: "i", name: "n" }, tag: "t" };
+  }
+  fn take(u: U);
+  fn f() {
+    val x: U = { id: "x", name: "n" };
+    take(x);
+  }
+}
+namespace b {
+  fn h();
+}

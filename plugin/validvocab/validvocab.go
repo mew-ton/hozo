@@ -77,8 +77,10 @@ type Constraint struct {
 	Decorator, Name string
 	// Core は、付いた先の元の型（核の型）。配列のフィールドに付けた length（Count が true）では、意味を持たない。
 	Core ir.CoreName
-	// Bound は min / max の value。BoundText は、その書かれたままの形。
+	// Bound は、元の型が float の先の min / max の value。IntBound は、元の型が int の先の value（丸めずに読む。
+	// 整数の小数のリテラルも、整数にする）。BoundText は、その書かれたままの形。
 	Bound     float64
+	IntBound  int64
 	BoundText string
 	// HasMin、HasMax、Min、Max は length の引数。
 	HasMin, HasMax bool
@@ -216,17 +218,29 @@ func parse(app *ir.Application, core ir.CoreName, coreOK bool, subject string) (
 		if !ok {
 			return c, &Problem{CodeArgument, fmt.Sprintf("%s の引数 value が、数のリテラルでない", at)}
 		}
+		c.BoundText = literalText(lit)
+		notInt := func() *Problem {
+			return &Problem{CodeArgument, fmt.Sprintf("%s の value %s は整数でないので、元の型が int の %s には付けられない", at, c.BoundText, subject)}
+		}
 		switch v := lit.(type) {
 		case ir.IntLiteral:
-			c.Bound = float64(v.Value)
+			if core == ir.CoreInt {
+				c.IntBound = v.Value
+			} else {
+				c.Bound = float64(v.Value)
+			}
 		case ir.FloatLiteral:
-			c.Bound = v.Value
+			if core != ir.CoreInt {
+				c.Bound = v.Value
+				break
+			}
+			// int64 に収まる整数の小数: [-2^63, 2^63)
+			if v.Value != math.Trunc(v.Value) || v.Value < -(1<<63) || v.Value >= 1<<63 {
+				return c, notInt()
+			}
+			c.IntBound = int64(v.Value)
 		default:
 			return c, &Problem{CodeArgument, fmt.Sprintf("%s の引数 value が、数のリテラルでない", at)}
-		}
-		c.BoundText = literalText(lit)
-		if core == ir.CoreInt && (c.Bound != math.Trunc(c.Bound) || math.Abs(c.Bound) >= 1<<63) {
-			return c, &Problem{CodeArgument, fmt.Sprintf("%s の value %s は整数でないので、元の型が int の %s には付けられない", at, c.BoundText, subject)}
 		}
 	case Length:
 		if p := wantString(); p != nil {
