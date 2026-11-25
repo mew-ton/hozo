@@ -1,0 +1,17 @@
+# go-http 自身の要求（docs/plugin-go-http.md「go-http 自身の要求」）。このディレクトリを、一つの Hozo のプロジェクトにする
+[hozo]
+sources     = ["go-http.hozo"]
+plugin_dirs = [".."]
+
+# Go のモジュールのパスに、このディレクトリまでのパスを足したもの（モジュールは、リポジトリのルートの go.mod）
+[options.go]
+module = "github.com/mew-ton/hozo/plugins/go-http"
+
+# 要求ごとの、テストの入れ物の口は go-design
+[[emit]]
+namespace   = "hozo.gohttp"
+transpilers = ["go", "go-design"]
+out         = "internal/spec"
+
+[emit.options.go-design]
+requirements = ["hozo.gohttp.Requirement"]

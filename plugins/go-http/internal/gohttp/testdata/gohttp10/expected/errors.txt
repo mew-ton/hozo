@@ -1,3 +1,5 @@
 GOHTTP-10	app.NewHandler	model app.NewHandler の型 NewHandler が、go-http が入口のパッケージに足す関数 NewHandler と当たる（直すのは仕様の名前）
 GOHTTP-10	typed.NewHandler	scalar typed.NewHandler の型 NewHandler が、go-http が入口のパッケージに足す関数 NewHandler と当たる（直すのは仕様の名前）
 GOHTTP-10	wrapped.New	union wrapped.New のアーム Handler を包む型 NewHandler が、go-http が入口のパッケージに足す関数 NewHandler と当たる（直すのは仕様の名前）
+GOHTTP-10	options.HandlerOption	model options.HandlerOption の型 HandlerOption が、go-http が入口のパッケージに足す型 HandlerOption と当たる（直すのは仕様の名前）
+GOHTTP-10	options.WithInternalError	scalar options.WithInternalError の型 WithInternalError が、go-http が入口のパッケージに足す関数 WithInternalError と当たる（直すのは仕様の名前）

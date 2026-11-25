@@ -1,0 +1,9 @@
+{
+  "tests": [
+    {"name": "hozo.gohttp.Requirement.BodyLimit", "file": "internal/spec/gohttptest/design.go", "lines": [40, 40]},
+    {"name": "hozo.gohttp.Requirement.NullIsAbsent", "file": "internal/spec/gohttptest/design.go", "lines": [43, 43]},
+    {"name": "hozo.gohttp.Requirement.FiniteFloat", "file": "internal/spec/gohttptest/design.go", "lines": [46, 46]},
+    {"name": "hozo.gohttp.Requirement.InternalErrorHook", "file": "internal/spec/gohttptest/design.go", "lines": [49, 49]},
+    {"name": "hozo.gohttp.Requirement.ScalarJSON", "file": "internal/spec/gohttptest/design.go", "lines": [52, 52]}
+  ]
+}

@@ -3,7 +3,7 @@
 //
 //   - 「入力の読み方」と「通信の形」の「要求」: 三つの場所（ヘッダ、クエリ、本文）の、項目の形（名前を書いたものと、省いたもの）と、
 //     全体の形。項目がないときの三つの扱い（@http.required は 400、@http.default はその値、どちらもなければ零値）を、三つの場所で。
-//     ヘッダの空の文字列は、ないもの。クエリの同じ名前が二度あれば最初の値。本文の項目は、キーがあれば、値が null でも、あるもの。
+//     ヘッダの空の文字列は、ないもの。クエリの同じ名前が二度あれば最初の値。本文の項目の値が null なら、ないもの（要求 NullIsAbsent）。
 //     読み方（文字列、整数、小数、真偽値。省略可能と scalar）は、補助が、実行時に、読む先の型で決める。
 //   - 「op を呼ぶ前の失敗」: 読めない要求は 400 `http.BadRequest` と決まった文言で、op を呼ばない。読めない要求が先で、次に制約の検査。
 //   - 「制約の検査」: validate = true のときだけ。違反の path は、通信の上の場所。validate = false なら、確かめずに op を呼ぶ。
@@ -24,6 +24,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"reflect"
 	"strings"
 	"testing"
@@ -212,6 +213,24 @@ func TestRouting(t *testing.T) {
 }
 
 // ヘッダと本文の項目: 名前を書いたものと省いたもの、項目がないときの三つの扱い。
+// TestNullIsAbsent は、要求 hozo.gohttp.Requirement.NullIsAbsent（plugins/go-http/go-http.hozo）: 本文の項目の値が null なら、
+// その項目を送らなかったものと読む。@http.required の項目は 400 の missing、@http.default の項目は、その値、どちらもなければ零値。
+func TestNullIsAbsent(t *testing.T) {
+	leaves, h := newAPI()
+	// @http.required の項目（labels）の null は、ないのと同じ: 400 で、op を呼ばない
+	expectJSON(t, call(t, h, "POST", "/items?dryRun=true", `{"labels":null}`, createHeaders...),
+		400, `{"error":"http.BadRequest","value":{"message":"body labels: missing","violations":[]}}`)
+	if len(leaves.calls) != 0 {
+		t.Fatalf("op が呼ばれた: %v", leaves.calls)
+	}
+	// @http.default の項目（copies、active）の null は、その値。どちらもない項目（memo、item）の null は、零値
+	expectJSON(t, call(t, h, "POST", "/items?dryRun=true", `{"labels":{},"copies":null,"active":null,"memo":null,"item":null}`, createHeaders...),
+		200, `{"name":"","quantity":0,"tags":null}`)
+	if c := leaves.create; c.Copies != 1 || !c.Active || c.Note != nil || !reflect.DeepEqual(c.Item, pkgtype.Item{}) || c.Weight != 2 {
+		t.Errorf("null の項目: 入力 = %+v, want copies は 1、active は true（null は、ないもの）、memo と item は零値、weight は 2（キーがない）", c)
+	}
+}
+
 func TestHeadersAndBodies(t *testing.T) {
 	leaves, h := newAPI()
 	// @http.required の項目だけを送る
@@ -243,13 +262,6 @@ func TestHeadersAndBodies(t *testing.T) {
 		Labels: map[string]pkgtype.Name{}, Weight: 0.5, Scale: 2, Active: false, Timeout: 1000, Wait: 2000, Owner: "me"}
 	if !reflect.DeepEqual(leaves.create, want) {
 		t.Errorf("入力 = %+v, want %+v", leaves.create, want)
-	}
-
-	// 本文の項目は、キーがあれば、値が null でも、あるものと読む: @http.default の値を入れず、@http.required でも誤りにしない
-	expectJSON(t, call(t, h, "POST", "/items?dryRun=true", `{"labels":null,"copies":null,"active":null,"memo":null,"item":null}`, createHeaders...),
-		200, `{"name":"","quantity":0,"tags":null}`)
-	if c := leaves.create; c.Labels != nil || c.Copies != 0 || c.Active || c.Note != nil || c.Weight != 2 {
-		t.Errorf("null の項目: 入力 = %+v, want labels は nil、copies は 0、active は false（null は、あるもの）、weight は 2（キーがない）", c)
 	}
 
 	// validate = false: 制約に合わない入力でも、確かめずに op を呼ぶ
@@ -371,6 +383,31 @@ func TestQuery(t *testing.T) {
 	// 空の配列（nil でない）も、[]
 	leaves.items = []pkgtype.Item{}
 	expectJSON(t, call(t, h, "GET", "/items?q=x&min=1", ""), 200, `[]`)
+}
+
+// TestFiniteFloat は、要求 hozo.gohttp.Requirement.FiniteFloat（plugins/go-http/go-http.hozo）: クエリの float の値は、有限の値だけを
+// 読む。strconv.ParseFloat が読む NaN と無限大は、読めない値で、op を呼ばずに 400 の "query <名前>: invalid float"。核の型、省略可能、
+// scalar の、どれも。有限の値は、指数の形でも、読む。
+func TestFiniteFloat(t *testing.T) {
+	leaves, h := newAPI()
+	for _, name := range []string{"min", "max", "scale"} {
+		for _, text := range []string{"NaN", "nan", "Inf", "+Inf", "-Inf", "inf", "Infinity", "-infinity"} {
+			target := "/items?q=x&min=1&" + name + "=" + url.QueryEscape(text)
+			if name == "min" {
+				target = "/items?q=x&min=" + url.QueryEscape(text)
+			}
+			want := `{"error":"http.BadRequest","value":{"message":"query ` + name + `: invalid float","violations":[]}}`
+			expectJSON(t, call(t, h, "GET", target, ""), 400, want)
+		}
+	}
+	if len(leaves.calls) != 0 {
+		t.Fatalf("op が呼ばれた: %v", leaves.calls)
+	}
+	// 有限の値は、読む（大きな指数も、有限なら）
+	expectJSON(t, call(t, h, "GET", "/items?q=x&min=-1.5e308&max=1e308", ""), 200, `[]`)
+	if leaves.search.Min != -1.5e308 || leaves.search.Max == nil || *leaves.search.Max != 1e308 {
+		t.Errorf("入力 = %+v, want min は -1.5e308、max は 1e308", leaves.search)
+	}
 }
 
 // 全体の形: ヘッダ、クエリ、本文を、一つずつの model で受け取る。
@@ -601,5 +638,61 @@ func TestNoStatus(t *testing.T) {
 	expectJSON(t, call(t, h, "GET", "/pong", ""), 200, `"pong"`)
 }
 
-// NewHandler が受け取るのは、入口の Ops（New の戻り値を、そのまま渡す）。http.Handler を返す。
-var _ func(api.Ops) http.Handler = api.NewHandler
+// NewHandler が受け取るのは、入口の Ops（New の戻り値を、そのまま渡す）と、設定。http.Handler を返す。設定は、省ける
+var (
+	_ func(api.Ops, ...api.HandlerOption) http.Handler = api.NewHandler
+	_                                                  = api.NewHandler(api.New(&apiLeaves{}))
+)
+
+// TestInternalErrorHook は、要求 hozo.gohttp.Requirement.InternalErrorHook（plugins/go-http/go-http.hozo）: WithInternalError の関数は、
+// ハンドラが 500 を返すときだけ、その要求と、op が返したエラーで、一度呼ばれる。応答は、渡さないときと同じ。@http.status を持つ例外と、
+// op を呼ぶ前の失敗では、呼ばれない。@http.status を持つ例外のない出力（bare）でも、同じ。
+func TestInternalErrorHook(t *testing.T) {
+	type seen struct {
+		route string
+		err   error
+	}
+	var got []seen
+	hook := api.WithInternalError(func(r *http.Request, err error) {
+		got = append(got, seen{r.Method + " " + r.URL.Path, err})
+	})
+	leaves := &apiLeaves{}
+	h := api.NewHandler(api.New(leaves), hook)
+
+	// 500: 一度、要求とエラーで呼ぶ。応答は、渡さないときと同じ。要求の context は、ハンドラが受けたもの
+	secret := errors.New("secret detail")
+	leaves.err = secret
+	expectJSON(t, call(t, h, "GET", "/items/first?id=1", ""), 500, `{"error":"internal"}`)
+	if len(got) != 1 || got[0].route != "GET /items/first" || got[0].err != secret {
+		t.Fatalf("500 のとき、渡した関数が受け取ったもの = %+v, want GET /items/first と、op が返したエラー、一度", got)
+	}
+	// ステータスを持たない例外も、500 なので、呼ぶ
+	got = nil
+	leaves.err = pkgtype.Broken{}
+	expectJSON(t, call(t, h, "GET", "/health", ""), 500, `{"error":"internal"}`)
+	if len(got) != 1 || !errors.Is(got[0].err, pkgtype.Broken{}) {
+		t.Errorf("ステータスを持たない例外で、渡した関数が受け取ったもの = %+v", got)
+	}
+	// @http.status を持つ例外と、op を呼ぶ前の失敗と、成功では、呼ばない
+	got = nil
+	leaves.err = pkgtype.NotFound{}
+	expectJSON(t, call(t, h, "GET", "/items/first?id=1", ""), 404, `{"error":"type.NotFound"}`)
+	leaves.err = nil
+	call(t, h, "GET", "/items?min=1", "") // q がない: 400
+	expectJSON(t, call(t, h, "GET", "/items?q=x&min=1", ""), 200, `[]`)
+	if len(got) != 0 {
+		t.Errorf("500 でないのに、渡した関数が呼ばれた: %+v", got)
+	}
+	// 渡さなければ、応答は同じ
+	leaves.err = secret
+	expectJSON(t, call(t, api.NewHandler(api.New(leaves)), "GET", "/items/first?id=1", ""), 500, `{"error":"internal"}`)
+
+	// @http.status を持つ例外のない出力でも、同じに呼ぶ
+	got = nil
+	expectJSON(t, call(t, bare.NewHandler(bare.New(bareLeaves{}), bare.WithInternalError(func(r *http.Request, err error) {
+		got = append(got, seen{r.Method + " " + r.URL.Path, err})
+	})), "POST", "/touch", ""), 500, `{"error":"internal"}`)
+	if len(got) != 1 || got[0].route != "POST /touch" || got[0].err == nil {
+		t.Errorf("bare の 500 で、渡した関数が受け取ったもの = %+v", got)
+	}
+}

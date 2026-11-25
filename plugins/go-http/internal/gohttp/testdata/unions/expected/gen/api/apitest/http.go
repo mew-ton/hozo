@@ -405,6 +405,9 @@ var httpUnions = map[reflect.Type][]httpArm{
 // httpConsts は、リテラルの型のフィールドを持つ model ごとの、そのフィールドの並び（フィールドの順）。
 var httpConsts = map[reflect.Type][]httpConst{}
 
+// httpScalars は、元が日時の核の型の scalar ごとの、元の型。通信の上では、元の型の JSON で読み書きする。
+var httpScalars = map[reflect.Type]reflect.Type{}
+
 // httpArm は、通信に出る union のアーム一つ: 値として持つ Go の型と、見分け方。keys は、決め手（そのアームだけが持つ、
 // 省略可能でないフィールドの、JSON のキー）。tag と value は、印のキーと、そのアームの印の JSON。tag がなく、value だけなら、
 // リテラルの型のアームで、value は、その値の JSON。wrap は、包む型（中身は、フィールド Value）。
@@ -443,6 +446,15 @@ func httpDecode(data []byte, dst reflect.Value) error {
 	t := dst.Type()
 	if !httpHasUnion(t, map[reflect.Type]bool{}) {
 		return json.Unmarshal(data, dst.Addr().Interface())
+	}
+	if base, ok := httpScalars[t]; ok {
+		// 日時の scalar: 元の型の JSON で読んで、scalar の型に変える
+		x := reflect.New(base)
+		if err := json.Unmarshal(data, x.Interface()); err != nil {
+			return err
+		}
+		dst.Set(x.Elem().Convert(t))
+		return nil
 	}
 	null := string(bytes.TrimSpace(data)) == "null"
 	switch t.Kind() {
@@ -575,6 +587,10 @@ func httpEncode(v reflect.Value) ([]byte, error) {
 	if !httpHasUnion(t, map[reflect.Type]bool{}) {
 		return json.Marshal(v.Interface())
 	}
+	if base, ok := httpScalars[t]; ok {
+		// 日時の scalar: 元の型に変えて、元の型の JSON で書く
+		return json.Marshal(v.Convert(base).Interface())
+	}
 	switch t.Kind() {
 	case reflect.Interface, reflect.Pointer:
 		if v.IsNil() {
@@ -667,13 +683,16 @@ func httpEncode(v reflect.Value) ([]byte, error) {
 	return nil, errors.New("union: unsupported type " + t.String())
 }
 
-// httpHasUnion は、型 t の値の中に、union（か、実行時に型の決まる値）か、リテラルの型のフィールドを持つ model が現れうるか。
-// 現れない型は、encoding/json に、そのまま渡す。
+// httpHasUnion は、型 t の値の中に、union（か、実行時に型の決まる値）か、リテラルの型のフィールドを持つ model か、日時の scalar が
+// 現れうるか。現れない型は、encoding/json に、そのまま渡す。
 func httpHasUnion(t reflect.Type, seen map[reflect.Type]bool) bool {
 	if seen[t] {
 		return false
 	}
 	seen[t] = true
+	if httpScalars[t] != nil {
+		return true
+	}
 	switch t.Kind() {
 	case reflect.Interface:
 		return true

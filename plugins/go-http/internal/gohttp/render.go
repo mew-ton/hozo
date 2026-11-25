@@ -102,14 +102,19 @@ func pattern(r *route) string {
 
 // locals は、NewHandler とハンドラの中の局所の名前（docs/plugin-go-http.md「出力」）。
 type locals struct {
-	ops, mux, w, r, in, req, out, err string
+	ops, opts, o, mux, w, r, in, req, out, err string
 }
 
 // handler は NewHandler（docs/plugin-go-http.md「出力」）: コメント（経路の一覧）と、経路ごとの mux.HandleFunc。
 func (f *file) handler(routes []route) string {
-	l := locals{ops: f.local("ops"), mux: f.local("mux"), w: f.local("w"), r: f.local("r"),
+	l := locals{ops: f.local("ops"), opts: f.local("opts"), o: f.local("o"), mux: f.local("mux"), w: f.local("w"), r: f.local("r"),
 		in: f.local("in"), req: f.local("req"), out: f.local("out"), err: f.local("err")}
 	var b strings.Builder
+	// 設定（docs/plugin-go-http.md「出力」）: HandlerOption と WithInternalError。中身は、出力によらない（net/http の名前だけ）
+	fmt.Fprintf(&b, "// %s は、%s の設定。\ntype %s func(*httpOptions)\n\n", optionName, handlerName, optionName)
+	fmt.Fprintf(&b, "// %s は、ハンドラが 500（{\"error\":\"internal\"}）を返す前に、f を、その要求と、op が返したエラーで呼ぶ。\n", internalName)
+	b.WriteString("// 応答は変えない（エラーの中身は、応答に出さない）。記録や通知は、f が決める。\n")
+	fmt.Fprintf(&b, "func %s(f func(r *%s.Request, err error)) %s {\nreturn func(o *httpOptions) { o.internal = f }\n}\n\n", internalName, f.http(), optionName)
 	b.WriteString("// " + handlerName + " は ops を net/http のハンドラにする。@http.get / @http.post の付いた op ごとに経路を一つ持つ。\n")
 	if f.g.opts.Validate {
 		b.WriteString("// 入力を読んだ後、op を呼ぶ前に、入力の制約を確かめる（単位のオプション validate = true）。\n")
@@ -125,13 +130,14 @@ func (f *file) handler(routes []route) string {
 		head := routes[i].method + " " + routes[i].path
 		fmt.Fprintf(&b, "//\t%s%s  %s\n", head, strings.Repeat(" ", width-len(head)), routes[i].op.Name)
 	}
-	fmt.Fprintf(&b, "func %s(%s Ops) %s.Handler {\n%s := %s.NewServeMux()\n", handlerName, l.ops, f.http(), l.mux, f.http())
+	fmt.Fprintf(&b, "func %s(%s Ops, %s ...%s) %s.Handler {\n%s := httpNewOptions(%s)\n%s := %s.NewServeMux()\n",
+		handlerName, l.ops, l.opts, optionName, f.http(), l.o, l.opts, l.mux, f.http())
 	for i := range routes {
 		r := &routes[i]
 		fmt.Fprintf(&b, "\n// %s\n%s.HandleFunc(%s, func(%s %s.ResponseWriter, %s *%s.Request) {\n%s})\n",
 			r.op.Name, l.mux, strconv.Quote(pattern(r)), l.w, f.http(), l.r, f.http(), f.route(r, &l))
 	}
-	fmt.Fprintf(&b, "\nreturn %s\n}\n\n", l.mux)
+	fmt.Fprintf(&b, "\nreturn %s.MaxBytesHandler(%s, %d)\n}\n\n", f.http(), l.mux, f.g.opts.maxBodyBytes())
 	return b.String()
 }
 
@@ -151,7 +157,7 @@ func (f *file) route(r *route, l *locals) string {
 		fmt.Fprintf(&b, "if !%s.ok(%s) {\nreturn\n}\n", l.req, l.w)
 		// 3: 制約の検査。入力が Validate を持つかどうかは、補助が実行時に見る
 		if f.g.opts.Validate {
-			fmt.Fprintf(&b, "if !httpValidate(%s, %s", l.w, l.in)
+			fmt.Fprintf(&b, "if !httpValidate(%s, %s, %s, %s", l.w, l.r, l.o, l.in)
 			for i := range r.inputs {
 				fmt.Fprintf(&b, ", httpPlace{%s, %s}", strconv.Quote(r.inputs[i].field.Name), strconv.Quote(r.inputs[i].location()))
 			}
@@ -164,7 +170,7 @@ func (f *file) route(r *route, l *locals) string {
 		call += ", " + l.in
 	}
 	call += ")"
-	fail := fmt.Sprintf("httpWriteError(%s, %s)\nreturn\n", l.w, l.err)
+	fail := fmt.Sprintf("httpWriteError(%s, %s, %s, %s)\nreturn\n", l.w, l.r, l.err, l.o)
 	result := "nil"
 	if r.op.Returns != nil && !ir.IsNever(r.op.Returns) {
 		result = l.out
@@ -236,7 +242,7 @@ func (f *file) helpers(routes []route) string {
 	validate := f.g.opts.Validate && input
 	statuses := f.g.statuses(routes)
 
-	unions := len(f.g.unions) > 0 || len(f.g.consts) > 0
+	unions := f.g.codec()
 	var b strings.Builder
 	add := func(on bool, h helper) {
 		if !on {
@@ -263,6 +269,7 @@ func (f *file) helpers(routes []route) string {
 	add(headerObj, helperHeaderObj)
 	add(queryObj, helperQueryObj)
 	add(bodyObj, helperBodyObj)
+	add(body || bodyObj, helperRead)
 	add(missing, helperMissing)
 	add(text, helperText)
 	add(input, helperOK)
@@ -270,10 +277,11 @@ func (f *file) helpers(routes []route) string {
 	add(true, helperWriteJSON)
 	if unions {
 		f.use("reflect")
-		b.WriteString(f.g.unionTable(f.im.Qualifier))
+		b.WriteString(f.g.unionTable(f.im))
 		add(true, helperUnionCodec)
 	}
 	add(true, helperWriteResult)
+	add(true, helperHandlerOptions)
 	b.WriteString(f.writeError(statuses))
 	add(len(statuses) > 0, helperThrown)
 	return strings.TrimSuffix(b.String(), "\n")
@@ -282,13 +290,14 @@ func (f *file) helpers(routes []route) string {
 // writeError は補助 httpWriteError（docs/plugin-go-http.md「補助」）: @http.status を持つ例外を、最初に現れた順に、例外ごとに一行
 // `case httpThrown[<例外の型>](w, err, <code>):`。引数を持つ例外も、持たない例外も、同じ形で、引数の数と型は、行を変えない
 // （例外の値をどう応答にするかは、補助 httpThrown が、実行時に見る）。
-// 一つもなければ、switch を書かず、いつも 500。引数の名前（w、err）は、例外の名前空間のパッケージの名前と当たれば、末尾に _ を足す。
+// 一つもなければ、switch を書かず、いつも 500（補助 httpInternal）。引数の名前（w、r、err、o）は、例外の名前空間のパッケージの名前と
+// 当たれば、末尾に _ を足す。
 func (f *file) writeError(statuses []status) string {
-	w, err := f.local("w"), f.local("err")
+	w, r, err, o := f.local("w"), f.local("r"), f.local("err"), f.local("o")
 	var b strings.Builder
 	b.WriteString(helperWriteErrorComment)
-	fmt.Fprintf(&b, "func httpWriteError(%s %s.ResponseWriter, %s error) {\n", w, f.http(), err)
-	internal := fmt.Sprintf("httpWriteJSON(%s, %s.StatusInternalServerError, httpErrorBody{Error: \"internal\"})\n", w, f.http())
+	fmt.Fprintf(&b, "func httpWriteError(%s %s.ResponseWriter, %s *%s.Request, %s error, %s httpOptions) {\n", w, f.http(), r, f.http(), err, o)
+	internal := fmt.Sprintf("httpInternal(%s, %s, %s, %s)\n", w, r, err, o)
 	if len(statuses) == 0 {
 		b.WriteString(internal + "}\n\n")
 		return b.String()

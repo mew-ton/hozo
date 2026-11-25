@@ -591,7 +591,7 @@ namespace hozo.cli {
 }
 ```
 
-`hozo.toml`（単位は一つ）:
+`hozo.toml`（単位は二つ）:
 
 ```toml
 [hozo]

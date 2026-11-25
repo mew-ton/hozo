@@ -16,7 +16,7 @@ import (
 // 診断のコード（docs/plugin-go-http.md「診断」）。
 const (
 	codeHTTPOption   = "GOHTTP-9"  // [emit.options.go-http] に、知らないキーか、型の違う値がある
-	codeHTTPName     = "GOHTTP-10" // NewHandler が、N の定義のパッケージの名前と当たる
+	codeHTTPName     = "GOHTTP-10" // 入口のパッケージに足す公開の名前が、N の定義のパッケージの名前と当たる
 	codeHTTPValidate = "GOHTTP-11" // validate = true で、Validate を持つ入力の model の置き場の単位が、go-valid を並べていない
 	codeHTTPResult   = "GOHTTP-16" // 経路の op の結果の型が、省略可能な配列か、省略可能な、インデックスの model
 	codeHTTPTestName = "GOHTTP-20" // テストのパッケージに足す公開の名前が、基底の公開の名前か、自分のほかの名前と当たる
@@ -27,8 +27,15 @@ const (
 // テストのパッケージに出すファイルの名前は TestFileName（testfile.go）。
 const FileName = "http.go"
 
-// handlerName は、このトランスパイラが入口のパッケージに足す、ただ一つの公開の名前。
-const handlerName = "NewHandler"
+// handlerName、optionName、internalName は、このトランスパイラが入口のパッケージに足す公開の名前（docs/plugin-go-http.md「出力」）。
+const (
+	handlerName  = "NewHandler"
+	optionName   = "HandlerOption"
+	internalName = "WithInternalError"
+)
+
+// publicNames は、入口のパッケージに足す公開の名前（GOHTTP-10 が見る）。
+var publicNames = map[string]string{handlerName: "関数", optionName: "型", internalName: "関数"}
 
 // 読む語彙（標準の http。docs/plugin-go-http.md「マニフェスト」）のデコレータの FQN。持ち主は plugin/httpvocab。
 const (
@@ -47,6 +54,19 @@ const (
 type options struct {
 	// Validate が true なら、入力を読んだ後、op を呼ぶ前に、入力の制約（@valid.*）を確かめる。
 	Validate bool `json:"validate"`
+	// MaxBodyBytes は request body の上限（バイト）。nil なら既定（defaultMaxBodyBytes）。
+	MaxBodyBytes *int64 `json:"maxBodyBytes"`
+}
+
+// defaultMaxBodyBytes は、オプション maxBodyBytes の既定（1 MiB）。
+const defaultMaxBodyBytes = 1 << 20
+
+// maxBodyBytes は、NewHandler が http.MaxBytesHandler に渡す、request body の上限。
+func (o options) maxBodyBytes() int64 {
+	if o.MaxBodyBytes == nil {
+		return defaultMaxBodyBytes
+	}
+	return *o.MaxBodyBytes
 }
 
 // Output は、一つの出力 (U, N) についての応答の中身。Errors が一つでもあれば、Files も Warnings も空。
@@ -73,16 +93,7 @@ func Emit(req *plugin.EmitRequest) (*Output, error) {
 	g.prepare()
 
 	// GOHTTP-9
-	unknown, err := plugin.Options(req, &g.opts)
-	if err != nil {
-		// オプションは validate だけなので、型の違う値は、その値
-		g.opts = options{}
-		value, _ := json.Marshal(view.Config.Options[TranspilerName]["validate"])
-		g.errorf(codeHTTPOption, "", "%d 番目の [[emit]] の [emit.options.%s] の validate の値 %s が、真偽値でない", view.Config.Index, TranspilerName, value)
-	}
-	for _, key := range unknown {
-		g.errorf(codeHTTPOption, "", "%d 番目の [[emit]] の [emit.options.%s] に、知らないキー %s がある（あるのは validate）", view.Config.Index, TranspilerName, key)
-	}
+	g.opts = g.options(req)
 
 	// 置き場。基底のオプション module がなければ、基底が GO-8 を返すので、ここでは何も返さない（診断は、そのときも返す）
 	layout, err := golang.LayoutOf(view)
@@ -161,6 +172,8 @@ type generator struct {
 	unions []*wireUnion
 	// consts は、通信に出る、リテラルの型のフィールドを持つ model（最初に現れた順。unions.go）。
 	consts []*wireConst
+	// scalars は、通信に出る、元が日時の核の型の scalar（最初に現れた順。unions.go の wireScalars）。
+	scalars []wireScalar
 
 	errs []plugin.Diagnostic
 	seen map[string]bool
@@ -246,6 +259,7 @@ func (g *generator) check() ([]route, error) {
 	}
 	g.wireUnions(reader.Unions())
 	g.wireConsts(reader.LiteralModels())
+	g.wireScalars(routes)
 	if len(routes) > 0 {
 		g.checkName()
 	}
@@ -322,11 +336,12 @@ func (g *generator) statuses(routes []route) []status {
 	return out
 }
 
-// checkName は GOHTTP-10: NewHandler が、N の定義のパッケージの公開の名前（docs/plugin-go.md「名前」。入口のパッケージは、その
+// checkName は GOHTTP-10: 入口のパッケージに足す公開の名前（publicNames）が、N の定義のパッケージの公開の名前（docs/plugin-go.md「名前」。入口のパッケージは、その
 // すべてを再公開する）と当たる。位置は、当たった宣言。名前の一覧は、基底と共有する golang.PublicNames。
 func (g *generator) checkName() {
 	for _, n := range golang.PublicNames(g.view) {
-		if n.Name != handlerName {
+		kind, ours := publicNames[n.Name]
+		if !ours {
 			continue
 		}
 		var what string
@@ -348,7 +363,7 @@ func (g *generator) checkName() {
 		default:
 			what = n.What // 状態の単位、Ops、New など（NewHandler とは当たらない形の名前）
 		}
-		g.errorf(codeHTTPName, n.Decl, "%s %s が、%s が入口のパッケージに足す関数 %s と当たる（直すのは仕様の名前）", what, n.Name, TranspilerName, handlerName)
+		g.errorf(codeHTTPName, n.Decl, "%s %s が、%s が入口のパッケージに足す%s %s と当たる（直すのは仕様の名前）", what, n.Name, TranspilerName, kind, n.Name)
 	}
 }
 
@@ -356,4 +371,41 @@ func (g *generator) checkName() {
 func isArray(t ir.Type) bool {
 	_, ok := t.(ir.ArrayType)
 	return ok
+}
+
+// options は [emit.options.go-http]（docs/plugin-go-http.md「オプション」）を読む。GOHTTP-9 を集める: 知らないキーと、型の違う値
+// （maxBodyBytes では、正の整数でない値も）。型の違うキーは、ないものとして（既定で）読む。
+func (g *generator) options(req *plugin.EmitRequest) options {
+	var opts options
+	keys, _ := plugin.Options(req, &struct{}{}) // どのキーも知らないキーとして、辞書順に返る
+	table := g.view.Config.Options[TranspilerName]
+	at := func(key, want string) {
+		value, _ := json.Marshal(table[key])
+		g.errorf(codeHTTPOption, "", "%d 番目の [[emit]] の [emit.options.%s] の %s の値 %s が、%sでない", g.view.Config.Index, TranspilerName, key, value, want)
+	}
+	// 型の違う値が先、知らないキーが後（どちらも、キーの辞書順）
+	var unknown []string
+	for _, key := range keys {
+		data, _ := json.Marshal(table[key])
+		switch key {
+		case "validate":
+			if err := json.Unmarshal(data, &opts.Validate); err != nil {
+				opts.Validate = false
+				at(key, "真偽値")
+			}
+		case "maxBodyBytes":
+			var n int64
+			if err := json.Unmarshal(data, &n); err != nil || n <= 0 {
+				at(key, "正の整数")
+				continue
+			}
+			opts.MaxBodyBytes = &n
+		default:
+			unknown = append(unknown, key)
+		}
+	}
+	for _, key := range unknown {
+		g.errorf(codeHTTPOption, "", "%d 番目の [[emit]] の [emit.options.%s] に、知らないキー %s がある（あるのは validate と maxBodyBytes）", g.view.Config.Index, TranspilerName, key)
+	}
+	return opts
 }

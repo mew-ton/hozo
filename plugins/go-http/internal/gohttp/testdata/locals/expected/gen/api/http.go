@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"math"
 	"net/http"
 	"reflect"
 	"strconv"
@@ -24,6 +25,15 @@ import (
 	"github.com/mew-ton/hozo/runtime"
 )
 
+// HandlerOption は、NewHandler の設定。
+type HandlerOption func(*httpOptions)
+
+// WithInternalError は、ハンドラが 500（{"error":"internal"}）を返す前に、f を、その要求と、op が返したエラーで呼ぶ。
+// 応答は変えない（エラーの中身は、応答に出さない）。記録や通知は、f が決める。
+func WithInternalError(f func(r *http.Request, err error)) HandlerOption {
+	return func(o *httpOptions) { o.internal = f }
+}
+
 // NewHandler は ops を net/http のハンドラにする。@http.get / @http.post の付いた op ごとに経路を一つ持つ。
 // 入力を読んだ後、op を呼ぶ前に、入力の制約を確かめる（単位のオプション validate = true）。
 //
@@ -35,7 +45,8 @@ import (
 //	GET /ops       api.viaOps
 //	GET /strconv   api.viaStrconv
 //	POST /reflect  api.viaReflect
-func NewHandler(ops Ops) http.Handler {
+func NewHandler(ops Ops, opts ...HandlerOption) http.Handler {
+	o := httpNewOptions(opts)
 	mux_ := http.NewServeMux()
 
 	// api.viaIn
@@ -46,12 +57,12 @@ func NewHandler(ops Ops) http.Handler {
 		if !req_.ok(w_) {
 			return
 		}
-		if !httpValidate(w_, in_, httpPlace{"text", "body.text"}) {
+		if !httpValidate(w_, r_, o, in_, httpPlace{"text", "body.text"}) {
 			return
 		}
 		out_, err_ := ops.ViaIn(r_.Context(), in_)
 		if err_ != nil {
-			httpWriteError(w_, err_)
+			httpWriteError(w_, r_, err_, o)
 			return
 		}
 		httpWriteResult(w_, out_)
@@ -65,12 +76,12 @@ func NewHandler(ops Ops) http.Handler {
 		if !req_.ok(w_) {
 			return
 		}
-		if !httpValidate(w_, in_, httpPlace{"q", "query.q"}) {
+		if !httpValidate(w_, r_, o, in_, httpPlace{"q", "query.q"}) {
 			return
 		}
 		out_, err_ := ops.ViaOut(r_.Context(), in_)
 		if err_ != nil {
-			httpWriteError(w_, err_)
+			httpWriteError(w_, r_, err_, o)
 			return
 		}
 		httpWriteResult(w_, out_)
@@ -84,12 +95,12 @@ func NewHandler(ops Ops) http.Handler {
 		if !req_.ok(w_) {
 			return
 		}
-		if !httpValidate(w_, in_, httpPlace{"trace", "header.X-Trace"}) {
+		if !httpValidate(w_, r_, o, in_, httpPlace{"trace", "header.X-Trace"}) {
 			return
 		}
 		out_, err_ := ops.ViaR(r_.Context(), in_)
 		if err_ != nil {
-			httpWriteError(w_, err_)
+			httpWriteError(w_, r_, err_, o)
 			return
 		}
 		httpWriteResult(w_, out_)
@@ -103,11 +114,11 @@ func NewHandler(ops Ops) http.Handler {
 		if !req_.ok(w_) {
 			return
 		}
-		if !httpValidate(w_, in_, httpPlace{"page", "query.page"}) {
+		if !httpValidate(w_, r_, o, in_, httpPlace{"page", "query.page"}) {
 			return
 		}
 		if err_ := ops.ViaReq(r_.Context(), in_); err_ != nil {
-			httpWriteError(w_, err_)
+			httpWriteError(w_, r_, err_, o)
 			return
 		}
 		httpWriteResult(w_, nil)
@@ -121,12 +132,12 @@ func NewHandler(ops Ops) http.Handler {
 		if !req_.ok(w_) {
 			return
 		}
-		if !httpValidate(w_, in_, httpPlace{"paging", "query"}) {
+		if !httpValidate(w_, r_, o, in_, httpPlace{"paging", "query"}) {
 			return
 		}
 		out_, err_ := ops.ViaMux(r_.Context(), in_)
 		if err_ != nil {
-			httpWriteError(w_, err_)
+			httpWriteError(w_, r_, err_, o)
 			return
 		}
 		httpWriteResult(w_, out_)
@@ -140,12 +151,12 @@ func NewHandler(ops Ops) http.Handler {
 		if !req_.ok(w_) {
 			return
 		}
-		if !httpValidate(w_, in_, httpPlace{"meta", "header"}) {
+		if !httpValidate(w_, r_, o, in_, httpPlace{"meta", "header"}) {
 			return
 		}
 		out_, err_ := ops.ViaOps(r_.Context(), in_)
 		if err_ != nil {
-			httpWriteError(w_, err_)
+			httpWriteError(w_, r_, err_, o)
 			return
 		}
 		httpWriteResult(w_, out_)
@@ -159,12 +170,12 @@ func NewHandler(ops Ops) http.Handler {
 		if !req_.ok(w_) {
 			return
 		}
-		if !httpValidate(w_, in_, httpPlace{"on", "query.on"}) {
+		if !httpValidate(w_, r_, o, in_, httpPlace{"on", "query.on"}) {
 			return
 		}
 		out_, err_ := ops.ViaStrconv(r_.Context(), in_)
 		if err_ != nil {
-			httpWriteError(w_, err_)
+			httpWriteError(w_, r_, err_, o)
 			return
 		}
 		httpWriteResult(w_, out_)
@@ -178,18 +189,18 @@ func NewHandler(ops Ops) http.Handler {
 		if !req_.ok(w_) {
 			return
 		}
-		if !httpValidate(w_, in_, httpPlace{"body", "body"}) {
+		if !httpValidate(w_, r_, o, in_, httpPlace{"body", "body"}) {
 			return
 		}
 		out_, err_ := ops.ViaReflect(r_.Context(), in_)
 		if err_ != nil {
-			httpWriteError(w_, err_)
+			httpWriteError(w_, r_, err_, o)
 			return
 		}
 		httpWriteResult(w_, out_)
 	})
 
-	return mux_
+	return http.MaxBytesHandler(mux_, 1048576)
 }
 
 // httpErrorBody は失敗の応答の本文。
@@ -233,9 +244,10 @@ func httpDefault(v any) httpOption { return httpOption{value: v} }
 
 // httpRequest は、要求一つを、入力のフィールドに読む。読めなかった最初の理由を fail に持ち、その後は何も読まない。
 type httpRequest struct {
-	r     *http.Request
-	fail  string                     // 読めなかった理由（http.BadRequest の message）。読めていれば空
-	items map[string]json.RawMessage // 本文のオブジェクト。body が、初めて呼ばれたときに読む
+	r      *http.Request
+	fail   string                     // 読めなかった理由（http.BadRequest の message）。読めていれば空
+	status int                        // 読めなかったときのステータス。0 なら 400（read だけが、413 を入れる）
+	items  map[string]json.RawMessage // 本文のオブジェクト。body が、初めて呼ばれたときに読む
 }
 
 // header は、ヘッダ name の値を dst（フィールドへのポインタ）に読む（@http.header）。空の値は、ないものと読む。
@@ -251,23 +263,23 @@ func (q *httpRequest) query(name string, dst any, opts ...httpOption) {
 }
 
 // body は、本文（JSON のオブジェクト）のキー name の値を dst（フィールドへのポインタ）に読む（@http.body）。
-// キーがあれば、値が null でも、あるものと読む。
+// キーがないか、値が null なら、項目がない（missing）。
 func (q *httpRequest) body(name string, dst any, opts ...httpOption) {
 	if q.fail != "" {
 		return
 	}
 	if q.items == nil {
-		data, err := io.ReadAll(q.r.Body)
-		if err == nil {
-			err = json.Unmarshal(data, &q.items)
+		data, ok := q.read()
+		if !ok {
+			return
 		}
-		if err != nil || q.items == nil {
+		if err := json.Unmarshal(data, &q.items); err != nil || q.items == nil {
 			q.fail = "body: invalid JSON"
 			return
 		}
 	}
 	raw, present := q.items[name]
-	if !present {
+	if !present || string(raw) == "null" {
 		q.missing("body", name, dst, opts)
 		return
 	}
@@ -301,13 +313,27 @@ func (q *httpRequest) bodyObj(dst any) {
 	if q.fail != "" {
 		return
 	}
-	data, err := io.ReadAll(q.r.Body)
-	if err == nil {
-		err = json.Unmarshal(data, dst)
+	data, ok := q.read()
+	if !ok {
+		return
 	}
-	if err != nil {
+	if err := json.Unmarshal(data, dst); err != nil {
 		q.fail = "body: invalid JSON"
 	}
+}
+
+// read は、本文の全体を読む。上限（NewHandler が包んだ http.MaxBytesHandler）を超えていれば、読めない要求
+// （"body: too large"、413）。ほかの理由で読めなければ "body: invalid JSON"。読めなければ false。
+func (q *httpRequest) read() ([]byte, bool) {
+	data, err := io.ReadAll(q.r.Body)
+	var tooLarge *http.MaxBytesError
+	switch {
+	case errors.As(err, &tooLarge):
+		q.fail, q.status = "body: too large", http.StatusRequestEntityTooLarge
+	case err != nil:
+		q.fail = "body: invalid JSON"
+	}
+	return data, err == nil
 }
 
 // missing は、項目がなかったときの扱い。決めるのは、行に渡された opts だけで、dst の型は見ない:
@@ -326,7 +352,7 @@ func (q *httpRequest) missing(place, name string, dst any, opts []httpOption) {
 }
 
 // text は、通信の上の文字列（ヘッダとクエリの値）一つを dst（フィールドへのポインタ）に読む。読み方は、実行時に、dst の指す型で決める:
-// ポインタ（省略可能）なら、値を置く先を作る。文字列はそのまま、整数、小数、真偽値は strconv で読む。
+// ポインタ（省略可能）なら、値を置く先を作る。文字列はそのまま、整数、小数、真偽値は strconv で読む。小数は、有限の値だけ（NaN と無限大は、読めない）。
 // 値がない（present が false）ときの扱いは、missing。
 func (q *httpRequest) text(place, name, text string, present bool, dst any, opts []httpOption) {
 	if q.fail != "" {
@@ -352,7 +378,7 @@ func (q *httpRequest) text(place, name, text string, present bool, dst any, opts
 		v.SetInt(x)
 	case reflect.Float64:
 		x, err := strconv.ParseFloat(text, 64)
-		if err != nil {
+		if err != nil || math.IsNaN(x) || math.IsInf(x, 0) {
 			q.fail = place + " " + name + ": invalid float"
 		}
 		v.SetFloat(x)
@@ -365,12 +391,17 @@ func (q *httpRequest) text(place, name, text string, present bool, dst any, opts
 	}
 }
 
-// ok は、要求を読めたかどうか。読めなかったなら、400（http.BadRequest）を返して false。op は呼ばない。
+// ok は、要求を読めたかどうか。読めなかったなら、400（request body が上限を超えたなら 413）の http.BadRequest を返して false。
+// op は呼ばない。
 func (q *httpRequest) ok(w http.ResponseWriter) bool {
 	if q.fail == "" {
 		return true
 	}
-	httpWriteJSON(w, http.StatusBadRequest, httpErrorBody{
+	status := http.StatusBadRequest
+	if q.status != 0 {
+		status = q.status
+	}
+	httpWriteJSON(w, status, httpErrorBody{
 		Error: "http.BadRequest",
 		Value: httpBadRequest{Message: q.fail, Violations: []httpViolation{}},
 	})
@@ -380,7 +411,7 @@ func (q *httpRequest) ok(w http.ResponseWriter) bool {
 // httpValidate は、読んだ入力 in の制約を確かめる。in が Validate を持つかどうかは、実行時に見る（持たなければ、確かめるものがない）。
 // 制約に合わなければ、400（http.BadRequest）と違反の一覧を返して false。op は呼ばない。
 // 違反の Path の先頭（入力の model のフィールド名）を、places の通りに通信の上の場所に置き換える。
-func httpValidate(w http.ResponseWriter, in any, places ...httpPlace) bool {
+func httpValidate(w http.ResponseWriter, r *http.Request, o httpOptions, in any, places ...httpPlace) bool {
 	v, has := in.(interface{ Validate() error })
 	if !has {
 		return true
@@ -391,7 +422,7 @@ func httpValidate(w http.ResponseWriter, in any, places ...httpPlace) bool {
 	}
 	var invalid *runtime.ValidationError
 	if !errors.As(err, &invalid) {
-		httpWriteError(w, err)
+		httpInternal(w, r, err, o)
 		return false
 	}
 	violations := make([]httpViolation, 0, len(invalid.Violations))
@@ -441,14 +472,36 @@ func httpWriteResult(w http.ResponseWriter, out any) {
 	httpWriteJSON(w, http.StatusOK, out)
 }
 
+// httpOptions は、NewHandler の設定（HandlerOption が書く先）。
+type httpOptions struct {
+	internal func(r *http.Request, err error) // WithInternalError の関数。なければ nil
+}
+
+// httpNewOptions は、NewHandler に渡された設定を、順に当てる。
+func httpNewOptions(opts []HandlerOption) httpOptions {
+	var o httpOptions
+	for _, opt := range opts {
+		opt(&o)
+	}
+	return o
+}
+
+// httpInternal は、想定していない失敗の応答: WithInternalError の関数があれば、それを、要求とエラーで呼んでから、500 で、中身を出さない。
+func httpInternal(w http.ResponseWriter, r *http.Request, err error, o httpOptions) {
+	if o.internal != nil {
+		o.internal(r, err)
+	}
+	httpWriteJSON(w, http.StatusInternalServerError, httpErrorBody{Error: "internal"})
+}
+
 // httpWriteError は op が返したエラーを応答にする。@http.status を持つ例外は、そのステータスと例外の FQN（と運ぶ値）。
 // それ以外（ステータスを持たない例外、ctx のエラー、ほかのエラー）は 500 で、中身を出さない。
-func httpWriteError(w_ http.ResponseWriter, err_ error) {
+func httpWriteError(w_ http.ResponseWriter, r_ *http.Request, err_ error, o httpOptions) {
 	switch {
 	case httpThrown[w.NotFound](w_, err_, 404):
 	case httpThrown[err.Conflict](w_, err_, 409):
 	default:
-		httpWriteJSON(w_, http.StatusInternalServerError, httpErrorBody{Error: "internal"})
+		httpInternal(w_, r_, err_, o)
 	}
 }
 

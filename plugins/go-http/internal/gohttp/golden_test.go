@@ -26,6 +26,8 @@ var goldenFixtures = []struct {
 	{name: "uniformb", covers: "同、二つ目: scalar、省略可能なフィールド、引数を持つ例外（一つと、二つ以上。省略可能な引数）、省略可能な戻り値の op。uniforma と同じテキストになる（TestUniform）"},
 	{name: "unions", covers: "「通信の形」の「union」（印を書かない。決め手のキーで、アームを決める。包む型は、その Value）と、「補助」の「union の読み書き」（表 httpUnions と、読み書きの補助を、二つの http.go に）", behavior: true},
 	{name: "literals", covers: "「補助」の「union の読み書き」の、リテラルの型: 表 httpConsts（リテラルの型のフィールドを持つ model）、httpUnions の、リテラルの型のアームと、印で見分ける union。合わない値と、決められないアームは 400", behavior: true},
+	{name: "limits", covers: "要求 BodyLimit（「go-http 自身の要求」）: オプション maxBodyBytes を書いた出力と、書かない出力（既定の 1 MiB）の、NewHandler の http.MaxBytesHandler と、上限を超えた request body の 413", behavior: true},
+	{name: "scalars", covers: "要求 ScalarJSON（「go-http 自身の要求」）: 元が日時の核の型の scalar（一段と二段、date と time）の、表 httpScalars と、request body、結果、例外の値の読み書き", behavior: true},
 	{name: "cases", covers: "「インテグレーションテストの口」のうち、routes が使わない場合: 結果の名前が当たるとき、never を返す op、Given・Request・Then と当たる引数の名前、基底が、テストのパッケージを作らない出力"},
 }
 
@@ -84,7 +86,7 @@ func TestBehavior(t *testing.T) {
 }
 
 // TestPlacement は「出力」と「インテグレーションテストの口」の置き場と、公開の名前: http.go は、N の入口のパッケージに一つ（内部の op を
-// 持つ名前空間でも、内側のパッケージではない）と、N のテストのパッケージに一つ。入口のパッケージの公開の名前は NewHandler 一つ。
+// 持つ名前空間でも、内側のパッケージではない）と、N のテストのパッケージに一つ。入口のパッケージの公開の名前は HandlerOption、WithInternalError、NewHandler の三つ（publicNames）。
 // テストのパッケージの公開の名前は、<Op>HTTPCases、<Op>HTTPCase、HTTPCases、RunHTTP。非公開の名前は、どちらも http で始まる。
 func TestPlacement(t *testing.T) {
 	_, files := emitFixture(t, "routes")
@@ -131,7 +133,7 @@ func TestPlacement(t *testing.T) {
 				continue
 			}
 			name = name[:strings.IndexAny(name, "([ ")]
-			public := name == handlerName
+			_, public := publicNames[name]
 			if inTest {
 				public = name == casesName || name == runName || strings.HasSuffix(name, "HTTPCases") || strings.HasSuffix(name, "HTTPCase")
 			}
@@ -167,15 +169,15 @@ func TestHelpers(t *testing.T) {
 	for p, want := range map[string][]string{
 		// validate = false: 制約の検査の補助（httpPlace、httpValidate）はない。六つのデコレータを、すべて使う
 		"gen/api/http.go": {"httpErrorBody", "httpBadRequest", "httpViolation", "httpOption", "httpRequired", "httpDefault", "httpRequest",
-			".header", ".query", ".body", ".headerObj", ".queryObj", ".bodyObj", ".missing", ".text", ".ok",
-			"httpWriteJSON", "httpWriteResult", "httpWriteError", "httpThrown"},
+			".header", ".query", ".body", ".headerObj", ".queryObj", ".bodyObj", ".read", ".missing", ".text", ".ok",
+			"httpWriteJSON", "httpWriteResult", "httpOptions", "httpNewOptions", "httpInternal", "httpWriteError", "httpThrown"},
 		// validate = true。@http.headerObj を使わない。@http.status を持つ例外がないので、httpThrown はない。
 		// 全体の形（@http.queryObj）は、項目の形のメソッド（query）で、項目を一つずつ読む
 		"gen/strict/http.go": {"httpErrorBody", "httpBadRequest", "httpViolation", "httpPlace", "httpOption", "httpRequired", "httpDefault", "httpRequest",
-			".header", ".query", ".body", ".queryObj", ".bodyObj", ".missing", ".text", ".ok",
-			"httpValidate", "httpWriteJSON", "httpWriteResult", "httpWriteError"},
+			".header", ".query", ".body", ".queryObj", ".bodyObj", ".read", ".missing", ".text", ".ok",
+			"httpValidate", "httpWriteJSON", "httpWriteResult", "httpOptions", "httpNewOptions", "httpInternal", "httpWriteError"},
 		// 入力がなく、@http.status を持つ例外もない: 失敗の本文と、応答を書く補助だけ（validate = true でも、確かめる入力がない）
-		"gen/bare/http.go": {"httpErrorBody", "httpWriteJSON", "httpWriteResult", "httpWriteError"},
+		"gen/bare/http.go": {"httpErrorBody", "httpWriteJSON", "httpWriteResult", "httpOptions", "httpNewOptions", "httpInternal", "httpWriteError"},
 	} {
 		got := declaredHelpers(files[p])
 		if strings.Join(got, " ") != strings.Join(want, " ") {
@@ -222,11 +224,11 @@ func TestHelpers(t *testing.T) {
 	}
 	for keep, want := range map[string][]string{
 		"api.viaIn": {"httpErrorBody", "httpBadRequest", "httpViolation", "httpPlace", "httpOption", "httpRequired", "httpDefault", "httpRequest",
-			".body", ".missing", ".ok", "httpValidate", "httpWriteJSON", "httpWriteResult", "httpWriteError", "httpThrown"},
+			".body", ".read", ".missing", ".ok", "httpValidate", "httpWriteJSON", "httpWriteResult", "httpOptions", "httpNewOptions", "httpInternal", "httpWriteError", "httpThrown"},
 		"api.viaReflect": {"httpErrorBody", "httpBadRequest", "httpViolation", "httpPlace", "httpRequest",
-			".bodyObj", ".ok", "httpValidate", "httpWriteJSON", "httpWriteResult", "httpWriteError"},
+			".bodyObj", ".read", ".ok", "httpValidate", "httpWriteJSON", "httpWriteResult", "httpOptions", "httpNewOptions", "httpInternal", "httpWriteError"},
 		"api.viaOps": {"httpErrorBody", "httpBadRequest", "httpViolation", "httpPlace", "httpOption", "httpRequired", "httpDefault", "httpRequest",
-			".header", ".headerObj", ".missing", ".text", ".ok", "httpValidate", "httpWriteJSON", "httpWriteResult", "httpWriteError"},
+			".header", ".headerObj", ".missing", ".text", ".ok", "httpValidate", "httpWriteJSON", "httpWriteResult", "httpOptions", "httpNewOptions", "httpInternal", "httpWriteError"},
 	} {
 		if got := only(keep); strings.Join(got, " ") != strings.Join(want, " ") {
 			t.Errorf("%s だけの出力の補助 = %v, want %v", keep, got, want)
@@ -311,7 +313,7 @@ func TestThrown(t *testing.T) {
 	if start < 0 || end < start {
 		t.Fatal("gen/api/http.go に、httpWriteError と httpThrown がない")
 	}
-	want := `func httpWriteError(w http.ResponseWriter, err error) {
+	want := `func httpWriteError(w http.ResponseWriter, r *http.Request, err error, o httpOptions) {
 	switch {
 	case httpThrown[pkgtype.Conflict](w, err, 409):
 	case httpThrown[pkgtype.Rejected](w, err, 422):
@@ -319,7 +321,7 @@ func TestThrown(t *testing.T) {
 	case httpThrown[pkgtype.Limited](w, err, 429):
 	case httpThrown[pkgtype.Gone](w, err, 410):
 	default:
-		httpWriteJSON(w, http.StatusInternalServerError, httpErrorBody{Error: "internal"})
+		httpInternal(w, r, err, o)
 	}
 }
 
@@ -393,11 +395,11 @@ func TestLines(t *testing.T) {
 	// 制約の検査: 入力を持つすべての経路に、同じ形で。場所の一覧は、すべてのフィールドを、フィールドの順に
 	strict := files["gen/strict/http.go"]
 	for _, line := range []string{
-		`if !httpValidate(w, in, httpPlace{"token", "header.Authorization"}, httpPlace{"lines", "body.lines"}) {`,
-		`if !httpValidate(w, in, httpPlace{"page", "query.page"}, httpPlace{"name", "header.X-Name"}, httpPlace{"item", "body.item"}, httpPlace{"extra", "body.more"}) {`,
-		`if !httpValidate(w, in, httpPlace{"payload", "body"}, httpPlace{"paging", "query"}) {`,
+		`if !httpValidate(w, r, o, in, httpPlace{"token", "header.Authorization"}, httpPlace{"lines", "body.lines"}) {`,
+		`if !httpValidate(w, r, o, in, httpPlace{"page", "query.page"}, httpPlace{"name", "header.X-Name"}, httpPlace{"item", "body.item"}, httpPlace{"extra", "body.more"}) {`,
+		`if !httpValidate(w, r, o, in, httpPlace{"payload", "body"}, httpPlace{"paging", "query"}) {`,
 		// Validate を持たない入力にも、同じ行
-		`if !httpValidate(w, in, httpPlace{"id", "query.id"}) {`,
+		`if !httpValidate(w, r, o, in, httpPlace{"id", "query.id"}) {`,
 	} {
 		if !strings.Contains(strict, line) {
 			t.Errorf("gen/strict/http.go に、%q がない", line)
@@ -506,7 +508,7 @@ func TestDiagnostics(t *testing.T) {
 func TestDiagnosticPositions(t *testing.T) {
 	for name, want := range map[string][]string{
 		"gohttp9":  {""},
-		"gohttp10": {"app.NewHandler", "typed.NewHandler", "wrapped.New"},
+		"gohttp10": {"app.NewHandler", "typed.NewHandler", "wrapped.New", "options.HandlerOption", "options.WithInternalError"},
 		"gohttp11": {"app.a", "app.b"},
 		"gohttp16": {"app.items", "app.byName", "app.names"},
 		// 当たった自分の名前を生んだ経路の op。決まった名前（RunHTTP、HTTPCases）が当たったなら、相手の名前を生んだ宣言（分類、葉の op）
@@ -577,7 +579,7 @@ func TestOptionValidate(t *testing.T) {
 		return files["gen/strict/http.go"]
 	}
 	on := emit(map[string]any{"validate": true})
-	if n := strings.Count(on, "if !httpValidate(w, in, "); n != 4 {
+	if n := strings.Count(on, "if !httpValidate(w, r, o, in, "); n != 4 {
 		t.Errorf("validate = true: httpValidate の呼び出しが %d 回（入力を持つ経路は四つ）", n)
 	}
 	if !strings.Contains(on, "validate = true") {

@@ -1,0 +1,9 @@
+{
+  "tests": [
+    {"name": "app.put/OK", "file": "gen/app/apptest/http.go", "lines": [89, 95]},
+    {"name": "app.put/BadRequest", "file": "gen/app/apptest/http.go", "lines": [98, 104]},
+    {"name": "app.put/Late/app.put", "file": "gen/app/apptest/http.go", "lines": [108, 112]},
+    {"name": "app.whole/OK", "file": "gen/app/apptest/http.go", "lines": [131, 137]},
+    {"name": "app.whole/BadRequest", "file": "gen/app/apptest/http.go", "lines": [140, 146]}
+  ]
+}

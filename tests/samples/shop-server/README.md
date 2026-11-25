@@ -711,7 +711,7 @@ v1 の規則から変えたのは三つ: `r.Context()` を渡す（P29）、制�
 - **`app/onsqlite/store_test.go`**: `go-sqlite` だけの事実。
   - **`placeOrder` は一つのトランザクション**（`TestPlaceOrderIsOneTransaction`）: 二つ目の効果（通知の行。`userId` が、いないユーザーで、外部キーの違反）が失敗すれば、一つ目の効果（注文の行）も取り消され、その後も続けて足せる。接続を一つに限ってあるので、二つの効果がトランザクションの外の接続を使えば、テストは戻ってこない。
   - **それを守っているのは、継ぎ目**（`TestTransactionIsTheSeam`）: 同じ表の型の上で、継ぎ目だけを素通しに替えると、二つ目の効果が失敗しても、注文の行が残る。
-  - **入れ子は、外側に加わる**（`TestNestedTransactionJoins`）: 継ぎ目の中から、もう一度継ぎ目を通っても、新しいトランザクションは始まらず、外側が失敗すれば、内側のしたことも残らない。
+  - **入れ子は、外側の中で行う**（`TestNestedTransactionInsideOuter`）: 継ぎ目の中から、もう一度継ぎ目を通っても、新しいトランザクションは始まらず（内側は SAVEPOINT。`docs/vocab.md`「`db` の read と効果」の `transaction`）、外側が失敗すれば、内側のしたことも残らない。
   - `CreateTables` は中断された `ctx` では表を作らず、二度呼んでも足した行が残る。プラグインの型に足りないメソッドを、人が埋め込みで書き足せ、`store.Conn` を通せば、そのメソッドもトランザクションに入る（`TestHumanCompletesPluginType`。足りないままの型が `store.UsersState` を満たさないことは、リフレクションで確かめる）。`datetime` と配列の列の形、`REFERENCES`。
   - **状態の単位は、状態ごとに、別の実装から取れる**（`TestStatesFromTwoImplementations`）: `users`、`sessions`、`orders` は `go-sqlite` の型、`notifications` は、テストの中に人が書いた、メモリの上の型（`memNotifications`）。`store.New` は、状態ごとのインターフェースを満たす値を受け取るだけで、どの実装かを知らない。`@db.transaction` の継ぎ目が取り消せるのは、同じ `db` の上の `go-sqlite` の型がしたことだけで、メモリの上の単位がしたことは、入らない。
 - **`app/server_test.go`**: `server` だけ（`store` のどの出力も使わず、`server.StoreOps` を満たす型をテストが書く）。
