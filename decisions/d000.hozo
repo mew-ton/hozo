@@ -715,6 +715,7 @@ namespace hozo.decisions {
      * 持ち主: `docs/plugin-go.md`「パッケージと import パス」「New」、`docs/packages.md`「`plugin/golang`（公開）」「`plugin/govalid`（公開）」、`docs/plugin-go-http.md`「制約の検査」「診断」、`docs/plugin-go-cli.md`「引数の解釈」「診断」
      */
     @adr.accepted
+    @adr.amends(Decision000.D80)
     D89;
 
     /**
@@ -730,7 +731,7 @@ namespace hozo.decisions {
      *
      * 持ち主: `docs/requirements.md`「出力を推論しない」
      */
-    @adr.accepted
+    @adr.superseded(Decision100.D103)
     D91;
 
     /**

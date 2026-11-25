@@ -19,6 +19,7 @@ namespace hozo.decisions {
      * 持ち主: `docs/open.md`「サンプルと、hozoc 自身の仕様」「語彙とプラグイン」
      */
     @adr.accepted
+    @adr.amends(Decision400.D489)
     D501;
 
     /**
@@ -75,6 +76,7 @@ namespace hozo.decisions {
      * 持ち主: `docs/types.md`「match の型」「union に入れる」
      */
     @adr.accepted
+    @adr.amends(Decision400.D484)
     D508;
 
     /**
@@ -132,6 +134,7 @@ namespace hozo.decisions {
      * 持ち主: `docs/types.md`「union に入れる」の「重ねない」
      */
     @adr.accepted
+    @adr.amends(Decision400.D484)
     D515;
 
     /**
@@ -205,7 +208,7 @@ namespace hozo.decisions {
      * 持ち主: `docs/open.md`「次の段」
      */
     @adr.accepted
-    @adr.amends(Decision500.D523)
+    @adr.amends(Decision500.D523, Decision500.D522)
     D524;
 
     /**
@@ -222,6 +225,7 @@ namespace hozo.decisions {
      * 持ち主: `docs/tools.md`「担い手」「作る順」、`docs/ide-scenarios.md`「主人公」、`docs/requirements.md`「書く人と、読む人」
      */
     @adr.accepted
+    @adr.amends(Decision100.D176)
     D526;
 
     /**
@@ -247,6 +251,7 @@ namespace hozo.decisions {
      * 持ち主: `docs/requirements.md`「書き方の指針」
      */
     @adr.accepted
+    @adr.amends(Decision500.D509, Decision500.D515)
     D529;
 
     /**
@@ -255,6 +260,7 @@ namespace hozo.decisions {
      * 持ち主: `docs/requirements.md`「書き方の指針」
      */
     @adr.accepted
+    @adr.amends(Decision500.D529)
     D530;
 
     /**
@@ -445,7 +451,7 @@ namespace hozo.decisions {
      * @adr.context 115 行のほかの行まで読むのは、533 行を、すべて読むことになる。読んでいない範囲を、ここで言っておけば、後で、足せる。
      * @adr.alternative 533 行を、すべて読む
      */
-    @adr.proposed
+    @adr.superseded(Decision500.D546)
     D543;
 
     /**
@@ -473,5 +479,22 @@ namespace hozo.decisions {
      */
     @adr.proposed
     D545;
+
+    /**
+     * 543 で読まなかった行（「置き換え」の語を使わず、「言い直す」「閉じる」「直す」「足す」「やめる」「取りやめる」「なくす」「変える」
+     * 「戻す」などで、前の決定を変えた行）も読み、状態の印と、一部を直す印を、付ける。
+     * 丸ごと置き換えた: 91 ← 103（「一つの原則に言い直す」）、202 ← 203（「決定から、後で決め直すものに戻す」）。
+     * 一部を直す（新しい側に @adr.amends）: 89 → 80、103 → 91、108 → 82、110 → 89、114・116〜120・122 → 112（112 の未決を閉じる）、
+     * 260 → 259、307 → 230、329 → 265、330 → 268、334 → 295、335 → 295・319、337 → 335、345 → 323、361 → 355、373 → 275・306、
+     * 414 → 2、424 → 385、426 → 414、451 → 381、461 → 455、465 → 448、466 → 381、485 → 435、492 → 491、493 → 492、494 → 491、
+     * 495 → 494、496 → 491、498 → 493、499 → 497、501 → 489、508 → 484、515 → 484、524 → 522、526 → 176、529 → 509・515、530 → 529。
+     * 前の決定を「変えない」「そのまま」と言うだけの行、後で見直すと言うだけの行（219、221、326 など）、決定ではないもの
+     * （文書の文、規則の ID、案）を変える行には、付けていない。
+     *
+     * @adr.context 543 のままだと、印だけを見る道具が、一部を直された決定を、直されていないと読む。
+     * @adr.said supersededも頼むー
+     */
+    @adr.proposed
+    D546;
   }
 }

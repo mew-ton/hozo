@@ -68,6 +68,7 @@ namespace hozo.decisions {
      * 持ち主: `docs/ide-chain.md`「アクティビティ図」
      */
     @adr.accepted
+    @adr.amends(Decision200.D230)
     D307;
 
     /**
@@ -249,6 +250,7 @@ namespace hozo.decisions {
      * 持ち主: `docs/ide-chain.md`「要求の文書」
      */
     @adr.accepted
+    @adr.amends(Decision200.D265)
     D329;
 
     /**
@@ -257,6 +259,7 @@ namespace hozo.decisions {
      * 持ち主: `docs/ide-chain.md`「要求の文書」
      */
     @adr.accepted
+    @adr.amends(Decision200.D268)
     D330;
 
     /**
@@ -289,6 +292,7 @@ namespace hozo.decisions {
      * 持ち主: `docs/ide-chain.md`「アクティビティ図」
      */
     @adr.accepted
+    @adr.amends(Decision200.D295)
     D334;
 
     /**
@@ -297,6 +301,7 @@ namespace hozo.decisions {
      * 持ち主: `docs/ide-chain.md`「アクティビティ図」
      */
     @adr.accepted
+    @adr.amends(Decision200.D295, Decision300.D319)
     D335;
 
     /**
@@ -313,6 +318,7 @@ namespace hozo.decisions {
      * 持ち主: `docs/ide-chain.md`「アクティビティ図」
      */
     @adr.accepted
+    @adr.amends(Decision300.D335)
     D337;
 
     /**
@@ -380,6 +386,7 @@ namespace hozo.decisions {
      * 持ち主: `docs/requirements.md`「書き方の指針」
      */
     @adr.accepted
+    @adr.amends(Decision300.D323)
     D345;
 
     /**
@@ -517,6 +524,7 @@ namespace hozo.decisions {
      * 持ち主: `docs/types.md`「形の書き方」
      */
     @adr.accepted
+    @adr.amends(Decision300.D355)
     D361;
 
     /**
@@ -620,7 +628,7 @@ namespace hozo.decisions {
      * 持ち主: `docs/ide-chain.md`「テストの規約」、`docs/requirements.md`「もとの考えと、Hozo が守るもの」
      */
     @adr.accepted
-    @adr.amends(Decision200.D227)
+    @adr.amends(Decision200.D227, Decision200.D275, Decision300.D306)
     D373;
 
     /**

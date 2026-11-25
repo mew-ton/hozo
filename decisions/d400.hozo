@@ -124,6 +124,7 @@ namespace hozo.decisions {
      * 持ち主: `docs/plugin-protocol.md`「信頼の前提」（整理が済んだら、書き直す）
      */
     @adr.accepted
+    @adr.amends(Decision000.D2)
     D414;
 
     /**
@@ -207,6 +208,7 @@ namespace hozo.decisions {
      * 持ち主: `docs/plugin-go.md`「runtime パッケージ」
      */
     @adr.accepted
+    @adr.amends(Decision300.D385)
     D424;
 
     /**
@@ -224,6 +226,7 @@ namespace hozo.decisions {
      * 持ち主: `docs/requirements.md`「プラグインの要件」の「作り直しの段」
      */
     @adr.accepted
+    @adr.amends(Decision400.D414)
     D426;
 
     /**
@@ -426,6 +429,7 @@ namespace hozo.decisions {
      * 持ち主: `docs/check.md`「Sig(O, v)」「診断」
      */
     @adr.accepted
+    @adr.amends(Decision300.D381)
     D451;
 
     /**
@@ -506,6 +510,7 @@ namespace hozo.decisions {
      * 持ち主: `vocab/`、`docs/vocab.md`「同梱する語彙」
      */
     @adr.superseded(Decision400.D462)
+    @adr.amends(Decision400.D455)
     D461;
 
     /**
@@ -538,6 +543,7 @@ namespace hozo.decisions {
      * 持ち主: `docs/grammar.md`「予約語」「決めたこと」
      */
     @adr.accepted
+    @adr.amends(Decision400.D448)
     D465;
 
     /**
@@ -546,6 +552,7 @@ namespace hozo.decisions {
      * 持ち主: `docs/requirements.md`「検査の規則の一覧」、`docs/check.md`「診断」の「throws」
      */
     @adr.accepted
+    @adr.amends(Decision300.D381)
     D466;
 
     /**
@@ -701,6 +708,7 @@ namespace hozo.decisions {
      * 持ち主: `docs/vocab.md`「同梱する語彙」「同梱しない語彙」
      */
     @adr.accepted
+    @adr.amends(Decision400.D435)
     D485;
 
     /**
@@ -757,6 +765,7 @@ namespace hozo.decisions {
      * 持ち主: `README.md`、`README.ja.md`
      */
     @adr.accepted
+    @adr.amends(Decision400.D491)
     D492;
 
     /**
@@ -765,6 +774,7 @@ namespace hozo.decisions {
      * 持ち主: `README.md`、`README.ja.md`
      */
     @adr.accepted
+    @adr.amends(Decision400.D492)
     D493;
 
     /**
@@ -773,6 +783,7 @@ namespace hozo.decisions {
      * 持ち主: `README.md`、`README.ja.md`
      */
     @adr.accepted
+    @adr.amends(Decision400.D491)
     D494;
 
     /**
@@ -781,6 +792,7 @@ namespace hozo.decisions {
      * 持ち主: `README.md`、`README.ja.md`
      */
     @adr.accepted
+    @adr.amends(Decision400.D494)
     D495;
 
     /**
@@ -789,6 +801,7 @@ namespace hozo.decisions {
      * 持ち主: `README.md`、`README.ja.md`
      */
     @adr.accepted
+    @adr.amends(Decision400.D491)
     D496;
 
     /**
@@ -805,6 +818,7 @@ namespace hozo.decisions {
      * 持ち主: `README.md`、`README.ja.md`
      */
     @adr.accepted
+    @adr.amends(Decision400.D493)
     D498;
 
     /**
@@ -813,6 +827,7 @@ namespace hozo.decisions {
      * 持ち主: `README.md`、`README.ja.md`
      */
     @adr.accepted
+    @adr.amends(Decision400.D497)
     D499;
   }
 }

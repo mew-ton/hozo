@@ -35,6 +35,7 @@ namespace hozo.decisions {
      * 持ち主: `docs/requirements.md`「出力を推論しない」
      */
     @adr.accepted
+    @adr.amends(Decision000.D91)
     D103;
 
     /**
@@ -75,6 +76,7 @@ namespace hozo.decisions {
      * 持ち主: `docs/plugin-go-http.md`「通信の形」「補助」
      */
     @adr.accepted
+    @adr.amends(Decision000.D82)
     D108;
 
     /**
@@ -91,6 +93,7 @@ namespace hozo.decisions {
      * 持ち主: `docs/plugin-go-http.md`「出力」「制約の検査」、`docs/plugin-go-cli.md`「コマンドごとの関数」、`docs/plugin-go-valid.md`「ほかの相乗りとの約束」
      */
     @adr.accepted
+    @adr.amends(Decision000.D89)
     D110;
 
     /**
@@ -123,6 +126,7 @@ namespace hozo.decisions {
      * 持ち主: `docs/vocab.md`「`http` の語彙」、`docs/plugin-go-http.md`「対象」「入力の読み方」、`docs/plugin-go-cli.md`「語彙」「引数の解釈」
      */
     @adr.accepted
+    @adr.amends(Decision100.D112)
     D114;
 
     /**
@@ -139,6 +143,7 @@ namespace hozo.decisions {
      * 持ち主: `docs/plugin-go.md`「model」「値」「bind で埋まる位置」、`docs/packages.md`「`plugin/golang`（公開）」、`docs/plugin-go-valid.md`「診断」
      */
     @adr.accepted
+    @adr.amends(Decision100.D112)
     D116;
 
     /**
@@ -147,6 +152,7 @@ namespace hozo.decisions {
      * 持ち主: `docs/plugin-go-http.md`「対象」「通信の形」
      */
     @adr.accepted
+    @adr.amends(Decision100.D112)
     D117;
 
     /**
@@ -155,6 +161,7 @@ namespace hozo.decisions {
      * 持ち主: `docs/plugin-go-http.md`「出力」
      */
     @adr.accepted
+    @adr.amends(Decision100.D112)
     D118;
 
     /**
@@ -163,6 +170,7 @@ namespace hozo.decisions {
      * 持ち主: `docs/vocab.md`「`db` の表と、しまい方」、`docs/plugin-go-sqlite.md`「表」「補助」
      */
     @adr.superseded(Decision100.D134)
+    @adr.amends(Decision100.D112)
     D119;
 
     /**
@@ -171,6 +179,7 @@ namespace hozo.decisions {
      * 持ち主: `docs/plugin-go-sqlite.md`「表」
      */
     @adr.accepted
+    @adr.amends(Decision100.D112)
     D120;
 
     /**
@@ -187,6 +196,7 @@ namespace hozo.decisions {
      * 持ち主: `docs/requirements.md`「作り直しの段階」の R3、`tests/samples/shop-server/README.md`「下書きから変えたこと」、`docs/plugin-go-http.md`「未決」、`docs/plugin-go-cli.md`「未決」
      */
     @adr.accepted
+    @adr.amends(Decision100.D112)
     D122;
 
     /**

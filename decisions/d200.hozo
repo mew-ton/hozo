@@ -26,7 +26,7 @@ namespace hozo.decisions {
      *
      * 持ち主: `docs/ide-shapes.md`「決まっている前提」
      */
-    @adr.accepted
+    @adr.superseded(Decision200.D203)
     D202;
 
     /**
@@ -495,6 +495,7 @@ namespace hozo.decisions {
      * 持ち主: `docs/ide-screens.md`「領域」
      */
     @adr.accepted
+    @adr.amends(Decision200.D259)
     D260;
 
     /**
