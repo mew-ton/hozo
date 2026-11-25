@@ -1,0 +1,35 @@
+// 元が日時の核の型の scalar（docs/plugin-go-http.md「補助」の「union の読み書き」の httpScalars）。Stamp は一段、Moment は二段。
+// Day と Clock は date と time。Count は数の scalar で、表に載らない（encoding/json が、元の型の JSON で読み書きする）。
+namespace app {
+  scalar Stamp extends datetime;
+  scalar Moment extends Stamp;
+  scalar Day extends date;
+  scalar Clock extends time;
+  scalar Count extends int;
+
+  model Event {
+    at: Stamp;
+    moment: Moment;
+    day: Day;
+    clock: Clock;
+    count: Count;
+    later: Stamp?;
+    days: Day[];
+  }
+
+  @http.status(409)
+  exception Late(at: Stamp, day: Day?);
+
+  model PutInput {
+    @http.body event: Event;
+    @http.body at: Moment;
+  }
+  /** 本文で受けた値を、そのまま返す。Late を投げることもある */
+  @http.post("/events")
+  export fn put(in: PutInput): Event
+    throws Late;
+
+  model WholeInput { @http.bodyObj event: Event; }
+  @http.post("/whole")
+  export fn whole(in: WholeInput): Stamp;
+}

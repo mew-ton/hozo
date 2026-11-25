@@ -22,6 +22,7 @@ type requirements struct{}
 func (requirements) BodyLimit(t *testing.T)         { behave(t, "limits", "TestBodyLimit") }
 func (requirements) NullIsAbsent(t *testing.T)      { behave(t, "routes", "TestNullIsAbsent") }
 func (requirements) FiniteFloat(t *testing.T)       { behave(t, "routes", "TestFiniteFloat") }
+func (requirements) ScalarJSON(t *testing.T)        { behave(t, "scalars", "TestScalarJSON") }
 func (requirements) InternalErrorHook(t *testing.T) { behave(t, "routes", "TestInternalErrorHook") }
 
 // behave は、入力 name の出力（基底 go と go-valid の出力と合わせたもの）を、一時のモジュールに置き、testdata/<name>/behavior_test.go の

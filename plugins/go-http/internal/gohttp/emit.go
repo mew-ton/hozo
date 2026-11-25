@@ -172,6 +172,8 @@ type generator struct {
 	unions []*wireUnion
 	// consts は、通信に出る、リテラルの型のフィールドを持つ model（最初に現れた順。unions.go）。
 	consts []*wireConst
+	// scalars は、通信に出る、元が日時の核の型の scalar（最初に現れた順。unions.go の wireScalars）。
+	scalars []wireScalar
 
 	errs []plugin.Diagnostic
 	seen map[string]bool
@@ -257,6 +259,7 @@ func (g *generator) check() ([]route, error) {
 	}
 	g.wireUnions(reader.Unions())
 	g.wireConsts(reader.LiteralModels())
+	g.wireScalars(routes)
 	if len(routes) > 0 {
 		g.checkName()
 	}

@@ -27,6 +27,11 @@ type Requirements interface {
 	// 持ち主: docs/plugin-go-http.md「出力」「補助」
 	// 指している設計: hozo.gohttp.InternalFailure
 	InternalErrorHook(t *testing.T)
+	// ScalarJSON は、要求 hozo.gohttp.Requirement.ScalarJSON: 元が日時の核の型（datetime、date、time。何段の scalar を経ても）の scalar の値は、通信の上では、元の型の JSON で読み書きする
+	// （datetime は RFC 3339 の文字列、date と time は、その形の文字列）。request body、結果、例外の値の、どれでも。
+	// 持ち主: docs/plugin-go-http.md「補助」の「union の読み書き」、docs/plugin-http.md「値の JSON」
+	// 指している設計: hozo.gohttp.WireScalar
+	ScalarJSON(t *testing.T)
 }
 
 // RunRequirements は、要求ごとに、入れ物を一つ走らせる。テストの名前は、要求の名前（<分類の FQN>.<ケース>）。
@@ -42,5 +47,8 @@ func RunRequirements(t *testing.T, c Requirements) {
 	})
 	t.Run("hozo.gohttp.Requirement.InternalErrorHook", func(t *testing.T) {
 		c.InternalErrorHook(t)
+	})
+	t.Run("hozo.gohttp.Requirement.ScalarJSON", func(t *testing.T) {
+		c.ScalarJSON(t)
 	})
 }

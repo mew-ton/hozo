@@ -27,6 +27,7 @@ var goldenFixtures = []struct {
 	{name: "unions", covers: "「通信の形」の「union」（印を書かない。決め手のキーで、アームを決める。包む型は、その Value）と、「補助」の「union の読み書き」（表 httpUnions と、読み書きの補助を、二つの http.go に）", behavior: true},
 	{name: "literals", covers: "「補助」の「union の読み書き」の、リテラルの型: 表 httpConsts（リテラルの型のフィールドを持つ model）、httpUnions の、リテラルの型のアームと、印で見分ける union。合わない値と、決められないアームは 400", behavior: true},
 	{name: "limits", covers: "要求 BodyLimit（「go-http 自身の要求」）: オプション maxBodyBytes を書いた出力と、書かない出力（既定の 1 MiB）の、NewHandler の http.MaxBytesHandler と、上限を超えた request body の 413", behavior: true},
+	{name: "scalars", covers: "要求 ScalarJSON（「go-http 自身の要求」）: 元が日時の核の型の scalar（一段と二段、date と time）の、表 httpScalars と、request body、結果、例外の値の読み書き", behavior: true},
 	{name: "cases", covers: "「インテグレーションテストの口」のうち、routes が使わない場合: 結果の名前が当たるとき、never を返す op、Given・Request・Then と当たる引数の名前、基底が、テストのパッケージを作らない出力"},
 }
 

@@ -1,0 +1,9 @@
+[options.go]
+module = "example.com/app"
+
+# plugins/go-http の単体テストの入力（docs/plugin-go-http.md「go-http 自身の要求」の ScalarJSON）: 元が日時の核の型の scalar
+# （一段と二段）を、request body、結果、例外の値に持つ。通信の上では、元の型の JSON。
+[[emit]]
+namespace   = "app"
+transpilers = ["go", "go-valid", "go-http"]
+out         = "gen/app"

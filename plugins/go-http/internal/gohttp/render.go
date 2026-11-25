@@ -242,7 +242,7 @@ func (f *file) helpers(routes []route) string {
 	validate := f.g.opts.Validate && input
 	statuses := f.g.statuses(routes)
 
-	unions := len(f.g.unions) > 0 || len(f.g.consts) > 0
+	unions := f.g.codec()
 	var b strings.Builder
 	add := func(on bool, h helper) {
 		if !on {
@@ -277,7 +277,7 @@ func (f *file) helpers(routes []route) string {
 	add(true, helperWriteJSON)
 	if unions {
 		f.use("reflect")
-		b.WriteString(f.g.unionTable(f.im.Qualifier))
+		b.WriteString(f.g.unionTable(f.im))
 		add(true, helperUnionCodec)
 	}
 	add(true, helperWriteResult)

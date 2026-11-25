@@ -33,6 +33,12 @@ namespace hozo.gohttp {
      * 持ち主: docs/plugin-go-http.md「出力」「補助」
      */
     InternalErrorHook;
+    /**
+     * 元が日時の核の型（datetime、date、time。何段の scalar を経ても）の scalar の値は、通信の上では、元の型の JSON で読み書きする
+     * （datetime は RFC 3339 の文字列、date と time は、その形の文字列）。request body、結果、例外の値の、どれでも。
+     * 持ち主: docs/plugin-go-http.md「補助」の「union の読み書き」、docs/plugin-http.md「値の JSON」
+     */
+    ScalarJSON;
   }
 
   /** 単位のオプション [emit.options.go-http]（docs/plugin-go-http.md「オプション」） */
@@ -71,5 +77,14 @@ namespace hozo.gohttp {
     route: string;
     /** op が返したエラーの文言 */
     message: string;
+  }
+
+  /** 通信に出る scalar 一つ: 名前と、元の核の型の名前（datetime など） */
+  @prd.ref(Requirement.ScalarJSON)
+  model WireScalar {
+    /** scalar の FQN */
+    name: string;
+    /** 元の核の型の名前 */
+    core: string;
   }
 }

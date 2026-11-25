@@ -35,3 +35,11 @@ type InternalFailure struct {
 	// op が返したエラーの文言
 	Message string `json:"message"`
 }
+
+// WireScalar は通信に出る scalar 一つ: 名前と、元の核の型の名前（datetime など）
+type WireScalar struct {
+	// scalar の FQN
+	Name string `json:"name"`
+	// 元の核の型の名前
+	Core string `json:"core"`
+}
