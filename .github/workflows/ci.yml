@@ -22,7 +22,7 @@ jobs:
       # go generate: IR の JSON スキーマ（schema/ir.schema.json、internal/tools/irschema）と
       # TextMate の文法（editors/vscode/syntaxes、internal/tools/tmgrammar）など
       - run: go generate ./...
-      # make generate: cli.hozo から internal/gen/hozo/compiler/**
+      # make generate: 自己生成（docs/packages.md「自己生成の手順」）
       - run: make generate
       - run: git diff --exit-code
   node:

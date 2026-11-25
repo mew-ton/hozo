@@ -442,7 +442,7 @@ go-http の出力の振る舞いのうち、テストで確かめ続けるもの
 
 ### 仕様と、口の置き場
 
-- **`plugins/go-http` は、それ自体で一つの Hozo のプロジェクト**: `plugins/go-http/hozo.toml` が、`sources = ["go-http.hozo"]`、`plugin_dirs = [".."]`（リポジトリの `plugins/`）と、単位を一つ持つ: 名前空間 `hozo.gohttp`、トランスパイラ `go` と `go-design`、出力先 `internal/spec`、`[emit.options.go-design]` の `requirements = ["hozo.gohttp.Requirement"]`。リポジトリのルートの `hozo.toml` には、入れない（ルートの `plugin_dirs` の下は、`sources` から除かれる: `docs/config.md`「置き場と探し方」）。
+- **`plugins/go-http` は、それ自体で一つの Hozo のプロジェクト**: `plugins/go-http/hozo.toml` が、`sources = ["go-http.hozo"]`、`plugin_dirs = [".."]`（リポジトリの `plugins/`）と、単位を一つ持つ: 名前空間 `hozo.gohttp`、トランスパイラ `go` と `go-design`、出力先 `internal/spec`、`[emit.options.go-design]` の `requirements = ["hozo.gohttp.Requirement"]`。リポジトリのルートの `hozo.toml` には、入れない（ルートの `plugin_dirs` の下は、`sources` から除かれる: `docs/config.md`「形」）。
 - **Go のモジュールは、リポジトリのルートの `go.mod`**。`[options.go]` の `module` は、モジュールのパスに、このディレクトリまでのパスを足したもの（`github.com/mew-ton/hozo/plugins/go-http`）にし、生成物の import パスを、リポジトリの中のものに合わせる。
 - **生成物**は `plugins/go-http/internal/spec/**`: 型のパッケージ `gohttp`（仕様の model）と、テストのパッケージ `gohttptest`（`design.go` の `Requirements` と `RunRequirements`）。`make generate` で作り直す（`docs/packages.md`「生成するもの」「自己生成の手順」）。
 - 仕様は、この文書の**写し**: 振る舞いの持ち主は、この文書の見出しで、要求の説明が、それを名指しする。食い違えば、この文書が正しい（`docs/README.md`「書き方」）。
@@ -450,15 +450,15 @@ go-http の出力の振る舞いのうち、テストで確かめ続けるもの
 
 ### 要求
 
-| 要求（`hozo.gohttp.Requirement` のケース） | 振る舞いの持ち主 | 満たすテスト |
-|---|---|---|
-| `BodyLimit` | 「オプション」の `maxBodyBytes` と、「入力の読み方」の request body の上限: 上限を超えた要求は、op を呼ばずに 413 と `body: too large`。上限ちょうどは、読む。オプションがなければ 1 MiB | 入力 `limits` の `TestBodyLimit` |
-| `ScalarJSON` | 「補助」の「union の読み書き」の `httpScalars`: 元が日時の核の型の scalar（何段でも）の値は、通信の上では、元の型の JSON（`datetime` は RFC 3339 の文字列、`date` と `time` は、その形の文字列）。本文、結果、例外の値の、どれでも、読み書きの両方 | 入力 `scalars` の `TestScalarJSON` |
-| `InternalErrorHook` | 「出力」の `WithInternalError` と、「補助」の `httpWriteError`: 500 を返すときだけ、渡した関数を、その要求と、op が返したエラーで、一度呼ぶ。`@http.status` を持つ例外と、op を呼ぶ前の失敗では、呼ばない。渡さなければ、今と同じ応答 | 入力 `routes` の `TestInternalErrorHook` |
-| `FiniteFloat` | 「入力の読み方」のヘッダとクエリの項目: `float` の値の `NaN` と無限大は、読めない値で、op を呼ばずに 400 と `<場所> <名前>: invalid float` | 入力 `routes` の `TestFiniteFloat` |
-| `NullIsAbsent` | 「入力の読み方」の本文の項目: 値が `null` のキーは、キーがないのと同じ（`@http.required` は 400 の `missing`、`@http.default(v)` は v、どちらもなければ零値） | 入力 `routes` の `TestNullIsAbsent` |
+| 要求（`hozo.gohttp.Requirement` のケース） | 振る舞いの持ち主 |
+|---|---|
+| `BodyLimit` | 「オプション」の `maxBodyBytes` と、「入力の読み方」の request body の上限: 上限を超えた要求は、op を呼ばずに 413 と `body: too large`。上限ちょうどは、読む。オプションがなければ 1 MiB |
+| `ScalarJSON` | 「補助」の「union の読み書き」の `httpScalars`: 元が日時の核の型の scalar（何段でも）の値は、通信の上では、元の型の JSON（`datetime` は RFC 3339 の文字列、`date` と `time` は、その形の文字列）。本文、結果、例外の値の、どれでも、読み書きの両方 |
+| `InternalErrorHook` | 「出力」の `WithInternalError` と、「補助」の `httpWriteError`: 500 を返すときだけ、渡した関数を、その要求と、op が返したエラーで、一度呼ぶ。`@http.status` を持つ例外と、op を呼ぶ前の失敗では、呼ばない。渡さなければ、今と同じ応答 |
+| `FiniteFloat` | 「入力の読み方」のヘッダとクエリの項目: `float` の値の `NaN` と無限大は、読めない値で、op を呼ばずに 400 と `<場所> <名前>: invalid float` |
+| `NullIsAbsent` | 「入力の読み方」の本文の項目: 値が `null` のキーは、キーがないのと同じ（`@http.required` は 400 の `missing`、`@http.default(v)` は v、どちらもなければ零値） |
 
-- **満たす所**: `plugins/go-http/internal/gohttp/requirements_test.go` の `TestRequirements` が、`gohttptest.RunRequirements` に、要求ごとのメソッドを持つ値を渡す。メソッドは、上の表の入力の出力を、一時のモジュールに置き（`TestBehavior` と同じ組み立て）、その入力の `behavior_test.go` の、表のテストだけを走らせる。
+- **満たす所**: `plugins/go-http/internal/gohttp/requirements_test.go` の `TestRequirements` が、`gohttptest.RunRequirements` に、要求ごとのメソッドを持つ値を渡す。メソッドは、テストの入力（`testdata/<名前>/`）の出力を、一時のモジュールに置き（`TestBehavior` と同じ組み立て）、その入力の `behavior_test.go` の、要求のテストだけを走らせる。どの要求が、どの入力の、どのテストかは、`requirements_test.go` のメソッドが言う。
 - **振る舞いを足すか変えるときは、先に要求を足す**: 要求を足せば、`Requirements` のメソッドが増え、テストを書くまで、`TestRequirements` がコンパイルできない（`docs/plugin-go-design.md`「口の形」）。
 
 ## 診断

@@ -8,8 +8,9 @@ namespace hozo.decisions {
      * db.transaction の約束は、呼ばれ方によらない: その op が失敗すれば、その op が DB にしたことは、入れ子でも、どれも残らない。
      * 入れ子の内側が失敗すれば、内側がしたことだけが消え、外側がその失敗を受けて成功すれば、外側の残りは確定する。確定するのは、
      * いちばん外側。意味は語彙の文書（docs/vocab.md）が持ち、go-sqlite は、入れ子の内側を SAVEPOINT（名前は、いつも "hozo"）で出す。
-     * go-sqlite 自身の要求 hozo.gosqlite.Requirement.NestedRollback に書き、そこから作るテストで確かめる。docs/plugin-go-sqlite.md の
-     * 「入れ子の内側は、外側に加わるだけで、セーブポイントは、しない」を、置き換える。
+     * go-sqlite 自身の要求 hozo.gosqlite.Requirement.NestedRollback に書き、そこから作るテストで確かめる。これまでの
+     * docs/plugin-go-sqlite.md「トランザクション」の、入れ子の内側は外側に加わるだけで、内側だけを取り消すこと（セーブポイント）は
+     * しない、という決まりを、置き換える。
      *
      * @adr.context 入れ子の内側の失敗を、途中のデコレータが受けて（catches … recovers）外側が成功すると、内側が失敗までに書いたものが
      * 確定していた（#164 の 6）。入れ子のトランザクションの意味は、ほかの仕組みでも分かれる（Django の atomic と SQLAlchemy の
@@ -33,7 +34,7 @@ namespace hozo.decisions {
      * 決める形が持ち、トランスパイラは、出力先の言語の型によらずに、それを守る。ある言語の中だけの型の表し方が要るなら、それも、
      * その言語の語彙のデコレータで書く。持ち主は docs/requirements.md「型の仕組みは、出力先の語彙を持たない」。
      *
-     * @adr.context Hozo の前からの方針だが、文書に書かれていなかった。#164 の 7（日時の scalar を、Go では名前付きの型で出すので、
+     * @adr.context 文書に書かれていなかった。#164 の 7（日時の scalar を、Go では名前付きの型で出すので、
      * JSON で文字列にならない）を、型（scalar）の問題として扱いかけたことで、書かれていないことが分かった。
      * @adr.consequence 7 は、基底 go の scalar に JSON のメソッドを足すのではなく、go-http が、通信の形（scalar は、元の型の JSON）に
      * 合わせて直す（D802）。Go の型に JSON の形を任せている、ほかの所（go-cli の表示、go-sqlite の @db.json の中）は、未決の点に置いた。

@@ -380,7 +380,7 @@ func Conn(ctx context.Context, db *sql.DB) Querier {
 - **入れ子**（トランザクションの中の op が、`@db.transaction` の付いた op を呼ぶ。同じ `db`。内側が、別の名前空間の op でも同じ）: 内側は、新しいトランザクションを始めずに、外側のものの中に SAVEPOINT を置く（決定 D800。意味の持ち主は `docs/vocab.md`「`db` の read と効果」の `transaction`）。確定するのは、いちばん外側。内側が失敗すれば、内側がしたことだけが取り消される（`ROLLBACK TO`）。その失敗がいちばん外側の op の失敗になれば、すべてが取り消される。内側の失敗を、途中のデコレータが吸収して（`catches … recovers`）、外側が成功したときは、内側がしたことは残らず、外側の残りだけが確定する。
 - 別の `db` の `DbSeams` を入れ子にすれば、`db` ごとに別のトランザクションになる（二つを一緒に確定する仕組みは、ない）。
 - トランザクションの分離のしかたは、`BeginTx(ctx, nil)`（ドライバの既定）。
-- **継ぎ目が掛かるのは、op の持ち主の名前空間の出力**（`docs/plugin-go.md`「内側のフォルダと、別の名前空間」）で、これは変わらない: 別の名前空間 M の op を呼ぶ側（N）は、M の op の継ぎ目を持たない。名前空間をまたぐのは、トランザクションそのもの（`ctx` が運ぶ `*sql.Tx`）だけ。N の `@db.transaction` の op が M の op を呼べば、M の表のメソッドは、N の継ぎ目が始めたトランザクションで文を実行し、M の op が自分の `@db.transaction` を持っていれば、M の継ぎ目は、それに加わる（入れ子）。
+- **継ぎ目が掛かるのは、op の持ち主の名前空間の出力**（`docs/plugin-go.md`「内側のフォルダと、別の名前空間」）で、これは変わらない: 別の名前空間 M の op を呼ぶ側（N）は、M の op の継ぎ目を持たない。名前空間をまたぐのは、トランザクションそのもの（`ctx` が運ぶ `*sql.Tx`）だけ。N の `@db.transaction` の op が M の op を呼べば、M の表のメソッドは、N の継ぎ目が始めたトランザクションで文を実行し、M の op が自分の `@db.transaction` を持っていれば、M の継ぎ目は、その中に SAVEPOINT を置く（入れ子）。
 - これまでの形から変えたこと: 鍵は、出力のパッケージごとの非公開の型 `dbTxKey` だった。同じ `db` の上でも、別の名前空間の op が読み書きする表は、トランザクションに入らなかった（「未決: 別の名前空間をまたぐトランザクション」）。鍵を `runtime.DBTxKey` にして、入るようにした。
 
 ### 補助
@@ -538,10 +538,10 @@ func dbConflict(err, conflict error) error {
 
 go-sqlite の出力の振る舞いのうち、テストで確かめ続けるものは、要求として、仕様 `plugins/go-sqlite/go-sqlite.hozo`（名前空間 `hozo.gosqlite`）に書く。形は go-http と同じ（`docs/plugin-go-http.md`「go-http 自身の要求」）: `plugins/go-sqlite` は、自分の `hozo.toml` を持つ一つの Hozo のプロジェクトで（`module` は `github.com/mew-ton/hozo/plugins/go-sqlite`）、要求ごとの、テストの入れ物の口（`plugins/go-sqlite/internal/spec/gosqlitetest` の `Requirements` と `RunRequirements`）は go-design が作り、`plugins/go-sqlite/internal/gosqlite/requirements_test.go` の `TestRequirements` が満たす。go-sqlite を使う人は、これらのテストを書かない。仕様は、この文書の写し。
 
-| 要求（`hozo.gosqlite.Requirement` のケース） | 振る舞いの持ち主 | 満たすテスト |
-|---|---|---|
-| `NestedRollback` | 「トランザクション」の入れ子: 入れ子の内側の op が失敗すれば、内側がしたことだけが消え、外側がその失敗を受けて成功すれば、外側の残りは確定する。確定するのは、いちばん外側 | 入力 `transaction` の `TestNestedRollback` |
-| `ForeignKeysOn` | 「表」の外部キー: `Schema` が `REFERENCES` を持つとき、`PRAGMA foreign_keys` が効いていない `db` では、`CreateTables` は表を作らずにエラー。効いていれば、表を作り、参照の違反を断る。`REFERENCES` がなければ、確かめない | 入力 `columns` の `TestForeignKeysOn` |
+| 要求（`hozo.gosqlite.Requirement` のケース） | 振る舞いの持ち主 |
+|---|---|
+| `NestedRollback` | 「トランザクション」の入れ子: 入れ子の内側の op が失敗すれば、内側がしたことだけが消え、外側がその失敗を受けて成功すれば、外側の残りは確定する。確定するのは、いちばん外側 |
+| `ForeignKeysOn` | 「表」の外部キー: `Schema` が `REFERENCES` を持つとき、`PRAGMA foreign_keys` が効いていない `db` では、`CreateTables` は表を作らずにエラー。効いていれば、表を作り、参照の違反を断る。`REFERENCES` がなければ、確かめない |
 
 この節の細部は、決定 D799 が決めた。
 
