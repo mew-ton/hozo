@@ -1,5 +1,6 @@
 {
   "tests": [
-    {"name": "hozo.gosqlite.Requirement.ForeignKeysOn", "file": "internal/spec/gosqlitetest/design.go", "lines": [20, 20]}
+    {"name": "hozo.gosqlite.Requirement.ForeignKeysOn", "file": "internal/spec/gosqlitetest/design.go", "lines": [25, 25]},
+    {"name": "hozo.gosqlite.Requirement.NestedRollback", "file": "internal/spec/gosqlitetest/design.go", "lines": [28, 28]}
   ]
 }

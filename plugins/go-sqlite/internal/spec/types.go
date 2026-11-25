@@ -11,3 +11,13 @@ type Reference struct {
 	// 指す先の列
 	Column string `json:"column"`
 }
+
+// TransactionCall は db.transaction の付いた op の呼び出し一つ: 入れ子の深さ（いちばん外側は 0）と、成功したか
+type TransactionCall struct {
+	// op の FQN
+	Op string `json:"op"`
+	// 入れ子の深さ。いちばん外側は 0
+	Depth int64 `json:"depth"`
+	// op が成功したか
+	Succeeded bool `json:"succeeded"`
+}

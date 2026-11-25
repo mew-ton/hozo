@@ -19,7 +19,8 @@ func TestRequirements(t *testing.T) {
 // 要求のテストだけを走らせる（docs/plugin-go-sqlite.md「go-sqlite 自身の要求」の表）。
 type requirements struct{}
 
-func (requirements) ForeignKeysOn(t *testing.T) { behave(t, "columns", "TestForeignKeysOn") }
+func (requirements) ForeignKeysOn(t *testing.T)  { behave(t, "columns", "TestForeignKeysOn") }
+func (requirements) NestedRollback(t *testing.T) { behave(t, "transaction", "TestNestedRollback") }
 
 // behave は、入力 name の出力（基底 go の出力と合わせたもの）を、本物の SQLite のドライバを足した一時のモジュールに置き、
 // testdata/<name>/behavior_test.go のテスト test だけを走らせる（TestBehavior と同じ組み立て）。

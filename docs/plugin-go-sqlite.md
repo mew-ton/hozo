@@ -294,12 +294,31 @@ func (s DbSeams) PlaceOrderDbTransaction(ctx context.Context, order pkgtype.Orde
 ```go
 // dbTransaction は、body を、db の一つのトランザクションの中で呼ぶ: 始めて、body を呼び、確定する。
 // トランザクションは、body に渡す ctx が運ぶ（鍵は runtime.DBTxKey）。body が失敗すれば（確定に失敗しても）取り消して、零値とそのエラーを返す。
-// ctx が、すでに db のトランザクションを運んでいれば（入れ子。別の名前空間の継ぎ目が始めたものでも）、新しく始めずに、それに加わる: 確定も取り消しも、いちばん外側がする。
+// ctx が、すでに db のトランザクションを運んでいれば（入れ子。別の名前空間の継ぎ目が始めたものでも）、新しく始めずに、SAVEPOINT を置いて
+// body を呼ぶ: body が失敗すれば、SAVEPOINT までを取り消し（外側は続く）、成功すれば RELEASE する。確定するのは、いちばん外側。
 func dbTransaction[R any](ctx context.Context, db *sql.DB, body func(ctx context.Context) (R, error)) (R, error) {
-	if _, ok := ctx.Value(runtime.DBTxKey{DB: db}).(*sql.Tx); ok {
-		return body(ctx)
-	}
 	var zero R
+	if tx, ok := ctx.Value(runtime.DBTxKey{DB: db}).(*sql.Tx); ok {
+		if _, err := tx.ExecContext(ctx, `SAVEPOINT "hozo"`); err != nil {
+			return zero, err
+		}
+		out, err := body(ctx)
+		if err != nil {
+			// 中断された ctx でも、取り消せるように
+			undo := context.WithoutCancel(ctx)
+			if _, rerr := tx.ExecContext(undo, `ROLLBACK TO "hozo"`); rerr != nil {
+				return zero, errors.Join(err, rerr)
+			}
+			if _, rerr := tx.ExecContext(undo, `RELEASE "hozo"`); rerr != nil {
+				return zero, errors.Join(err, rerr)
+			}
+			return zero, err
+		}
+		if _, err := tx.ExecContext(ctx, `RELEASE "hozo"`); err != nil {
+			return zero, err
+		}
+		return out, nil
+	}
 	tx, err := db.BeginTx(ctx, nil)
 	if err != nil {
 		return zero, err
@@ -318,10 +337,12 @@ func dbTransaction[R any](ctx context.Context, db *sql.DB, body func(ctx context
 
 | 起きること | 結果 |
 |---|---|
-| `body` が成功する | 確定する（`Commit`）。確定に失敗すれば、取り消して、そのエラー |
-| `body` がエラーを返す（仕様の例外も、ほかのエラーも同じ） | 取り消して（`Rollback`）、そのエラーを、そのまま返す |
-| `body` が panic する | 取り消してから、panic が続く（`defer tx.Rollback()`） |
+| `body` が成功する | 確定する（`Commit`）。確定に失敗すれば、取り消して、そのエラー。入れ子なら、`RELEASE` するだけで、確定は、いちばん外側 |
+| `body` がエラーを返す（仕様の例外も、ほかのエラーも同じ） | 取り消して（`Rollback`。入れ子なら `ROLLBACK TO` で、その op の分だけ）、そのエラーを、そのまま返す |
+| `body` が panic する | 取り消してから、panic が続く（いちばん外側の `defer tx.Rollback()`。入れ子の内側も、外側ごと消える） |
 | 始められない（中断された `ctx` など） | `body` を呼ばずに、そのエラー |
+
+- **SAVEPOINT の名前**は、いつも `"hozo"`。SQLite は、同じ名前の SAVEPOINT が重なれば、`ROLLBACK TO` と `RELEASE` で、いちばん新しいものを指すので、入れ子が何段でも、名前を分けなくてよい。
 
 **表のメソッドが、トランザクションに入る仕組み**: トランザクション（`*sql.Tx`）は、`body` に渡す `ctx` が運ぶ（`context.WithValue`。鍵は、`runtime` パッケージの公開の型 `runtime.DBTxKey` に `db` を入れたもの: `runtime.DBTxKey{DB: db}`）。文を実行するところは、どれも `Conn(ctx, db)` を通り、`ctx` が、その `db` のトランザクションを運んでいれば、それで実行する。
 
@@ -356,7 +377,7 @@ func Conn(ctx context.Context, db *sql.DB) Querier {
 | `db` を直に使う人のコード | `Conn` を通していない |
 | ほかの保存先の実装（人がメモリの上に書いた単位など） | DB ではない |
 
-- **入れ子**（トランザクションの中の op が、`@db.transaction` の付いた op を呼ぶ。同じ `db`。内側が、別の名前空間の op でも同じ）: 内側は、新しいトランザクションを始めずに、外側のものに**加わる**。内側の継ぎ目は、`body` を、そのまま呼ぶだけ。確定するのも、取り消すのも、いちばん外側。内側が失敗し、その失敗がいちばん外側の op の失敗になれば、すべてが取り消される。内側の失敗を、途中のデコレータが吸収して（`catches … recovers`）、外側が成功したときは、内側が失敗までにしたことも、外側と一緒に確定される（内側だけを取り消すこと — セーブポイント — は、しない）。
+- **入れ子**（トランザクションの中の op が、`@db.transaction` の付いた op を呼ぶ。同じ `db`。内側が、別の名前空間の op でも同じ）: 内側は、新しいトランザクションを始めずに、外側のものの中に SAVEPOINT を置く（決定 D800。意味の持ち主は `docs/vocab.md`「`db` の read と効果」の `transaction`）。確定するのは、いちばん外側。内側が失敗すれば、内側がしたことだけが取り消される（`ROLLBACK TO`）。その失敗がいちばん外側の op の失敗になれば、すべてが取り消される。内側の失敗を、途中のデコレータが吸収して（`catches … recovers`）、外側が成功したときは、内側がしたことは残らず、外側の残りだけが確定する。
 - 別の `db` の `DbSeams` を入れ子にすれば、`db` ごとに別のトランザクションになる（二つを一緒に確定する仕組みは、ない）。
 - トランザクションの分離のしかたは、`BeginTx(ctx, nil)`（ドライバの既定）。
 - **継ぎ目が掛かるのは、op の持ち主の名前空間の出力**（`docs/plugin-go.md`「内側のフォルダと、別の名前空間」）で、これは変わらない: 別の名前空間 M の op を呼ぶ側（N）は、M の op の継ぎ目を持たない。名前空間をまたぐのは、トランザクションそのもの（`ctx` が運ぶ `*sql.Tx`）だけ。N の `@db.transaction` の op が M の op を呼べば、M の表のメソッドは、N の継ぎ目が始めたトランザクションで文を実行し、M の op が自分の `@db.transaction` を持っていれば、M の継ぎ目は、それに加わる（入れ子）。
@@ -519,6 +540,7 @@ go-sqlite の出力の振る舞いのうち、テストで確かめ続けるも�
 
 | 要求（`hozo.gosqlite.Requirement` のケース） | 振る舞いの持ち主 | 満たすテスト |
 |---|---|---|
+| `NestedRollback` | 「トランザクション」の入れ子: 入れ子の内側の op が失敗すれば、内側がしたことだけが消え、外側がその失敗を受けて成功すれば、外側の残りは確定する。確定するのは、いちばん外側 | 入力 `transaction` の `TestNestedRollback` |
 | `ForeignKeysOn` | 「表」の外部キー: `Schema` が `REFERENCES` を持つとき、`PRAGMA foreign_keys` が効いていない `db` では、`CreateTables` は表を作らずにエラー。効いていれば、表を作り、参照の違反を断る。`REFERENCES` がなければ、確かめない | 入力 `columns` の `TestForeignKeysOn` |
 
 この節の細部は、決定 D799 が決めた。

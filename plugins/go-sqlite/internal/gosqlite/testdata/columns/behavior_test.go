@@ -436,4 +436,3 @@ func TestForeignKeysOn(t *testing.T) {
 		t.Errorf("参照の違反 = %v, want FOREIGN KEY の違反", err)
 	}
 }
-

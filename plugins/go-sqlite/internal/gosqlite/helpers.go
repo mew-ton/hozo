@@ -225,14 +225,33 @@ func dbJSON(v any, opts ...dbOption) dbCol {
 	}}
 }
 `},
-	{name: helperTransaction, names: []string{helperTransaction}, text: `// dbTransaction は、body を、db の一つのトランザクションの中で呼ぶ: 始めて、body を呼び、確定する。
+	{name: helperTransaction, names: []string{helperTransaction}, imports: []string{"errors"}, text: `// dbTransaction は、body を、db の一つのトランザクションの中で呼ぶ: 始めて、body を呼び、確定する。
 // トランザクションは、body に渡す ctx が運ぶ（鍵は runtime.DBTxKey）。body が失敗すれば（確定に失敗しても）取り消して、零値とそのエラーを返す。
-// ctx が、すでに db のトランザクションを運んでいれば（入れ子。別の名前空間の継ぎ目が始めたものでも）、新しく始めずに、それに加わる: 確定も取り消しも、いちばん外側がする。
+// ctx が、すでに db のトランザクションを運んでいれば（入れ子。別の名前空間の継ぎ目が始めたものでも）、新しく始めずに、SAVEPOINT を置いて
+// body を呼ぶ: body が失敗すれば、SAVEPOINT までを取り消し（外側は続く）、成功すれば RELEASE する。確定するのは、いちばん外側。
 func dbTransaction[R any](ctx context.Context, db *sql.DB, body func(ctx context.Context) (R, error)) (R, error) {
-	if _, ok := ctx.Value(runtime.DBTxKey{DB: db}).(*sql.Tx); ok {
-		return body(ctx)
-	}
 	var zero R
+	if tx, ok := ctx.Value(runtime.DBTxKey{DB: db}).(*sql.Tx); ok {
+		if _, err := tx.ExecContext(ctx, ` + "`" + `SAVEPOINT "hozo"` + "`" + `); err != nil {
+			return zero, err
+		}
+		out, err := body(ctx)
+		if err != nil {
+			// 中断された ctx でも、取り消せるように
+			undo := context.WithoutCancel(ctx)
+			if _, rerr := tx.ExecContext(undo, ` + "`" + `ROLLBACK TO "hozo"` + "`" + `); rerr != nil {
+				return zero, errors.Join(err, rerr)
+			}
+			if _, rerr := tx.ExecContext(undo, ` + "`" + `RELEASE "hozo"` + "`" + `); rerr != nil {
+				return zero, errors.Join(err, rerr)
+			}
+			return zero, err
+		}
+		if _, err := tx.ExecContext(ctx, ` + "`" + `RELEASE "hozo"` + "`" + `); err != nil {
+			return zero, err
+		}
+		return out, nil
+	}
 	tx, err := db.BeginTx(ctx, nil)
 	if err != nil {
 		return zero, err

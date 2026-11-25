@@ -247,7 +247,7 @@ func TestLeaf(t *testing.T) {
 	wantIDs(t, "成功した CloseAll の後", w.ids(t, ctx))
 }
 
-// TestNested は、入れ子（継ぎ目を持つ op が、継ぎ目を持つ op を呼ぶ）: 内側は、新しいトランザクションを始めずに、外側のものに加わる。
+// TestNested は、入れ子（継ぎ目を持つ op が、継ぎ目を持つ op を呼ぶ）: 内側は、新しいトランザクションを始めずに、外側のものの中に SAVEPOINT を置く。
 // 確定するのも、取り消すのも、いちばん外側。
 func TestNested(t *testing.T) {
 	ctx := testContext(t)
@@ -279,6 +279,64 @@ func TestNested(t *testing.T) {
 	if b, err := w.bank.Find(ctx, "b"); err != nil || b == nil || b.Balance != 99 {
 		t.Errorf("成功した openThenReplace の後の b = %+v, %v（期待は、残高 99）", b, err)
 	}
+}
+
+// TestNestedRollback は、要求 hozo.gosqlite.Requirement.NestedRollback（plugins/go-sqlite/go-sqlite.hozo）: 入れ子の内側が失敗すれば、
+// 内側がしたことだけが消える（SAVEPOINT）。外側がその失敗を受けて成功すれば、外側の残りは確定する。確定するのは、いちばん外側。
+// 失敗を受ける道（catches … recovers の継ぎ目）は、外側の継ぎ目の body の中で、内側の継ぎ目のエラーを捨てることで作る。
+func TestNestedRollback(t *testing.T) {
+	ctx := testContext(t)
+	w := newWorld(t, ctx, nil)
+	seams := bank.NewDbSeams(w.db)
+	innerErr := errors.New("inner fails")
+	// 外側（Snapshot の継ぎ目）が x を足し、内側（Open の継ぎ目）が y を足してから失敗し、外側がそれを受けて z を足す
+	_, err := seams.SnapshotDbTransaction(ctx, func(ctx context.Context) ([]bank.Account, error) {
+		if err := w.accounts.CreateAccount(ctx, account("x", 1)); err != nil {
+			return nil, err
+		}
+		err := seams.OpenDbTransaction(ctx, account("y", 2), account("unused", 0), func(ctx context.Context, first, _ bank.Account) error {
+			if err := w.accounts.CreateAccount(ctx, first); err != nil {
+				return err
+			}
+			// 内側の中では、内側が足したものが見える
+			if got := w.ids(t, ctx); !reflect.DeepEqual(got, []kinds.AccountId{"x", "y"}) {
+				t.Errorf("内側の中の口座 = %v, want x と y", got)
+			}
+			return innerErr
+		})
+		if !errors.Is(err, innerErr) {
+			t.Errorf("内側の継ぎ目のエラー = %v, want 内側のエラーそのもの", err)
+		}
+		// 内側の失敗の後、外側の中では、内側が足した y は、もうない
+		if got := w.ids(t, ctx); !reflect.DeepEqual(got, []kinds.AccountId{"x"}) {
+			t.Errorf("内側が失敗した後の、外側の中の口座 = %v, want x だけ", got)
+		}
+		return nil, w.accounts.CreateAccount(ctx, account("z", 3))
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	wantIDs(t, "内側の失敗を受けて、外側が成功した後", w.ids(t, ctx), "x", "z")
+
+	// 入れ子が二段でも、同じ: いちばん内側の失敗は、そこだけを消す。真ん中が成功すれば、真ん中の分は、外側と一緒に確定する
+	_, err = seams.SnapshotDbTransaction(ctx, func(ctx context.Context) ([]bank.Account, error) {
+		return nil, seams.OpenDbTransaction(ctx, account("m", 1), account("unused", 0), func(ctx context.Context, first, _ bank.Account) error {
+			if err := w.accounts.CreateAccount(ctx, first); err != nil {
+				return err
+			}
+			_ = seams.OpenDbTransaction(ctx, account("deep", 1), account("unused", 0), func(ctx context.Context, first, _ bank.Account) error {
+				if err := w.accounts.CreateAccount(ctx, first); err != nil {
+					return err
+				}
+				return innerErr
+			})
+			return nil
+		})
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	wantIDs(t, "二段の入れ子の後", w.ids(t, ctx), "x", "z", "m")
 }
 
 // TestAcrossNamespaces は、同じ db の上の二つの名前空間: bank の @db.transaction の op が呼ぶ audit の op のすることも、同じ

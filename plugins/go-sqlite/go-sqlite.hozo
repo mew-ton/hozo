@@ -15,6 +15,12 @@ namespace hozo.gosqlite {
      * 持ち主: docs/plugin-go-sqlite.md「表」
      */
     ForeignKeysOn;
+    /**
+     * db.transaction の op の中から、別の db.transaction の op を呼んだとき（入れ子。同じ db）、内側が失敗すれば、内側がしたことだけが
+     * 消える。外側がその失敗を受けて成功すれば、外側の残りは確定する。確定するのは、いちばん外側。
+     * 持ち主: docs/vocab.md「db の read と効果」の transaction、docs/plugin-go-sqlite.md「トランザクション」
+     */
+    NestedRollback;
   }
 
   /** 表の列の参照一つ（db.ref の付いたフィールド）: 指す先の表と列 */
@@ -26,5 +32,16 @@ namespace hozo.gosqlite {
     target: string;
     /** 指す先の列 */
     column: string;
+  }
+
+  /** db.transaction の付いた op の呼び出し一つ: 入れ子の深さ（いちばん外側は 0）と、成功したか */
+  @prd.ref(Requirement.NestedRollback)
+  model TransactionCall {
+    /** op の FQN */
+    op: string;
+    /** 入れ子の深さ。いちばん外側は 0 */
+    depth: int;
+    /** op が成功したか */
+    succeeded: boolean;
   }
 }
