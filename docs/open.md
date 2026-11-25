@@ -231,6 +231,7 @@
 | 点 | 要るもの | 持ち主 |
 |---|---|---|
 | サンプル `order-app` の、作るものの問い（分けて送ること、上限を超えた送料） | 判断 | `tests/samples/order-app/README.md`「利用者への問い」の Q3、Q8 |
+| プラグイン自身の要求（`plugin-go-http.md`「go-http 自身の要求」、`plugin-go-sqlite.md`「go-sqlite 自身の要求」）に入っているのは、#164 で直した振る舞いだけ。残りの振る舞いを要求に移し、持ち主（今は文書）を決め、ほかのプラグインに広げるか。一部だけが仕様にある形は、早く片づける | 作業、判断 | #184 |
 | プラグイン自身の要求（`hozo.gohttp.Requirement`、`hozo.gosqlite.Requirement`）を結ぶ宣言が、仕様にない。振る舞いを決める宣言は、仕様の外（文書と、語彙の宣言）にあるので、go-design が、要求ごとに「指している設計: なし」の warning を返す。要求を、語彙の宣言（`vocab/http.hozo`、`vocab/db.hozo`）などの本物の宣言に結べる形を考えるか | 設計 | `plugin-go-http.md`「仕様と、口の置き場」 |
 | プラグインのプロジェクト（`plugins/go-http`、`plugins/go-sqlite`。決定 D795、D799）は、Go のモジュールのルート（リポジトリのルートの `go.mod`）の下にある。`plugin-go.md`「パッケージと import パス」は、モジュールのルートを、プロジェクトのルート（`hozo.toml` のあるディレクトリ）とし、`go.mod` を、そこに置くと言う。今は、`[options.go]` の `module` に、このディレクトリまでのパスを足して、import パスを合わせている。プロジェクトが、モジュールの下のディレクトリにあることを、決まりとして認めるか | 判断 | `plugin-go-http.md`「go-http 自身の要求」、`plugin-go-sqlite.md`「go-sqlite 自身の要求」、`plugin-go.md`「パッケージと import パス」 |
 | サンプル `shop-server` に、引数を持つ例外を足すか | 判断 | この文書「`shop-server` の、引数を持つ例外」 |
