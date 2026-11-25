@@ -51,7 +51,7 @@ namespace a {
   fn recordToOther(x: M, n: N): void {
     val r = match (x by C) {
       A => m(x);
-      B => { name: n.name };           // ERROR: TYPE-5
+      B => { name: n.name };           // ERROR: TYPE-5, BIND-4
     };
     use(r);
   }

@@ -2,6 +2,7 @@ package sema
 
 import (
 	"fmt"
+	"reflect"
 	"testing"
 
 	"github.com/mew-ton/hozo/internal/source"
@@ -362,6 +363,8 @@ func TestCompatRule9RecordLiteral(t *testing.T) {
 	rec := &recordVal{fields: []recordFieldVal{
 		{name: "id", typ: literalType(0, ir.StringLiteral{Value: "x"})},
 	}}
+	// 呼び出しの引数の位置で見る: 必須のフィールド（BIND-4）は、そこでは internal/check が確かめる（TestRequiredFieldsOutsideCall）。
+	a.callArgs = 1
 	// 当てはめの違反は fitRecord が TYPE-5 / TYPE-6 として報告し、呼び手には渡せた扱いで返す（二重に報告しないため）。
 	a.assign(exprType{kind: etRecord, rec: rec}, ir.Optional(other))
 	if len(a.diags) != 1 || a.diags[0].Code != "TYPE-5" {
@@ -373,6 +376,33 @@ func TestCompatRule9RecordLiteral(t *testing.T) {
 	}
 	if a.assign(exprType{kind: etRecord, rec: rec}, ir.String()) == assignOK {
 		t.Error("model でない位置にレコードリテラルは渡せない")
+	}
+}
+
+// TestRequiredFieldsOutsideCall は docs/check.md「必須の入力」の「呼び出しの引数の外の、レコードリテラル」（決定 D548）: 呼び出しの
+// 引数の外で、当てはめたリテラルの必須のフィールドが埋まっていなければ BIND-4。パスは、リテラルのフィールドの名前から。
+// 省略可能なフィールドは、埋めなくてよい。
+func TestRequiredFieldsOutsideCall(t *testing.T) {
+	a := compatAnalyzer(t)
+	rec := &recordVal{fields: []recordFieldVal{
+		{name: "id", typ: literalType(0, ir.StringLiteral{Value: "x"})},
+	}}
+	a.assign(exprType{kind: etRecord, rec: rec}, ir.Ref("a.HasDefault"))
+	if len(a.diags) != 1 || a.diags[0].Code != "BIND-4" {
+		t.Fatalf("BIND-4 が一つ出る: %+v", a.diags)
+	}
+	if got, want := a.diags[0].Data["missing"], [][]string{{"limit"}}; !reflect.DeepEqual(got, want) {
+		t.Errorf("missing = %v, want %v", got, want)
+	}
+	a.diags = nil
+	full := &recordVal{fields: []recordFieldVal{
+		{name: "id", typ: literalType(0, ir.StringLiteral{Value: "x"})},
+		{name: "email", typ: valueType(email)},
+		{name: "hash", typ: literalType(0, ir.StringLiteral{Value: "h"})},
+		{name: "page", typ: literalType(ast.IntLit, ir.IntLiteral{Value: 1})},
+	}}
+	if a.assign(exprType{kind: etRecord, rec: full}, user) != assignOK || len(a.diags) != 0 {
+		t.Errorf("省略可能な nick は埋めなくてよい: %+v", a.diags)
 	}
 }
 
