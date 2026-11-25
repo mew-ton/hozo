@@ -136,7 +136,7 @@ Go のパッケージごとの、このモジュールの中で import してい
 
 ## パッケージ
 
-**公開のパッケージは、見本の SDK で、形は、約束しない**（`docs/decisions.md`「決めたこと」446）: プラグインを書く人に約束するのは、やり取り（`docs/plugin-protocol.md`）と、IR の JSON Schema（`schema/ir.schema.json`。版の持ち主は `docs/ir.md`「版」）。下の「（公開）」は、Go の `internal/` の外にあって、プラグインから import できる、という意味で、名前や引数を変えない、という約束ではない。
+**公開のパッケージは、見本の SDK で、形は、約束しない**（決定 D446）: プラグインを書く人に約束するのは、やり取り（`docs/plugin-protocol.md`）と、IR の JSON Schema（`schema/ir.schema.json`。版の持ち主は `docs/ir.md`「版」）。下の「（公開）」は、Go の `internal/` の外にあって、プラグインから import できる、という意味で、名前や引数を変えない、という約束ではない。
 
 ### `ir`（公開）
 
@@ -164,7 +164,7 @@ func NamedEffects(fqns ...string) []EffectRef      // effect の宣言の FQN �
 
 `ReadRef` と `EffectRef`（`docs/ir.md`「op」）は、具体型が値型（`NamedRead`、`DirectRead`、`NamedEffect`、`DirectEffect`）の interface で、`==` で比べられ、写像のキーにできる。`Callee`（同「配線」）も同じ形で、具体型は `OpCallee`、`ReadCallee`、`EffectCallee`。`String()` は表示のための文字列: 名前で書いた要素は宣言の FQN、直に書いた要素は `<状態の FQN>`（読む方）か `<状態の FQN>.<操作>`（効果）。
 
-TS の SDK は、ない（`docs/decisions.md`「決めたこと」415 で、外した）。
+TS の SDK は、ない（決定 D415 で、外した）。
 
 ### `plugin`（公開）
 
@@ -400,7 +400,7 @@ func (p *CoverProfile) Lines(name string) (lines [][2]int, measured bool)   // <
 - 継ぎ目を宣言した相乗りは、`ShapeOf(view).Seams` のうち `Transpiler` が自分の名前のものについて、メソッドを出す。基底も同じ値から `Seams` を出すので、二つは合う。
 - 状態の単位を満たす型を出す相乗り（`go-sqlite`）は、`ShapeOf(view).States` の `Builtins`、`Reads`、`Effects` から、単位のメソッドの並びを、`ReadSignature`、`EffectSignature`、`BuiltinSignature` から、その形を求める。メソッドの名前は、`read` と効果が `MethodName(<FQN>)`、形で決まる命令が `BuiltinMethod(<操作>)`。N の `read` と効果は、どれも、ちょうど一つの単位の `Reads` / `Effects` にある（`read` は `Read.state` の単位、効果は宛先の単位。`docs/plugin-go.md`「状態の単位」の「効果の宛先の単位」）ので、ある `read` か効果がどの単位のメソッドかは、`States` を走査して求める。`Reads` と `Effects` は、単位の対象（`in`）によらず、配線が呼んでいるかにもよらない。`Builtins` だけが、単位の対象の配線が直に呼ぶ操作で決まる。
 - op のメソッドは、どれも、最初に `ctx` を取り、最後に `error` を返す（`docs/plugin-go.md`「op の形」）。op を呼ぶ相乗りは、op ごとに確かめずに、`ctx` を渡し、`error` を受ける。これまでの `OpShape.Ctx` / `OpShape.Err`（op ごとに、取るか、返すか）は、いつも真なので、なくした。
-- op の置き場（`OpShape.Place`）は三つだけで、状態の単位に op のメソッドはない: `Shape.Leaves` は、置き場が `Leaf` の op のすべて。これまでの、状態の単位の `Queries` / `Commands`、`Shape.Shared`（`SharedState`）、`OpShape.Unit`、置き場 `StateCommand` / `SharedCommand` / `StateQuery` / `SharedQuery`、`PublicShared` は、なくした（`docs/decisions.md`「決めたこと」139）。
+- op の置き場（`OpShape.Place`）は三つだけで、状態の単位に op のメソッドはない: `Shape.Leaves` は、置き場が `Leaf` の op のすべて。これまでの、状態の単位の `Queries` / `Commands`、`Shape.Shared`（`SharedState`）、`OpShape.Unit`、置き場 `StateCommand` / `SharedCommand` / `StateQuery` / `SharedQuery`、`PublicShared` は、なくした（決定 D139）。
 - 例外の値を作るか読む相乗り（`go-http`、`go-cli`、サンプルの `go-ratelimit`）は、例外の構造体のフィールドを、`Exception.params` の順に、`FieldName(<引数名>)` で求める（型は `GoType(<引数の型>)`、タグは `json:"<引数名>"`、省略可能なら `,omitempty`）。引数のない例外は `struct{}`。値を一つに包むフィールド `Value` は、もうない。
 - これまでの `Resolver`（複製した型をローカルにする判断）はなくした。別の名前空間の型は、いつも置き場の入口のパッケージ。
 - 当たる名前（GO-2）と import の循環（GO-3）を見つけるのは基底のプラグイン（`plugins/go/internal/gobase`）で、このパッケージは、当たらない前提で名前を返す。
@@ -410,7 +410,7 @@ func (p *CoverProfile) Lines(name string) (lines [][2]int, measured bool)   // <
 
 ### `plugin/httpvocab`（公開）
 
-`docs/plugin-http.md`「対象」「通信の形」の「union」「診断」の写し: 標準の語彙 `http` の、言語に依らない読み解き。語彙のプラグイン `http`（`plugins/http`）と、`http` の語彙をある言語に出すトランスパイラ（`go-http`）が共有する（`docs/decisions.md`「決めたこと」428）。読むのは `ir.Program` だけで、単位にも、言語にも、依らない。
+`docs/plugin-http.md`「対象」「通信の形」の「union」「診断」の写し: 標準の語彙 `http` の、言語に依らない読み解き。語彙のプラグイン `http`（`plugins/http`）と、`http` の語彙をある言語に出すトランスパイラ（`go-http`）が共有する（決定 D428）。読むのは `ir.Program` だけで、単位にも、言語にも、依らない。
 
 ```go
 const Namespace = "http"                               // この語彙の名前空間
@@ -439,7 +439,7 @@ type ExceptionStatus struct { Exception *ir.Exception; Code int64 }
 
 ### `plugin/validvocab`（公開）
 
-`docs/plugin-valid.md`「制約」「形式」「値一つを確かめる」「診断」の写し: 標準の語彙 `valid` の、言語に依らない読み解き。語彙のプラグイン `valid`（`plugins/valid`）と、`valid` の制約を読むプラグイン（`go-valid`、`go-cli`、`plugin/httpvocab` を通して語彙のプラグイン `http`）が共有する（`docs/decisions.md`「決めたこと」428）。読むのは `ir.Program` だけで、単位にも、言語にも、依らない。
+`docs/plugin-valid.md`「制約」「形式」「値一つを確かめる」「診断」の写し: 標準の語彙 `valid` の、言語に依らない読み解き。語彙のプラグイン `valid`（`plugins/valid`）と、`valid` の制約を読むプラグイン（`go-valid`、`go-cli`、`plugin/httpvocab` を通して語彙のプラグイン `http`）が共有する（決定 D428）。読むのは `ir.Program` だけで、単位にも、言語にも、依らない。
 
 ```go
 const Namespace = "valid"                              // この語彙の名前空間
@@ -464,7 +464,7 @@ func CheckLiteral(p *ir.Program, field *ir.Field, lit ir.Literal) []Mismatch   /
 
 ### `plugin/dbvocab`（公開）
 
-`docs/plugin-db.md`「対象」「表」「キーと参照」「read」「効果」「列と引数の型」「診断」の写し: 標準の語彙 `db` の、言語にも保存先にも依らない読み解き。語彙のプラグイン `db`（`plugins/db`）と、`db` の語彙を出すプラグイン（`go-sqlite`）が共有する（`docs/decisions.md`「決めたこと」428）。読むのは `ir.Program` だけで、単位にも、言語にも、保存先にも、依らない。
+`docs/plugin-db.md`「対象」「表」「キーと参照」「read」「効果」「列と引数の型」「診断」の写し: 標準の語彙 `db` の、言語にも保存先にも依らない読み解き。語彙のプラグイン `db`（`plugins/db`）と、`db` の語彙を出すプラグイン（`go-sqlite`）が共有する（決定 D428）。読むのは `ir.Program` だけで、単位にも、言語にも、保存先にも、依らない。
 
 ```go
 const Namespace = "db"                                 // この語彙の名前空間
@@ -773,7 +773,7 @@ Go のプラグインは、どれも同じ形: `main` パッケージが `plugin
 `internal/gen/hozo/compiler` と `internal/gen/hozo/cli`（以下、「置き場」）は `cmd/hozoc` が import するパッケージなので、hozoc がそこへ直に書くと、プラグインの不具合でコンパイルできない Go が出たときに hozoc 自身がビルドできなくなり、生成し直すこともできなくなる。そうならないように、`make generate`（`go run ./internal/tools/selfgen`）は、置き場に、コンパイルできると確かめたものしか置かない。
 
 1. 今のソース（今の置き場を含む）で `hozoc` を一時ディレクトリにビルドする。使うプラグイン（`plugins/` の `go`、`go-valid`、`go-cli`）を、WASM にビルドして、それぞれのディレクトリの `plugin.wasm` に置く（`docs/testing.md`「プラグインの WASM」）。
-2. 別の一時ディレクトリに、リポジトリのルートの仕様のファイル（`*.hozo`: `hozo.toml` の `sources` が並べる、`cli.hozo` と、設計だけのファイル。`cli.hozo` の宣言が、設計だけのファイルの宣言を指せるように、すべて写す）、`hozo.toml`、`go.mod`、`go.sum` を写し、プラグインの置き場 `plugins` と、3 の vet が要る `ir`、`plugin`、`runtime` をシンボリックリンクで足して、そこで 1 の `hozoc build` を走らせる（`tests/generated_test.go` と同じ組み立て。import パスは、`hozo.toml` の `[options.go]` の `module` から決まるので、同じになる。`go.mod` は、3 の vet とビルドのために写す）。プラグインの探索が見るプロジェクトの外の場所（`HOZO_PLUGIN_PATH`、ホーム）は空にして、生成物が実行する人の環境に左右されないようにする。WASM を、機械の言葉に直したものの置き場（`HOZO_CACHE_DIR`）は、ホームを空にする前の、もとの場所を渡す（生成のたびに、直し直さないように。答えは、変わらない）。
+2. 別の一時ディレクトリに、リポジトリのルートの仕様のファイル（`*.hozo` と `decisions/*.hozo`: `hozo.toml` の `sources` が並べる、`cli.hozo` と、設計だけのファイル。ディレクトリの形は、そのまま写す。`cli.hozo` の宣言が、設計だけのファイルの宣言を指せるように、すべて写す）、`hozo.toml`、`go.mod`、`go.sum` を写し、プラグインの置き場 `plugins` と、3 の vet が要る `ir`、`plugin`、`runtime` をシンボリックリンクで足して、そこで 1 の `hozoc build` を走らせる（`tests/generated_test.go` と同じ組み立て。import パスは、`hozo.toml` の `[options.go]` の `module` から決まるので、同じになる。`go.mod` は、3 の vet とビルドのために写す）。プラグインの探索が見るプロジェクトの外の場所（`HOZO_PLUGIN_PATH`、ホーム）は空にして、生成物が実行する人の環境に左右されないようにする。WASM を、機械の言葉に直したものの置き場（`HOZO_CACHE_DIR`）は、ホームを空にする前の、もとの場所を渡す（生成のたびに、直し直さないように。答えは、変わらない）。
 3. 生成した置き場の中身を、その一時ディレクトリで `go vet` に通し、次に、リポジトリの今のものの代わりに置いたつもりで（`go build -overlay`。ディスクの上の置き場には触れない）、それを import するパッケージ（`cmd/hozoc`、`internal/app`）ごと `go build` する。
 4. 3 が通ったときだけ、置き場の中身を生成したものに置き換える（なくなったファイルは消し、同じ内容のファイルには触れない）。通らなければ何も変えず、生成したものを残した一時ディレクトリの場所を示して失敗する。
 

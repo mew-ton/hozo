@@ -84,7 +84,7 @@ func TestSelfEmitDryRun(t *testing.T) {
 		t.Fatalf("hozoc build --dry-run の終了コード %d\n%s%s", code, stdout.String(), stderr.String())
 	}
 	// hozoc 自身の仕様の warning は、CFG-26 が二つ: @fs.files（状態 sources と config）。どのトランスパイラも
-	// 解釈せず、中身は、人が書いている（docs/vocab.md「解釈されなくてよいデコレータ」、docs/decisions.md「決めたこと」433）
+	// 解釈せず、中身は、人が書いている（docs/vocab.md「解釈されなくてよいデコレータ」、決定 D433）
 	rest, warnings := splitUninterpreted(stdout.String())
 	var marks []string
 	for _, w := range warnings {

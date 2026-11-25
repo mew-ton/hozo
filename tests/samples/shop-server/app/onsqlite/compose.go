@@ -1,6 +1,6 @@
 // Package onsqlite は、server を gen/store（SQLite。状態の単位の実装は go-sqlite の出力）の上に組み立てる
 // （../../README.md「人が書いたもの」）。このサンプルの組み立ては、ここの一つ: メモリの上の組み立て（onmem）は、
-// docs/decisions.md「決めたこと」388 で、なくした。
+// 決定 D388 で、なくした。
 package onsqlite
 
 import (

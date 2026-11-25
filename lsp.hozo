@@ -1,4 +1,4 @@
-// Hozo 自身の仕様（docs/decisions.md「決めたこと」468）。言語サーバー: 入口の名前空間 hozo.lsp、その相手（文面のエディタ）の
+// Hozo 自身の仕様（決定 D468）。言語サーバー: 入口の名前空間 hozo.lsp、その相手（文面のエディタ）の
 // 名前空間 hozo.editor、入口から入る操作の名前空間 hozo.operation。
 // **写し。持ち主は、文書（docs/lsp.md、docs/editors.md、docs/tools.md「ユースケース」「操作」）と、Go の型（internal/lsp/protocol）。
 // 生成に使うようになるまで。** 食い違えば、文書が正しい。どの単位の対象でもない: コードには、ならない。
@@ -18,7 +18,7 @@
 //   前の穴に、ここでも当たったもの: 6（真偽の値で、道を分ける）、9（空の並び）、14（null の結果）、15（形の決まっていない値: LSP の data）、
 //   18（運び方: 標準入出力の JSON-RPC）
 //   決まった値の項目（MarkupContent の kind、capabilities）と、列挙（重さ、シンボルの種類、位置の数え方）は、リテラルの型で書いてある
-//   （docs/decisions.md「決めたこと」482。前は、穴 12 と 13）
+//   （決定 D482。前は、穴 12 と 13）
 
 /** 入口から入る操作。言語サーバー、IDE、MCP サーバーは、同じ操作への、別々の口（docs/tools.md「操作」） */
 namespace hozo.operation {

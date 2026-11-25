@@ -15,7 +15,7 @@ var ErrNoModule = errors.New("no Go module name in the options")
 
 // ModuleOf は、出力の設定 cfg の、Go のモジュールの名前（docs/plugin-go.md「マニフェスト」のオプション module:
 // cfg.Options[cfg.Base]["module"]）。書かれていない、文字列でない、空なら ErrNoModule を包んだ誤り（GO-8）。
-// ファイル（go.mod）は、読まない（docs/decisions.md「決めたこと」425）。
+// ファイル（go.mod）は、読まない（決定 D425）。
 func ModuleOf(cfg ir.NamespaceConfig) (string, error) {
 	v, written := cfg.Options[cfg.Base]["module"]
 	if !written {

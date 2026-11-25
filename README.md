@@ -179,7 +179,7 @@ A decision is a named case. Its context and its rejected options are tags in the
  * @adr.alternative Leave it as it is.
  */
 @adr.accepted
-@adr.amends(Decision.D478)
+@adr.amends(Decision400.D478)
 D480;
 ```
 

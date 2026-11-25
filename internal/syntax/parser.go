@@ -1573,7 +1573,7 @@ func (p *parser) atCaseKind() bool { return p.at(token.Case) }
 // case は case of any の省略。of の後ろの型は、型として読む（分類の名前も、型の名前として読み、名前の解決が分ける。
 // docs/grammar.md「decorator の宣言」）。
 //
-// 型で絞る形の対象に、省略可能な型（いちばん外が ? か nullable<…>）は、書けない（docs/decisions.md「決めたこと」354）。
+// 型で絞る形の対象に、省略可能な型（いちばん外が ? か nullable<…>）は、書けない（決定 D354）。
 // 引数の種類（param が true。any の後ろ）では、いちばん後ろの ? を、引数を省ける印として読み（CaseKind.Optional）、対象の型から外す。
 // 付ける先（for の後ろ）には、省ける印がないので、SYNTAX。
 func (p *parser) parseCaseKind(param bool) *ast.CaseKind {

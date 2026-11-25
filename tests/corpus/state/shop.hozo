@@ -1,4 +1,4 @@
-// 状態を分類で表す決定（docs/decisions.md「設計書から離れた決定」S1〜S5、S8）のサンプル。
+// 状態を分類で表す決定（決定 S1〜S5、S8）のサンプル。
 // 各ブロックの `// docs/...「見出し」` は、その構文が確かめる文書の見出し。見出し → 構文の対応は README.md。
 
 /** カートと注文を持つ店 */
@@ -44,7 +44,7 @@ namespace shop {
   effect fn addLine(line: Line): effects carts.post;
   /** 店の名前を変える */
   effect fn rename(): effects title.put;
-  // 空にするのは delete（docs/decisions.md S2）
+  // 空にするのは delete（決定 S2）
   /** 手元のトークンを消す */
   effect fn removeToken(): effects token.delete;
 

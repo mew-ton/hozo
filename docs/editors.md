@@ -21,7 +21,7 @@ editors/vscode/
 - クライアントは `vscode-languageclient` で `hozoc lsp` を起動する。`hozoc` の場所は設定 `hozo.hozocPath`（既定は `PATH` の `hozoc`）。見つからなければ、エラーの通知と、設定を開くボタン。バイナリの同梱と取得は段階 4 の後。
 - `hozo:` スキーム（`docs/ir.md`「Program」の `Span.file`）の `TextDocumentContentProvider` を登録し、要求 `hozo/vocabulary` で内容を取る（`docs/lsp.md`「プロジェクト」）。
 - 設定 `hozo.trace.server`（LSP の通信のログ）。
-- **プラグインを起動してよいと、言語サーバーに言うのは、ワークスペースが信頼されていて、設定 `hozo.pluginChecks` が入のときだけ**（`docs/decisions.md`「決めたこと」412。口は `docs/lsp.md`「プラグインの診断」の「許し」）。
+- **プラグインを起動してよいと、言語サーバーに言うのは、ワークスペースが信頼されていて、設定 `hozo.pluginChecks` が入のときだけ**（決定 D412。口は `docs/lsp.md`「プラグインの診断」の「許し」）。
   - 設定 `hozo.pluginChecks`（既定は、入）: 信頼したワークスペースでも、エディタからの、プラグインの check を、切れる。
   - 起動のとき、`vscode.workspace.isTrusted` と、設定から決めて、`initializationOptions` に渡す。
   - 動いている間に、ワークスペースが信頼されたとき（`onDidGrantWorkspaceTrust`）と、設定 `hozo.pluginChecks` が変わったときは、`workspace/didChangeConfiguration` で、渡し直す（サーバーは、起動し直さない）。

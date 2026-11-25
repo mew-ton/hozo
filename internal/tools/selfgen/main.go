@@ -120,6 +120,9 @@ func run(repo string, stdout, stderr io.Writer) error {
 		if err != nil {
 			return err
 		}
+		if err := os.MkdirAll(filepath.Dir(filepath.Join(work, name)), 0o755); err != nil {
+			return err
+		}
 		if err := os.WriteFile(filepath.Join(work, name), data, 0o644); err != nil {
 			return err
 		}
@@ -157,17 +160,23 @@ func run(repo string, stdout, stderr io.Writer) error {
 }
 
 // places は、置き場の一覧（メッセージ用）。
-// specFiles は、リポジトリのルートの仕様のファイル（*.hozo。hozo.toml の sources が並べるもの: cli.hozo と、設計だけのファイル）の
-// 名前。cli.hozo の宣言が、設計だけのファイルの宣言を指す（決定の記録への @adr.decided など）ので、生成するときに、すべて要る
-// （docs/packages.md「自己生成の手順」の 2）。
+// specFiles は、リポジトリのルートの仕様のファイル（*.hozo と decisions/*.hozo。hozo.toml の sources が並べるもの: cli.hozo と、
+// 設計だけのファイル）の、ルートからの相対の名前。cli.hozo の宣言が、設計だけのファイルの宣言を指す（決定の記録への @adr.decided など）
+// ので、生成するときに、すべて要る（docs/packages.md「自己生成の手順」の 2）。
 func specFiles(repo string) ([]string, error) {
-	matches, err := filepath.Glob(filepath.Join(repo, "*.hozo"))
-	if err != nil {
-		return nil, err
-	}
-	names := make([]string, 0, len(matches))
-	for _, m := range matches {
-		names = append(names, filepath.Base(m))
+	var names []string
+	for _, pattern := range []string{"*.hozo", filepath.Join("decisions", "*.hozo")} {
+		matches, err := filepath.Glob(filepath.Join(repo, pattern))
+		if err != nil {
+			return nil, err
+		}
+		for _, m := range matches {
+			rel, err := filepath.Rel(repo, m)
+			if err != nil {
+				return nil, err
+			}
+			names = append(names, rel)
+		}
 	}
 	sort.Strings(names)
 	return names, nil

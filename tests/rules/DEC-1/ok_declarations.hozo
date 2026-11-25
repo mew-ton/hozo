@@ -1,4 +1,4 @@
-// DEC-1 に当たらない（docs/check.md「デコレータ」、docs/grammar.md「decorator の宣言」、docs/decisions.md「決めたこと」476）:
+// DEC-1 に当たらない（docs/check.md「デコレータ」、docs/grammar.md「decorator の宣言」、決定 D476）:
 // 付ける先に union / classify / decorator を書いたデコレータは、それぞれの宣言に付けられる。
 // デコレータの宣言に付けた印は、その宣言に付くだけ。自分の宣言に付ける、互いの宣言に付ける、も書ける。
 namespace a {

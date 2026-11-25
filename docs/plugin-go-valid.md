@@ -45,7 +45,7 @@ interprets = [
 
 - 継承した model は、展開済みのフィールド（受け継いだデコレータを含む）で判定する。受け継いだ制約は外せない。
 - union と exception は `Validate` を持たない（例外の引数の型が `Validate` を持つ型でも、例外の構造体には出さない。例外の値を確かめる者は、いない）。union のインターフェースには、メソッドを足せない。
-- **union のアームの検証**は、値が当たっているアームのものを、呼ぶ（`docs/decisions.md`「決めたこと」399 に合わせて決めた。`docs/open.md`「聞かずに決めて、確かめていない決定」）: union をフィールドに持つ model の `Validate`（上の 5）が、実行時に、値が `Validate() error` を持つかを見て、呼ぶ（「model」の表）。アームの値の Go の型（`docs/plugin-go.md`「union」）が `Validate` を持つのは、次の二つ:
+- **union のアームの検証**は、値が当たっているアームのものを、呼ぶ（決定 D399 に合わせて決めた。`docs/open.md`「聞かずに決めて、確かめていない決定」）: union をフィールドに持つ model の `Validate`（上の 5）が、実行時に、値が `Validate() error` を持つかを見て、呼ぶ（「model」の表）。アームの値の Go の型（`docs/plugin-go.md`「union」）が `Validate` を持つのは、次の二つ:
   - アームの型が、union と同じ名前空間の model で、その model が `Validate` を持つ（その構造体が、アームの値）。
   - アームの型が、`Validate` を持つ型への `ref` で、アームの値が、包む型（別の名前空間の model、scalar）。包む型に、`Validate` を出す（「出力」）。
 - アームの型が、`ref` でなく（`optional`、`array`）、または、インデックスの model か、別の union への `ref` で、その中（4 と同じに、通して見たもの。union なら、そのアームも）に `Validate` を持つ型があれば、GOVALID-4（その形のアームを、確かめる形が、まだない）。
@@ -130,7 +130,7 @@ func (m User) Validate() error {
 
 - 「元の型」は、`docs/plugin-valid.md`「制約」の言うもの。
 - 違反は `violations = append(violations, runtime.Violation{Path: "<パス>", Constraint: "<違反の名前>"})`。違反の名前は、同「制約」の表（デコレータの名前。配列のフィールドに付けた `length` だけ、`count`）。
-- **標準でない `valid` の制約**（名前空間 `valid` の、標準の五つのほかのデコレータ）は、中身を人が書くもので、`Validate()` に実装を渡す形がまだない。使われていれば GOVALID-5。`valid` は、語彙の名前空間なので、仕様からは、足せない（`docs/vocab.md`「語彙の名前空間」。RES-8）: 足せるのは、ほかのプラグインの語彙のファイルだけ（`docs/decisions.md`「決めたこと」463）。設計書 §6.5 の、利用者の自前の制約は、利用者の名前空間のデコレータ（`@server.checkDigit`）で、このトランスパイラは、読まない。
+- **標準でない `valid` の制約**（名前空間 `valid` の、標準の五つのほかのデコレータ）は、中身を人が書くもので、`Validate()` に実装を渡す形がまだない。使われていれば GOVALID-5。`valid` は、語彙の名前空間なので、仕様からは、足せない（`docs/vocab.md`「語彙の名前空間」。RES-8）: 足せるのは、ほかのプラグインの語彙のファイルだけ（決定 D463）。設計書 §6.5 の、利用者の自前の制約は、利用者の名前空間のデコレータ（`@server.checkDigit`）で、このトランスパイラは、読まない。
 
 ## runtime
 
@@ -177,4 +177,4 @@ func CheckFormat(name, v string) bool                   // valid.format の四�
   | `pattern` が RE2 でない | VALID-3 |
   | `format` の名前を知らない | VALID-4 |
 
-- GOVALID-2 は欠番。「フィールドの既定値が、その型かフィールドの制約に合わない」という規則だったが、フィールドの既定値を言語からなくしたので、確かめるものがない（`docs/decisions.md`「設計書から離れた決定」S24）。値を入れるデコレータ（`@http.default`、`@cli.default`）の値は、それを読む相乗りが、生成するときに制約で確かめる（`docs/plugin-http.md`「補う値と制約」）。番号は別の意味に使い回さない（欠番の一覧は `docs/requirements.md`「検査の規則の一覧」）。
+- GOVALID-2 は欠番。「フィールドの既定値が、その型かフィールドの制約に合わない」という規則だったが、フィールドの既定値を言語からなくしたので、確かめるものがない（決定 S24）。値を入れるデコレータ（`@http.default`、`@cli.default`）の値は、それを読む相乗りが、生成するときに制約で確かめる（`docs/plugin-http.md`「補う値と制約」）。番号は別の意味に使い回さない（欠番の一覧は `docs/requirements.md`「検査の規則の一覧」）。

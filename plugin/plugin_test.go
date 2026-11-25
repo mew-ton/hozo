@@ -170,7 +170,7 @@ func TestRunEmitBatch(t *testing.T) {
 }
 
 // TestRunIgnoresUnknownFields は docs/plugin-protocol.md「要求と応答」: プラグインは、要求の、知らない項目を、どの階層でも、
-// 無視する（docs/decisions.md「決めたこと」421）。知らない項目を足した要求への応答は、足さない要求への応答と、同じ。
+// 無視する（決定 D421）。知らない項目を足した要求への応答は、足さない要求への応答と、同じ。
 func TestRunIgnoresUnknownFields(t *testing.T) {
 	decl := func(extra string) string {
 		return `{"kind":"model","name":"a.M","span":{"file":"a.hozo","start":{"line":1,"col":1` + extra + `},"end":{"line":1,"col":2}},"decorators":[],"fields":[` +

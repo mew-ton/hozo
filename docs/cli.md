@@ -8,9 +8,9 @@
 
 hozoc 自身の仕様は、リポジトリ直下の `cli.hozo`。下のコードブロックはその写しで、`hozo.toml` のブロックも同じ（バイト単位で同じであることを `tests/parse_test.go` の `TestDocsEmbedRootFiles` が確かめる）。この文書と `docs/` のほかの文書が、修飾なしに `cli.hozo` と書けばこのファイルを指す。go-cli プラグインの語彙のファイルは `plugins/go-cli/cli.hozo` と書く（`docs/plugin-go-cli.md`「マニフェスト」）。
 
-業務の流れ（ユースケースを、順に呼ぶ配線）は、別のファイル `flows.hozo` の、名前空間 `hozo.flows` が持つ（`docs/decisions.md`「決めたこと」475。写しは、ここには、置かない）。hozoc の外の手順（利用者か CI が、テストを走らせる）は、同じファイルの `hozo.toolchain` の op として言う。どちらの名前空間も、単位の対象ではなく、コードには、ならない。
+業務の流れ（ユースケースを、順に呼ぶ配線）は、別のファイル `flows.hozo` の、名前空間 `hozo.flows` が持つ（決定 D475。写しは、ここには、置かない）。hozoc の外の手順（利用者か CI が、テストを走らせる）は、同じファイルの `hozo.toolchain` の op として言う。どちらの名前空間も、単位の対象ではなく、コードには、ならない。
 
-プラグインとのやり取り（`plugin.hozo` の `hozo.plugin`）と、IR（`ir.hozo` の `hozo.ir`）も、Hozo で写してある（同 468）。**写しで、持ち主は、文書**（`docs/plugin-protocol.md`、`docs/ir.md`）: 今の言語で、JSON の上の形を、言い切れない所があり（`docs/open.md`「サンプルと、hozoc 自身の仕様」の 14〜20。印 `kind` などの、決まった値の項目と、列挙は、リテラルの型で書いてある: `docs/decisions.md`「決めたこと」482）、生成には、使っていない。単位の対象ではなく、コードには、ならない。
+プラグインとのやり取り（`plugin.hozo` の `hozo.plugin`）と、IR（`ir.hozo` の `hozo.ir`）も、Hozo で写してある（同 468）。**写しで、持ち主は、文書**（`docs/plugin-protocol.md`、`docs/ir.md`）: 今の言語で、JSON の上の形を、言い切れない所があり（`docs/open.md`「サンプルと、hozoc 自身の仕様」の 14〜20。印 `kind` などの、決まった値の項目と、列挙は、リテラルの型で書いてある: 決定 D482）、生成には、使っていない。単位の対象ではなく、コードには、ならない。
 
 言語サーバー（`lsp.hozo`）も、同じに、写してある（同 468）: 入口（LSP の要求と通知）の `hozo.lsp`、入口から入る操作の `hozo.operation`、相手（文面のエディタ）の `hozo.editor`。**写しで、持ち主は、文書**（`docs/lsp.md`、`docs/editors.md`、`docs/tools.md`「操作」）。単位の対象ではなく、コードには、ならない。ユースケース `serve`（下の `hozo.compiler`。葉）は、その入口と操作の全体を、一つの op にしたもので、重なっている（`docs/open.md`「サンプルと、hozoc 自身の仕様」）。
 
@@ -18,22 +18,22 @@ IDE と、MCP サーバー（`ide.hozo`）も、同じに、写してある（�
 
 診断（`diagnostics.hozo` の `hozo.diagnostics`）も、要求として、写してある（同 442、468、469）: 診断の ID が、対象のない分類のケースで、重さ、出どころの決定、持ち主の文書と見出し、欠番、文言に埋める値を、自前の印で結ぶ。写したのは、代表の 24 個。**写しで、持ち主は、文書**（`docs/requirements.md`「検査の規則の一覧」と、それぞれの文書の「診断」の表）。単位の対象ではなく、コードには、ならない。書けなかった所は `docs/open.md`「サンプルと、hozoc 自身の仕様」の 30〜35。
 
-決定の記録（`decisions.hozo` の `hozo.decisions`）も、写してある（同 471、476〜480）: 決定が、対象のない分類 `Decision` のケースで、理由、結果、採らなかった案、決めた人の言葉を、説明のコメントの中のタグ（`@adr.context` など）で、状態（提案、採用、却下、廃止、置き換え済み）と、一部を直す決定を、印で書く（状態の印は `decisions.hozo` の D534）。語彙 `adr` は、同じファイルに、自前のものとして宣言してある（同梱の語彙では、ない）。形を決めた宣言の側には、`@adr.decided(…)` を付けてある（この文書の写しの `cli.hozo` にも、現れる）。写したのは、468〜483 と、それらが置き換えた 417、確かめていない決定の三つと、533。**533 までは写しで、持ち主は `docs/decisions.md`。534 からの決定は、`decisions.hozo` が持ち主**（同 533）。単位の対象ではなく、コードには、ならない。書けなかった所は `docs/open.md`「サンプルと、hozoc 自身の仕様」の 36〜39。
+決定の記録（`decisions/` の `hozo.decisions`）も、Hozo で書いてある（決定 D471、D476〜D481、D533、D534、D541）: 決定が、対象のない分類（百の位ごとの `Decision000`〜、設計書から離れた決定の `DecisionS`）のケースで、理由、結果、採らなかった案、決めた人の言葉を、説明のコメントの中のタグ（`@adr.context` など）で、状態（提案、採用、却下、廃止、置き換え済み）と、一部を直す決定を、印で書く。語彙 `adr` は `decisions/adr.hozo` に、自前のものとして宣言してある（同梱の語彙では、ない）。形を決めた宣言の側には、`@adr.decided(…)` を付けてある（この文書の写しの `cli.hozo` にも、現れる）。**決定の持ち主は、`decisions/` のケース**。`docs/decisions.md` の行は、そのまま本文に移した（D541）。単位の対象ではなく、コードには、ならない。書けなかった所は `docs/open.md`「サンプルと、hozoc 自身の仕様」の 36〜39。
 
-設計書の `examples/hozoc.hozo` を元に、次を変えたもの。変えた理由はそれぞれの項目に書く（決定の一覧での番号は `docs/decisions.md` の 20 と 36）。
+設計書の `examples/hozoc.hozo` を元に、次を変えたもの。変えた理由はそれぞれの項目に書く（決定の一覧での番号は 決定 D20 と D36）。
 
 `examples/hozoc.hozo` が「書けなかったもの」として挙げた三つは、次のように解く。
 
 - **状態の宣言から設定の値を参照できない**（`@fs.files("{out}/**")`）: `outputs` の状態には `@fs.files` を付けず、置き場が `hozo.toml` の各単位の `out` で決まることを説明に書く。置き場は設定で決まり、仕様の宣言の時点では決まらないため。
 - **`runEmit` を呼ぶ繰り返しを配線で書けない**（配線はループを持たない。§9）: 繰り返しは葉の op の中に置く（プラグインを、一つずつ起動するのは `check`。その答えから、ファイルを集めるのは `collectOutputs`）。書き出すユースケース `write` は配線にし、`check` を呼んでから、葉 `collectOutputs`（`check` が受け取った、トランスパイラの答えから、ファイルを集める。ファイルには触れない）、`read` の `outputChanges`（書くファイルと消すファイルを、今の `outputs` と比べて決める）、効果 `syncOutputs`（書き出す）を、この順に呼ぶ: 状態に触れるのは `read` と効果だけで、葉の op は触れない（`docs/check.md`「葉の op」）。検査を通った結果だけを書き出しに渡すことと、`check` の例外が、ユースケースと、コマンド `build` に伝わることを、境界の記述のまま検査器に確かめさせるため。`runEmit` はどの配線からも呼ばれないが、プラグインとの境界の記述として残す（「手で書くもの」）。
-- **デコレータの引数に実行時の値を書けない**（`@proc.stdio("{plugin.command}")`）: 呼び先を引数 `plugin` で渡す。デコレータ `proc.stdio` は、付けない: 語彙 `proc`（外部プロセスの起動）は、プラグインを WASM で動かすようにした後、なくした（`docs/decisions.md`「決めたこと」434）。`runEmit` は、例外を、op に直に書く。`runImport` は段階 6 で足す。
+- **デコレータの引数に実行時の値を書けない**（`@proc.stdio("{plugin.command}")`）: 呼び先を引数 `plugin` で渡す。デコレータ `proc.stdio` は、付けない: 語彙 `proc`（外部プロセスの起動）は、プラグインを WASM で動かすようにした後、なくした（決定 D434）。`runEmit` は、例外を、op に直に書く。`runImport` は段階 6 で足す。
 
 ほかに変えたこと:
 
-- 名前空間は `hozo.compiler`（出典は `hozoc`）。Hozo 自身の仕様は、`hozo` の下の、入れ子の名前空間に書く（`docs/decisions.md`「決めたこと」468）。生成物の置き場は `internal/gen/hozo/compiler` で、Go のパッケージ名は `compiler`。例外の名前の表示（`--format json` の `"error"`）は、`hozo.compiler.CheckFailed` のように、名前空間から書く。コマンドの名前（`hozoc`）と、バイナリの置き場（`cmd/hozoc`）は、変えていない。
-- **入口（コマンドの行）と、ユースケースを、二つの名前空間に分ける**（`docs/decisions.md`「決めたこと」472、473）。`hozo.cli` が、コマンドの op（`@cli.command` の `build`、`tests`、`lsp`）と、その入力（`@cli.flag` などを持つ `BuildInput`、`TestsInput`、`LspInput`）を持ち、`hozo.compiler` が、ユースケースの op（`verify`: 検査する。`preview`: 書き出す予定を見る。`write`: 書き出す。`confirmTests`: 求めるテストが走ったかを確かめる。`serve`: 言語サーバーとして動く）を持つ。フラグ（`--no-emit`、`--dry-run`、`--format`）を知っているのは、`hozo.cli` だけ: ユースケースの入力（`EmitInput`、`CoverageInput`、`ServeInput`）は、それに当たる項目を持たず、コマンドの op が、入力から、レコードリテラルで組んで渡す。`build` は、フラグ（`noEmit`、`dryRun`。真偽の値）を、型で決まる分類 `Flag`（`On`: `boolean as true`、`Off`: `boolean as false`。リテラルの型: `docs/decisions.md`「決めたこと」483）で分け、三つのユースケースの、どれかを呼ぶ（「build」の表）: フラグの値から、ユースケースへの対応は、仕様の配線が言い、人が書く述語は、ない。分かれ道は二つ（`--no-emit` か。そうでなければ、`--dry-run` か）で、アームの本体に `match` は書けないので、二つ目は、内部の op `writeOrPreview` に分けてある（`docs/open.md`「サンプルと、hozoc 自身の仕様」）。フラグは、省略可能でない `boolean`: 付いていなければ、偽（`docs/plugin-go-cli.md`「語彙」の、値が与えられなかったときの扱い）。生成物の置き場は、`internal/gen/hozo/cli`（コマンドの行）と `internal/gen/hozo/compiler`（ユースケース）。
+- 名前空間は `hozo.compiler`（出典は `hozoc`）。Hozo 自身の仕様は、`hozo` の下の、入れ子の名前空間に書く（決定 D468）。生成物の置き場は `internal/gen/hozo/compiler` で、Go のパッケージ名は `compiler`。例外の名前の表示（`--format json` の `"error"`）は、`hozo.compiler.CheckFailed` のように、名前空間から書く。コマンドの名前（`hozoc`）と、バイナリの置き場（`cmd/hozoc`）は、変えていない。
+- **入口（コマンドの行）と、ユースケースを、二つの名前空間に分ける**（決定 D472、D473）。`hozo.cli` が、コマンドの op（`@cli.command` の `build`、`tests`、`lsp`）と、その入力（`@cli.flag` などを持つ `BuildInput`、`TestsInput`、`LspInput`）を持ち、`hozo.compiler` が、ユースケースの op（`verify`: 検査する。`preview`: 書き出す予定を見る。`write`: 書き出す。`confirmTests`: 求めるテストが走ったかを確かめる。`serve`: 言語サーバーとして動く）を持つ。フラグ（`--no-emit`、`--dry-run`、`--format`）を知っているのは、`hozo.cli` だけ: ユースケースの入力（`EmitInput`、`CoverageInput`、`ServeInput`）は、それに当たる項目を持たず、コマンドの op が、入力から、レコードリテラルで組んで渡す。`build` は、フラグ（`noEmit`、`dryRun`。真偽の値）を、型で決まる分類 `Flag`（`On`: `boolean as true`、`Off`: `boolean as false`。リテラルの型: 決定 D483）で分け、三つのユースケースの、どれかを呼ぶ（「build」の表）: フラグの値から、ユースケースへの対応は、仕様の配線が言い、人が書く述語は、ない。分かれ道は二つ（`--no-emit` か。そうでなければ、`--dry-run` か）で、アームの本体に `match` は書けないので、二つ目は、内部の op `writeOrPreview` に分けてある（`docs/open.md`「サンプルと、hozoc 自身の仕様」）。フラグは、省略可能でない `boolean`: 付いていなければ、偽（`docs/plugin-go-cli.md`「語彙」の、値が与えられなかったときの扱い）。生成物の置き場は、`internal/gen/hozo/cli`（コマンドの行）と `internal/gen/hozo/compiler`（ユースケース）。
 - 例外は、投げるユースケースの側（`hozo.compiler`）に宣言し、終了コード（`@cli.exitCode`）も、その宣言に付ける（`@http.status` を、別の名前空間の例外に付けるのと、同じ形。`go-cli` は、コマンドの op が投げうる例外を、どの名前空間のものでも、見分ける: `docs/plugin-go-cli.md`「コマンドごとの関数」）。終了コードは、入口の側の事情だが、デコレータは、宣言に付けるものなので、ユースケースの側の宣言に、残る（同「サンプルと、hozoc 自身の仕様」）。
-- 担い手（分類 `Actor`）と、要求（分類 `Requirement`）を足し、ユースケースの op に、行う担い手（`@prd.usecase.of`）と、要求（`@prd.ref`）を結んだ（`docs/vocab.md`「設計の図の語彙」。`docs/decisions.md`「決めたこと」468）。中身は、文書から写した: 担い手は `docs/requirements.md`「書く人と、読む人」「言語サーバー」、この文書の「tests」、`docs/testing.md`「CI」。要求は `docs/requirements.md`「ただ一つの正」「もとの考えと、Hozo が守るもの」（決定 373）「言語サーバー」「品質の要件」。四つのデコレータは `@hint` で、今の単位のトランスパイラは読まない: 生成物は、変わらない。業務フロー（`@prd.business.flow`）は、書いていない（`docs/open.md`「サンプルと、hozoc 自身の仕様」）。
+- 担い手（分類 `Actor`）と、要求（分類 `Requirement`）を足し、ユースケースの op に、行う担い手（`@prd.usecase.of`）と、要求（`@prd.ref`）を結んだ（`docs/vocab.md`「設計の図の語彙」。決定 D468）。中身は、文書から写した: 担い手は `docs/requirements.md`「書く人と、読む人」「言語サーバー」、この文書の「tests」、`docs/testing.md`「CI」。要求は `docs/requirements.md`「ただ一つの正」「もとの考えと、Hozo が守るもの」（決定 373）「言語サーバー」「品質の要件」。四つのデコレータは `@hint` で、今の単位のトランスパイラは読まない: 生成物は、変わらない。業務フロー（`@prd.business.flow`）は、書いていない（`docs/open.md`「サンプルと、hozoc 自身の仕様」）。
 - `fs` の語彙は標準の語彙（`docs/vocab.md`「同梱する語彙」）に、`cli` の語彙は go-cli プラグインが提供する語彙（同「同梱しない語彙」）になったので、どちらも `cli.hozo` では宣言しない。出典の語彙 `proc` の二つの例外（`Crashed`、`MalformedOutput`）は、名前空間 `hozoc` の例外として、`cli.hozo` に宣言する（同 434）。
 - `lsp` を足す。言語サーバーを別のバイナリにしない（`docs/requirements.md`「言語サーバー」）ので、hozoc のサブコマンドとして境界に書く。
 - 書き出しの三つの変化（追加・書き換え・削除）は、`outputs` を対象にした分類 `OutputsSync` の遷移 `syncOutputs` 一つにする（一つの効果が変えるのは、一つの状態の一つの変化。`docs/check.md`「効果の宛先」）。ケースは `UpToDate` と `OutOfDate` の二つで、どちらも述語を持つ（`docs/check.md`「ケースの判定」）。述語 `UpToDate` は「生成し直して差分がない」で、`docs/testing.md`「生成物の一致」の検査と同じ中身。述語 `OutOfDate` は、その否定。
@@ -43,11 +43,11 @@ IDE と、MCP サーバー（`ide.hozo`）も、同じに、写してある（�
 - 環境変数 `HOZO_CACHE_DIR` も、同じ流儀で、`build` / `tests` / `lsp` の入力のフィールド `cacheDir` として足す（`check` には、配線が渡す）。プラグインの WASM を、機械の言葉に直したものを、覚える置き場（`docs/plugin-protocol.md`「起動」）。
 - model `Plugin` は、プラグインの名前と、WASM のファイルの場所だけを持つ。プラグインは、hozoc の中の、サンドボックスで動き、作業ディレクトリも、引数も、渡さない（同「起動」）ので、前にあった `command`、`dir`、`root` は、ない。
 - 設定を単位の一覧にした（`docs/config.md`「単位」）のに合わせて、`EmitRequest` に `transpiler` を足し、`LanguageMismatch` と `UnknownNamespace` の意味を単位の言葉に直す。
-- プラグインとやり取りする model（`EmitRequest` / `EmitResponse` と、その中の `EmitOutput`、`OutputResult`、`TranspilerResult`）は `docs/plugin-protocol.md`「要求と応答」の JSON をそのまま写す（一つの要求に、仕様を一度と、受け持つ出力の並び。`docs/decisions.md`「決めたこと」411）。IR の中身（`Spec`、`OutputView`）は、書かない。応答の `select` をなくした（同「選択をなくしたこと」）のに合わせて、`Select` と `Wrap` を持たない。
-- **コマンドは `build`、`tests`、`lsp` の三つ**（`docs/decisions.md`「決めたこと」417）。前にあった `check` と `emit` の二つのコマンドは、`build` 一つにまとめた（「build」）: `build` は、検査して、書き出す。`build --no-emit` は、検査だけ。検査の op `check` は、コマンドでも、ユースケースでもない、内部の葉の op として残る（ユースケース `verify`、`preview`、`write`、`confirmTests` の配線が、はじめに呼ぶ）。その入力 `CheckInput` は、配線が、ユースケースの入力から作る。
+- プラグインとやり取りする model（`EmitRequest` / `EmitResponse` と、その中の `EmitOutput`、`OutputResult`、`TranspilerResult`）は `docs/plugin-protocol.md`「要求と応答」の JSON をそのまま写す（一つの要求に、仕様を一度と、受け持つ出力の並び。決定 D411）。IR の中身（`Spec`、`OutputView`）は、書かない。応答の `select` をなくした（同「選択をなくしたこと」）のに合わせて、`Select` と `Wrap` を持たない。
+- **コマンドは `build`、`tests`、`lsp` の三つ**（決定 D417）。前にあった `check` と `emit` の二つのコマンドは、`build` 一つにまとめた（「build」）: `build` は、検査して、書き出す。`build --no-emit` は、検査だけ。検査の op `check` は、コマンドでも、ユースケースでもない、内部の葉の op として残る（ユースケース `verify`、`preview`、`write`、`confirmTests` の配線が、はじめに呼ぶ）。その入力 `CheckInput` は、配線が、ユースケースの入力から作る。
 - `build` / `tests` / `lsp` に `export` を付ける。`@cli.command` の付いた op は、`go-cli` の `Main` が、名前空間の外から入口の `Ops` を通して呼ぶ（`docs/plugin-go-cli.md`「対象」の CLI-6）。ユースケースの op（`hozo.compiler` の `verify`、`preview`、`write`、`confirmTests`、`serve`）にも、`export` を付ける: 別の名前空間（`hozo.cli`）から、呼ぶ。`check`、`collectOutputs`、`verifyOutputs`、`plannedChanges`、`matchTests`、`runEmit` は内部の op。
 - 例外が運ぶ値は、例外の引数で書く（`exception CheckFailed(diagnostics: Diagnostic[]);`。`docs/grammar.md`「exception / effect / read」）。値を包むだけの model `Diagnostics` は持たない。
-- `tests` を足す（`docs/decisions.md`「決めたこと」380）。ユースケース `confirmTests` は配線にして、`check` を呼んでから、葉の op `matchTests` を呼ぶ（`write` と同じ理由: 検査を通った結果だけを渡すことを、境界の記述のまま、検査器に確かめさせる）。対応表を集めるところは、`collectOutputs` を呼ばず、`matchTests` の中に置く: 配線は、リストのリテラルを書けず（`docs/grammar.md`「配線」）、`EmitInput`（`namespaces` を持つ）を、配線の中で作れない。入力の `coverage` は、なければ使い方の誤りにする（`@cli.required`。`docs/plugin-go-cli.md`「語彙」）。
+- `tests` を足す（決定 D380）。ユースケース `confirmTests` は配線にして、`check` を呼んでから、葉の op `matchTests` を呼ぶ（`write` と同じ理由: 検査を通った結果だけを渡すことを、境界の記述のまま、検査器に確かめさせる）。対応表を集めるところは、`collectOutputs` を呼ばず、`matchTests` の中に置く: 配線は、リストのリテラルを書けず（`docs/grammar.md`「配線」）、`EmitInput`（`namespaces` を持つ）を、配線の中で作れない。入力の `coverage` は、なければ使い方の誤りにする（`@cli.required`。`docs/plugin-go-cli.md`「語彙」）。
 - `BuildInput` の位置引数は、位置を引数で言う（`@cli.arg(1) namespaces: string[];`。`docs/plugin-go-cli.md`「語彙」）。フラグと環境変数の行は、名前を書いている。
 
 ```ts
@@ -62,7 +62,7 @@ namespace hozo.compiler {
    * 担い手は、していることで分ける。道具（エディタ、CLI、MCP サーバー、IDE）は、入口で、担い手ではない。
    * 設計する人が使う操作と、画面は、ide.hozo
    */
-  @adr.decided(hozo.decisions.Decision.D474)
+  @adr.decided(hozo.decisions.Decision400.D474)
   classify Actor of never {
     /** 仕様（.hozo）の文面を書く AI。文面を書くのは、主に AI */
     @prd.actor.ai Agent;
@@ -88,7 +88,7 @@ namespace hozo.compiler {
     /** 診断: 漏れを指摘するときは、何が漏れているかを、名指しする */
     NamedOmission;
     /** 配布: OS ごとの、単一のバイナリ。実行環境を要求しない。言語サーバーも、別のバイナリにしない */
-    @adr.decided(hozo.decisions.Decision.D470)
+    @adr.decided(hozo.decisions.Decision400.D470)
     SingleBinary;
     /** ハーネス: 必要なテストケースが、用意されていて、それが、通っていること */
     RequiredTestsRan;
@@ -339,7 +339,7 @@ namespace hozo.compiler {
    */
   @prd.usecase.of(Actor.Agent, Actor.Engineer, Actor.Ci)
   @prd.ref(Requirement.SharedDiagnostics)
-  @adr.decided(hozo.decisions.Decision.D472, hozo.decisions.Decision.D473)
+  @adr.decided(hozo.decisions.Decision400.D472, hozo.decisions.Decision400.D473)
   export fn verify(in: EmitInput): BuildResult {
     val checked = check({ config: in.config, pluginPath: in.pluginPath, cacheDir: in.cacheDir });
     return verifyOutputs(in, checked);
@@ -360,7 +360,7 @@ namespace hozo.compiler {
    * @see write
    */
   @prd.usecase.of(Actor.Agent, Actor.Engineer)
-  @adr.decided(hozo.decisions.Decision.D472, hozo.decisions.Decision.D473)
+  @adr.decided(hozo.decisions.Decision400.D472, hozo.decisions.Decision400.D473)
   export fn preview(in: EmitInput): BuildResult {
     val checked = check({ config: in.config, pluginPath: in.pluginPath, cacheDir: in.cacheDir });
     val plan = collectOutputs(in, checked);
@@ -376,7 +376,7 @@ namespace hozo.compiler {
    */
   @prd.usecase.of(Actor.Agent, Actor.Engineer)
   @prd.ref(Requirement.SingleSource, Requirement.Deterministic)
-  @adr.decided(hozo.decisions.Decision.D472, hozo.decisions.Decision.D473, hozo.decisions.Decision.WriteWithoutCi)
+  @adr.decided(hozo.decisions.Decision400.D472, hozo.decisions.Decision400.D473, hozo.decisions.DecisionUnnumbered.WriteWithoutCi)
   export fn write(in: EmitInput): BuildResult
     effects syncOutputs
     throws CheckFailed, ConfigInvalid, LanguageMismatch, OutputConflict, UnknownNamespace prevents effects
@@ -412,7 +412,7 @@ namespace hozo.compiler {
    */
   @prd.usecase.of(Actor.Agent, Actor.Engineer, Actor.Ci)
   @prd.ref(Requirement.RequiredTestsRan)
-  @adr.decided(hozo.decisions.Decision.D472, hozo.decisions.Decision.D473)
+  @adr.decided(hozo.decisions.Decision400.D472, hozo.decisions.Decision400.D473)
   export fn confirmTests(in: CoverageInput): TestsResult {
     val checked = check({ config: in.config, pluginPath: in.pluginPath, cacheDir: in.cacheDir });
     return matchTests(in, checked);
@@ -425,7 +425,7 @@ namespace hozo.compiler {
    */
   @prd.usecase.of(Actor.Engineer)
   @prd.ref(Requirement.SharedDiagnostics)
-  @adr.decided(hozo.decisions.Decision.D472, hozo.decisions.Decision.D473, hozo.decisions.Decision.D474)
+  @adr.decided(hozo.decisions.Decision400.D472, hozo.decisions.Decision400.D473, hozo.decisions.Decision400.D474)
   export fn serve(in: ServeInput);
 
   /** プラグインの起動のしかた（docs/plugin-protocol.md「起動」）。wasm は、プラグインの本体（WASM）のファイル */
@@ -499,11 +499,11 @@ namespace hozo.cli {
   }
 
   /**
-   * フラグが、付いているか。真偽の値の、型で決まる分類（docs/check.md「分類」。リテラルの型: docs/decisions.md「決めたこと」483）。
+   * フラグが、付いているか。真偽の値の、型で決まる分類（docs/check.md「分類」。リテラルの型: 決定 D483）。
    * build は、これで、--no-emit と --dry-run を見て、入るユースケースを分ける: フラグの値から、ユースケースへの対応は、
    * 人が書く述語ではなく、下の二つの op の配線が、言う（docs/cli.md「build」）。
    */
-  @adr.decided(hozo.decisions.Decision.D472, hozo.decisions.Decision.D483)
+  @adr.decided(hozo.decisions.Decision400.D472, hozo.decisions.Decision400.D483)
   classify Flag of boolean {
     /** 付いている */
     On: boolean as true;
@@ -518,7 +518,7 @@ namespace hozo.cli {
    * @see tests
    */
   @cli.command("build")
-  @adr.decided(hozo.decisions.Decision.D472, hozo.decisions.Decision.D473)
+  @adr.decided(hozo.decisions.Decision400.D472, hozo.decisions.Decision400.D473)
   export fn build(in: BuildInput): hozo.compiler.BuildResult {
     return match (in.noEmit by Flag) {
       On => hozo.compiler.verify({ config: in.config, namespaces: in.namespaces, pluginPath: in.pluginPath, cacheDir: in.cacheDir });
@@ -532,7 +532,7 @@ namespace hozo.cli {
    *
    * @param in コマンドの入力
    */
-  @adr.decided(hozo.decisions.Decision.D472, hozo.decisions.Decision.D473)
+  @adr.decided(hozo.decisions.Decision400.D472, hozo.decisions.Decision400.D473)
   fn writeOrPreview(in: BuildInput): hozo.compiler.BuildResult {
     return match (in.dryRun by Flag) {
       On => hozo.compiler.preview({ config: in.config, namespaces: in.namespaces, pluginPath: in.pluginPath, cacheDir: in.cacheDir });
@@ -593,7 +593,7 @@ namespace hozo.cli {
 
 ```toml
 [hozo]
-sources     = ["cli.hozo", "decisions.hozo", "diagnostics.hozo", "flows.hozo", "ide.hozo", "ir.hozo", "lsp.hozo", "plugin.hozo"]   # vocab/ と tests/ の .hozo を読まないため
+sources     = ["cli.hozo", "decisions/*.hozo", "diagnostics.hozo", "flows.hozo", "ide.hozo", "ir.hozo", "lsp.hozo", "plugin.hozo"]   # vocab/ と tests/ の .hozo を読まないため
 plugin_dirs = ["plugins"]
 
 # Go のモジュールの名前（go.mod の module と同じもの。docs/plugin-go.md「マニフェスト」）。プロジェクト全体のオプション
@@ -619,7 +619,7 @@ out         = "internal/gen/hozo/cli"
 
 ## build
 
-`hozoc build [--no-emit] [--dry-run] [--format text|json] [--config <パス>] [<名前空間>…]`。仕様を検査し、プラグインから受け取ったファイルを書き出す（`docs/decisions.md`「決めたこと」417）。TypeScript の `tsc` と `tsc --noEmit` と、同じ形。
+`hozoc build [--no-emit] [--dry-run] [--format text|json] [--config <パス>] [<名前空間>…]`。仕様を検査し、プラグインから受け取ったファイルを書き出す（決定 D417）。TypeScript の `tsc` と `tsc --noEmit` と、同じ形。
 
 | 書き方 | フラグ（分類 `Flag`） | 入るユースケース | すること |
 |---|---|---|---|
@@ -627,7 +627,7 @@ out         = "internal/gen/hozo/cli"
 | `hozoc build --no-emit` | `noEmit` が `On` | `verify` | 検査だけ。ファイルには、触れない（読みも、書きも、消しもしない）。「書き出し」の 1〜3（ファイルを集め、`path` と衝突を確かめる）までは、行う |
 | `hozoc build --dry-run` | `noEmit` が `Off`、`dryRun` が `On` | `preview` | 書き出さずに、書き出す予定のファイルを表示する（「書き出し」の 4） |
 
-- **入口が、フラグで、道を分ける**（`docs/decisions.md`「決めたこと」472）: コマンドの op `hozo.cli.build` は、入力のフラグを、分類 `Flag` の `match` で見て、三つのユースケースの、どれかを呼ぶ（`build` が `noEmit` を見て、`On` なら `verify`。`Off` なら、内部の op `writeOrPreview` が `dryRun` を見て、`On` なら `preview`、`Off` なら `write`）。フラグは、ユースケースには、渡さない（ユースケースの入力 `EmitInput` は、`noEmit` も `dryRun` も持たず、書き出す予定 `EmitPlan` も、持たない）。三つのユースケースは、どれも、はじめに `check` を呼ぶ: `verify` は、その後に `verifyOutputs`、`preview` は `collectOutputs` と `plannedChanges`、`write` は `collectOutputs`、`outputChanges`、`syncOutputs`（「cli.hozo」）。
+- **入口が、フラグで、道を分ける**（決定 D472）: コマンドの op `hozo.cli.build` は、入力のフラグを、分類 `Flag` の `match` で見て、三つのユースケースの、どれかを呼ぶ（`build` が `noEmit` を見て、`On` なら `verify`。`Off` なら、内部の op `writeOrPreview` が `dryRun` を見て、`On` なら `preview`、`Off` なら `write`）。フラグは、ユースケースには、渡さない（ユースケースの入力 `EmitInput` は、`noEmit` も `dryRun` も持たず、書き出す予定 `EmitPlan` も、持たない）。三つのユースケースは、どれも、はじめに `check` を呼ぶ: `verify` は、その後に `verifyOutputs`、`preview` は `collectOutputs` と `plannedChanges`、`write` は `collectOutputs`、`outputChanges`、`syncOutputs`（「cli.hozo」）。
 - **`--no-emit` の表示**は、検査の結果だけ: text は、warning と、数の行（`0 errors, 0 warnings`。`docs/diagnostics.md`「text」）。warning だけなら、終了コードは 0（hozoc 自身の仕様では、CFG-26 が二つ出る: `docs/vocab.md`「解釈されなくてよいデコレータ」）。json は、`{"warnings": [...]}`。`written` と `removed` は、出さない（いつも空）。`--no-emit` のない `build` は、warning と、`written: <パス>` / `removed: <パス>` の行（json は、`warnings`、`written`、`removed`）。
 - `--no-emit` と `--dry-run` を、両方書けば、`--no-emit`（書き出す予定も、表示しない）: `build` が、先に `noEmit` を見て、`verify` に入るので、`dryRun` は、見ない。
 - 名前空間の引数は、`--no-emit` でも、集めて確かめるファイルの範囲を選ぶ（「書き出し」の 1。`UnknownNamespace` も、同じ）。
@@ -641,7 +641,7 @@ out         = "internal/gen/hozo/cli"
 1. `hozo.toml` を読み、入っているプラグインのマニフェストを探して読み、各単位の `transpilers` の名前をトランスパイラに解決する（`docs/config.md`「置き場と探し方」「単位」、`docs/plugin-protocol.md`「探索」）。探索が見るプロジェクトの外の場所は、入力の `pluginPath`（`HOZO_PLUGIN_PATH`）と、`cmd/hozoc` が渡すホームディレクトリ（「手で書くもの」）。`hozo.toml` がなければ設定なしで進む（作業ディレクトリをルートにし、`sources` は既定。プラグインは探さない）。設定とマニフェストの error は、CFG-16 なら `LanguageMismatch`、それ以外は `ConfigInvalid`（`docs/config.md`「診断」、`docs/plugin-protocol.md`「診断」）。
 2. 標準の語彙、使うプラグイン（`docs/plugin-protocol.md`「探索」）の語彙、`sources` のファイルの順に読み、解析する（`docs/grammar.md`）。`in` は読むファイルを変えない（`docs/config.md`「in」）。
 3. 解決（`docs/resolve.md`）、正規化（`docs/ir.md`）、計算と検査（`docs/check.md`）を行う。
-4. 1〜3 に error が一つもなければ、プラグインに頼む。はじめに、語彙のプラグインごとに一回、`direction: "read"` を送る（相手は `docs/plugin-protocol.md`「語彙のプラグイン」: 仕様が使っている語彙のもの。単位がなくても、頼む）。その応答に error がなければ、使うプラグインごとに一回、`direction: "emit"` を送る（相手と、受け持つ出力は同「起動」）。どちらの応答も、返った `errors` を error の診断として、`warnings` を warning の診断（`PLUGIN`）として、足す（同じ診断は、一度だけ。同「emit」）。語彙の使い方の誤り（HTTP-5 など）と、トランスパイラが返す誤り（GOHTTP-16 など）は、ここで出る（`docs/decisions.md`「決めたこと」404、410、416）。返ったファイルは、書かない: 同じ実行の、後の段（「emit」の `collectOutputs`、「tests」の `matchTests`）が使う。プラグインの異常終了は `Crashed`、形の違う応答は `MalformedOutput`。
+4. 1〜3 に error が一つもなければ、プラグインに頼む。はじめに、語彙のプラグインごとに一回、`direction: "read"` を送る（相手は `docs/plugin-protocol.md`「語彙のプラグイン」: 仕様が使っている語彙のもの。単位がなくても、頼む）。その応答に error がなければ、使うプラグインごとに一回、`direction: "emit"` を送る（相手と、受け持つ出力は同「起動」）。どちらの応答も、返った `errors` を error の診断として、`warnings` を warning の診断（`PLUGIN`）として、足す（同じ診断は、一度だけ。同「emit」）。語彙の使い方の誤り（HTTP-5 など）と、トランスパイラが返す誤り（GOHTTP-16 など）は、ここで出る（決定 D404、D410、D416）。返ったファイルは、書かない: 同じ実行の、後の段（「emit」の `collectOutputs`、「tests」の `matchTests`）が使う。プラグインの異常終了は `Crashed`、形の違う応答は `MalformedOutput`。
 5. error が一つでもあれば例外（値は error と warning のすべて）。設定かマニフェストの error（CFG-*、MAN-*）が一つでもあれば `ConfigInvalid`、ただしそれがすべて CFG-16 なら `LanguageMismatch`。それ以外は `CheckFailed`。error がなければ `CheckResult`（warning）。
 
 構文エラーのあるファイルも、読めた宣言は解決・検査に進める。診断の順序は `docs/diagnostics.md`。

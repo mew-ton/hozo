@@ -1,5 +1,5 @@
 // 設計書 §8.1 デコレータの宣言。
-// `redirectOn` / `redirectToLogin` はスコープ外（docs/decisions.md「スコープ外にした設計書の例」）なので外した。
+// `redirectOn` / `redirectToLogin` はスコープ外（`docs/open.md`「スコープ外にした設計書の例」）なので外した。
 
 namespace server {
   // 4xx は設計判断なので op ごとのデコレータで宣言する

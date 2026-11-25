@@ -1,4 +1,4 @@
-// Hozo 自身の仕様（docs/decisions.md「決めたこと」468）。プラグインとのやり取りの名前空間 hozo.plugin。
+// Hozo 自身の仕様（決定 D468）。プラグインとのやり取りの名前空間 hozo.plugin。
 // **写し。持ち主は、文書（docs/plugin-protocol.md）と、Go の型（plugin/plugin.go、internal/plugin/manifest.go）。
 // 生成に使うようになるまで。** 食い違えば、文書が正しい。どの単位の対象でもない: コードには、ならない。
 //
@@ -87,7 +87,7 @@ namespace hozo.plugin {
 
   // どの要求も、protocol（IR の版）と direction（頼みごとの名前）を持つ。direction は、頼みごとごとに、決まった値
   // （"read"、"emit"、"coverage"、"import"）で、hozoc とプラグインは、これで、頼みごとを見分ける。
-  // 下の要求の model では、direction を、リテラルの型の項目で書いてある（docs/decisions.md「決めたこと」482）。
+  // 下の要求の model では、direction を、リテラルの型の項目で書いてある（決定 D482）。
 
   // ---- read（語彙のプラグインへの、ただ一つの頼みごと） ----
 
@@ -153,7 +153,7 @@ namespace hozo.plugin {
   // 穴 18: 運び方を言う語彙が、ない。hozoc は、プラグインの WASM を、一度動かし、標準入力に、要求を JSON で渡す。
   // 終了コード 0 なら、標準出力の JSON が、応答。2 なら、標準出力は、断りの応答（Refusal）。ほかは、異常終了
   // （docs/plugin-protocol.md「起動」）。どの頼みごとに入るかは、要求の direction で決まる。
-  // 外部プロセスの語彙 proc は、なくした（docs/decisions.md「決めたこと」434）。JSON の上の形を言う決まりは、
+  // 外部プロセスの語彙 proc は、なくした（決定 D434）。JSON の上の形を言う決まりは、
   // 今は、語彙 http の中にしか、ない（docs/plugin-http.md「通信の形」）。
 
   /**

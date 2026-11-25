@@ -9,7 +9,7 @@ namespace hozo.compiler {
    * 担い手は、していることで分ける。道具（エディタ、CLI、MCP サーバー、IDE）は、入口で、担い手ではない。
    * 設計する人が使う操作と、画面は、ide.hozo
    */
-  @adr.decided(hozo.decisions.Decision.D474)
+  @adr.decided(hozo.decisions.Decision400.D474)
   classify Actor of never {
     /** 仕様（.hozo）の文面を書く AI。文面を書くのは、主に AI */
     @prd.actor.ai Agent;
@@ -35,7 +35,7 @@ namespace hozo.compiler {
     /** 診断: 漏れを指摘するときは、何が漏れているかを、名指しする */
     NamedOmission;
     /** 配布: OS ごとの、単一のバイナリ。実行環境を要求しない。言語サーバーも、別のバイナリにしない */
-    @adr.decided(hozo.decisions.Decision.D470)
+    @adr.decided(hozo.decisions.Decision400.D470)
     SingleBinary;
     /** ハーネス: 必要なテストケースが、用意されていて、それが、通っていること */
     RequiredTestsRan;
@@ -286,7 +286,7 @@ namespace hozo.compiler {
    */
   @prd.usecase.of(Actor.Agent, Actor.Engineer, Actor.Ci)
   @prd.ref(Requirement.SharedDiagnostics)
-  @adr.decided(hozo.decisions.Decision.D472, hozo.decisions.Decision.D473)
+  @adr.decided(hozo.decisions.Decision400.D472, hozo.decisions.Decision400.D473)
   export fn verify(in: EmitInput): BuildResult {
     val checked = check({ config: in.config, pluginPath: in.pluginPath, cacheDir: in.cacheDir });
     return verifyOutputs(in, checked);
@@ -307,7 +307,7 @@ namespace hozo.compiler {
    * @see write
    */
   @prd.usecase.of(Actor.Agent, Actor.Engineer)
-  @adr.decided(hozo.decisions.Decision.D472, hozo.decisions.Decision.D473)
+  @adr.decided(hozo.decisions.Decision400.D472, hozo.decisions.Decision400.D473)
   export fn preview(in: EmitInput): BuildResult {
     val checked = check({ config: in.config, pluginPath: in.pluginPath, cacheDir: in.cacheDir });
     val plan = collectOutputs(in, checked);
@@ -323,7 +323,7 @@ namespace hozo.compiler {
    */
   @prd.usecase.of(Actor.Agent, Actor.Engineer)
   @prd.ref(Requirement.SingleSource, Requirement.Deterministic)
-  @adr.decided(hozo.decisions.Decision.D472, hozo.decisions.Decision.D473, hozo.decisions.Decision.WriteWithoutCi)
+  @adr.decided(hozo.decisions.Decision400.D472, hozo.decisions.Decision400.D473, hozo.decisions.DecisionUnnumbered.WriteWithoutCi)
   export fn write(in: EmitInput): BuildResult
     effects syncOutputs
     throws CheckFailed, ConfigInvalid, LanguageMismatch, OutputConflict, UnknownNamespace prevents effects
@@ -359,7 +359,7 @@ namespace hozo.compiler {
    */
   @prd.usecase.of(Actor.Agent, Actor.Engineer, Actor.Ci)
   @prd.ref(Requirement.RequiredTestsRan)
-  @adr.decided(hozo.decisions.Decision.D472, hozo.decisions.Decision.D473)
+  @adr.decided(hozo.decisions.Decision400.D472, hozo.decisions.Decision400.D473)
   export fn confirmTests(in: CoverageInput): TestsResult {
     val checked = check({ config: in.config, pluginPath: in.pluginPath, cacheDir: in.cacheDir });
     return matchTests(in, checked);
@@ -372,7 +372,7 @@ namespace hozo.compiler {
    */
   @prd.usecase.of(Actor.Engineer)
   @prd.ref(Requirement.SharedDiagnostics)
-  @adr.decided(hozo.decisions.Decision.D472, hozo.decisions.Decision.D473, hozo.decisions.Decision.D474)
+  @adr.decided(hozo.decisions.Decision400.D472, hozo.decisions.Decision400.D473, hozo.decisions.Decision400.D474)
   export fn serve(in: ServeInput);
 
   /** プラグインの起動のしかた（docs/plugin-protocol.md「起動」）。wasm は、プラグインの本体（WASM）のファイル */
@@ -446,11 +446,11 @@ namespace hozo.cli {
   }
 
   /**
-   * フラグが、付いているか。真偽の値の、型で決まる分類（docs/check.md「分類」。リテラルの型: docs/decisions.md「決めたこと」483）。
+   * フラグが、付いているか。真偽の値の、型で決まる分類（docs/check.md「分類」。リテラルの型: 決定 D483）。
    * build は、これで、--no-emit と --dry-run を見て、入るユースケースを分ける: フラグの値から、ユースケースへの対応は、
    * 人が書く述語ではなく、下の二つの op の配線が、言う（docs/cli.md「build」）。
    */
-  @adr.decided(hozo.decisions.Decision.D472, hozo.decisions.Decision.D483)
+  @adr.decided(hozo.decisions.Decision400.D472, hozo.decisions.Decision400.D483)
   classify Flag of boolean {
     /** 付いている */
     On: boolean as true;
@@ -465,7 +465,7 @@ namespace hozo.cli {
    * @see tests
    */
   @cli.command("build")
-  @adr.decided(hozo.decisions.Decision.D472, hozo.decisions.Decision.D473)
+  @adr.decided(hozo.decisions.Decision400.D472, hozo.decisions.Decision400.D473)
   export fn build(in: BuildInput): hozo.compiler.BuildResult {
     return match (in.noEmit by Flag) {
       On => hozo.compiler.verify({ config: in.config, namespaces: in.namespaces, pluginPath: in.pluginPath, cacheDir: in.cacheDir });
@@ -479,7 +479,7 @@ namespace hozo.cli {
    *
    * @param in コマンドの入力
    */
-  @adr.decided(hozo.decisions.Decision.D472, hozo.decisions.Decision.D473)
+  @adr.decided(hozo.decisions.Decision400.D472, hozo.decisions.Decision400.D473)
   fn writeOrPreview(in: BuildInput): hozo.compiler.BuildResult {
     return match (in.dryRun by Flag) {
       On => hozo.compiler.preview({ config: in.config, namespaces: in.namespaces, pluginPath: in.pluginPath, cacheDir: in.cacheDir });

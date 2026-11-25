@@ -1,10 +1,10 @@
-// Hozo 自身の仕様（docs/decisions.md「決めたこと」468）。IR の名前空間 hozo.ir。
+// Hozo 自身の仕様（決定 D468）。IR の名前空間 hozo.ir。
 // **写し。持ち主は、文書（docs/ir.md）と、Go の型（ir/）。生成に使うようになるまで。** 食い違えば、文書が正しい。
 // どの単位の対象でもない: コードには、ならない。
 //
 // 今の言語で、JSON の上の形（docs/ir.md「JSON」）を、同じに言えない所は、近い形に曲げず、コメントにしてある。
 // 決まった値を持つ項目（印 kind: "core" など）と、決まった値の集まり（列挙）は、リテラルの型で書いてある
-// （docs/decisions.md「決めたこと」482。前は、書けなかった所の 12 と 13 で、コメントと、scalar と @valid.pattern だった）。
+// （決定 D482。前は、書けなかった所の 12 と 13 で、コメントと、scalar と @valid.pattern だった）。
 // 列挙は、リテラルの型をアームに持つ、名前の付いた union。印で見分ける union は、アームの model が、kind の項目を持つ。
 // 書けなかった所の持ち主は docs/open.md「サンプルと、hozoc 自身の仕様」（下の「穴 14」などは、その番号）:
 //   穴 14: 「項目は、いつもあり、値が null」（Op.returns、Op.body）と、「項目がない」を、分けて書けない。コメントにした
@@ -22,7 +22,7 @@ namespace hozo.ir {
   scalar Fqn extends string;
 
   /** 核の型の名前 */
-  @adr.decided(hozo.decisions.Decision.D482)
+  @adr.decided(hozo.decisions.Decision400.D482)
   union CoreName {
     String: "string"; Boolean: "boolean"; Int: "int"; Float: "float"; Datetime: "datetime"; Date: "date";
     Time: "time"; Duration: "duration";
@@ -135,7 +135,7 @@ namespace hozo.ir {
   // ---- 型 ----
 
   /** 型。JSON では、印 kind（"core"、"ref"、"optional"、"array"、"case"、"literal"、"never"）で見分ける */
-  @adr.decided(hozo.decisions.Decision.D482)
+  @adr.decided(hozo.decisions.Decision400.D482)
   union Type {
     Core: CoreType;
     Ref: RefType;

@@ -179,7 +179,7 @@ export fn signInAndOrder() {
  * @adr.alternative 今のまま。
  */
 @adr.accepted
-@adr.amends(Decision.D478)
+@adr.amends(Decision400.D478)
 D480;
 ```
 

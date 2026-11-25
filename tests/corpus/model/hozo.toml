@@ -1,4 +1,4 @@
-# 「モデルが先」（docs/requirements.md「モデルが先」、docs/decisions.md「設計書から離れた決定」S10〜S12）のコーパス
+# 「モデルが先」（docs/requirements.md「モデルが先」、決定 S10〜S12）のコーパス
 # （docs/testing.md「コーパス」、README.md）。出力したい名前空間は shop だけ。人の操作 customer は、どの単位の対象でもなく、
 # 出力しない（docs/config.md「単位の対象」）。検査は同じに掛かる。
 # shop は、印の語彙 marks と、外部のシステム carrier の例外（marks.NotApproved、carrier.Closed）を使うので、その二つには、

@@ -1,5 +1,5 @@
 // prevents / keeps の目的語は `effects` だけ（docs/grammar.md「decorator の宣言」の Relation、「決めたこと」。
-// docs/decisions.md「設計書から離れた決定」S9）。設計書 §7.3 の `keeps createOrder prevents notifyUser` のように
+// 決定 S9）。設計書 §7.3 の `keeps createOrder prevents notifyUser` のように
 // 効果を名前で書き分ける形は構文エラー。誤りのある op は捨てられ、残りの宣言は検査される
 namespace a {
   state s: list<string>;

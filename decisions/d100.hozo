@@ -1,0 +1,827 @@
+// 決定の記録（100〜199）。名前空間 hozo.decisions。書き方は decisions/adr.hozo の頭のコメント。
+// コードには、ならない（hozo.toml の単位の対象ではない）。
+// docs/decisions.md「決めたこと」の行を、そのまま移したもの（本文は、行の「決めたこと」の列。持ち主は、行の「持ち主」の列）。
+
+namespace hozo.decisions {
+  /** 決めたこと。100〜199 */
+  classify Decision100 of never {
+    /**
+     * Go の基底は、葉の op の置き場を、直に持つ効果と直に読む状態で決める（op が書いたか、デコレータが運んだかによらない）。効果を持つ葉は、効果の宛先の単位がすべて同じならその状態の単位、分かれるなら `SharedState`（複数の状態を読む葉と同じ口）。`go-sqlite` は、`SharedState` の op のために `SharedTable`（`NewSharedTable(db *sql.DB)`）を、述語で決まる状態の分類の単位の命令のために `<C>Table` を出す。足りないメソッドを人が埋め込みで書き足す規則は、表の型と同じ
+     *
+     * 持ち主: `docs/plugin-go.md`「op の置き場」「状態の単位」、`docs/plugin-go-sqlite.md`「状態をまたぐ単位の型」
+     */
+    @adr.accepted
+    D100;
+
+    /**
+     * 91〜100 のための規則の ID: 新しいものは DEC-17、GOSQL-7〜GOSQL-15。DEC-1、DEC-2、EFF-3、READS-1、STATE-2、THROWS-3 は、同じ規則を、対象 `effect` と、デコレータが運ぶものを含む形に書き直した。欠番は増えない（GOSQL-5 は欠番のまま）
+     *
+     * 持ち主: `docs/check.md`「診断」、`docs/plugin-go-sqlite.md`「診断」
+     */
+    @adr.accepted
+    D101;
+
+    /**
+     * 91〜101 は、文書とサンプルが実装より先にある（59、88 の当てはめ）。サンプル `shop-server` の `store` を、デコレータの形に書き直す: 二つの効果を一つのトランザクションで行う `store.placeOrder`（注文と、その通知の記録）を足し、`store.addOrder` / `store.addNotification` と `server.notify` をなくす。`store.findSession` は `type.Token` を取り、トークンのない要求は、`server` の分類 `Credential` が、`store` を呼ぶ前に断る（96 の当てはめ）。`TestSamples` は、文書の版（`docs/ir.md`「版」）が今の hozoc の版より先にある間、`check` と `transpilers/*` を、版を名指しして飛ばす
+     *
+     * 持ち主: `tests/samples/shop-server/README.md`「まだないもの」、`tests/samples/README.md`「飛ばす条件」「移行の間」、`docs/requirements.md`「作り直しの段階」の R3
+     */
+    @adr.accepted
+    D102;
+
+    /**
+     * 91 を、一つの原則に言い直す: **デコレータが出すコードは、op の型にも、ほかのどの宣言の型にも依らず、デコレータの引数だけから作る。型は、書かれたものが食い違っていないかを確かめるのにだけ使う（食い違えばトランスパイラの error）。** 91 の「値の表し方を型で決めること（列の型、JSON の形）は推論ではない」という読み方は、やめた。当てはめ: 値で変わる振る舞いは、共通のコードが実行時に決め、トランスパイラは、型を見て出すコードの形を切り替えない（op ごと、フィールドごとのコードは、どの型でも同じ補助の呼び出し）
+     *
+     * 持ち主: `docs/requirements.md`「出力を推論しない」
+     */
+    @adr.accepted
+    D103;
+
+    /**
+     * 表は、状態に `@db.table(<要素の model>)` を付けて言う。グローバルのデコレータ `db`（`@db state …`）は、なくす。状態の要素の型が、その model と違えば、トランスパイラの error
+     *
+     * 持ち主: `docs/vocab.md`「`db` の表と、しまい方」、`docs/plugin-go-sqlite.md`「表」
+     */
+    @adr.accepted
+    D104;
+
+    /**
+     * 表の model のフィールドは、しまい方のデコレータを、ちょうど一つ持つ（なければ、トランスパイラの error）: `@db.text` / `@db.int` / `@db.float` / `@db.bool` / `@db.time` / `@db.json`。名前は語彙が決めた、保存先の製品に依らない種類。`CREATE TABLE` の列の型と、値の読み書きは、このデコレータだけで決まり、フィールドの型は、種類に合うかの検査にだけ使う。一つの種類の中で、型によって変え方が分かれるなら、型で分けずに種類を足す（`Duration` は、`int` と同じ変え方で済むので、`@db.int`）。`@db.key` / `@db.unique` / `@db.ref` は変えない。列の名前は、フィールドの名前
+     *
+     * 持ち主: `docs/vocab.md`「`db` の表と、しまい方」、`docs/plugin-go-sqlite.md`「しまい方」
+     */
+    @adr.accepted
+    D105;
+
+    /**
+     * `go-sqlite` の、列ごと・op ごとのコードは、型によらず同じ形: `dbArgs<Model>` と `dbScan<Model>` は、フィールドごとに、しまい方の補助の呼び出し一つ。値があるかどうか（`NULL`）は、補助が実行時に見る。列と値を比べる条件は、型によらず、いつも `"c" IS ?n`（96 の規則は、整合の検査として残る。合う行は変わらない）
+     *
+     * 持ち主: `docs/plugin-go-sqlite.md`「補助」「列と引数の型」
+     */
+    @adr.accepted
+    D106;
+
+    /**
+     * `http` の語彙の、要求のどこから読むかを言うデコレータは、三つの場所（ヘッダ、クエリ、本文）に、同じ二つの形を持つ。項目一つ: `@http.header` / `@http.query` / `@http.body`（引数は名前で、省けば、フィールドの名前）。場所の全体を一つの model で: `@http.headerObj` / `@http.queryObj` / `@http.bodyObj`（型が model のフィールドにだけ。項目の名前は、その model のフィールドの名前。一つの場所に高々一つで、同じ場所の項目の形と一緒に書けない。破れば、トランスパイラの error）。「`@http.body` が一つなら本文そのもの、二つ以上ならフィールド名をキーにしたオブジェクト」という読み方は、なくした
+     *
+     * 持ち主: `docs/vocab.md`「`http` の語彙」、`docs/plugin-go-http.md`「対象」「通信の形」
+     */
+    @adr.accepted
+    D107;
+
+    /**
+     * HTTP の成功の応答は、一つの共通の関数が、実行時に、返す値で決める: 返す値がなければ 204 で本文なし、あれば 200 と JSON。「返す値がない」は、戻り値のない op と、省略可能な戻り値で値がないとき（これまでは 200 と `null`）。空の配列は値で、200 と `[]`（`nil` の配列も `[]`）。ハンドラは、ステータスを書かない。`@http.status` を持たない例外が 500 であることは、変えない。82 が持ち主にした「通信の形」の、成功の応答を変える
+     *
+     * 持ち主: `docs/plugin-go-http.md`「通信の形」「補助」
+     */
+    @adr.accepted
+    D108;
+
+    /**
+     * `cli` の語彙: 位置引数は `@cli.arg(<位置>)`（1 から数える。重なりと抜けは、トランスパイラの error。残りを受け取る配列は、いちばん後ろの位置だけ）。名前を取る `@cli.flag` と `@cli.env` は、107 の項目の形と同じ決まり（名前を省けば、フィールドの名前）
+     *
+     * 持ち主: `docs/plugin-go-cli.md`「語彙」「対象」
+     */
+    @adr.accepted
+    D109;
+
+    /**
+     * デコレータを読む三つのプラグイン（`go-http`、`go-cli`、`go-sqlite`）の、フィールドごと・op ごとのコードは、型によらず同じ形（103 の当てはめ）。値がないことが誤りかどうか、文字列の読み方、値の書き方は、共通の補助の中で決める。`Validate` は、値がそれを持つかを実行時に見る共通の補助を通して呼ぶ。GOHTTP-11 と CLI-9 は、整合の検査として残す（コンパイルできない出力を防ぐためではなく、確かめると書いた入力が、確かめられないまま通るのを防ぐため。89 の（c）の理由を変える）
+     *
+     * 持ち主: `docs/plugin-go-http.md`「出力」「制約の検査」、`docs/plugin-go-cli.md`「コマンドごとの関数」、`docs/plugin-go-valid.md`「ほかの相乗りとの約束」
+     */
+    @adr.accepted
+    D110;
+
+    /**
+     * 103〜110 のための規則の ID: 新しいものは GOSQL-16、GOSQL-17、GOHTTP-12、GOHTTP-13、CLI-10。GOSQL-1、GOSQL-2、GOSQL-3、GOSQL-7、GOHTTP-3、GOHTTP-4、GOHTTP-6、CLI-4、CLI-5 は、同じ規則を、新しいデコレータを含む形に書き直した（GOSQL-1 は「要素が model でない」を、「要素が、`@db.table` の model でない」に広げた）。欠番は増えない
+     *
+     * 持ち主: `docs/plugin-go-sqlite.md`「診断」、`docs/plugin-go-http.md`「診断」、`docs/plugin-go-cli.md`「診断」
+     */
+    @adr.accepted
+    D111;
+
+    /**
+     * 103 を当てはめると、今の振る舞いが変わるか、デコレータの引数のほかの宣言を見ないと決められないところは、決めずに、それぞれのプラグインの文書の「未決」に置く: 要る項目（ヘッダ、クエリ、フラグ、位置引数）がないことの見分け方、入力の初めの値、省略可能な配列と record の戻り値、op を呼ぶ行の形、省略可能な列（`NOT NULL`）、先の決まらない `@db.ref`。決めるまで、文書とサンプルは、今の振る舞いのまま
+     *
+     * 持ち主: `docs/plugin-go-http.md`「未決」、`docs/plugin-go-cli.md`「未決」、`docs/plugin-go-sqlite.md`「未決」
+     */
+    @adr.accepted
+    D112;
+
+    /**
+     * 103〜112 も、文書とサンプルが実装より先にある（102 と同じ段階 R3 に入れる）。版は 0.5 のまま（言語と IR は変えない: 省ける引数と、予約語のデコレータ名は、すでにある）。語彙のファイル（`vocab/db.hozo`、`vocab/http.hozo`、`plugins/go-cli/cli.hozo`）と、今の語彙で書いてある仕様（リポジトリ直下の `cli.hozo` の `@cli.arg`、コーパスと規則のテストの `@db state …` など）は、実装と一緒に直す。サンプル `shop-server` は、表の model にしまい方を、状態に `@db.table` を書き、`server.LoginInput` の本文を `@http.bodyObj` にし（通信の形は変わらない）、`server.PlaceOrderInput` の `@http.body lines` は項目の形になる（本文が、配列そのものから `{"lines":[…]}` に変わる）。省略可能な戻り値の経路 `GET /orders/latest`（`server.getLatestOrder`）を足す
+     *
+     * 持ち主: `docs/requirements.md`「作り直しの段階」の R3、`tests/samples/shop-server/README.md`「まだないもの」「下書きから変えたこと」
+     */
+    @adr.accepted
+    D113;
+
+    /**
+     * 要求や引数に値がないことを誤りにするのは、それを言う別のデコレータ（場所のデコレータの引数にはしない）: `@http.required` は、項目の形（`@http.header` / `@http.query` / `@http.body`）を持つフィールドに足し、項目がなければ 400（`<場所> <名前>: missing`）。`@cli.required` は、値の出どころ（`@cli.arg` / `@cli.flag` / `@cli.env`）を持つフィールドに足し、値が与えられなければ、使い方と 64。付けていない項目は、なくても誤りにしない。「要る」を、フィールドの型（省略可能でなく、既定値もない）から決めることは、やめた。本文の項目（`@http.body`）も、ヘッダとクエリと同じ規則になる（これまでは、なくても誤りにしなかった）。112 が未決に置いた「要る項目がないことの見分け方」を閉じる
+     *
+     * 持ち主: `docs/vocab.md`「`http` の語彙」、`docs/plugin-go-http.md`「対象」「入力の読み方」、`docs/plugin-go-cli.md`「語彙」「引数の解釈」
+     */
+    @adr.accepted
+    D114;
+
+    /**
+     * S24 でなくしたフィールドの既定値の代わりに、値がないときに入れる値を、境界のデコレータが言う: `@http.default(<リテラル>)` と `@cli.default(<リテラル>)`。値がないとき、`required` なら誤り、`default(v)` なら v、どちらもなければ零値のまま。二つのデコレータは、項目の形（CLI では、値の出どころ）を持たないフィールドにも、省略可能なフィールド（`T?`）にも付けられず、一つのフィールドに両方は付けられず、`default` のリテラルは、フィールドの型（scalar は元の核の型）に渡せなければならない。破れば、トランスパイラの error（42 の規則は、ここに移る）。HTTP では、値を入れるのは、要求を読むサーバー（呼ぶ側は入れない）
+     *
+     * 持ち主: `docs/vocab.md`「`http` の語彙」、`docs/plugin-go-http.md`「対象」「入力の読み方」「通信の形」、`docs/plugin-go-cli.md`「語彙」「引数の解釈」
+     */
+    @adr.accepted
+    D115;
+
+    /**
+     * 基底 `go` は、`New<Model>` を出さない: model から出すのは、構造体だけ。ハンドラと CLI の関数は、どの入力の model でも `var in <Model>`（零値）から始める。112 が未決に置いた「入力の初めの値」を閉じる。途中の案「基底が、すべての model に `New<Model>()` を出し、いつもそれを呼ぶ」は、S24 で既定値がなくなったので、採らなかった。あわせてなくなるもの: レコードリテラルと `bind` の、書かれていないフィールドに既定値を書く規則、`nullable` の状態を既定値を持つ位置に「値があるときだけ埋める」形、`types.go` の `ptr`、基底が避ける局所の名前 `m`（89 の（a））、`plugin/golang` の `PublicNewModel`、`go-valid` の GOVALID-2
+     *
+     * 持ち主: `docs/plugin-go.md`「model」「値」「bind で埋まる位置」、`docs/packages.md`「`plugin/golang`（公開）」、`docs/plugin-go-valid.md`「診断」
+     */
+    @adr.accepted
+    D116;
+
+    /**
+     * 経路の op の結果が、省略可能な配列か、省略可能な record（`T[]?`、`Record<K, V>?`）なら、`go-http` の error。Go では、どちらも `nil` が「値がない」を表し、実行時に、値がない（204）ことと、空である（200）ことを見分けられない。112 が未決に置いた「省略可能な配列と record の戻り値」を閉じる
+     *
+     * 持ち主: `docs/plugin-go-http.md`「対象」「通信の形」
+     */
+    @adr.accepted
+    D117;
+
+    /**
+     * ハンドラの、op を呼ぶ行は、二つの形のまま（`out, err := …` と `if err := …`）。呼ぶ相手の、基底のメソッドの形（引数と戻り値を持つか）を写したもので、行の形は、振る舞いを運ばない: 何を返すかは、108 の補助が、実行時に決める。112 が未決に置いた「op を呼ぶ行の形」を閉じる
+     *
+     * 持ち主: `docs/plugin-go-http.md`「出力」
+     */
+    @adr.accepted
+    D118;
+
+    /**
+     * 列が値を持たなくてよいことは、表の model のフィールドの `@db.nullable` が言う。付けていない列は、どれも `NOT NULL`。`NOT NULL` を、フィールドの型（省略可能でない）から決めることは、やめた。型は、整合の検査にだけ使う: 省略可能でないフィールドの `@db.nullable` も、`@db.nullable` のない省略可能なフィールドも、トランスパイラの error。`@db.nullable` の列では、値のない省略可能な値（Go の `nil` のポインタ、スライス、マップ）を `NULL` で書き（`@db.json` でも、JSON の `null` という文字列にしない）、`NULL` を読めるのは、その列だけ。112 が未決に置いた「省略可能な列（`NOT NULL`）」を閉じる
+     *
+     * 持ち主: `docs/vocab.md`「`db` の表と、しまい方」、`docs/plugin-go-sqlite.md`「表」「補助」
+     */
+    @adr.superseded(Decision100.D134)
+    D119;
+
+    /**
+     * `@db.ref(M)` の指す先が一つに決まらない（`@db.table(M)` の表の状態が、ないか、二つ以上ある。M の `@db.key` が一つでない）なら、トランスパイラの error。黙って制約を省くことは、やめた。112 が未決に置いた「先の決まらない `@db.ref`」を閉じる
+     *
+     * 持ち主: `docs/plugin-go-sqlite.md`「表」
+     */
+    @adr.accepted
+    D120;
+
+    /**
+     * デコレータが言ったことは、生成するコードに、引数（か、行）として現れる。型で変わるものは、足さない（103、110 の当てはめ）: `req.body("lines", &in.Lines, httpRequired)`、`req.query("page", &in.Page, httpDefault(1))`、`line.required(&in.<F>)`、`line.orDefault(&in.<F>, <リテラル>)`、`dbText(row.<F>, dbNullable)`。114〜120 のための規則の ID: 新しいものは GOHTTP-14〜GOHTTP-18、CLI-11〜CLI-13、GOSQL-18〜GOSQL-20。CLI-2 は、同じ規則を「値の出どころ（`@cli.arg` / `@cli.flag` / `@cli.env`）が一つもない」と書き直した（`@cli.required` か `@cli.default` だけのフィールドを含むので、CLI には、GOHTTP-14 に当たる ID がない）。欠番が増える: TYPE-13 と GOVALID-2（S24）
+     *
+     * 持ち主: `docs/plugin-go-http.md`「入力の読み方」「診断」、`docs/plugin-go-cli.md`「コマンドごとの関数」「診断」、`docs/plugin-go-sqlite.md`「補助」「診断」、`docs/requirements.md`「検査の規則の一覧」
+     */
+    @adr.accepted
+    D121;
+
+    /**
+     * 114〜121 と S24 も、文書とサンプルが実装より先にある（102、113 と同じ段階 R3 に入れる）。サンプル `shop-server` は、`server.PlaceOrderInput` の `lines` に `@http.required` を付け（`lines` のない `POST /orders` が、空の注文を作る 200 から、400 `body lines: missing` に変わる）、`server.GetOrdersInput` の `page: int = 1` を `@http.query @http.default(1) page: int` に書き直す（`page` のない要求が 1 ページ目であることは、変わらない）。表の model に省略可能なフィールドはないので、`@db.nullable` は付かず、どの列も `NOT NULL` のまま。112 の未決は、すべて閉じた。新しく決めていないところは二つ: `default` の値を、生成するときに制約（`@valid.*`）で確かめるか（GOVALID-2 がしていたこと）。省略可能でない record の結果が `nil` のとき、`null` を返すか `{}` を返すか
+     *
+     * 持ち主: `docs/requirements.md`「作り直しの段階」の R3、`tests/samples/shop-server/README.md`「下書きから変えたこと」、`docs/plugin-go-http.md`「未決」、`docs/plugin-go-cli.md`「未決」
+     */
+    @adr.accepted
+    D122;
+
+    /**
+     * 122 の後に残っていた、112 の続きの二点を決めた。（a）`@http.default` / `@cli.default` の値は、生成するときにフィールドの制約（`@valid.*`）で確かめ、合わなければトランスパイラの error（GOHTTP-19、CLI-14）。書いたものどうしの矛盾の検査なので、実行時には任せない。（b）値のない record の結果は、配列を `[]` にするのと同じに、`{}` を返す
+     *
+     * 持ち主: `docs/plugin-go-http.md`「補う値と制約」「補助」、`docs/plugin-go-cli.md`「補う値と制約」
+     */
+    @adr.accepted
+    D123;
+
+    /**
+     * `throws`、`effects`、`reads` の節の区切りは、`,` 一つ（op の節と、デコレータの宣言の節。`catches` を含む）。`throws A \| B`、`effects a \| b` は、書かない。三つの節は、どれも「起こりうるものの集まり」を言い、書き方は「どれか」と「どれも」を分けない: 「すべてを行う」と言うのは、デコレータの引数だけ（`@db.effects(a, b)`）。例外と、効果と、`read` を、同じ書き方にするため。`docs/grammar.md`「決めたこと」の二行を置き換える: 「`reads` の並びの区切りは `,`」の理由（`effects` と `throws` の `\|` は宣言の集合）と、「デコレータの宣言に `reads` / `effects` の節を書ける。区切りは op の節と同じ」の、`effects` は `\|` という部分。この決定が言うのは節だけ（デコレータの引数や、引数の型に書く `\|` は、節ではない）。設計書の書き方を変える（S25）
+     *
+     * 持ち主: `docs/grammar.md`「op」「decorator の宣言」「決めたこと」
+     */
+    @adr.accepted
+    D124;
+
+    /**
+     * 状態を読むことに、名前を付けられる: `read <名前> on <状態>;`（`read userByEmail on users;`）。説明のコメントとデコレータを付けられる（デコレータの対象 `read`、引数の種類 `any read`）。効果の宣言（`effect <名前> on …`）と対になる。S15 の「状態を読むための別の宣言は足さない」の読み直し: 状態を読むのは、今も op で、`read` は、op が読むものに付けた名前
+     *
+     * 持ち主: `docs/grammar.md`「read」「決めたこと」、`docs/check.md`「読むことの宛先」、`docs/types.md`「デコレータの引数」
+     */
+    @adr.accepted
+    D125;
+
+    /**
+     * 名前を付けるかどうかは、読む側も、書く側も、選べる。op の `reads` には、状態を直に（`reads users`）か、`read` の名前を（`reads userByEmail`）書く。`effects` には、状態の組み込みの操作を直に（`effects users.post`）か、効果の名前を（`effects createUser`）書く。遷移（`C: A -> B`）を書けるのは、名前を付けた `effect` の宣言だけ
+     *
+     * 持ち主: `docs/grammar.md`「op」「決めたこと」、`docs/check.md`「直に書く要素」
+     */
+    @adr.accepted
+    D126;
+
+    /**
+     * デコレータの働く先についての、二つの指針。（a）例外、効果、`read` に付けたデコレータは、それを投げる、持つ、読む op の実装に働く。（b）デコレータのない op には、中身を生成しない。`read` や効果にデコレータが付いていても、同じ。だから、読む側にも、書く側の `@db.effects` に当たる op のデコレータ（`@db.reads`）が要る。91、103 の当てはめ
+     *
+     * 持ち主: `docs/requirements.md`「出力を推論しない」
+     */
+    @adr.accepted
+    D127;
+
+    /**
+     * `db` の語彙の読む側を、書く側と同じ二段にする。`@db.find(表, "列")` / `@db.list(表, "列")` / `@db.list(表)` は、`read` の宣言に付け（`for read`。節は持たない）、op は、行う `read` を `@db.reads(<read>, …)` で並べる（`decorator reads(...targets: any read) for op reads targets;`。`reads` を op に運ぶのは、このデコレータ）。表は、`read` の `on <状態>` に書いてあっても、デコレータの引数でもう一度名指しし（93 と同じ理由）、食い違いは、トランスパイラの error。92 の「読む op は、`@db.find` / `@db.list` で、表と列を名指しする。デコレータが `reads` を運ぶ」を置き換える: `@db.find` / `@db.list` を op に付ける形は、なくなる
+     *
+     * 持ち主: `docs/vocab.md`「`db` の読み書きのデコレータ」、`docs/plugin-go-sqlite.md`「op の中身」
+     */
+    @adr.superseded(Decision100.D135)
+    @adr.amends(Decision000.D92)
+    D128;
+
+    /**
+     * `@db.reads` は、`read` を二つ以上並べられ（いくつかの行を合わせた型を返す op のため）、op の戻り値の型は、`read` の引くものと等しくなくてよい。ただし、そのとき、op の返す値を誰が作るか（型から組み立て方を決めることは、103 ができない）と、op のどの引数がどの `read` に渡るかは、**まだ決めていない**。決まっているのは、`read` を一つ並べた形だけ: op は、その `read` が受け取るものを引数に取り、引くもの（`@db.find` は `M?`、`@db.list` は `M[]`）を、そのまま返す。決まるまで、`go-sqlite` は、`read` を二つ以上並べた op を error にし（GOSQL-23。何も黙って出さない）、`read` が一つで戻り値の型が違う op は、今までの戻り値の検査（GOSQL-10）のまま error にする。サンプルは、決まっている形だけを持つ
+     *
+     * 持ち主: `docs/plugin-go-sqlite.md`「op の中身」「未決: 複数の `read` と、戻り値の型」
+     */
+    @adr.superseded(Decision100.D135)
+    D129;
+
+    /**
+     * 128、129 のための、`go-sqlite` の規則の ID: 新しいものは GOSQL-21（`read` のデコレータの表が、`read` の `on` の状態でない）、GOSQL-22（`@db.reads` に並べた `read` が `@db.find` も `@db.list` も持たないか、一つの `read` が両方持つ）、GOSQL-23（`read` を二つ以上並べた `@db.reads`。129 が決まるまでの間だけの規則で、決まれば欠番にする）。GOSQL-7〜GOSQL-10、GOSQL-13、GOSQL-14 は、同じ規則を、`@db.find` / `@db.list` を `read` に、`@db.reads` を op に付ける形に合わせて書き直した。欠番は増えない。言語の側（124〜126）の規則の ID の持ち主は、`docs/check.md`「診断」
+     *
+     * 持ち主: `docs/plugin-go-sqlite.md`「診断」
+     */
+    @adr.accepted
+    D130;
+
+    /**
+     * 124〜130 も、文書とサンプルが実装より先にある（59、88 の当てはめ。段階 R4）。サンプル `shop-server` は、節の区切りを `,` にし（`server.placeOrder` の `throws type.Unauthorized, type.NotificationFailed`）、`store` の四つの読む op を、名前を付けた `read`（`userByEmail`、`userById`、`sessionByToken`、`ordersOfUser`）と `@db.reads` の二段に書き直す。振る舞いも、通信の形も、変わらない。期待する出力で変わるのは、`gen/store/db.go` の、四つの読む op のコメントの行だけ
+     *
+     * 持ち主: `docs/requirements.md`「作り直しの段階」の R4、`tests/samples/shop-server/README.md`「下書きから変えたこと」、`tests/samples/README.md`「移行の間」
+     */
+    @adr.superseded(Decision100.D143)
+    D131;
+
+    /**
+     * プラグインの原則（91、103）の、当てはまる範囲を決め直す。**op は、関数の枠だけを作る。op に付けるデコレータは、包むもの**: op の中身の前後に処理を足し、中身は決めない。出すコードは、型に依らない（103 の規則は、ここに残る。型に依らないことが、デコレータを中身に関わらせない仕組み）。`@http.*`、`@cli.*`、`@rate.limited`、`@db.transaction` が、これ。**op 以外（`read`、効果、例外、状態、model のフィールド）は、プラグインが、宣言の全体（型と引数）から、そのものを作る。** そこに付けるデコレータは、宣言が言っていないことだけを言う、最小のもの。人が書くコードは、できるだけ減らす: `read` と効果は、プラグインが作れるように書ける。91 と 103 の「デコレータが出すコードは、どの宣言の型にも依らない」を、op のデコレータに限る。127 の（b）「デコレータのない op には、中身を生成しない。だから op の側にも、中身を言うデコレータが要る」を、置き換える: op のデコレータは、op の中身を言わない。127 の（a）は、そのまま
+     *
+     * 持ち主: `docs/requirements.md`「出力を推論しない」
+     */
+    @adr.accepted
+    @adr.amends(Decision000.D91, Decision100.D103, Decision100.D127)
+    D132;
+
+    /**
+     * 言語: `read`、`effect`、`exception` を、同じ形で、引数を付けて宣言する（`read userByEmail(email: type.Email): type.User? on users;`、`effect createOrder(order: type.Order) on orders.post;`、`exception LimitExceeded(retryAfter: Duration);`）。配線から、op と同じ形で使う（`return userByEmail(email);`、`createOrder(order);`、`throw rate.LimitExceeded(wait)`）。`read` と効果を呼べるのは、宣言した名前空間の配線だけで、`export` は op だけ。**状態に触れるのは `read` と効果だけ**: op は、それを呼ぶ配線か、状態に触れない葉で、葉は `reads` / `effects` の節を書けない。`read` と効果は本体を持たず、デコレータを読むプラグインが中身を出すか、人が書く。名前を付けない形は、配線の中にある: 状態を名前で読むことと、組み込みの効果を直に呼ぶこと（`users.post(user);`）。デコレータの宣言に、核の印 `@repeatable`（一つの宣言に何度でも付けられる）。125 の「`read <名前> on <状態>;`」（引数も結果の型もない宣言）と、126 の「名前を付けるかどうかは、op の `reads` / `effects` の節で選ぶ」を置き換える（節に、名前でも直にでも書けることは、配線の op の節に残る）。98 の、S8 の読み直し（葉の op が自分で書ける効果は高々一つ）は、なくなる: 葉は効果を書けない。設計書を変える（S26〜S28）。規則の ID の持ち主は `docs/check.md`「診断」
+     *
+     * 持ち主: `docs/grammar.md`「exception / effect / read」「decorator の宣言」「配線」、`docs/check.md`「状態に触れるもの」
+     */
+    @adr.accepted
+    @adr.amends(Decision100.D125, Decision100.D126)
+    D133;
+
+    /**
+     * `db` の語彙の表: `@db.table` は引数を持たず、表の行の model は、状態の要素の型（104 の「`@db.table(<要素の model>)` で、もう一度名指しする」を置き換える）。`@db.nullable` は、なくす: 列が値を持たなくてよいかは、フィールドの型の `?` が言う。型に書いてあることで、当てるのではない（119 を置き換える）。しまい方のデコレータ（105）は、そのまま: 表の model のフィールドは、ちょうど一つ持ち、しまい方は、型からは当てない
+     *
+     * 持ち主: `docs/vocab.md`「`db` の表と、しまい方」、`docs/plugin-go-sqlite.md`「表」「しまい方」
+     */
+    @adr.accepted
+    @adr.amends(Decision100.D104)
+    D134;
+
+    /**
+     * `db` の語彙の読む側: `@db.find` / `@db.list` は、引数を持たず、`read` の宣言に付ける。表は、宣言の `on` の状態。列は、`read` の引数の名前（表の model の、同じ名前のフィールド。なければ、トランスパイラの error）。引数が二つ以上なら、どの列も同じ行（かつ）。`@db.list` は、引数がなければ、すべての行。結果の型は、`find` が `M?`、`list` が `M[]`。`@db.reads`（op が、行う `read` を並べる）は、なくす: op は、`read` を呼ぶ配線。92、95（列は、デコレータごとに一つの `column: string`）、128、129（`read` を二つ以上並べた op と、戻り値の型の未決）を置き換える。129 の未決は、なくなった: 複数の `read` を使う op は、それらを呼ぶ配線で、返す値は、配線か、人が書く葉が作る
+     *
+     * 持ち主: `docs/vocab.md`「`db` の read と効果」、`docs/plugin-go-sqlite.md`「read の中身」
+     */
+    @adr.accepted
+    D135;
+
+    /**
+     * `db` の語彙の、`read` に足すデコレータ二つ。`@db.where(column, value)`: 引数にならない、決まった値の条件（列がリテラルと同じ）。`@repeatable` で、いくつでも書け、引数の条件と合わせて、どれも満たす行。同じ列を二度は書けない。`@db.latest(column)`: 列の新しい順（値の大きい順。同じ値なら、後から足した行が先。値のない行は最後）。`list` に足せば、その順のすべての行。`find` に足せば、条件に合う行のうち、いちばん新しい一行。列のしまい方は `time` / `int` / `float` だけ。**`find` は、一行に決まらなければ error**: 条件の列（引数と `where`）が、表の model の `@db.key` のすべてか、`@db.unique` の列を含むか、`latest` が付いている
+     *
+     * 持ち主: `docs/plugin-go-sqlite.md`「read の中身」
+     */
+    @adr.accepted
+    D136;
+
+    /**
+     * `db` の語彙の書く側: `@db.insert` / `@db.update` / `@db.delete` は、引数を持たず、効果の宣言に付ける。表は、効果の宛先の状態で、操作が合わなければ error（`insert` は `.post`、`update` は `.put`、`delete` は `.delete`）。`insert` と `update` の効果の引数は、表の model の行一つ。`delete` は、引数の名前が列で、どの列も同じ行を消す。分類の遷移を宛先にする効果には、付けられない（どの表に何をするかが、宣言から決まらない。人が書く）。`@db.effects`（op が、行う効果を並べる）は、なくす: op は、効果を呼ぶ配線。93（表を、デコレータの引数でもう一度名指しする。遷移の効果にも付けられる）と、94 の「op は、行う効果を `@db.effects` で並べ、n 番目の効果が n 番目の引数を受け取る」を置き換える。引数のない `@db.delete`（すべての行を消す）は、まだ決めていない（決まるまで error）
+     *
+     * 持ち主: `docs/vocab.md`「`db` の read と効果」、`docs/plugin-go-sqlite.md`「効果の中身」
+     */
+    @adr.accepted
+    @adr.amends(Decision000.D94)
+    D137;
+
+    /**
+     * `@db.transaction`: op に付ける、包むデコレータ。その op が DB にすることのすべてが、一つのトランザクションで起き、op が失敗すれば、どれも残らない。`go-sqlite` が、マニフェストで継ぎ目として宣言し（`seams = ["db.transaction"]`）、継ぎ目の実装 `DbSeams` を出す: 始めて、中身を呼び、確定し、失敗なら取り消す。トランザクションは、中身に渡す `ctx` が運び（鍵は `db` ごと）、表のメソッドは、`Conn(ctx, db)` を通して、それに入る（継ぎ目から表のメソッドへ届く道が、`ctx` しかない）。入れ子は、新しく始めずに、外側のものに加わる。入るのは、同じ出力の、同じ `db` の上の型がすることと、`Conn` を通した人のメソッドで、別の名前空間の op が読み書きする表は、入らない（未決）。並べていない単位では、印で、何も起きない。94 の「`@db.effects` に並べた二つ以上の効果は、一つのトランザクション」と、`docs/plugin-go-sqlite.md` にあった「複数の op にまたがるトランザクションは、ない」を置き換える
+     *
+     * 持ち主: `docs/plugin-go-sqlite.md`「マニフェスト」「トランザクション」
+     */
+    @adr.accepted
+    @adr.amends(Decision000.D94)
+    D138;
+
+    /**
+     * Go の基底: `read` と効果は、状態の単位のメソッド（`read` は読む状態の単位の問い合わせ、効果は宛先の単位の命令。宛先の単位の決め方は、100 のまま）。N の `read` と効果のすべてを、配線が呼んでいるかによらず出す。配線は、それを呼ぶ（`o.users.UserByEmail(ctx, email)`）。直に呼ぶ組み込みの効果は、状態の単位の、形で決まる命令 `Post` / `Put` / `Delete`（配線が呼んでいる操作だけを出す）。葉の op の置き場は `Leaves` 一つで、**`SharedState` は、なくす**（二つの状態にまたがる処理は、二つの効果を呼ぶ配線）。例外の構造体は、引数ごとにフィールド一つ（`struct{ Value <型> }` は、なくす）で、`throw E(v)` は、そのリテラルを作る。コメントの `Reads:` は読む状態、`Effects:` は効果（直に呼んだものは `<状態>.<操作>`）で、区切りは `, `。100 の「葉の op の置き場を、直に持つ効果と直に読む状態で決める。分かれるなら `SharedState`」と、99 の `Op.carried` を置き場に使うことを置き換える
+     *
+     * 持ち主: `docs/plugin-go.md`「op の置き場」「状態の単位」「呼び出し」「exception」「コメント」
+     */
+    @adr.accepted
+    @adr.amends(Decision000.D99, Decision100.D100)
+    D139;
+
+    /**
+     * `go-sqlite` の型: `<状態>Table` は、その状態の単位のうち、形で決まるメソッド（`IsEmpty`、`Get`、単位にあれば `Post`）と、`db` のデコレータを付けた `read` と効果を持つ。付けていないものは持たず、人が埋め込んで書き足す（足りなければコンパイルエラー。warning は出さない）。`SharedTable` と `<C>Table` は、なくす（100 の後半を置き換える）。文を実行するところは、公開の `Conn(ctx, db)` を通る（人が書き足すメソッドも、それを通せば、トランザクションに入る）。列ごとの補助（106）は、形を変えない: 省略可能なフィールドの印 `dbNullable` を、`@db.nullable` ではなく、フィールドの型の `?` から足す。96（列と引数の型）は、`read` と `@db.delete` の効果の、引数の条件に掛かる規則として、そのまま
+     *
+     * 持ち主: `docs/plugin-go-sqlite.md`「状態ごとの型」「補助」「列と引数の型」
+     */
+    @adr.accepted
+    @adr.amends(Decision100.D100)
+    D140;
+
+    /**
+     * 例外が運ぶ値の、通信の上の形: `value` は、例外の引数の名前をキーにしたオブジェクト（引数が一つでも包む。引数のない例外には、ない）。`go-http` の失敗の応答と、`go-cli` の `JSONPresenter` が同じ形。`http.BadRequest` は、`exception BadRequest(message: string, violations: Violation[]);` と書き直し、通信の上の形（`{"message":…,"violations":[…]}`）は変わらない（82 の、運ぶ値の model を、引数に置き換える）
+     *
+     * 持ち主: `docs/plugin-go-http.md`「失敗の応答」、`docs/plugin-go-cli.md`「実行と表示」、`docs/vocab.md`「同梱する語彙」
+     */
+    @adr.accepted
+    @adr.amends(Decision000.D82)
+    D141;
+
+    /**
+     * 134〜140 のための、`go-sqlite` の規則の ID: 新しいものは GOSQL-24〜GOSQL-29。欠番にするものは GOSQL-14、GOSQL-18、GOSQL-19、GOSQL-21、GOSQL-23（130 が「決まれば欠番にする」とした GOSQL-23 を含む）。GOSQL-1、GOSQL-7〜GOSQL-13、GOSQL-22 は、同じ規則を、今の書き方に合わせて書き直した。基底 `go` と `go-http`、`go-cli`、`go-valid` には、新しい ID も、欠番もない。101、111、121、130 の一覧に続く
+     *
+     * 持ち主: `docs/plugin-go-sqlite.md`「診断」、`docs/requirements.md`「検査の規則の一覧」
+     */
+    @adr.accepted
+    D142;
+
+    /**
+     * 132〜142 も、文書とサンプルが実装より先にある（59、88 の当てはめ。段階 R4）。131 を置き換える。サンプル `shop-server` の `store` は、五つの `read`（`userByEmail`、`userById`、`sessionByToken`、`ordersOfUser`、`latestOrderOf`）と五つの効果が中身を持ち、九つの op は、それを呼ぶ配線。`placeOrder` は、二つの効果を呼ぶ配線に `@db.transaction` を付けたもの（102 の、`@db.effects(createOrder, notifyUser)` の葉を置き換える）。`server` の、人が書く葉 `latestOf` は、なくす: いちばん新しい注文は、`@db.find` と `@db.latest("placedAt")` の `read` が引く（「一覧の最後」から「`placedAt` がいちばん新しい」に変わる）。`gen/store` と `gen/storemem` の基底のファイルは、継ぎ目の有無で、`ops.go` と `wiring.go` が違う。メモリの上の単位（`@db.transaction` を読むトランスパイラがいない）では、`placeOrder` は一つのトランザクションではない
+     *
+     * 持ち主: `docs/requirements.md`「作り直しの段階」の R4、`tests/samples/shop-server/README.md`「下書きから変えたこと」、`tests/samples/README.md`「移行の間」
+     */
+    @adr.accepted
+    @adr.amends(Decision100.D102)
+    D143;
+
+    /**
+     * 138 の「別の名前空間の op が読み書きする表は、入らない（未決）」を決めた: `@db.transaction` のトランザクションは、同じ `*sql.DB` を使う別の名前空間の出力にも及ぶ。トランザクションを `ctx` で運ぶ鍵を、出力ごとの型ではなく、共有の `runtime.DBTxKey{DB: db}` にする。出力ごとの型のままだと、トランザクションの付いた op が別の名前空間の op を呼んだとき、その先の文がトランザクションの外で実行され、SQLite では書き込みの待ち合わせで止まりうる
+     *
+     * 持ち主: `docs/plugin-go-sqlite.md`「トランザクション」、`docs/packages.md`「runtime（公開）」
+     */
+    @adr.accepted
+    D144;
+
+    /**
+     * Hozo は、プログラミング言語として書いた仕様で、同時に、ハーネスでもある。仕様が守られている限り、op の中身には立ち入らない（中身は AI が書いてもよく、壊れたら作り直せばよい）。そこから、基底は、op の中身に何が要るかを判定しない: 出力する言語の作法で関数に付くもの（Go の `context.Context` と `error`）は仕様ではなく、仕様の宣言を写した関数のすべてに、同じ形で与える
+     *
+     * 持ち主: `docs/requirements.md`「op の中身に立ち入らない」
+     */
+    @adr.accepted
+    D145;
+
+    /**
+     * 145 の当てはめ: Go の基底が出す、仕様の宣言を写した関数（op の、`Ops` / `<Ns>Ops` / `Leaves` / 構造体 `ops` のメソッド、状態の単位のメソッド、分類の述語と判定関数 `Classify<C>`、継ぎ目のメソッドと `body`）は、どれも、最初の引数に `ctx context.Context` を取り、最後の戻り値に `error` を返す。純粋かどうかでも、`throws` の有無でも、形を分けない（72 の「純粋な op は取らない。純粋で例外のない op は `error` を返さない」を置き換える。72 の残り: 標準の `context.Context`、形は op の宣言だけで決まること、引数の並びを決めるのは基底だけであること、状態を `Get` で読むことは、変わらない）。純粋さ（60）は、言語が割り出す事実として IR に残り、基底は読まない: op のコメントの「純粋（ctx を取らない）…」の行もなくす。`<Ns>Ops` のコメントの「相手の op の判定に従う」は、「相手の op の宣言だけで決まる」に直す。`New`、補助 `ptr`、union のマーカーメソッド、例外の `Error()` / `HozoException()` は、仕様の宣言を写した関数ではなく、形を変えない。`plugin/golang` は、いつも真になる `OpShape.Ctx` / `OpShape.Err` をなくす
+     *
+     * 持ち主: `docs/plugin-go.md`「op の形」「呼び出し」「分類」「コメント」、`docs/packages.md`「`plugin/golang`（公開）」
+     */
+    @adr.accepted
+    @adr.amends(Decision000.D72)
+    D146;
+
+    /**
+     * 述語で決まる分類の判定の誤り（述語の `error` と、`*runtime.ClassificationError`）は、配線が、ほかの呼び出しの失敗と同じに、`error` として返す。どの配線も `error` を返す（146）ので、返す先は、いつもある。基底は、`panic` を呼ぶコードを出さない（90 の「判定の誤りを返す先がない配線は、`error` を返す形に変えず、`panic` する」を置き換える。90 の、ケースは排他で全体を覆うことを述語を書く人が担保する、は変わらない）
+     *
+     * 持ち主: `docs/plugin-go.md`「分類」
+     */
+    @adr.accepted
+    @adr.amends(Decision000.D90)
+    D147;
+
+    /**
+     * 145〜147 も、文書とサンプルが実装より先にある（59、88 の当てはめ。段階 R5）。サンプル `shop-server` は、仕様（`.hozo`）を変えない。期待する出力で変わるのは、基底のファイルの、`server` の七つの葉（`checkPassword`、`newSession`、`toPublicUser`、`requireFresh`、`pageOf`、`newOrder`、`composeNotice`）のメソッドと、それを呼ぶ配線の行、`<Ns>Ops` のコメント。人が書く葉の実装（`app/leaves.go`）は、七つとも `ctx` を取り、`error` を返す。hozoc 自身では、葉 `collectOutputs` が `ctx` を取る。`hozoc` の外から見える振る舞いは、変わらない
+     *
+     * 持ち主: `docs/requirements.md`「作り直しの段階」の R5、`tests/samples/shop-server/README.md`「下書きから変えたこと」、`docs/cli.md`「手で書くもの」
+     */
+    @adr.accepted
+    D148;
+
+    /**
+     * 宣言に `reads` / `effects` の節を持つデコレータ（足す処理が状態に触れるデコレータ）は、配線の op にも付けられる。デコレータが宣言したもの（`throws` の例外、`effects`、`reads`）は、葉でも配線でも、付いた op の関数の型に加わり、呼び出し元へ伝わる。デコレータは、op の始端と終端に処理を足すだけで、op の中身を変えないことは、変わらない。配線では、運ばれたものを、本体が行き着くものの後ろに並べ、運ばれた効果の、例外ごとの状態と成功のアームの状態は、葉と同じに決める（本体も行き着く効果は、本体から決めた状態と違えば `unknown`）。配線が `reads` / `effects` の節を書くなら、運ばれたものも書く（READS-2、EFF-2 のまま。規則は足さない）。運ばれたものが、付いた op の名前空間のものであること（READS-1、STATE-2）は、配線にも掛かる。葉の op が節を書けないこと（STATE-5）は、変わらない。DEC-17 は欠番。98 の「運ぶ節を持つデコレータを付けられるのは葉の op だけ」を置き換える。IR の構造は変わらないので、版は 0.6 のまま
+     *
+     * 持ち主: `docs/check.md`「デコレータが運ぶ reads と effects」「Sig(O, v)」「reads」「デコレータ」、`docs/requirements.md`「出力を推論しない」「検査の規則の一覧」、`docs/ir.md`「op」「版」
+     */
+    @adr.accepted
+    @adr.amends(Decision000.D98)
+    D149;
+
+    /**
+     * 文書が「設計書」と呼んできた `mew-ton/drafts` の `hozo/README.md` は、設計書ではない: この言語の出発点になった、粗いアイデアの集まりで、実装を始めた時点で古くなっていて、保守しない。仕様の持ち主は、このリポジトリの `docs/`。「設計書」と「§n」は、考えの出どころを指す呼び名として残す。設計書へ返すことはなく、設計書との違いを追う一覧も持たない: 節「設計書へ返すこと」（この文書、`docs/requirements.md`、`docs/grammar.md`）と、`docs/requirements.md`「設計書の置き場」（設計書を `docs/design.md` に移す推奨）は、なくした。S の表は、設計書を書き換える予定ではなく、設計書の案から離れた決定の記録として残す（見出しは「設計書から離れた決定」。番号は変えない）。この表と S の表の行にある、設計書を変える・変えないという言い方（124、133、S10 など）は、書き直さない: 「設計書の案から離れた（離れない）」と読み、設計書そのものを変えることは意味しない
+     *
+     * 持ち主: `docs/README.md`「設計書という呼び名」
+     */
+    @adr.accepted
+    D150;
+
+    /**
+     * 仕様に書く範囲の指針: 仕様は、最低限、PRD の水準の概念と、その境界を定める。それより先は、要るようになったときにだけ足す。その線をどこに引くかの規則は、**まだ決めていない**（仕様だけのサンプル `tests/samples/order-app/` を書いて探す）
+     *
+     * 持ち主: `docs/requirements.md`「仕様に書く範囲」
+     */
+    @adr.accepted
+    D151;
+
+    /**
+     * 型で決まる分類の残りに、名前を付けられる: ケースを `<名前>: <対象> as else;` と書く（残りのケース）。対象が、ほかのケースが `as` に書いた型のどれにも当たらないとき（`T?` なら値がない側、union なら残りのアーム）で、述語を持たない。`default` は、名前のない残りとして残り、一つの分類に、残りのケースと `default` の両方は書けない。`else` は予約語。書けるのは型で決まる分類だけ（CLS-7）。IR は `CaseTyping.by` に `else` を足し、版を 0.7 に上げる。Go の基底は、型で決まる分類には今までどおり何も出さず、`match` の枝に、残りのケースの名前を書く
+     *
+     * 持ち主: `docs/check.md`「残りのケース」、`docs/grammar.md`「classify」、`docs/types.md`「残りのケースでの対象の型」、`docs/ir.md`「classify」「版」、`docs/plugin-go.md`「match」
+     */
+    @adr.accepted
+    D152;
+
+    /**
+     * 書き方の指針: 意味のある状態であるケースには、名前を付ける。`default` は、名前を付けるほどの意味を持たない残りにだけ使い、if-else の `else` の代わりには使わない。規則ではなく、検査しない。二つのサンプル（`tests/samples/order-app/`、`tests/samples/shop-server/`）の `default` を、この指針で名前に直した
+     *
+     * 持ち主: `docs/requirements.md`「書き方の指針」
+     */
+    @adr.superseded(Decision100.D154, Decision100.D161)
+    D153;
+
+    /**
+     * 分類を閉じる。`classify` のケースは、どれも名前を持ち、宣言したケースが、その分類のすべて。名前のないケース `default;` は、なくす: 残りが意味のある状態なら、名前を付ける。値がない側（と、union の残りのアーム）なら、残りのケース（152 の `as else`）で名前を付ける。仕様が使わない場合は、宣言しない。宣言したケースの外の値は、分類の誤りで、黙って「その他」にはならない。分類の誤りは、仕様の例外ではない（`throws` に書かず、`catches` で受けられない）。`default;` は構文エラーで、メッセージが、名前を付けることと `as else` を示す。`default` は予約語のまま（予約を外すと、`default;` が、その名前のケースとして通る）。152 の「`default` は、名前のない残りとして残り…」と、153 を置き換える
+     *
+     * 持ち主: `docs/check.md`「閉じた分類」、`docs/grammar.md`「classify」「予約語」「決めたこと」
+     */
+    @adr.accepted
+    @adr.amends(Decision100.D152)
+    D154;
+
+    /**
+     * `condition` をなくす。二つに分かれる判定も、両側に名前を付けた `classify` で書く（`classify Role of Member { Admin; Regular; }`）。`condition C of T;` は構文エラーで、メッセージが、その書き方を示す。`condition` は予約語から外す（宣言の頭に `Ident` が来る生成規則はなく、なくした書き方が別の意味で通ることはない）。IR の `Classify.fromCondition` もなくなる
+     *
+     * 持ち主: `docs/grammar.md`「classify」「予約語」「決めたこと」、`docs/check.md`「閉じた分類」
+     */
+    @adr.accepted
+    D155;
+
+    /**
+     * `match` に `else` のアームを足す: `else => …` は、その分類が宣言したケースのうち、ほかのアームが並べなかったもののすべてを受ける。宣言したケースの外の値は、受けない（154 の分類の誤り）。書けるのは、名前で並べたアームの後ろに、最後に一つだけ（文法で閉じる）。受けるケースが一つもなければ MATCH-9。`default =>` のアームは、なくす（構文エラー）。`else` のアームの中の対象の型は、受けるケースが二つ以上なら絞り込まず（外の型のまま）、ちょうど一つなら、そのケースを名前で書いたアームと同じ
+     *
+     * 持ち主: `docs/check.md`「アームが受けるケース」「classify / match」、`docs/types.md`「アームの中の対象の型」、`docs/grammar.md`「配線」
+     */
+    @adr.accepted
+    D156;
+
+    /**
+     * ケースの並びの区切りは `,`: `match` のアーム（`Draft, Cancelled => throw NotAccepted;`）と、分類の遷移の前後のケース（`on Checkout: Shopping, Ordered -> any`）。ケースを `\|` で並べる書き方は、なくす（構文エラーで、メッセージが `,` を示す）。`\|` が残るのは、デコレータの宣言の対象と引数の型、適用の引数の値。節の並びを `,` にした決定（124、S25）と同じ向き
+     *
+     * 持ち主: `docs/grammar.md`「exception / effect / read」「配線」「決めたこと」
+     */
+    @adr.accepted
+    D157;
+
+    /**
+     * 154 の帰結として、分類の判定を定め直す。（a）述語で決まる分類は、すべてのケースが述語を持つ: 「ほかのどの述語も真でない」ことから決まるケースはなく、言語も基底も、残りを導かない。どの述語も真でない値は、分類の誤り。（b）型で決まる分類の条件から「残りを受けるものがある」（条件 4）をなくす: 残りのケースがなくても、型で決まる分類。どのケースの型にも当たらない値（値がない。どのケースも書かなかった型のアーム）は、分類の誤り。条件 4 を残すと、値がない側を使わない分類（`classify Arrival of Time? { Arrived: Time? as Time; }`）が述語で決まる分類になり、型から決まることに、人が述語を書くことになる。（c）規則: CLS-1、CLS-2、CLS-3、CLS-7、MATCH-2 を書き直す。欠番にする規則はない。足す規則は MATCH-9。標準の分類（`nullable`、`list`）は変わらない
+     *
+     * 持ち主: `docs/check.md`「ケースの判定」「classify / match」、`docs/requirements.md`「検査の規則の一覧」
+     */
+    @adr.accepted
+    D158;
+
+    /**
+     * IR の版を 0.8 に上げる（構造が変わる）: `Classify.hasDefault`、`Classify.defaultDescription`、`Classify.fromCondition` をなくす。`MatchArm.cases` は、いつもケース名の列（`"default"` をなくす）。`MatchArm.else` を足し、`else` のアームの `cases` には、それが受けるケースを、宣言の順で置く（プラグインは `cases` だけを読めば足りる）。hozoc、スキーマ、`sdk/ts`、すべてのプラグインのマニフェスト（サンプルの中の `go-ratelimit` と、テストの fixture を含む）を、一緒に上げる
+     *
+     * 持ち主: `docs/ir.md`「classify」「配線」「正規化」「版」
+     */
+    @adr.accepted
+    D159;
+
+    /**
+     * Go の基底: 列挙に `<C>Default` はない。判定関数 `Classify<C>` は、真がちょうど一つでなければ `*runtime.ClassificationError` を返す。型で決まる分類の `match` は、どのケースにも当たらない値を、分類の誤りの枝（`return <零値>, &runtime.ClassificationError{…}`）で返す: `if` の形の、値のない側の枝（残りのケースがない分類）と、型の `switch` の、いつも置く最後の `default:`（union の値が `nil` のときも、ここに来る。`const` と文の `match` で、どの節にも入らずに通り抜けていた）。`else` のアームは、受けるケースを名前で並べたアームと同じコードで、Go の `default:` は使わない。枝の頭のコメントのケースの区切りは `, `
+     *
+     * 持ち主: `docs/plugin-go.md`「match」「分類」「これまでの形から変えたこと」
+     */
+    @adr.accepted
+    D160;
+
+    /**
+     * 書き方の指針を二つ: （i）分類には、仕様が使う場合だけを宣言する。使わない場合のためのケース（「その他」）は置かず、宣言したケースの外の値は、誤りにする。（ii）`match` の `else` のアームは、多くのケースから一つ（か、少し）を取り出すとき（「1 : 4」）に使い、ケースがいくつかの組に分かれるとき（「1 : 2 : 2」）は、どのアームにも名前で並べる。規則ではなく、検査しない（153 を置き換える）
+     *
+     * 持ち主: `docs/requirements.md`「書き方の指針」
+     */
+    @adr.accepted
+    D161;
+
+    /**
+     * 154〜161 の当てはめ。文書、期待する出力、仕様を先に直し、実装を後に入れた。`cli.hozo` の `OutputsSync` は、`default;` を `OutOfDate;`（足りない、古い、または余分なファイルがある）にし、状態の単位は、述語 `UpToDate` と `OutOfDate` を持つ（hozoc の外から見える振る舞いは、変わらない）。サンプル `order-app` は、`psp.Meaning` と `fulfilment.Arrival` の `default;` を消し（使わない種類の通知は、分類の誤りになる）、`staff` の三つの `condition` を、仕事ごとの、両側に名前のある `classify` にした（一人が複数の仕事を持てるので、一つの `Role` にはしない）。サンプル `shop-server` は、仕様も、期待する出力も、変わらない（`default` も、`\|` のアームも、述語で決まる分類も、ない）
+     *
+     * 持ち主: `docs/cli.md`「cli.hozo」「手で書くもの」、`tests/samples/order-app/README.md`、`tests/samples/shop-server/README.md`、`tests/samples/README.md`「移行の間」
+     */
+    @adr.accepted
+    D162;
+
+    /**
+     * 表の一行の状態を、遷移で書けるようにする（**行の遷移**）。値の分類は、値一つ、表なら一行の状態を言う。効果は、二つの別のことを言う: どこに、何の操作で書くか（宛先 `on orders.put`。今までどおり）と、受け取った行の状態がどうなるか（宛先の後ろの `as` の節）。`as X` は「効果の後、行は X にある」、`as Xs -> Y` は「Xs の行が Y になる」。矢印の前の `any` は「どのケースからでも」、後ろの `else` は「決まっていない」。前のケースの並びの区切りは `,`。状態の分類の遷移（`on OutputsSync: any -> UpToDate`）は、そのまま、変わらない。設計書を変える（S30）
+     *
+     * 持ち主: `docs/grammar.md`「exception / effect / read」「決めたこと」、`docs/check.md`「行の遷移」
+     */
+    @adr.accepted
+    D163;
+
+    /**
+     * 行の遷移の、操作ごとの形。`post`: `as X` は X で入る、`as` がなければ（か、`as any`）入るケースは決まっていない。矢印は、前が「ない」のときにだけ書く（165）。`put`: 矢印で書く。**`as` がなければ、行のケースは変わらない**（行のケースが変わる道は、宣言した行の遷移だけ。抜け道は、書いて言う `-> else` だけ）。`delete`: ない側のケースを持つ分類でだけ書ける（165）。合わない形は STATE-8
+     *
+     * 持ち主: `docs/check.md`「行の遷移」の「書き方と意味」「操作ごとに書ける形」
+     */
+    @adr.accepted
+    D164;
+
+    /**
+     * 行がないこと。対象の型が T の分類には「行がない」を言うケースがないので、その分類では `delete` の効果に `as` を書けない。行がないことを名前のある状態として扱うなら、`T?` を対象にした分類に、**ない側のケース**を書く: `<名前>: T? as none;` か、残りが、ちょうど「値がない」の `as else`。「値がない」を言う語は `none`（配線の値と同じ語。`null` は足さない）。`delete` は `as Life.Draft -> Life.Absent`（下書きだけを消せる）か `as Life.Absent`、`post` は `as Life.Absent -> Life.Draft` か `as Life.Draft`。`delete` の後のケースは、ない側のケースだけで、`put` と `post` の後のケースには書けない。そのために、CLS-7 を、ここまでだけ緩める: 値の分類か op の分類で、対象の型が `T?`、ほかのケースが、どれも `T? as T` なら、ほかのケースが二つ以上でも（述語で決まる分類でも）、`as else` と `as none` を書ける。決め方は二段: 値がなければ、ない側のケース（型で決まり、述語を持たない）。値があれば、ほかのケースの述語（排他の規則は、その中）。158 の（a）「述語で決まる分類は、すべてのケースが述語を持つ」は、ない側のケースを除く、と読む。`as none` の規則は CLS-8
+     *
+     * 持ち主: `docs/check.md`「ケースの判定」「残りのケース」「ない側のケース」「行がないこと」、`docs/types.md`「型で決まる絞り込み」「残りのケースでの対象の型」、`docs/grammar.md`「classify」
+     */
+    @adr.accepted
+    D165;
+
+    /**
+     * 行の遷移の結びつき（STATE-7）: `as` のケースの分類は、書き込む状態の要素の型 T（か `T?`）を対象にした、値の分類。効果の引数のうち、型が T のものが、ちょうど一つで、それが行。分類は、何の型の状態かを、もう決めていて、それに結びつかない遷移は、意味を持たない。**呼ぶ側の検査**（STATE-9）: 矢印の前にケースを並べた効果は、そのケースにあると分かっている行でしか呼べない: `match 行 by C` の、そのケースを受けるアームの中（`else` のアームを含む）か、型が `C.K<T>` の値。前が `any` の形、`as` のない効果、`post` は、どの行でも受け取る
+     *
+     * 持ち主: `docs/check.md`「行の遷移」の「結びつき」「呼ぶ側の検査」、`docs/types.md`「ケースが分かっている値」
+     */
+    @adr.accepted
+    D166;
+
+    /**
+     * 163〜166 が決めていなかった点を、いちばん小さい規則で決めた。（a）一つの `as` が言うのは、一つの分類。行のほかの分類については、`as` のない効果と同じ意味。二つの分類を一度に変える効果は `as any -> else`。（b）行の引数を持たない効果（行の並びをまとめて書く効果、識別子で消す効果）は、`as` を書けない。行の引数に数えるのは、型が T と等しい引数だけ（`T[]` も `C.K<T>` も数えない）。（c）矢印のない形のケースは一つ（`as A, B;` は構文エラー）。`put` の矢印のない形（`put as X`）は書けない: `as any -> X` と同じ意味の、二つ目の書き方になる。（d）`delete` の `as any -> N` は、`as N` と同じ意味で、書ける（前の書き方を、`put` と同じにする）。IR では、`post` の `as N -> X` と `as X`、`delete` の `as any -> N` と `as N`、`post` の `as any` と `as` を書かない形は、同じ形。（e）`post` の `as N -> X` は、呼ぶ側の検査をしない: 渡す行は入る行で、「入る前にない」ことを示す値ではない。（f）デコレータが運ぶ効果と `halts` の効果には、呼ぶ側の検査が掛からない（デコレータの処理は、仕様の上で行を受け取らない）。（g）op の分類と状態の分類は、行の分類にならない。（h）`else` のアームの中の値も、ケースが分かっている（受けるケースの集合。分類にケースを足せば、足りていた呼び出しが STATE-9 になる）。（i）`as none` は、状態の分類には書けない。`as none` と `as else` を、一つの分類に両方は書けない。（j）直に呼ぶ組み込みの効果は、`as` のない宣言と同じ意味
+     *
+     * 持ち主: `docs/check.md`「行の遷移」、`docs/types.md`「ケースが分かっている値」、`docs/ir.md`「正規化」
+     */
+    @adr.accepted
+    D167;
+
+    /**
+     * IR の版を 0.9 に上げる（構造が変わる）: `Effect.row`（`RowTransition`: 行の引数、分類、前のケース、後のケース）、`CaseTyping.by` の `none`、`Classify.absent`。述語で決まる分類が、述語を持たないケース（`absent`）を持ちうる。`View` とやり取りの形は変わらない。159 の当てはめと同じに、版を言うところ（`ir.Version`、スキーマ、`sdk/ts`、プラグインの SDK、すべてのマニフェスト、テストの `views.json`、文書）を、まとめて上げる
+     *
+     * 持ち主: `docs/ir.md`「state / exception / effect」「classify」「正規化」「版」
+     */
+    @adr.accepted
+    D168;
+
+    /**
+     * Go の基底: 行の遷移を持つ効果も、宛先の状態の単位のメソッドのままで、形は変わらない。行の遷移から出すのは、コメントだけ（効果の定数の一行と、単位のメソッドのコメントの宛先）。行のケースを確かめるコードも、遷移の表も、テストも、出さない。述語で決まる分類のない側のケースは、列挙の定数を持つが、述語を持たない（`<C>Cases` にメソッドがない）: 判定関数が、値がないことで決める（160 の「判定関数は、どのケースも述語を呼ぶ」を、ない側のケースを除く、と読む）
+     *
+     * 持ち主: `docs/plugin-go.md`「effect」「状態の単位」「分類」「コメント」
+     */
+    @adr.accepted
+    D169;
+
+    /**
+     * `go-sqlite`: 行の遷移を持つ効果に `db` のデコレータを付けても、SQL は変わらない。行のケースは、述語で決まる分類のもので、列とは限らないので、SQL は、前のケースも後のケースも確かめない（コメントが、そう言う）。`@db.update` は、後のケースが前のケースの並びにない効果には、付けられない（GOSQL-30）: 渡る行は前のケースにあり（STATE-9）、そのまま書いても、後のケースにならない。その効果は、人が書く（137 の、遷移を宛先にする効果と同じ扱い）。`@db.delete` は、行の遷移を持つ効果に付けられない（行の引数は、列の条件ではない: GOSQL-8）。行を受け取る `@db.delete`（キーで消す）は、**まだ決めていない**
+     *
+     * 持ち主: `docs/plugin-go-sqlite.md`「効果の中身」「メソッドの形とコメント」「診断」
+     */
+    @adr.accepted
+    D170;
+
+    /**
+     * 書き方の指針を三つ。（i）表の一行の進み具合は、行の型の分類と、行の遷移で書く。`-> else` は、後のケースを約束できない効果にだけ使う。（ii）履歴や記録が要るものは、消さない: 消す代わりに、ケースを持たせる（取り消した注文は `Cancelled`）。消すのは、なくなることそのものが意味であるもの（下書き、期限の切れたセッション、カートの行）。（iii）当たらない値に対して何かをしたい（無視する、定義した例外を投げる）なら、それは分類できるということなので、ケースとして宣言して、枝に書く。分類の誤りは、仕様が扱わない、ありえないことが起きた誤り（161 の（i）「使わない場合のためのケースは置かない」の読み方: 仕様が、その値に何かをするなら、それは「使う場合」）。分類の誤りを受ける例外は、言語に足さない。規則ではなく、検査しない
+     *
+     * 持ち主: `docs/requirements.md`「書き方の指針」
+     */
+    @adr.accepted
+    D171;
+
+    /**
+     * 行の遷移の目的: 宣言した遷移（`A -> B`、`B -> C`）のほかの向きに行のケースが変わらないことと、`as` のない `put` が行のケースを変えないことを、生成したテストで保証できるようにする。**テストの生成は、まだ作っていない、次の段階**で、設計もしていない。今は、IR が、それに要るもの（状態、操作、分類、前のケース、後のケース、行の引数）を持つところまで
+     *
+     * 持ち主: `docs/requirements.md`「段階」、`docs/check.md`「行の遷移」の「検査器が確かめないこと」、`docs/ir.md`「state / exception / effect」
+     */
+    @adr.accepted
+    D172;
+
+    /**
+     * 163〜172 の当てはめ。文書と、サンプル `order-app` の仕様を先に直し、実装を後に入れた。`order-app` は、注文、支払い、製作の仕事、出荷（と、その荷物、送り状）、取り置き、セッション、配送業者の進み具合を、行の遷移で書き直した（値の分類と、行の全体を書き換える `put` の効果と、時刻を入れる葉で近づけていた形: `tests/samples/order-app/README.md` の F1 を置き換える）。通知の入口の分類（`psp.Meaning`、`fulfilment.Arrival`）は、171 の（iii）で見直し、受け取るだけの通知に、名前のあるケース（`Echo`、`Underway`）と、何もしない枝を足した（162 の「`default;` を消し、使わない種類の通知は、分類の誤りになる」を置き換える）。サンプル `shop-server` は、仕様も、期待する出力も、変わらない（行の進み具合がない）。規則の ID: 新しいものは STATE-7、STATE-8、STATE-9、CLS-8、GOSQL-30。CLS-1 と CLS-7 は、同じ規則を、`as none` と、ない側のケースを含む形に書き直した。欠番は増えない
+     *
+     * 持ち主: `tests/samples/order-app/README.md`、`tests/samples/README.md`「移行の間」、`docs/check.md`「診断」、`docs/plugin-go-sqlite.md`「診断」
+     */
+    @adr.accepted
+    @adr.amends(Decision100.D162)
+    D173;
+
+    /**
+     * Hozo の価値を言い直した: **Hozo は、アプリの設計の、ただ一つの正（SSOT）になる言語。** 要件や設計を AI が書いても、人が UI でレビューし、手直しできる。レビューしたものが、そのままコードの枠とハーネスになる。それによって、アプリ開発で人が責任を持つ範囲を、はっきりさせる（人が責任を持つのは仕様で、中身は AI に任せられる）。コードの品質は軽んじない: 生成するコードは、その言語の作法に従い、中身が仕様から外れないことは、ハーネスが確かめる。「設計書から離れた決定」S13 の、価値の言い方（一文目）と、それまでの `docs/requirements.md`「価値と位置づけ」の文を置き換える（S13 の、UML と UI の部分は、177、178）。145 の「仕様で、同時に、ハーネス」は、変えない
+     *
+     * 持ち主: `docs/requirements.md`「価値と位置づけ」
+     */
+    @adr.accepted
+    @adr.amends(DecisionS.S13)
+    D174;
+
+    /**
+     * ただ一つの正であることの要件: 設計を言うものは、仕様（`.hozo`）だけ。レビューで見せる形、図、生成するコードの枠、テストは、どれも仕様から作り、設計を言うものを、仕様の横に、手で保守しない。今、仕様から作っているのは、コードだけ
+     *
+     * 持ち主: `docs/requirements.md`「ただ一つの正」
+     */
+    @adr.accepted
+    D175;
+
+    /**
+     * 書く人と、読む人: `.hozo` の文面を書くのは、主に AI（と、エンジニア）で、人は、UI で読み、手直しする。文面は、長く、厳密でよい（手で書きやすいことより、検査が曖昧なく確かめられることを取る）。`docs/requirements.md` の節「エンジニアでない人が設計するときの摩擦」は、「検査が求める完全さ」に置き換えた: 摩擦は、AI が下書きした不完全な仕様を検査に掛ける場面と、人がレビューする場面のもの。明示を緩めないこと（THROWS-1。`throws` を推論しない）と、足りない宣言を、道具が診断の `Data` から足すことは、変えない。不完全な仕様を受け付ける方法と、レビューする人に何を見せるかは、**まだ決めていない**
+     *
+     * 持ち主: `docs/requirements.md`「書く人と、読む人」「検査が求める完全さ」
+     */
+    @adr.accepted
+    D176;
+
+    /**
+     * 設計の手法や図に合わせることは、目的ではない。図は、仕様を、レビューする人に見せる形の候補。図と、言語の記述の対応の表（それまでの「価値と位置づけ」の UML の表）は、どの記述が、どの図の材料になりうるかの一覧で、図を出して確かめたものではない。仕様をレビューのために表示するものは、**まだない**。S13 の「UML に当たる記述を検査できる仕様として持ち」を置き換える。要件「図への展開」は、「モデルが先」の表から、この見出しに移した
+     *
+     * 持ち主: `docs/requirements.md`「レビューで見せる形」
+     */
+    @adr.accepted
+    @adr.amends(DecisionS.S13)
+    D177;
+
+    /**
+     * UI での手直しは、価値から導く要件: 人は、UI で仕様を手直しでき、その結果を、`.hozo` の文面に書き戻す。S13 の「将来は UI で編集する」と、それまでの `docs/requirements.md`「段階」の「UI での編集は将来の目標で、段階には入れない」を置き換える。文面への書き戻しは、この要件の一部で、「モデルが先」の表から、この見出しに移した（54 の中身と、その持ち主「決まったこと」は、変えない）。**まだ作っておらず、作る段階も割り当てていない**
+     *
+     * 持ち主: `docs/requirements.md`「UI での手直し」「段階」
+     */
+    @adr.accepted
+    @adr.amends(DecisionS.S13)
+    D178;
+
+    /**
+     * 174 の言うハーネスの部分は、今ある原則と仕組み: 仕様の中のつながりの検査、「op の中身に立ち入らない」（145）、「出力を推論しない」（132）、実装の漏れがコンパイルエラーになること、閉じた分類（154）、行の遷移（163〜167）、テストの生成（172。まだない）。仕組みは、足さない
+     *
+     * 持ち主: `docs/requirements.md`「ハーネス」
+     */
+    @adr.accepted
+    D179;
+
+    /**
+     * 仕様に書く範囲の線（151 が、まだ決めていないとした規則）は、「人が責任を持たなければならないこと」として決める。規則は、**まだ決めていない**。材料は、サンプル `order-app` のまま。151 の二つの指針は、変えない
+     *
+     * 持ち主: `docs/requirements.md`「仕様に書く範囲」
+     */
+    @adr.accepted
+    D180;
+
+    /**
+     * 目指す向き（要件ではない）: PRD の水準の記述（誰に、何を約束するか）も、Hozo の中に書けるようにする。今、書けるのは、op と概念の名前と説明、印のデコレータ（サンプル `order-app` の `@prd.promise`）。約束の中身を、確かめられる形で言う書き方は、**まだ決めていない**。PRD の取り込みと、PRD の文と仕様の要素を結ぶ仕組みも、ない
+     *
+     * 持ち主: `docs/requirements.md`「PRD の水準の記述」
+     */
+    @adr.accepted
+    D181;
+
+    /**
+     * 未決の点の一覧を、`docs/open.md` に置く。問いの中身（何が起きたか、選択肢、勧め）は、持ち主の文書が持ち、一覧は、それを名指しするだけ。持ち主のない点だけは、一覧が、見出し一つにつき一つ持つ。点が決まったら、決定をこの表に足し、一覧の行を消す。実装した側が聞かずに決めて、利用者が確かめていない決定も、一覧に置く。作業の進め方の決まり（文書が契約、直す順、食い違いの扱い、判断の聞き方、番号と決定の行の扱い、テスト、`main` に入れる条件）の持ち主は、リポジトリ直下の `CLAUDE.md`
+     *
+     * 持ち主: `docs/open.md`「この文書が決めること」「一覧の直し方」、`CLAUDE.md`「進め方の決まり」
+     */
+    @adr.accepted
+    D182;
+
+    /**
+     * 「まだ何もない」四つ（レビューと手直しの UI、PRD、不完全な仕様の受け止め、テストの生成）のうち、次に作るのは、仕様を人に見せる形（レビューと手直しの UI）
+     *
+     * 持ち主: `docs/requirements.md`「段階」
+     */
+    @adr.accepted
+    D183;
+
+    /**
+     * レビューで見せるものは、選ばない: 仕様にあるものは、すべて見せる。決めるのは、読む順と、畳み方だけ。人が責任を持つのは仕様なので、仕様にあって見えないものを作らない。「レビューに要るものだけを選んで出す」は、採らなかった（何が要るかの決まりが、「仕様に書く範囲」と二重になる）。176 が、まだ決めていないとした「レビューする人に何を見せるか」を決める
+     *
+     * 持ち主: `docs/tools.md`「見るものの決まり」
+     */
+    @adr.accepted
+    D184;
+
+    /**
+     * 仕様を人に見せるものは、IDE: 見る、欠けを知る、直す、を一つの場所で繰り返せる、動き続ける道具。一度出して終わる、静的なページや図を出す仕組みは、作らない。道具（CLI、言語サーバー、VS Code 拡張、IDE）は、ユースケースと、そこでの操作が違うものとして、ユースケースから分けて設計する。177 の「仕様から図を出すことは、プラグインの展開先の一つとして扱う」を置き換える。担い手、ユースケース、道具の境目、操作の表、IDE の段階は、案を `docs/tools.md` に書いた（利用者は、まだ確かめていない: `docs/open.md`「聞かずに決めて、確かめていない決定」）
+     *
+     * 持ち主: `docs/tools.md`「この文書が決めること」、`docs/requirements.md`「レビューで見せる形」
+     */
+    @adr.accepted
+    @adr.amends(Decision100.D177)
+    D185;
+
+    /**
+     * 道具の前提を、三つ決めた。（a）IDE は、エンジニアでない人のための道具: プロジェクトのルートを開くと、その `.hozo` のファイル、設計の手法ごとの編集の画面、ハーネスの状況、AI とのチャットが、一つの画面に並ぶ。（b）AI の口は、MCP サーバー: AI が仕様を扱うための口を、CLI には足さない。（c）VS Code 拡張に、画面は作らない: VS Code を選んだのは、早く形にするためで、ユースケースから選んだのではなく、拡張の中の画面は、エンジニアでない人には向かない。拡張は、色付けと、言語サーバーへの接続のまま。185 の後に書いた案（IDE は文面も中身も扱わない、IDE は言語サーバーのクライアントではない、AI の口は CLI、VS Code 拡張が IDE の表示を開く）は、この前提で書き直した
+     *
+     * 持ち主: `docs/tools.md`「決まっている前提」「境目」
+     */
+    @adr.accepted
+    D186;
+
+    /**
+     * IDE は、手元のアプリ: インストールして、プロジェクトのフォルダを開く。裏方は `hozoc` で、検査、トランスパイル、MCP サーバーの立ち上げは、このコマンドが担う。ブラウザだけで使う形（起動にターミナルが要る）と、クラウドのサービス（動かす基盤が要る）は、採らなかった。画面を `hozoc` が配ること、やり取りの形、置き場は、案（利用者は、まだ確かめていない）
+     *
+     * 持ち主: `docs/tools.md`「IDE の形」
+     */
+    @adr.accepted
+    D187;
+
+    /**
+     * IDE の殻は、Tauri 2。Electron は採らない（ブラウザを丸ごと同梱するので重く、デスクトップのアプリとして嫌われている）。Wails は採らなかった（v3 がベータで、配るための仕組みは Tauri が公式にそろえている）。殻は、フォルダを選ぶ、`hozoc` を起動する、画面をウィンドウに出す、配る、だけを持つ。リポジトリと CI に、殻のビルドのための Rust が加わる（1 の「本体は Go」は変わらない: 殻は、言語の知識を持たない）
+     *
+     * 持ち主: `docs/tools.md`「IDE の形」
+     */
+    @adr.accepted
+    D188;
+
+    /**
+     * IDE の設計は、段階を踏む。ユースケースを、具体的な筋書きまで詰めてから、画面の要件を導く。それより前に、画面の一覧を決めたり、見本（模型）を作ったりしない: 先に形を作ると、要件が、その形に引っ張られる。画面の枠組み（フレームワーク）は、画面の要件が決まってから、そこから選ぶ。`docs/tools.md`「IDE の画面」の、手法ごとの画面の表は、概要の水準の候補のまま（画面の要件ではない）。この決定の前に書いた画面の要件の案（`docs/ide.md`）は、`main` に入れる前に取り下げた
+     *
+     * 持ち主: `docs/tools.md`「IDE の画面」「IDE の形」
+     */
+    @adr.accepted
+    D189;
+
+    /**
+     * 189 の段階を、六つにする: 1 ユースケースの筋書き、2 情報と操作の洗い出し、3 画面の構成、4 画面の見本、5 動きの要件と枠組みの選定、6 `hozoc` との口の設計。一つの段が終わるごとに、利用者が確かめてから、次に進む。段 1 では、筋書きと組にして、具体例（サンプル `order-app`）を、UML などの設計の手法に写したときに、どうなるかを調べる
+     *
+     * 持ち主: `docs/tools.md`「IDE の設計の段階」
+     */
+    @adr.accepted
+    D190;
+
+    /**
+     * IDE の画面の設計の原則: 今の Hozo（言語、語彙、`hozoc`）が、設計の手法の求めるものを、すべては出せないことを、画面の設計の制約にしない。情報と操作は、筋書きが要るものを、すべて並べ、画面の設計は、それが、あるものとして行う。出せないものは、Hozo の側の改善する点として、別に残す
+     *
+     * 持ち主: `docs/ide-needs.md`「原則」、`docs/open.md`「Hozo の側の改善する点」
+     */
+    @adr.accepted
+    D191;
+
+    /**
+     * IDE で、詳細に設計する単位は、コンテキスト（仕様の名前空間）。アプリの全体は、粗く俯瞰する。全部を一括で設計する形は、採らない。画面は、図の種類ごとに分けず、設計している単位ごとに、関わる図を並べる（図ごとの画面は、同じものを見るのに、行き来が要る）
+     *
+     * 持ち主: `docs/ide-screens.md`「決まっている前提」
+     */
+    @adr.accepted
+    D192;
+
+    /**
+     * IDE の設計の場は、ノート: Miro や Figma のような、自由なキャンバス。設計の図形を、好きなところに置き、線でつなぎ、矩形、ラベル、付箋を、好きに足せる。図の種類ごとの編集の画面は、作らない。ノートは、コンテキストごとに作る。186 の（a）の「設計の手法ごとの編集の画面」は、ノートに置く図形と塊の組として持つ
+     *
+     * 持ち主: `docs/ide-screens.md`「決まっている前提」「ノート」「手法との対応」
+     */
+    @adr.accepted
+    D193;
+
+    /**
+     * ノートの上で、仕様に結ばれた図形を描くこと、線を引くことは、仕様を直すこと（宣言と、関係が足される）。矩形、ラベル、付箋は、仕様に入らない。「キャンバスは並べて見るだけで、直すのは別の操作」と、「すべて自由に描き、AI が仕様に起こす」は、採らなかった（後者の使い方は、自由な図形を選んで AI に頼む形で、受け持つ）。ノートが持つのは配置と自由な図形だけであること、導いた線は引けないこと、塊、まだ置いていないもの、全体のノートと自由なノートは、案（利用者は、まだ確かめていない）
+     *
+     * 持ち主: `docs/ide-screens.md`「決まっている前提」「図形の二つの種類」
+     */
+    @adr.accepted
+    D194;
+
+    /**
+     * ノートの上で、担い手は、入口を入れる囲み: 入口を中に入れると、その担い手の入口になる。担い手と入口を、線で結ぶ形は、採らなかった（見本で、入口の多い担い手の線が、扇になって、受け渡しの線を埋めた）。担い手の囲みは意味を持つので、意味を持たない自由な囲みと、見て分かる違いを持たせる
+     *
+     * 持ち主: `docs/ide-screens.md`「決まっている前提」「結ばれた図形」
+     */
+    @adr.accepted
+    D195;
+
+    /**
+     * ノートに、種類を持たせない。ノートは、コンテキストごとと、全体とで、作るのがよいが、仕組みは、それを縛らない: どのノートにも、どの要素でも置ける。193 の「ノートは、コンテキストごとに作る」は、勧めで、仕組みの決まりではない。全体、コンテキスト、空からの三つは、IDE が用意する作り方（はじめの中身の決め方）で、案
+     *
+     * 持ち主: `docs/ide-screens.md`「決まっている前提」「ノートの作り方」
+     */
+    @adr.accepted
+    D196;
+
+    /**
+     * ノートは、専用のファイルとして保存する。置いた図形は、設計（仕様）に連動する。`hozoc ide` でプロジェクトを開くと、プロジェクトのルートに `.hozo/` と、その下のノートのファイルが作られる。設計（`.hozo` の仕様のファイル）は、`.hozo/` の外に置く。ノートの置き場は、プロジェクトの設定に持たせる（既定は `.hozo/`）。ファイルの形は、決めていない
+     *
+     * 持ち主: `docs/ide-screens.md`「ノートのファイル」
+     */
+    @adr.accepted
+    D197;
+
+    /**
+     * 付箋には、ラベル（後で決める、など）を付けられる。付けるかどうかは、任意
+     *
+     * 持ち主: `docs/ide-screens.md`「自由な図形」
+     */
+    @adr.accepted
+    D198;
+
+    /**
+     * ノートに置く図形は、プラグインが作る。図形の定義が持つのは、形、入力の欄、線をつなぐ口、つなげる相手。IDE は、図形を自由に置ける仕組みを提供する。線は、種類が多くないので、プラグインが決めるのは、線の見た目と、何と何の、どことどこを、どの線で結べて、その結果、仕様（`.hozo`）が、どう変わるか。設計の手法は数が多く、IDE がすべてを作り込めないため。分け方（プラグインは文面を自分では書き換えず、`hozoc` の操作を呼ぶ。語彙を提供するプラグインが、その語彙の図形も提供する。標準の図形は同梱する）は、案
+     *
+     * 持ち主: `docs/ide-shapes.md`「決まっている前提」
+     */
+    @adr.accepted
+    D199;
+  }
+}

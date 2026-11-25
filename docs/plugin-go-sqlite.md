@@ -188,7 +188,7 @@ effect fn deleteSession(token: type.Token): effects sessions.delete;
 | `@db.delete` | `T.delete`。引数は条件 | `DELETE FROM "<表>" WHERE <条件>`。どの条件も満たす行をすべて消す。行がなければ何もしない |
 
 - `@db.delete` の条件の値の渡し方は、`read` と同じ（「read の中身」）。
-- **`@db.conflict(E)`**（付けられる効果と、E の決まりは `docs/plugin-db.md`「効果」。`docs/decisions.md`「決めたこと」353）: 文が、表の一意の制約（`@db.key` の `PRIMARY KEY` と、`@db.unique` の `UNIQUE`。「表」）に当たったら、例外 E を返す。当たらなければ、SQL は、上の表のまま。
+- **`@db.conflict(E)`**（付けられる効果と、E の決まりは `docs/plugin-db.md`「効果」。決定 D353）: 文が、表の一意の制約（`@db.key` の `PRIMARY KEY` と、`@db.unique` の `UNIQUE`。「表」）に当たったら、例外 E を返す。当たらなければ、SQL は、上の表のまま。
 
   ```
   /** ユーザーを登録する。同じ email のユーザーが、もういれば、投げる */
@@ -518,7 +518,7 @@ func dbConflict(err, conflict error) error {
 
 番号は別の意味に使い回さない（欠番の一覧は `docs/requirements.md`「検査の規則の一覧」）。
 
-- **言語にも、保存先にも依らない 19 個は、語彙のプラグイン `db` の診断に移した**（`docs/plugin-db.md`「診断」。`docs/decisions.md`「決めたこと」410）。規則は、同じ。メッセージも同じで、変えたのは、型の書き方（言語の綴り）と、DB-19 の「引数を持つ」の言い方だけ。
+- **言語にも、保存先にも依らない 19 個は、語彙のプラグイン `db` の診断に移した**（`docs/plugin-db.md`「診断」。決定 D410）。規則は、同じ。メッセージも同じで、変えたのは、型の書き方（言語の綴り）と、DB-19 の「引数を持つ」の言い方だけ。
 
   | 欠番 | 移した先 | 欠番 | 移した先 | 欠番 | 移した先 | 欠番 | 移した先 |
   |---|---|---|---|---|---|---|---|

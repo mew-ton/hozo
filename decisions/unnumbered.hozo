@@ -1,0 +1,41 @@
+// 決定の記録（番号のない、確かめていない決定）。名前空間 hozo.decisions。書き方は decisions/adr.hozo の頭のコメント。
+// コードには、ならない（hozo.toml の単位の対象ではない）。
+// docs/open.md「聞かずに決めて、確かめていない決定」の行の写し。534 からの決定は、番号を振って d500.hozo などに入れる（D536）。
+
+namespace hozo.decisions {
+  /** 番号を持たない、確かめていない決定。名前は、中身を言う */
+  classify DecisionUnnumbered of never {
+    /**
+     * ユースケース write（書き出す）の担い手に、Ci を入れない。
+     * 出どころは、docs/open.md「聞かずに決めて、確かめていない決定」の、hozoc の担い手の行。
+     *
+     * @adr.context 472 の理由に、例として書いた言い方（「CI は、検査する」「人と AI は、書き出す」）を、写した。文書に、根拠は、ない。
+     * @adr.alternative Ci を、write にも入れる（CI が、ビルドの中でコードを書き出す使い方は、ありえる）
+     */
+    @adr.proposed
+    WriteWithoutCi;
+
+    /**
+     * 業務の流れは、新しいファイル flows.hozo に書き、流れに、担い手は、結ばない。
+     * hozo.flows と hozo.toolchain は、単位に入れない。
+     * 出どころは、docs/open.md「聞かずに決めて、確かめていない決定」の、hozoc の業務の流れの行。
+     *
+     * @adr.alternative 流れを cli.hozo に書く
+     * @adr.alternative 流れにも、担い手を結ぶ印を足す
+     * @adr.alternative go-design を並べて、流れのテストの口を出す
+     */
+    @adr.proposed
+    FlowsInOwnFile;
+
+    /**
+     * 生成物の置き場は internal/gen/hozo/compiler、Go のパッケージ名は compiler。仕様のファイルは cli.hozo のまま。
+     * 出どころは、docs/open.md「聞かずに決めて、確かめていない決定」の、名前空間を付け直したときの行。
+     *
+     * @adr.context 後で、hozo.plugin、hozo.ide が、横に並ぶ形にする。
+     * @adr.alternative 置き場を internal/gen/hozoc のままにする
+     * @adr.alternative 仕様のファイルを hozo/compiler.hozo に移す
+     */
+    @adr.proposed
+    GeneratedUnderHozo;
+  }
+}

@@ -4,7 +4,7 @@
 // 値一つを制約で確かめる関数（CheckLiteral。同「値一つを確かめる」）も、ここに置く。読むのは、仕様だけ: 単位にも、言語にも、依らない。
 //
 // 語彙のプラグイン valid（plugins/valid）は、ここの診断を、そのまま返す。制約を読むプラグイン（plugins/go-valid、plugins/go-cli、
-// 語彙のプラグイン http の plugin/httpvocab）は、同じ読み解きの結果を使う（docs/decisions.md「決めたこと」428: 同じ読み解きを、
+// 語彙のプラグイン http の plugin/httpvocab）は、同じ読み解きの結果を使う（決定 D428: 同じ読み解きを、
 // 語彙のプラグインと、言語のプラグインで、分け合うのは、ライブラリで行う）。
 package validvocab
 

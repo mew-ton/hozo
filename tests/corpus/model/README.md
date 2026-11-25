@@ -1,6 +1,6 @@
 # コーパス `model`
 
-「モデルが先」の決定（`docs/decisions.md`「設計書から離れた決定」S10〜S12、`docs/requirements.md`「モデルが先」）の構文を、小さな一つのプロジェクトで一か所ずつ使う（`docs/testing.md`「コーパス」）。コードを生成したい名前空間は一つ（`shop`）だけで、残りは設計のためだけにある: 印の語彙（`marks`）、人の操作（`customer`）、外部のシステム（`carrier`）。`hozoc build --no-emit` が error も warning もなしで通ること、IR（`docs/ir.md`）に載る形、検査と計算（`docs/check.md`）が出力しない名前空間にも同じに掛かることを確かめる。
+「モデルが先」の決定（決定 S10〜S12、`docs/requirements.md`「モデルが先」）の構文を、小さな一つのプロジェクトで一か所ずつ使う（`docs/testing.md`「コーパス」）。コードを生成したい名前空間は一つ（`shop`）だけで、残りは設計のためだけにある: 印の語彙（`marks`）、人の操作（`customer`）、外部のシステム（`carrier`）。`hozoc build --no-emit` が error も warning もなしで通ること、IR（`docs/ir.md`）に載る形、検査と計算（`docs/check.md`）が出力しない名前空間にも同じに掛かることを確かめる。
 
 | ファイル | 中身 |
 |---|---|

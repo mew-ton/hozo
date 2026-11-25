@@ -483,7 +483,7 @@ func TestCaseKindMatches(t *testing.T) {
 		{"case of any", CaseKind{}, all},
 		{"case of Size", CaseKind{Classify: "a.Size"}, []*Classify{value}},
 		{"case of Order", CaseKind{Subject: Ref("a.Order")}, []*Classify{value}},
-		// 省略可能な型の絞りは、仕様には書けない（docs/decisions.md「決めたこと」354）。IR の上では、等しい型に当たる
+		// 省略可能な型の絞りは、仕様には書けない（決定 D354）。IR の上では、等しい型に当たる
 		{"対象が Order? の絞り", CaseKind{Subject: Optional(Ref("a.Order"))}, []*Classify{optional}},
 		{"case of never", CaseKind{Subject: Never()}, []*Classify{never}},
 	} {
