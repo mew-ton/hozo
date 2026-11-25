@@ -277,13 +277,25 @@ func Build() Grammar {
 
 		// ---- リテラル ----
 		{Key: "string", Rule: Rule{
-			Name:  "string.quoted.double.hozo",
-			Begin: `"`,
-			End:   `"`,
-			Patterns: []Rule{{
-				Name:  "constant.character.escape.hozo",
-				Match: `\\(?:["\\ntr]|u\{[0-9A-Fa-f]+\})`,
-			}},
+			Comment: "TextBlock（複数行の文字列）を Quoted より先に拾う（docs/grammar.md「リテラル」）",
+			Patterns: []Rule{
+				{
+					Name:     "string.quoted.triple.hozo",
+					Begin:    `"""`,
+					End:      `"""`,
+					Patterns: []Rule{{Include: "#string-escape"}},
+				},
+				{
+					Name:     "string.quoted.double.hozo",
+					Begin:    `"`,
+					End:      `"`,
+					Patterns: []Rule{{Include: "#string-escape"}},
+				},
+			},
+		}},
+		{Key: "string-escape", Rule: Rule{
+			Name:  "constant.character.escape.hozo",
+			Match: `\\(?:["\\ntr]|u\{[0-9A-Fa-f]+\})`,
 		}},
 		{Key: "number", Rule: Rule{
 			Comment: "Int / Float / Duration（docs/grammar.md「リテラル」）。Duration は単位を含む",

@@ -514,6 +514,12 @@ test('リテラル', () => {
   assertScope(t, 'model X', '\\n', 'constant.character.escape.hozo');
   assertScope(t, 'model X', '\\u{1F600}', 'constant.character.escape.hozo');
   assertScope(t, 'model X', '\\"', 'constant.character.escape.hozo');
+  // 複数行の文字列（docs/grammar.md「リテラル」の TextBlock）。中の " と "" は閉じない。エスケープは同じ scope
+  const tb = tokensOf('@adr.context("""\n  say "hi" ""x""\\t\n  model Y\n  """) model X { a: int; }');
+  assertScope(tb, 'say', '  say "hi" ""x""', 'string.quoted.triple.hozo');
+  assertScope(tb, 'say', '\\t', 'constant.character.escape.hozo');
+  assertScope(tb, '  model Y', '  model Y', 'string.quoted.triple.hozo');
+  assertScope(tb, 'model X', 'model', 'keyword.declaration.hozo');
   // 識別子の中の数字は数値ではない
   const id = tokensOf('model X { a1: int; }');
   assert.ok(!id[0].tokens.some((tk) => tk.scopes.includes('constant.numeric.hozo')));

@@ -206,6 +206,70 @@ func TestUnquote(t *testing.T) {
 	}
 }
 
+// TestTextBlock は複数行の文字列（docs/grammar.md「リテラル」の TextBlock）の値と誤りを確かめる。
+func TestTextBlock(t *testing.T) {
+	tests := []struct {
+		name, src, want string
+	}{
+		{"閉じの字下げを取り除く", "\"\"\"\n  a\n    b\n  c\n  \"\"\"", "a\n  b\nc"},
+		{"字下げなし", "\"\"\"\na\nb\n\"\"\"", "a\nb"},
+		{"空の値", "\"\"\"\n  \"\"\"", ""},
+		{"空白だけの行は空の行", "\"\"\"\n  a\n\n \n  b\n  \"\"\"", "a\n\n\nb"},
+		{"開きの後ろの空白", "\"\"\"  \n  a\n  \"\"\"", "a"},
+		{"タブの字下げ", "\"\"\"\n\ta\n\t\"\"\"", "a"},
+		{"引用符", "\"\"\"\n  \"a\" \"\"b\"\"\n  \"\"\"", `"a" ""b""`},
+		{"三つの引用符のエスケープ", "\"\"\"\n  \\\"\"\"\n  \"\"\"", `"""`},
+		{"エスケープ", "\"\"\"\n  a\\tb\\u{3042}\n  \"\"\"", "a\tbあ"},
+		{"CRLF", "\"\"\"\r\n  a\r\n  b\r\n  \"\"\"", "a\nb"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			toks, msgs := lexString(t, tt.src)
+			if len(msgs) != 0 {
+				t.Fatalf("診断: %v", msgs)
+			}
+			if got := kindsOf(toks); !sameKinds(got, []token.Kind{token.String, token.EOF}) {
+				t.Fatalf("kinds = %v", got)
+			}
+			if toks[0].Text != tt.src {
+				t.Errorf("Text = %q, want %q", toks[0].Text, tt.src)
+			}
+			got, err := unquote(toks[0].Text)
+			if err != nil {
+				t.Fatalf("unquote: %v", err)
+			}
+			if got != tt.want {
+				t.Errorf("値 = %q, want %q", got, tt.want)
+			}
+		})
+	}
+
+	errs := []struct {
+		name, src, message string
+	}{
+		{"開きの後ろに文字", "\"\"\"a\n  \"\"\"", "開きの \"\"\" の後ろ"},
+		{"一行で閉じる", `"""a"""`, "開きの \"\"\" の後ろ"},
+		{"閉じが行の途中", "\"\"\"\n  a\"\"\"", "閉じの \"\"\" は"},
+		{"字下げで始まらない行", "\"\"\"\n a\n  \"\"\"", "字下げ"},
+		{"閉じていない", "\"\"\"\n  a\n", "複数行の文字列が閉じていない"},
+		{"使えないエスケープ", "\"\"\"\n  \\x\n  \"\"\"", `エスケープ \x は使えない`},
+	}
+	for _, tt := range errs {
+		t.Run(tt.name, func(t *testing.T) {
+			toks, msgs := lexString(t, tt.src)
+			if len(msgs) == 0 {
+				t.Fatalf("診断がない（%v）", kindsOf(toks))
+			}
+			if toks[0].Kind != token.Illegal {
+				t.Errorf("kind = %v, want Illegal", toks[0].Kind)
+			}
+			if !strings.Contains(msgs[0], tt.message) {
+				t.Errorf("message = %q, want contains %q", msgs[0], tt.message)
+			}
+		})
+	}
+}
+
 func TestParseDuration(t *testing.T) {
 	tests := []struct {
 		in   string
