@@ -47,8 +47,6 @@ namespace hozo.decisions {
 
     /**
      * （68 が置き換えた。言語ごとの出力の担い手は、hozoc 本体ではなく基底のトランスパイラ。最初の言語が Go で、TS が段階 5 であることは変わらない）
-     *
-     * 持ち主: 68
      */
     @adr.superseded(Decision000.D68)
     D6;
@@ -215,16 +213,12 @@ namespace hozo.decisions {
 
     /**
      * （72 と 73 が置き換えた。「宣言一つにつき型一つ、束ねるのは構造体、未設定は `*runtime.MissingError`、`context` を取らない」という、本体に組み込んでいた Go の出力の形）
-     *
-     * 持ち主: 72、73
      */
     @adr.superseded(Decision000.D72, Decision000.D73)
     D27;
 
     /**
      * （77 と 78 が置き換えた。「出力の対象はトランスパイラが `emit` の応答の `select` で返す。包む関数を生成するのは `wraps` で引き受けたデコレータの適用だけ」）。マニフェストの `decorate` / `entry` / `stop` を持たないことは変わらない
-     *
-     * 持ち主: 77、78
      */
     @adr.superseded(Decision000.D77, Decision000.D78)
     D28;
@@ -263,8 +257,6 @@ namespace hozo.decisions {
 
     /**
      * （79 が置き換えた。「別の名前空間への呼び出しの `bind` の位置は `Deps` の実装者が埋める」）
-     *
-     * 持ち主: 79
      */
     @adr.superseded(Decision000.D79)
     D33;
@@ -375,8 +367,6 @@ namespace hozo.decisions {
 
     /**
      * （73 が置き換えた。「状態はパッケージの変数 `States` に置く」。状態の単位が問い合わせと命令を持つことは、73 に残る）
-     *
-     * 持ち主: 73
      */
     @adr.superseded(Decision000.D73)
     D47;
@@ -519,8 +509,6 @@ namespace hozo.decisions {
 
     /**
      * （69 が置き換えた。組み込みの Go の出力を基底のプラグインに置き換えるまでの、移行の間の扱い。置き換えたので、なくなった）
-     *
-     * 持ち主: 69
      */
     @adr.superseded(Decision000.D69)
     D65;
@@ -623,8 +611,6 @@ namespace hozo.decisions {
 
     /**
      * （84〜86 が置き換えた。「Go の基底は、デコレータについて何も生成しない（包む関数も、それを受け取る口も）。配線の op に `catches` を持つデコレータが付いていれば warning」）。デコレータの意味を、それを読むトランスパイラが形にすることは変わらない
-     *
-     * 持ち主: 84、85、86
      */
     @adr.superseded(Decision000.D84, Decision000.D85, Decision000.D86)
     D78;
