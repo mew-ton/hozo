@@ -801,5 +801,24 @@ namespace hozo.decisions {
      */
     @adr.accepted
     D792;
+
+    /**
+     * request body に上限を持つ。上限を超えた要求は、本文を読まずに 413 で断り、op は呼ばない。本文は、ほかの読めない要求と同じ
+     * `http.BadRequest` で、message は `body: too large`、violations は空。上限の値は、サーバーを出すトランスパイラが決める。
+     * `go-http` は、単位のオプション `maxBodyBytes`（正の整数。既定は 1048576）で持ち、`NewHandler` が、`mux` を
+     * `http.MaxBytesHandler(mux, <値>)` で包んで返す。request body を読む経路がなくても、いつも包む。
+     *
+     * @adr.context 生成したハンドラは、request body を、上限なしで、すべてメモリに読んでいた（#164 の 1）。人が NewHandler を
+     * http.MaxBytesHandler で包むことはできたが、超えた要求は 400 body: invalid JSON になっていた。
+     * 利用者は、三つの案（A: この決定の上限とオプション。B: 上限は人に任せ、413 だけ直す。C: 今のまま）から A を選んだ。
+     * 413 の本文の形と、いつも包むことは、聞かずに決めた。
+     * @adr.consequence 生成したコードを、そのまま外に出しても、大きな request body でメモリを使い切らない。1 MiB を超える本文を
+     * 受ける経路は、オプションで上限を上げる。
+     * @adr.alternative 上限は人に任せ（NewHandler を包む）、超えたときの応答だけを 413 に直す
+     * @adr.alternative 上限を超えた要求に、新しい例外（http.PayloadTooLarge など）を足す: 語彙の宣言が増え、クライアントの読み方が分かれる
+     * @adr.said A
+     */
+    @adr.proposed
+    D793;
   }
 }

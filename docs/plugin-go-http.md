@@ -39,8 +39,9 @@ interprets = [
 | キー | 型 | 既定 | 意味 |
 |---|---|---|---|
 | `validate` | 真偽値 | `false` | `true` なら、入力を読んだ後、op を呼ぶ前に、入力の制約（`@valid.*`）を確かめる（「制約の検査」） |
+| `maxBodyBytes` | 正の整数 | `1048576`（1 MiB） | request body の上限（バイト）。超えた要求は 413（`docs/plugin-http.md`「op を呼ぶ前の失敗」）。`NewHandler` が、そのまま `http.MaxBytesHandler` に渡す（「出力」） |
 
-知らないキーと、型の違う値は GOHTTP-9。
+知らないキーと、型の違う値（`maxBodyBytes` では、正の整数でない値も）は GOHTTP-9。
 
 ## 対象
 
@@ -87,11 +88,12 @@ func NewHandler(ops Ops) http.Handler {
 		httpWriteResult(w, out)
 	})
 	…
-	return mux
+	return http.MaxBytesHandler(mux, 1048576)
 }
 ```
 
 - `NewHandler` が受け取るのは、基底の入口の `Ops`（`New` の戻り値を、そのまま渡す）。経路の op だけのインターフェースは作らない。
+- `NewHandler` は、`mux` を `http.MaxBytesHandler(mux, <maxBodyBytes>)` で包んで返す。数は、オプションの値を 10 進で書く。request body を読む経路がなくても、いつも包む（上限は、サーバーの決まりで、経路の形によらない）。
 - コメントの二行目は、`validate = true` のときだけ。経路の一覧は、`<メソッド> <パス>` を、いちばん長いものに合わせて空白で埋め、二つの空白の後に op の FQN。
 - 経路ごとに、`// <op の FQN>` のコメントと、`mux.HandleFunc("<メソッド> <パス>", …)`。メソッドは `@http.get` なら `GET`、`@http.post` なら `POST`。経路の間は一行空ける。`/` で終わるパス（`/` そのものを含む）は、`http.ServeMux` のパターンではその下のすべてのパスに合ってしまうので、パターンの末尾に `{$}` を足して、そのパスだけに合わせる（`"GET /{$}"`。コメントの経路の一覧には、仕様のパスのまま書く）。
 - op には `r.Context()` を渡す（op のメソッドは、どれも `ctx` を取り、`error` を返す。`docs/plugin-go.md`「op の形」）。
@@ -100,7 +102,7 @@ func NewHandler(ops Ops) http.Handler {
 ハンドラの中は、この順。1、2、3、5 の行は、入力の model の宣言と、フィールドの型と、戻り値の型によらず、同じ形。4 は、二つの形を持つが、振る舞いは同じ。
 
 1. **入力を置く**: `var in <Model>`。どのフィールドも零値で始まる。基底は、初めの値を入れる関数を出さない（`docs/plugin-go.md`「model」）。引数のない op は、入力を持たず、1〜3 を出さない。
-2. **入力を読む**: `req := httpRequest{r: r}` の後、フィールドの順に、フィールドごとに一行（「入力の読み方」）。その後に `if !req.ok(w) { return }`: 読めなかった最初の理由で 400 を返して終わる。
+2. **入力を読む**: `req := httpRequest{r: r}` の後、フィールドの順に、フィールドごとに一行（「入力の読み方」）。その後に `if !req.ok(w) { return }`: 読めなかった最初の理由で 400（request body が上限を超えたときは 413）を返して終わる。
 3. **制約の検査**（`validate = true` のとき、入力を持つすべての経路に）: `if !httpValidate(w, in, <場所の一覧>) { return }`。場所の一覧は、入力の model のすべてのフィールドについて、フィールドの順に `httpPlace{"<フィールド名>", "<場所>"}`。入力が `Validate` を持つかどうかは、補助が実行時に見る（「制約の検査」）。
 4. **op を呼ぶ**: 戻り値があれば `out, err := ops.<Op>(r.Context(), in)`、なければ `if err := ops.<Op>(r.Context(), in); err != nil { … }`（引数のない op は、`in` を渡さない）。失敗は `httpWriteError(w, err)`。**行の形が二つあるのは、呼ぶ相手の、基底のメソッドの形（引数と戻り値を持つか。`plugin/golang` の `Signature`）を写しているからで、行の形は、振る舞いを運ばない**: どちらの形も、op を呼び、失敗なら `httpWriteError` に渡すだけ。何を返すかは、5 の補助が決める。
 5. **成功を返す**: `httpWriteResult(w, out)`。戻り値のない op は `httpWriteResult(w, nil)`。ステータスも、本文も、ここには書かない: 何を返すかは、補助が、実行時に、渡された値で決める（`docs/plugin-http.md`「通信の形」の「成功の応答」）。
@@ -136,7 +138,7 @@ func NewHandler(ops Ops) http.Handler {
 - **本文の項目**（`req.body`）: 本文は JSON のオブジェクトで、初めて呼ばれたときに一度だけ読む。キーの値を、`encoding/json` で読む先に読む。キーがなければ、項目がない（上）。キーがあれば、値が `null` でも、あるものと読む。本文が JSON のオブジェクトとして読めない（空の本文、配列、本文の全体が `null` のときを含む）、キーの値の型が合わないときは、文言 `body: invalid JSON`。
 - **本文の全体**（`req.bodyObj`）: 本文を、`encoding/json` で、読む先の model に読む。読めなければ `body: invalid JSON`。知らないキーは無視し、ないキーのフィールドは零値のままにする（`encoding/json` の既定）。
 - **ヘッダとクエリの全体**（`req.headerObj`、`req.queryObj`）: 読む先の model（Go の構造体）のフィールドごとに、その `json` タグの名前（仕様のフィールドの名前。基底が付ける）の項目を、項目の形と同じに読む。その項目には、`httpRequired` も `httpDefault` も渡らないので、なければ、零値のまま（付けていれば HTTP-11: `docs/plugin-http.md`「対象」）。
-- 本文の大きさは制限しない。
+- **request body の上限**: 本文は、`NewHandler` が包んだ `http.MaxBytesHandler` を通して読む。読む途中で上限を超えたら（`*http.MaxBytesError`）、読めない要求で、文言 `body: too large`、ステータス 413（ほかの読めない要求は 400）。`req.body` と `req.bodyObj` は、本文を、同じ補助 `read` で読む。
 - 場所（`httpPlace` の二つ目と、違反の `path` の先頭）は、項目の形が `header.<名前>`、`query.<名前>`、`body.<名前>`、全体の形が `header`、`query`、`body`。
 
 ### 補助
@@ -148,7 +150,7 @@ func NewHandler(ops Ops) http.Handler {
 | `httpErrorBody`、`httpBadRequest`、`httpViolation` | 失敗の応答の本文の形（`docs/plugin-http.md`「通信の形」） |
 | `httpPlace` | 入力の model のフィールドと、通信の上の場所の組 |
 | `httpOption`、`httpRequired`、`httpDefault(v any) httpOption` | 項目がないときの扱い（`httpOption`）と、それを作る二つ: `@http.required` の `httpRequired` と、`@http.default(v)` の `httpDefault(v)`。`missing` を出すときに、三つとも出す |
-| `httpRequest` | 要求一つを、入力のフィールドに読む。読めなかった最初の理由を持ち、その後は何も読まない。メソッドは、使うものだけを、`header`、`query`、`body`、`headerObj`、`queryObj`、`bodyObj`、`missing`（項目がないときの扱い。ヘッダ、クエリ、本文の項目の、どの読み方も使う）、`text`（ヘッダとクエリの値を読む共通の中身）、`ok` の順。項目の形のメソッドは `header(name string, dst any, opts ...httpOption)`（`query`、`body` も同じ引数）で、`opts` を見るのは `missing` だけ |
+| `httpRequest` | 要求一つを、入力のフィールドに読む。読めなかった最初の理由を持ち、その後は何も読まない。フィールド `status` は、読めなかったときのステータス（0 なら 400）で、`read` だけが 413 を入れる。メソッドは、使うものだけを、`header`、`query`、`body`、`headerObj`、`queryObj`、`bodyObj`、`read`（本文の全体を読む。`body` か `bodyObj` を出すとき）、`missing`（項目がないときの扱い。ヘッダ、クエリ、本文の項目の、どの読み方も使う）、`text`（ヘッダとクエリの値を読む共通の中身）、`ok` の順。項目の形のメソッドは `header(name string, dst any, opts ...httpOption)`（`query`、`body` も同じ引数）で、`opts` を見るのは `missing` だけ |
 | `httpValidate(w http.ResponseWriter, in any, places ...httpPlace) bool` | 入力の制約を確かめる。`in` が `Validate() error` を持つかどうかを、実行時に見る（持たなければ、何もせず `true`）。違反があれば 400 を返して `false`。`validate = true` のときだけ出す |
 | `httpWriteJSON(w http.ResponseWriter, status int, v any)` | 値を JSON にして返す |
 | `httpArm`、`httpUnions`、`httpConst`、`httpConsts`、`httpUnmarshal(data []byte, dst any) error`、`httpMarshal(v any) ([]byte, error)` と、その中身（`httpDecode`、`httpEncode`、`httpHasUnion`、`httpSame`、`httpEmpty`） | union と、リテラルの型のフィールドを、通信の形（`docs/plugin-http.md`「通信の形」の表の、リテラルの型の行と、「union」）で読み書きする。経路の op の、本文、結果、例外の引数の型の中に、union か、リテラルの型のフィールドを持つ model が、一つでもあるときだけ出す（下の「union の読み書き」） |
@@ -194,7 +196,7 @@ func httpWriteError(w http.ResponseWriter, err error) {
   - 読み書きは、実行時に、値の Go の型を辿って決める（`reflect`）: union を中に持たない型は、`encoding/json` に、そのまま渡す。union のインターフェースは、アームの値を書き（包む型は、その `Value`。リテラルの型のアームは、表の `value`）、読むときは、JSON がオブジェクトでなければ、`value` が同じ値（`httpSame`）の、リテラルの型のアーム、オブジェクトなら、印の値か、決め手のキーで、アームを決める。構造体は、フィールドの順に、`json` タグのとおりに（`omitempty` を含む）書き、配列、ポインタ、マップは、要素を同じに辿る。`httpConsts` に載っている構造体は、書くとき、リテラルの型のフィールドのキーと値を、仕様のフィールドの順の位置（`at`）に足し、読むとき、そのキーがないか、値が違えば、誤りを返す（要求の本文なら、400 `body: invalid JSON`）。`httpSame` は、二つの JSON を、値として比べる（数は、数として）。
 - 補助に、受け付けない型の値が渡ることは、HTTP-4、HTTP-5、HTTP-16（`docs/plugin-http.md`「診断」）が先に断るので、ない（そのときの振る舞いは、決めない）。読む先を型引数にしないのは、省略可能な読む先（`**T`）と、そうでない読む先（`*T`）を、一つの関数で、型を書かずに受け取れないため（Go は、その二つの和の制約から T を推論できない）。
 
-この節の細部は、決定 D604、D784 が決めた。
+この節の細部は、決定 D604、D784、D793 が決めた。
 
 ## 制約の検査
 

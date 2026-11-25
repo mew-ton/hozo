@@ -24,7 +24,7 @@ func NewHandler(ops Ops) http.Handler {
 		httpWriteResult(w, out)
 	})
 
-	return mux
+	return http.MaxBytesHandler(mux, 1048576)
 }
 
 // httpErrorBody は失敗の応答の本文。

@@ -58,7 +58,7 @@ namespaces = ["http"]
 
 **この節は規範。** `@http.get` / `@http.post` の付いた op を HTTP で呼ぶとき、要求と応答は次の形をしていなければならない。サーバーを出すトランスパイラ（`go-http`: `docs/plugin-go-http.md`）も、クライアントを出すトランスパイラも、これに合わせる。その言語のコードの都合では、変えない。
 
-この節の細部は、決定 D674、D782、D783 が決めた。
+この節の細部は、決定 D674、D782、D783、D793 が決めた。
 
 ### 要求
 
@@ -152,7 +152,7 @@ namespaces = ["http"]
 | 場合 | ステータス | 本文 |
 |---|---|---|
 | op が、`@http.status(n)` を持つ例外を投げた | n | `{"error":"<FQN>"}`。引数を持つ例外なら `value` を足す |
-| op を呼ぶ前の失敗（下） | 400 | `{"error":"http.BadRequest","value":{"message":…,"violations":[…]}}` |
+| op を呼ぶ前の失敗（下） | 400（request body が上限を超えたときだけ 413） | `{"error":"http.BadRequest","value":{"message":…,"violations":[…]}}` |
 | それ以外（`@http.status` を持たない例外、保存先のエラー、中断を含むほかのエラー） | 500 | `{"error":"internal"}`（中身を出さない。`internal` は例外の FQN ではない） |
 
 - 例外の FQN は、その例外を宣言した名前空間の名前を含む（`type.Unauthorized`）。例外を別の名前空間に移すと、通信の上の名前が変わる。
@@ -165,9 +165,11 @@ op を呼ぶ前の失敗は、`http` の語彙の例外 `http.BadRequest`（`doc
 | 場合 | `message` | `violations` |
 |---|---|---|
 | 要求を入力に読めない（本文が JSON として読めない・型が違う、クエリが読めない、`@http.required` の付いた項目がない） | `<場所>: <理由>` の決まった文言: `body: invalid JSON`、`query <名前>: invalid int`（`float`、`boolean`）、`<場所> <名前>: missing`（場所は `header`、`query`、`body`） | `[]` |
+| request body が、サーバーの上限より大きい（ステータスは 413） | `body: too large` | `[]` |
 | 読んだ入力が制約に合わない（サーバーが、入力の制約を確かめる設定のときだけ。`go-http` では `validate = true`: `docs/plugin-go-http.md`「制約の検査」） | `invalid input` | 違反の一覧。確かめた順 |
 
 - 違反の `path` は、**通信の上の場所**と、その中のパス（`body.email`、`body.lines[1].quantity`、`query.page`）。通信の上の場所は、項目の形が `header.<名前>`、`query.<名前>`、`body.<名前>`、全体の形が `header`、`query`、`body`。入力の model のフィールド名（通信に現れない名前）は出さない。`constraint` は、`valid` の語彙のデコレータの名前（`min`、`length`、…）。
+- **request body の大きさには、上限がある。** 値は、サーバーを出すトランスパイラが決める（`go-http` は、オプション `maxBodyBytes`: `docs/plugin-go-http.md`「オプション」）。上限を超えた要求は、本文を読まずに 413 で断り、op は呼ばない。ステータスのほかは、ほかの読めない要求と同じ形（`http.BadRequest`）で、新しい例外は足さない。
 - 読めない要求が先で、次に制約の検査、その後に op。認証を op の中で確かめる仕様では、トークンのない要求でも、本文が制約に合わなければ 400 が先になる。
 
 ## 補う値と制約

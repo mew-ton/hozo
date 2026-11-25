@@ -529,6 +529,32 @@ func TestValidationPrecedesOp(t *testing.T) {
 	}
 }
 
+// TestBodyTooLarge は、request body が上限（オプション maxBodyBytes の既定、1 MiB）を超えた要求を、op を呼ばずに 413 で断り、
+// 本文が http.BadRequest の "body: too large" であること（go-http）。上限ちょうどの本文は、読む（JSON として読めないので 400）。
+func TestBodyTooLarge(t *testing.T) {
+	t.Parallel()
+	spy := &spyOps{}
+	handler := server.NewHandler(spy)
+	post := func(size int) *httptest.ResponseRecorder {
+		rec := httptest.NewRecorder()
+		handler.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/orders", strings.NewReader(strings.Repeat(" ", size))))
+		return rec
+	}
+	rec := post(1<<20 + 1)
+	if rec.Code != http.StatusRequestEntityTooLarge {
+		t.Fatalf("上限を超えた本文: %d（期待は 413）", rec.Code)
+	}
+	if want := `{"error":"http.BadRequest","value":{"message":"body: too large","violations":[]}}`; strings.TrimSpace(rec.Body.String()) != want {
+		t.Errorf("上限を超えた本文の応答 = %s, want %s", rec.Body.String(), want)
+	}
+	if rec := post(1 << 20); rec.Code != http.StatusBadRequest || !strings.Contains(rec.Body.String(), "body: invalid JSON") {
+		t.Errorf("上限ちょうどの本文: %d %s（期待は 400 body: invalid JSON）", rec.Code, rec.Body.String())
+	}
+	if spy.placeOrders != 0 {
+		t.Fatalf("op が呼ばれた: placeOrder %d 回", spy.placeOrders)
+	}
+}
+
 // seenInputs は、渡された入力を覚えるだけの server.Ops。書いていない op は、埋め込んだ nil のインターフェースのまま。
 type seenInputs struct {
 	server.Ops

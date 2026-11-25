@@ -131,7 +131,7 @@ func (f *file) handler(routes []route) string {
 		fmt.Fprintf(&b, "\n// %s\n%s.HandleFunc(%s, func(%s %s.ResponseWriter, %s *%s.Request) {\n%s})\n",
 			r.op.Name, l.mux, strconv.Quote(pattern(r)), l.w, f.http(), l.r, f.http(), f.route(r, &l))
 	}
-	fmt.Fprintf(&b, "\nreturn %s\n}\n\n", l.mux)
+	fmt.Fprintf(&b, "\nreturn %s.MaxBytesHandler(%s, %d)\n}\n\n", f.http(), l.mux, f.g.opts.maxBodyBytes())
 	return b.String()
 }
 
@@ -263,6 +263,7 @@ func (f *file) helpers(routes []route) string {
 	add(headerObj, helperHeaderObj)
 	add(queryObj, helperQueryObj)
 	add(bodyObj, helperBodyObj)
+	add(body || bodyObj, helperRead)
 	add(missing, helperMissing)
 	add(text, helperText)
 	add(input, helperOK)

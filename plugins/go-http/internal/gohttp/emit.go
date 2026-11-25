@@ -47,6 +47,19 @@ const (
 type options struct {
 	// Validate が true なら、入力を読んだ後、op を呼ぶ前に、入力の制約（@valid.*）を確かめる。
 	Validate bool `json:"validate"`
+	// MaxBodyBytes は request body の上限（バイト）。nil なら既定（defaultMaxBodyBytes）。
+	MaxBodyBytes *int64 `json:"maxBodyBytes"`
+}
+
+// defaultMaxBodyBytes は、オプション maxBodyBytes の既定（1 MiB）。
+const defaultMaxBodyBytes = 1 << 20
+
+// maxBodyBytes は、NewHandler が http.MaxBytesHandler に渡す、request body の上限。
+func (o options) maxBodyBytes() int64 {
+	if o.MaxBodyBytes == nil {
+		return defaultMaxBodyBytes
+	}
+	return *o.MaxBodyBytes
 }
 
 // Output は、一つの出力 (U, N) についての応答の中身。Errors が一つでもあれば、Files も Warnings も空。
@@ -73,16 +86,7 @@ func Emit(req *plugin.EmitRequest) (*Output, error) {
 	g.prepare()
 
 	// GOHTTP-9
-	unknown, err := plugin.Options(req, &g.opts)
-	if err != nil {
-		// オプションは validate だけなので、型の違う値は、その値
-		g.opts = options{}
-		value, _ := json.Marshal(view.Config.Options[TranspilerName]["validate"])
-		g.errorf(codeHTTPOption, "", "%d 番目の [[emit]] の [emit.options.%s] の validate の値 %s が、真偽値でない", view.Config.Index, TranspilerName, value)
-	}
-	for _, key := range unknown {
-		g.errorf(codeHTTPOption, "", "%d 番目の [[emit]] の [emit.options.%s] に、知らないキー %s がある（あるのは validate）", view.Config.Index, TranspilerName, key)
-	}
+	g.opts = g.options(req)
 
 	// 置き場。基底のオプション module がなければ、基底が GO-8 を返すので、ここでは何も返さない（診断は、そのときも返す）
 	layout, err := golang.LayoutOf(view)
@@ -356,4 +360,41 @@ func (g *generator) checkName() {
 func isArray(t ir.Type) bool {
 	_, ok := t.(ir.ArrayType)
 	return ok
+}
+
+// options は [emit.options.go-http]（docs/plugin-go-http.md「オプション」）を読む。GOHTTP-9 を集める: 知らないキーと、型の違う値
+// （maxBodyBytes では、正の整数でない値も）。型の違うキーは、ないものとして（既定で）読む。
+func (g *generator) options(req *plugin.EmitRequest) options {
+	var opts options
+	keys, _ := plugin.Options(req, &struct{}{}) // どのキーも知らないキーとして、辞書順に返る
+	table := g.view.Config.Options[TranspilerName]
+	at := func(key, want string) {
+		value, _ := json.Marshal(table[key])
+		g.errorf(codeHTTPOption, "", "%d 番目の [[emit]] の [emit.options.%s] の %s の値 %s が、%sでない", g.view.Config.Index, TranspilerName, key, value, want)
+	}
+	// 型の違う値が先、知らないキーが後（どちらも、キーの辞書順）
+	var unknown []string
+	for _, key := range keys {
+		data, _ := json.Marshal(table[key])
+		switch key {
+		case "validate":
+			if err := json.Unmarshal(data, &opts.Validate); err != nil {
+				opts.Validate = false
+				at(key, "真偽値")
+			}
+		case "maxBodyBytes":
+			var n int64
+			if err := json.Unmarshal(data, &n); err != nil || n <= 0 {
+				at(key, "正の整数")
+				continue
+			}
+			opts.MaxBodyBytes = &n
+		default:
+			unknown = append(unknown, key)
+		}
+	}
+	for _, key := range unknown {
+		g.errorf(codeHTTPOption, "", "%d 番目の [[emit]] の [emit.options.%s] に、知らないキー %s がある（あるのは validate と maxBodyBytes）", g.view.Config.Index, TranspilerName, key)
+	}
+	return opts
 }

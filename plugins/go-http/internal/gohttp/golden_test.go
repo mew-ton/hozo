@@ -167,12 +167,12 @@ func TestHelpers(t *testing.T) {
 	for p, want := range map[string][]string{
 		// validate = false: 制約の検査の補助（httpPlace、httpValidate）はない。六つのデコレータを、すべて使う
 		"gen/api/http.go": {"httpErrorBody", "httpBadRequest", "httpViolation", "httpOption", "httpRequired", "httpDefault", "httpRequest",
-			".header", ".query", ".body", ".headerObj", ".queryObj", ".bodyObj", ".missing", ".text", ".ok",
+			".header", ".query", ".body", ".headerObj", ".queryObj", ".bodyObj", ".read", ".missing", ".text", ".ok",
 			"httpWriteJSON", "httpWriteResult", "httpWriteError", "httpThrown"},
 		// validate = true。@http.headerObj を使わない。@http.status を持つ例外がないので、httpThrown はない。
 		// 全体の形（@http.queryObj）は、項目の形のメソッド（query）で、項目を一つずつ読む
 		"gen/strict/http.go": {"httpErrorBody", "httpBadRequest", "httpViolation", "httpPlace", "httpOption", "httpRequired", "httpDefault", "httpRequest",
-			".header", ".query", ".body", ".queryObj", ".bodyObj", ".missing", ".text", ".ok",
+			".header", ".query", ".body", ".queryObj", ".bodyObj", ".read", ".missing", ".text", ".ok",
 			"httpValidate", "httpWriteJSON", "httpWriteResult", "httpWriteError"},
 		// 入力がなく、@http.status を持つ例外もない: 失敗の本文と、応答を書く補助だけ（validate = true でも、確かめる入力がない）
 		"gen/bare/http.go": {"httpErrorBody", "httpWriteJSON", "httpWriteResult", "httpWriteError"},
@@ -222,9 +222,9 @@ func TestHelpers(t *testing.T) {
 	}
 	for keep, want := range map[string][]string{
 		"api.viaIn": {"httpErrorBody", "httpBadRequest", "httpViolation", "httpPlace", "httpOption", "httpRequired", "httpDefault", "httpRequest",
-			".body", ".missing", ".ok", "httpValidate", "httpWriteJSON", "httpWriteResult", "httpWriteError", "httpThrown"},
+			".body", ".read", ".missing", ".ok", "httpValidate", "httpWriteJSON", "httpWriteResult", "httpWriteError", "httpThrown"},
 		"api.viaReflect": {"httpErrorBody", "httpBadRequest", "httpViolation", "httpPlace", "httpRequest",
-			".bodyObj", ".ok", "httpValidate", "httpWriteJSON", "httpWriteResult", "httpWriteError"},
+			".bodyObj", ".read", ".ok", "httpValidate", "httpWriteJSON", "httpWriteResult", "httpWriteError"},
 		"api.viaOps": {"httpErrorBody", "httpBadRequest", "httpViolation", "httpPlace", "httpOption", "httpRequired", "httpDefault", "httpRequest",
 			".header", ".headerObj", ".missing", ".text", ".ok", "httpValidate", "httpWriteJSON", "httpWriteResult", "httpWriteError"},
 	} {

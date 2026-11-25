@@ -1,3 +1,4 @@
+GOHTTP-9		1 番目の [[emit]] の [emit.options.go-http] の maxBodyBytes の値 0 が、正の整数でない
 GOHTTP-9		1 番目の [[emit]] の [emit.options.go-http] の validate の値 "yes" が、真偽値でない
-GOHTTP-9		1 番目の [[emit]] の [emit.options.go-http] に、知らないキー strict がある（あるのは validate）
-GOHTTP-9		1 番目の [[emit]] の [emit.options.go-http] に、知らないキー timeout がある（あるのは validate）
+GOHTTP-9		1 番目の [[emit]] の [emit.options.go-http] に、知らないキー strict がある（あるのは validate と maxBodyBytes）
+GOHTTP-9		1 番目の [[emit]] の [emit.options.go-http] に、知らないキー timeout がある（あるのは validate と maxBodyBytes）
