@@ -17,6 +17,11 @@ type Requirements interface {
 	// 持ち主: docs/plugin-go-http.md「入力の読み方」、docs/plugin-http.md「要求」
 	// 指している設計: hozo.gohttp.BodyItem
 	NullIsAbsent(t *testing.T)
+	// FiniteFloat は、要求 hozo.gohttp.Requirement.FiniteFloat: ヘッダとクエリの項目の float の値は、有限の値だけを読む: NaN と無限大（Inf、-Infinity など）は、読めない値で、op を呼ばずに
+	// 400 と "<場所> <名前>: invalid float" で断る。
+	// 持ち主: docs/plugin-go-http.md「入力の読み方」、docs/plugin-http.md「要求」
+	// 指している設計: hozo.gohttp.TextItem
+	FiniteFloat(t *testing.T)
 }
 
 // RunRequirements は、要求ごとに、入れ物を一つ走らせる。テストの名前は、要求の名前（<分類の FQN>.<ケース>）。
@@ -26,5 +31,8 @@ func RunRequirements(t *testing.T, c Requirements) {
 	})
 	t.Run("hozo.gohttp.Requirement.NullIsAbsent", func(t *testing.T) {
 		c.NullIsAbsent(t)
+	})
+	t.Run("hozo.gohttp.Requirement.FiniteFloat", func(t *testing.T) {
+		c.FiniteFloat(t)
 	})
 }

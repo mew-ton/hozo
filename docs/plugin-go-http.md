@@ -133,7 +133,7 @@ func NewHandler(ops Ops) http.Handler {
 
 読み方は、補助 `httpRequest` が、実行時に、読む先の Go の型を見て決める（`reflect`）:
 
-- **ヘッダとクエリの項目**（文字列一つを読む）: 読む先がポインタ（省略可能）なら、値を置く先を作ってから読む。文字列はそのまま、整数は `strconv.ParseInt(v, 10, 64)`、小数は `strconv.ParseFloat(v, 64)`、真偽値は `strconv.ParseBool(v)`。読めなければ、文言 `<場所> <名前>: invalid <int / float / boolean>`（`query page: invalid int`）。クエリの同じ名前が二度あれば、最初の値。ヘッダの値は、そのまま読む（`Bearer ` などの前置きを外さない）。空の文字列のヘッダは、ないものと読む。
+- **ヘッダとクエリの項目**（文字列一つを読む）: 読む先がポインタ（省略可能）なら、値を置く先を作ってから読む。文字列はそのまま、整数は `strconv.ParseInt(v, 10, 64)`、小数は `strconv.ParseFloat(v, 64)` で、有限の値だけ（`NaN`、`Inf`、`-Infinity` など、`ParseFloat` が読む、有限でない値は、読めない値。`docs/plugin-http.md`「要求」）、真偽値は `strconv.ParseBool(v)`。読めなければ、文言 `<場所> <名前>: invalid <int / float / boolean>`（`query page: invalid int`）。クエリの同じ名前が二度あれば、最初の値。ヘッダの値は、そのまま読む（`Bearer ` などの前置きを外さない）。空の文字列のヘッダは、ないものと読む。
 - **項目がないとき**（ヘッダ、クエリ、本文の項目のどれも同じ）: 行に `httpRequired` があれば、読めない要求で、文言 `<場所> <名前>: missing`（`header Authorization: missing`、`body lines: missing`）。`httpDefault(v)` があれば、読む先を v にする（`reflect` で、読む先の型に変える）。どちらもなければ、読む先に何も書かない（1 で置いた零値のまま）。読む先の型は、見ない。
 - **本文の項目**（`req.body`）: 本文は JSON のオブジェクトで、初めて呼ばれたときに一度だけ読む。キーの値を、`encoding/json` で読む先に読む。キーがないか、値が `null` なら、項目がない（上。`docs/plugin-http.md`「要求」）。本文が JSON のオブジェクトとして読めない（空の本文、配列、本文の全体が `null` のときを含む）、キーの値の型が合わないときは、文言 `body: invalid JSON`。
 - **本文の全体**（`req.bodyObj`）: 本文を、`encoding/json` で、読む先の model に読む。読めなければ `body: invalid JSON`。知らないキーは無視し、ないキーのフィールドは零値のままにする（`encoding/json` の既定）。
@@ -439,6 +439,7 @@ go-http の出力の振る舞いのうち、テストで確かめ続けるもの
 | 要求（`hozo.gohttp.Requirement` のケース） | 振る舞いの持ち主 | 満たすテスト |
 |---|---|---|
 | `BodyLimit` | 「オプション」の `maxBodyBytes` と、「入力の読み方」の request body の上限: 上限を超えた要求は、op を呼ばずに 413 と `body: too large`。上限ちょうどは、読む。オプションがなければ 1 MiB | 入力 `limits` の `TestBodyLimit` |
+| `FiniteFloat` | 「入力の読み方」のヘッダとクエリの項目: `float` の値の `NaN` と無限大は、読めない値で、op を呼ばずに 400 と `<場所> <名前>: invalid float` | 入力 `routes` の `TestFiniteFloat` |
 | `NullIsAbsent` | 「入力の読み方」の本文の項目: 値が `null` のキーは、キーがないのと同じ（`@http.required` は 400 の `missing`、`@http.default(v)` は v、どちらもなければ零値） | 入力 `routes` の `TestNullIsAbsent` |
 
 - **満たす所**: `plugins/go-http/internal/gohttp/requirements_test.go` の `TestRequirements` が、`gohttptest.RunRequirements` に、要求ごとのメソッドを持つ値を渡す。メソッドは、上の表の入力の出力を、一時のモジュールに置き（`TestBehavior` と同じ組み立て）、その入力の `behavior_test.go` の、表のテストだけを走らせる。

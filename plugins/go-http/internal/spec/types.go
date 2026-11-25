@@ -19,3 +19,11 @@ type BodyItem struct {
 	// デコレータ http.default が付いている
 	HasDefault bool `json:"hasDefault"`
 }
+
+// TextItem は経路の入力の、ヘッダかクエリの項目一つ（http.header か http.query の付いたフィールド）。値は、文字列一つを、フィールドの型で読む
+type TextItem struct {
+	// 項目の名前（ヘッダの名前か、クエリの名前）
+	Name string `json:"name"`
+	// 通信の上の文字列
+	Text string `json:"text"`
+}

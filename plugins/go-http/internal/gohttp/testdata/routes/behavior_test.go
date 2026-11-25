@@ -24,6 +24,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"reflect"
 	"strings"
 	"testing"
@@ -382,6 +383,31 @@ func TestQuery(t *testing.T) {
 	// 空の配列（nil でない）も、[]
 	leaves.items = []pkgtype.Item{}
 	expectJSON(t, call(t, h, "GET", "/items?q=x&min=1", ""), 200, `[]`)
+}
+
+// TestFiniteFloat は、要求 hozo.gohttp.Requirement.FiniteFloat（plugins/go-http/go-http.hozo）: クエリの float の値は、有限の値だけを
+// 読む。strconv.ParseFloat が読む NaN と無限大は、読めない値で、op を呼ばずに 400 の "query <名前>: invalid float"。核の型、省略可能、
+// scalar の、どれも。有限の値は、指数の形でも、読む。
+func TestFiniteFloat(t *testing.T) {
+	leaves, h := newAPI()
+	for _, name := range []string{"min", "max", "scale"} {
+		for _, text := range []string{"NaN", "nan", "Inf", "+Inf", "-Inf", "inf", "Infinity", "-infinity"} {
+			target := "/items?q=x&min=1&" + name + "=" + url.QueryEscape(text)
+			if name == "min" {
+				target = "/items?q=x&min=" + url.QueryEscape(text)
+			}
+			want := `{"error":"http.BadRequest","value":{"message":"query ` + name + `: invalid float","violations":[]}}`
+			expectJSON(t, call(t, h, "GET", target, ""), 400, want)
+		}
+	}
+	if len(leaves.calls) != 0 {
+		t.Fatalf("op が呼ばれた: %v", leaves.calls)
+	}
+	// 有限の値は、読む（大きな指数も、有限なら）
+	expectJSON(t, call(t, h, "GET", "/items?q=x&min=-1.5e308&max=1e308", ""), 200, `[]`)
+	if leaves.search.Min != -1.5e308 || leaves.search.Max == nil || *leaves.search.Max != 1e308 {
+		t.Errorf("入力 = %+v, want min は -1.5e308、max は 1e308", leaves.search)
+	}
 }
 
 // 全体の形: ヘッダ、クエリ、本文を、一つずつの model で受け取る。

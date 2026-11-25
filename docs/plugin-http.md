@@ -65,8 +65,8 @@ namespaces = ["http"]
 | 部分 | 形 |
 |---|---|
 | メソッドとパス | `@http.get(path)` は `GET <path>`、`@http.post(path)` は `POST <path>` |
-| `@http.header` のフィールド | ヘッダ `<名前>`。値は、フィールドの値の文字列そのまま。値がない（省略可能で、ない）なら、ヘッダを送らない。空の文字列のヘッダは、ないものとして読まれる |
-| `@http.query` のフィールド | クエリの `<名前>=<値>`。`string` はそのまま（URL のエンコードだけ）、`int` は 10 進、`float` は 10 進の小数か指数、`boolean` は `true` / `false`。値がないなら、送らない |
+| `@http.header` のフィールド | ヘッダ `<名前>`。値は、フィールドの値の文字列そのまま（数は、クエリの行と同じ形）。値がない（省略可能で、ない）なら、ヘッダを送らない。空の文字列のヘッダは、ないものとして読まれる |
+| `@http.query` のフィールド | クエリの `<名前>=<値>`。`string` はそのまま（URL のエンコードだけ）、`int` は 10 進、`float` は 10 進の小数か指数（有限の値だけ。`NaN` と無限大は、送れない: 決定 D796）、`boolean` は `true` / `false`。値がないなら、送らない |
 | `@http.body` のフィールド | 本文が、JSON のオブジェクトで、キー `<名前>` の値が、フィールドの値の JSON。`@http.body` のフィールドが一つでも、オブジェクトで包む。省略可能で値がないフィールドは、キーを省く。`Content-Type: application/json` |
 | `@http.headerObj` / `@http.queryObj` のフィールド | その model のフィールドの一つずつが、フィールドの名前の、ヘッダ一つ、クエリの項目一つ（上の二行と同じ） |
 | `@http.bodyObj` のフィールド | 本文が、その model の JSON（「値の JSON」）。フィールドの名前では包まない。`Content-Type: application/json` |
@@ -166,7 +166,7 @@ op を呼ぶ前の失敗は、`http` の語彙の例外 `http.BadRequest`（`doc
 
 | 場合 | `message` | `violations` |
 |---|---|---|
-| 要求を入力に読めない（本文が JSON として読めない・型が違う、クエリが読めない、`@http.required` の付いた項目がない） | `<場所>: <理由>` の決まった文言: `body: invalid JSON`、`query <名前>: invalid int`（`float`、`boolean`）、`<場所> <名前>: missing`（場所は `header`、`query`、`body`） | `[]` |
+| 要求を入力に読めない（本文が JSON として読めない・型が違う、クエリかヘッダの値が読めない（`float` の `NaN` と無限大を含む）、`@http.required` の付いた項目がない） | `<場所>: <理由>` の決まった文言: `body: invalid JSON`、`query <名前>: invalid int`（`float`、`boolean`）、`<場所> <名前>: missing`（場所は `header`、`query`、`body`） | `[]` |
 | request body が、サーバーの上限より大きい（ステータスは 413） | `body: too large` | `[]` |
 | 読んだ入力が制約に合わない（サーバーが、入力の制約を確かめる設定のときだけ。`go-http` では `validate = true`: `docs/plugin-go-http.md`「制約の検査」） | `invalid input` | 違反の一覧。確かめた順 |
 

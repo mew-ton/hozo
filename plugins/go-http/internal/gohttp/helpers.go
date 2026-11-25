@@ -23,6 +23,7 @@ var helperPackages = map[string]string{
 	"errors":            "errors",
 	"fmt":               "fmt",
 	"io":                "io",
+	"math":              "math",
 	"net/http":          "http",
 	"net/http/httptest": "httptest",
 	"net/url":           "url",
@@ -200,8 +201,8 @@ func (q *httpRequest) missing(place, name string, dst any, opts []httpOption) {
 }
 
 `}
-	helperText = helper{imports: []string{"reflect", "strconv"}, text: `// text は、通信の上の文字列（ヘッダとクエリの値）一つを dst（フィールドへのポインタ）に読む。読み方は、実行時に、dst の指す型で決める:
-// ポインタ（省略可能）なら、値を置く先を作る。文字列はそのまま、整数、小数、真偽値は strconv で読む。
+	helperText = helper{imports: []string{"math", "reflect", "strconv"}, text: `// text は、通信の上の文字列（ヘッダとクエリの値）一つを dst（フィールドへのポインタ）に読む。読み方は、実行時に、dst の指す型で決める:
+// ポインタ（省略可能）なら、値を置く先を作る。文字列はそのまま、整数、小数、真偽値は strconv で読む。小数は、有限の値だけ（NaN と無限大は、読めない）。
 // 値がない（present が false）ときの扱いは、missing。
 func (q *httpRequest) text(place, name, text string, present bool, dst any, opts []httpOption) {
 	if q.fail != "" {
@@ -227,7 +228,7 @@ func (q *httpRequest) text(place, name, text string, present bool, dst any, opts
 		v.SetInt(x)
 	case reflect.Float64:
 		x, err := strconv.ParseFloat(text, 64)
-		if err != nil {
+		if err != nil || math.IsNaN(x) || math.IsInf(x, 0) {
 			q.fail = place + " " + name + ": invalid float"
 		}
 		v.SetFloat(x)

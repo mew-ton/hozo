@@ -861,5 +861,20 @@ namespace hozo.decisions {
      */
     @adr.proposed
     D795;
+
+    /**
+     * ヘッダとクエリの項目の float の値は、有限の値だけを読む。NaN と無限大（strconv.ParseFloat が読む、Inf、-Infinity など）は、
+     * 読めない値で、op を呼ばずに 400 の `<場所> <名前>: invalid float`。通信の形の float は「10 進の小数か指数」で、有限の値だけ。
+     * go-http 自身の要求 hozo.gohttp.Requirement.FiniteFloat に書き、そこから作るテストで確かめる（D795）。
+     *
+     * @adr.context go-http は strconv.ParseFloat の読めるものを、そのまま op に渡していた（#164 の 3）。request body の JSON では、
+     * NaN と無限大は、もともと送れない。利用者は、三つの案（A: この決定。B: 通し、文書に書く。C: 今のまま）から A を選んだ。
+     * 要求の名前と、仕様の model TextItem は、聞かずに決めた。
+     * @adr.consequence クエリとヘッダで、NaN と無限大を受けていたクライアントは、400 になる。
+     * @adr.alternative 通して、文書に書く: 断るかどうかは、op の中身か、制約に任せる
+     * @adr.said A. 400 で断る (Recommended)
+     */
+    @adr.proposed
+    D796;
   }
 }
