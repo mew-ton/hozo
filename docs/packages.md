@@ -49,6 +49,7 @@ plugins/go-cli/        go-cli プラグイン（main。中身は internal/gocli/
 plugins/go-design/     go-design プラグイン（main。中身は internal/godesign/）
 schema/                IR の JSON スキーマ（go generate の置き場のパッケージ schema）
 editors/vscode/        VS Code 拡張（syntaxes/ は TextMate の文法と、go generate の置き場のパッケージ syntaxes）
+tools/secretlint/      CI の秘密の検出（SecretLint）の、版を固めた package.json と、設定（docs/testing.md「CI」）
 tests/                 リポジトリをまたぐテスト（パッケージ tests。テストのファイルだけ）
 tests/rules/, tests/corpus/   テストの入力（docs/testing.md）
 tests/corpus/view/plugins/view-dump/   テスト用のプラグイン（main パッケージ。docs/testing.md「コーパス」）

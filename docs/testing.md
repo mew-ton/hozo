@@ -145,8 +145,9 @@ hozoc が起動するのは、WASM だけ（`docs/plugin-protocol.md`「マニ�
 
 ## CI
 
-`.github/workflows/ci.yml`: `go build ./...`、`go vet ./...`、`go test ./...`、生成物の一致。プラグインの WASM は、テストと `make generate` が、自分で作る（「プラグインの WASM」）ので、CI に、そのための手順は、ない。`editors/vscode` は Node 22 で、`npm ci`、ビルド（`npm run build`）、`npm test`。`editors/vscode` のテストのうち、`test/trust.test.js` は、ビルドした `out/trust.js` を読む（`docs/editors.md`「VS Code 拡張」）。
+`.github/workflows/ci.yml`: `go build ./...`、`go vet ./...`、`go test ./...`、生成物の一致、秘密の検出（下）。プラグインの WASM は、テストと `make generate` が、自分で作る（「プラグインの WASM」）ので、CI に、そのための手順は、ない。`editors/vscode` は Node 22 で、`npm ci`、ビルド（`npm run build`）、`npm test`。`editors/vscode` のテストのうち、`test/trust.test.js` は、ビルドした `out/trust.js` を読む（`docs/editors.md`「VS Code 拡張」）。
 
+- **秘密の検出。** ジョブ `secretlint` が、リポジトリのすべてのファイルを、SecretLint（推奨の規則の組 `@secretlint/secretlint-rule-preset-recommend`）で調べる。一つでも見つかれば、落ちる。道具の版と、規則の設定は `tools/secretlint/`（`package.json` と `package-lock.json` で版を固め、`npm ci` で入れる。設定は `.secretlintrc.json`）。手元では `(cd tools/secretlint && npm ci) && tools/secretlint/node_modules/.bin/secretlint --secretlintrc tools/secretlint/.secretlintrc.json "**/*"`。
 - **実行は、同時に一つだけ。** `main` への push と、どの PR の実行も、一つの組（`concurrency` の `group: ci`）に入れる。新しい実行が始まると、動いている実行と、待っている実行は、止まる（`cancel-in-progress`）。止められた実行は、緑ではない。
 
 ## トランスパイラのテスト
