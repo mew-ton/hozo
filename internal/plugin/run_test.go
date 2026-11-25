@@ -3,6 +3,8 @@ package plugin
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"net"
@@ -386,6 +388,10 @@ func TestRunCacheDir(t *testing.T) {
 	if !hasFiles("wasm") || hasFiles("wasm-stoppable") {
 		t.Errorf("止める口のない起動: wasm=%v wasm-stoppable=%v", hasFiles("wasm"), hasFiles("wasm-stoppable"))
 	}
+	// wasm/ の下は、WASM の内容ごとのディレクトリ（名前は、内容の SHA-256 の 16 進）
+	if content := filepath.Join("wasm", echoContent(t)); !hasFiles(content) {
+		t.Errorf("WASM の内容のディレクトリ %s に、覚えたものが、ない", filepath.Join(dir, content))
+	}
 	// 止める口を渡した起動は、途中で止められる形で、置き場が、別（二つの形を、混ぜない）
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -403,6 +409,123 @@ func TestRunCacheDir(t *testing.T) {
 	if err := (Runner{CacheDir: file}).Run("echo", echoWasm, echoReq{Mode: "echo", Hello: "uncached"}, &resp); err != nil || resp.Hello != "uncached" {
 		t.Errorf("置き場を作れないとき: err=%v resp=%+v", err, resp)
 	}
+}
+
+// echoContent は、echoWasm の内容の SHA-256 の 16 進（置き場の、WASM の内容のディレクトリの名前）。
+func echoContent(t *testing.T) string {
+	t.Helper()
+	data, err := os.ReadFile(echoWasm)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sum := sha256.Sum256(data)
+	return hex.EncodeToString(sum[:])
+}
+
+// dirSize は、path の下の、ふつうのファイルの大きさの合計。
+func dirSize(t *testing.T, path string) int64 {
+	t.Helper()
+	var n int64
+	_ = filepath.WalkDir(path, func(_ string, d os.DirEntry, err error) error {
+		if err == nil && d.Type().IsRegular() {
+			if info, err := d.Info(); err == nil {
+				n += info.Size()
+			}
+		}
+		return nil
+	})
+	return n
+}
+
+// docs/plugin-protocol.md「起動」の、置き場の大きさの上限: 上限を超えたら、最後に使った時刻の古いものから、wasm/ と
+// wasm-stoppable/ をまたいで消え、上限の内に戻る。その実行が使ったものは、上限を超えたままでも、消えない。上限の内なら、
+// 何も消えない。
+func TestRunCacheLimit(t *testing.T) {
+	saved := cacheLimit
+	t.Cleanup(func() { cacheLimit = saved })
+
+	// echoWasm を、機械の言葉に直したものの大きさ
+	measure := t.TempDir()
+	var resp echoReq
+	if err := (Runner{CacheDir: measure}).Run("echo", echoWasm, echoReq{Mode: "echo", Hello: "measure"}, &resp); err != nil {
+		t.Fatal(err)
+	}
+	echoSize := dirSize(t, filepath.Join(measure, "wasm", echoContent(t)))
+	if echoSize == 0 {
+		t.Fatal("覚えたものが、ない")
+	}
+
+	// fake は、dir の下の sub に、大きさ 1000 の、最後に使った時刻が ago 前の、ものを置く
+	now := time.Now()
+	fake := func(dir, sub string, ago time.Duration) string {
+		p := filepath.Join(dir, sub)
+		if err := os.MkdirAll(filepath.Join(p, "inner"), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		for i, n := range []int{400, 600} {
+			if err := os.WriteFile(filepath.Join(p, "inner", string(rune('a'+i))), make([]byte, n), 0o644); err != nil {
+				t.Fatal(err)
+			}
+		}
+		if err := os.Chtimes(p, now.Add(-ago), now.Add(-ago)); err != nil {
+			t.Fatal(err)
+		}
+		return p
+	}
+	exists := func(p string) bool { _, err := os.Stat(p); return err == nil }
+	run := func(dir string) {
+		t.Helper()
+		var resp echoReq
+		if err := (Runner{CacheDir: dir}).Run("echo", echoWasm, echoReq{Mode: "echo", Hello: "limit"}, &resp); err != nil || resp.Hello != "limit" {
+			t.Fatalf("err=%v resp=%+v", err, resp)
+		}
+	}
+
+	t.Run("古いものから消える", func(t *testing.T) {
+		dir := t.TempDir()
+		oldest := fake(dir, "wasm/oldest", 4*time.Hour)
+		older := fake(dir, "wasm-stoppable/older", 3*time.Hour)
+		old := fake(dir, "wasm/wazero-v0.0.0-old-layout", 2*time.Hour) // 前の形のディレクトリも、一つのもの
+		recent := fake(dir, "wasm-stoppable/recent", time.Hour)
+		// 合計は echoSize+4000。上限 echoSize+1500 の内に戻るには、古い三つが消える
+		cacheLimit = echoSize + 1500
+		run(dir)
+		for _, p := range []string{oldest, older, old} {
+			if exists(p) {
+				t.Errorf("%s が、消えていない", p)
+			}
+		}
+		if !exists(recent) {
+			t.Errorf("上限の内に戻った後の %s まで、消えた", recent)
+		}
+		if !exists(filepath.Join(dir, "wasm", echoContent(t))) {
+			t.Error("使ったものが、消えた")
+		}
+	})
+
+	t.Run("使ったものは消えない", func(t *testing.T) {
+		dir := t.TempDir()
+		other := fake(dir, "wasm/other", time.Hour)
+		cacheLimit = 1
+		run(dir)
+		if exists(other) {
+			t.Errorf("%s が、消えていない", other)
+		}
+		if !exists(filepath.Join(dir, "wasm", echoContent(t))) {
+			t.Error("使ったものが、上限を超えて、消えた")
+		}
+	})
+
+	t.Run("上限の内なら消えない", func(t *testing.T) {
+		dir := t.TempDir()
+		a := fake(dir, "wasm/a", 4*time.Hour)
+		b := fake(dir, "wasm-stoppable/b", 3*time.Hour)
+		cacheLimit = echoSize + 2000
+		run(dir)
+		if !exists(a) || !exists(b) {
+			t.Errorf("上限の内で、消えた: a=%v b=%v", exists(a), exists(b))
+		}
+	})
 }
 
 // MountForTest（docs/testing.md「環境からの独立」）: 言った WASM にだけ、言ったディレクトリだけが、"/" として見える。
