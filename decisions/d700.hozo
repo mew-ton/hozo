@@ -896,5 +896,17 @@ namespace hozo.decisions {
      */
     @adr.proposed
     D797;
+
+    /**
+     * 基底 go の例外の Error() は、今までどおり、例外の FQN だけを返し、引数の値を入れない。理由を、文書に書く。
+     *
+     * @adr.context #164 の 4 は、生成した例外の Error() が名前だけを返すことも挙げていた。WithInternalError（D797）で記録するとき、
+     * 引数は、値を errors.As で取り出せば読める。Error() に入れれば、引数の秘密（トークンなど）が、ログにそのまま出る。
+     * 利用者は、二つの案（A: 今のまま。B: 引数も入れる）から A を選んだ。
+     * @adr.alternative Error() に引数を入れる（"rate.LimitExceeded(retryAfter: 30s)"）: 記録は楽になるが、秘密がログに出る
+     * @adr.said A. 今のまま (Recommended)
+     */
+    @adr.proposed
+    D798;
   }
 }
