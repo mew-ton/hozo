@@ -16,7 +16,7 @@ import (
 // 診断のコード（docs/plugin-go-http.md「診断」）。
 const (
 	codeHTTPOption   = "GOHTTP-9"  // [emit.options.go-http] に、知らないキーか、型の違う値がある
-	codeHTTPName     = "GOHTTP-10" // NewHandler が、N の定義のパッケージの名前と当たる
+	codeHTTPName     = "GOHTTP-10" // 入口のパッケージに足す公開の名前が、N の定義のパッケージの名前と当たる
 	codeHTTPValidate = "GOHTTP-11" // validate = true で、Validate を持つ入力の model の置き場の単位が、go-valid を並べていない
 	codeHTTPResult   = "GOHTTP-16" // 経路の op の結果の型が、省略可能な配列か、省略可能な、インデックスの model
 	codeHTTPTestName = "GOHTTP-20" // テストのパッケージに足す公開の名前が、基底の公開の名前か、自分のほかの名前と当たる
@@ -27,8 +27,15 @@ const (
 // テストのパッケージに出すファイルの名前は TestFileName（testfile.go）。
 const FileName = "http.go"
 
-// handlerName は、このトランスパイラが入口のパッケージに足す、ただ一つの公開の名前。
-const handlerName = "NewHandler"
+// handlerName、optionName、internalName は、このトランスパイラが入口のパッケージに足す公開の名前（docs/plugin-go-http.md「出力」）。
+const (
+	handlerName  = "NewHandler"
+	optionName   = "HandlerOption"
+	internalName = "WithInternalError"
+)
+
+// publicNames は、入口のパッケージに足す公開の名前（GOHTTP-10 が見る）。
+var publicNames = map[string]string{handlerName: "関数", optionName: "型", internalName: "関数"}
 
 // 読む語彙（標準の http。docs/plugin-go-http.md「マニフェスト」）のデコレータの FQN。持ち主は plugin/httpvocab。
 const (
@@ -326,11 +333,12 @@ func (g *generator) statuses(routes []route) []status {
 	return out
 }
 
-// checkName は GOHTTP-10: NewHandler が、N の定義のパッケージの公開の名前（docs/plugin-go.md「名前」。入口のパッケージは、その
+// checkName は GOHTTP-10: 入口のパッケージに足す公開の名前（publicNames）が、N の定義のパッケージの公開の名前（docs/plugin-go.md「名前」。入口のパッケージは、その
 // すべてを再公開する）と当たる。位置は、当たった宣言。名前の一覧は、基底と共有する golang.PublicNames。
 func (g *generator) checkName() {
 	for _, n := range golang.PublicNames(g.view) {
-		if n.Name != handlerName {
+		kind, ours := publicNames[n.Name]
+		if !ours {
 			continue
 		}
 		var what string
@@ -352,7 +360,7 @@ func (g *generator) checkName() {
 		default:
 			what = n.What // 状態の単位、Ops、New など（NewHandler とは当たらない形の名前）
 		}
-		g.errorf(codeHTTPName, n.Decl, "%s %s が、%s が入口のパッケージに足す関数 %s と当たる（直すのは仕様の名前）", what, n.Name, TranspilerName, handlerName)
+		g.errorf(codeHTTPName, n.Decl, "%s %s が、%s が入口のパッケージに足す%s %s と当たる（直すのは仕様の名前）", what, n.Name, TranspilerName, kind, n.Name)
 	}
 }
 

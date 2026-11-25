@@ -22,6 +22,11 @@ type Requirements interface {
 	// 持ち主: docs/plugin-go-http.md「入力の読み方」、docs/plugin-http.md「要求」
 	// 指している設計: hozo.gohttp.TextItem
 	FiniteFloat(t *testing.T)
+	// InternalErrorHook は、要求 hozo.gohttp.Requirement.InternalErrorHook: NewHandler に WithInternalError(f) を渡せば、ハンドラが 500（{"error":"internal"}）を返す前に、f を、その要求と、op が返した
+	// エラーで、一度呼ぶ。http.status を持つ例外と、op を呼ぶ前の失敗では、呼ばない。渡さなければ、応答は同じで、何も呼ばない。
+	// 持ち主: docs/plugin-go-http.md「出力」「補助」
+	// 指している設計: hozo.gohttp.InternalFailure
+	InternalErrorHook(t *testing.T)
 }
 
 // RunRequirements は、要求ごとに、入れ物を一つ走らせる。テストの名前は、要求の名前（<分類の FQN>.<ケース>）。
@@ -34,5 +39,8 @@ func RunRequirements(t *testing.T, c Requirements) {
 	})
 	t.Run("hozo.gohttp.Requirement.FiniteFloat", func(t *testing.T) {
 		c.FiniteFloat(t)
+	})
+	t.Run("hozo.gohttp.Requirement.InternalErrorHook", func(t *testing.T) {
+		c.InternalErrorHook(t)
 	})
 }

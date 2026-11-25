@@ -27,3 +27,11 @@ type TextItem struct {
 	// 通信の上の文字列
 	Text string `json:"text"`
 }
+
+// InternalFailure はハンドラが 500 にした失敗一つ: 要求と、op が返したエラー。WithInternalError の関数が受け取る
+type InternalFailure struct {
+	// 要求のメソッドとパス
+	Route string `json:"route"`
+	// op が返したエラーの文言
+	Message string `json:"message"`
+}

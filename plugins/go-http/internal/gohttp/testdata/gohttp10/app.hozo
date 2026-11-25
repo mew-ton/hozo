@@ -1,4 +1,4 @@
-// GOHTTP-10: 位置は、当たった宣言。
+// GOHTTP-10: 位置は、当たった宣言。当たるのは、入口のパッケージに足す三つの公開の名前（HandlerOption、WithInternalError、NewHandler）。
 namespace app {
   // model の名前そのもの
   model NewHandler { retries: int; }
@@ -18,6 +18,14 @@ namespace wrapped {
   union New { Handler: string; Other: int; }
   @http.get("/c")
   export fn c(): string;
+}
+
+namespace options {
+  // 設定の型 HandlerOption と、関数 WithInternalError
+  model HandlerOption { name: string; }
+  scalar WithInternalError extends string;
+  @http.get("/e")
+  export fn e(): string;
 }
 
 namespace quiet {

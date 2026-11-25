@@ -25,6 +25,15 @@ import (
 	"github.com/mew-ton/hozo/runtime"
 )
 
+// HandlerOption は、NewHandler の設定。
+type HandlerOption func(*httpOptions)
+
+// WithInternalError は、ハンドラが 500（{"error":"internal"}）を返す前に、f を、その要求と、op が返したエラーで呼ぶ。
+// 応答は変えない（エラーの中身は、応答に出さない）。記録や通知は、f が決める。
+func WithInternalError(f func(r *http.Request, err error)) HandlerOption {
+	return func(o *httpOptions) { o.internal = f }
+}
+
 // NewHandler は ops を net/http のハンドラにする。@http.get / @http.post の付いた op ごとに経路を一つ持つ。
 // 入力を読んだ後、op を呼ぶ前に、入力の制約を確かめる（単位のオプション validate = true）。
 //
@@ -36,7 +45,8 @@ import (
 //	GET /ops       api.viaOps
 //	GET /strconv   api.viaStrconv
 //	POST /reflect  api.viaReflect
-func NewHandler(ops Ops) http.Handler {
+func NewHandler(ops Ops, opts ...HandlerOption) http.Handler {
+	o := httpNewOptions(opts)
 	mux_ := http.NewServeMux()
 
 	// api.viaIn
@@ -47,12 +57,12 @@ func NewHandler(ops Ops) http.Handler {
 		if !req_.ok(w_) {
 			return
 		}
-		if !httpValidate(w_, in_, httpPlace{"text", "body.text"}) {
+		if !httpValidate(w_, r_, o, in_, httpPlace{"text", "body.text"}) {
 			return
 		}
 		out_, err_ := ops.ViaIn(r_.Context(), in_)
 		if err_ != nil {
-			httpWriteError(w_, err_)
+			httpWriteError(w_, r_, err_, o)
 			return
 		}
 		httpWriteResult(w_, out_)
@@ -66,12 +76,12 @@ func NewHandler(ops Ops) http.Handler {
 		if !req_.ok(w_) {
 			return
 		}
-		if !httpValidate(w_, in_, httpPlace{"q", "query.q"}) {
+		if !httpValidate(w_, r_, o, in_, httpPlace{"q", "query.q"}) {
 			return
 		}
 		out_, err_ := ops.ViaOut(r_.Context(), in_)
 		if err_ != nil {
-			httpWriteError(w_, err_)
+			httpWriteError(w_, r_, err_, o)
 			return
 		}
 		httpWriteResult(w_, out_)
@@ -85,12 +95,12 @@ func NewHandler(ops Ops) http.Handler {
 		if !req_.ok(w_) {
 			return
 		}
-		if !httpValidate(w_, in_, httpPlace{"trace", "header.X-Trace"}) {
+		if !httpValidate(w_, r_, o, in_, httpPlace{"trace", "header.X-Trace"}) {
 			return
 		}
 		out_, err_ := ops.ViaR(r_.Context(), in_)
 		if err_ != nil {
-			httpWriteError(w_, err_)
+			httpWriteError(w_, r_, err_, o)
 			return
 		}
 		httpWriteResult(w_, out_)
@@ -104,11 +114,11 @@ func NewHandler(ops Ops) http.Handler {
 		if !req_.ok(w_) {
 			return
 		}
-		if !httpValidate(w_, in_, httpPlace{"page", "query.page"}) {
+		if !httpValidate(w_, r_, o, in_, httpPlace{"page", "query.page"}) {
 			return
 		}
 		if err_ := ops.ViaReq(r_.Context(), in_); err_ != nil {
-			httpWriteError(w_, err_)
+			httpWriteError(w_, r_, err_, o)
 			return
 		}
 		httpWriteResult(w_, nil)
@@ -122,12 +132,12 @@ func NewHandler(ops Ops) http.Handler {
 		if !req_.ok(w_) {
 			return
 		}
-		if !httpValidate(w_, in_, httpPlace{"paging", "query"}) {
+		if !httpValidate(w_, r_, o, in_, httpPlace{"paging", "query"}) {
 			return
 		}
 		out_, err_ := ops.ViaMux(r_.Context(), in_)
 		if err_ != nil {
-			httpWriteError(w_, err_)
+			httpWriteError(w_, r_, err_, o)
 			return
 		}
 		httpWriteResult(w_, out_)
@@ -141,12 +151,12 @@ func NewHandler(ops Ops) http.Handler {
 		if !req_.ok(w_) {
 			return
 		}
-		if !httpValidate(w_, in_, httpPlace{"meta", "header"}) {
+		if !httpValidate(w_, r_, o, in_, httpPlace{"meta", "header"}) {
 			return
 		}
 		out_, err_ := ops.ViaOps(r_.Context(), in_)
 		if err_ != nil {
-			httpWriteError(w_, err_)
+			httpWriteError(w_, r_, err_, o)
 			return
 		}
 		httpWriteResult(w_, out_)
@@ -160,12 +170,12 @@ func NewHandler(ops Ops) http.Handler {
 		if !req_.ok(w_) {
 			return
 		}
-		if !httpValidate(w_, in_, httpPlace{"on", "query.on"}) {
+		if !httpValidate(w_, r_, o, in_, httpPlace{"on", "query.on"}) {
 			return
 		}
 		out_, err_ := ops.ViaStrconv(r_.Context(), in_)
 		if err_ != nil {
-			httpWriteError(w_, err_)
+			httpWriteError(w_, r_, err_, o)
 			return
 		}
 		httpWriteResult(w_, out_)
@@ -179,12 +189,12 @@ func NewHandler(ops Ops) http.Handler {
 		if !req_.ok(w_) {
 			return
 		}
-		if !httpValidate(w_, in_, httpPlace{"body", "body"}) {
+		if !httpValidate(w_, r_, o, in_, httpPlace{"body", "body"}) {
 			return
 		}
 		out_, err_ := ops.ViaReflect(r_.Context(), in_)
 		if err_ != nil {
-			httpWriteError(w_, err_)
+			httpWriteError(w_, r_, err_, o)
 			return
 		}
 		httpWriteResult(w_, out_)
@@ -401,7 +411,7 @@ func (q *httpRequest) ok(w http.ResponseWriter) bool {
 // httpValidate は、読んだ入力 in の制約を確かめる。in が Validate を持つかどうかは、実行時に見る（持たなければ、確かめるものがない）。
 // 制約に合わなければ、400（http.BadRequest）と違反の一覧を返して false。op は呼ばない。
 // 違反の Path の先頭（入力の model のフィールド名）を、places の通りに通信の上の場所に置き換える。
-func httpValidate(w http.ResponseWriter, in any, places ...httpPlace) bool {
+func httpValidate(w http.ResponseWriter, r *http.Request, o httpOptions, in any, places ...httpPlace) bool {
 	v, has := in.(interface{ Validate() error })
 	if !has {
 		return true
@@ -412,7 +422,7 @@ func httpValidate(w http.ResponseWriter, in any, places ...httpPlace) bool {
 	}
 	var invalid *runtime.ValidationError
 	if !errors.As(err, &invalid) {
-		httpWriteError(w, err)
+		httpInternal(w, r, err, o)
 		return false
 	}
 	violations := make([]httpViolation, 0, len(invalid.Violations))
@@ -462,14 +472,36 @@ func httpWriteResult(w http.ResponseWriter, out any) {
 	httpWriteJSON(w, http.StatusOK, out)
 }
 
+// httpOptions は、NewHandler の設定（HandlerOption が書く先）。
+type httpOptions struct {
+	internal func(r *http.Request, err error) // WithInternalError の関数。なければ nil
+}
+
+// httpNewOptions は、NewHandler に渡された設定を、順に当てる。
+func httpNewOptions(opts []HandlerOption) httpOptions {
+	var o httpOptions
+	for _, opt := range opts {
+		opt(&o)
+	}
+	return o
+}
+
+// httpInternal は、想定していない失敗の応答: WithInternalError の関数があれば、それを、要求とエラーで呼んでから、500 で、中身を出さない。
+func httpInternal(w http.ResponseWriter, r *http.Request, err error, o httpOptions) {
+	if o.internal != nil {
+		o.internal(r, err)
+	}
+	httpWriteJSON(w, http.StatusInternalServerError, httpErrorBody{Error: "internal"})
+}
+
 // httpWriteError は op が返したエラーを応答にする。@http.status を持つ例外は、そのステータスと例外の FQN（と運ぶ値）。
 // それ以外（ステータスを持たない例外、ctx のエラー、ほかのエラー）は 500 で、中身を出さない。
-func httpWriteError(w_ http.ResponseWriter, err_ error) {
+func httpWriteError(w_ http.ResponseWriter, r_ *http.Request, err_ error, o httpOptions) {
 	switch {
 	case httpThrown[w.NotFound](w_, err_, 404):
 	case httpThrown[err.Conflict](w_, err_, 409):
 	default:
-		httpWriteJSON(w_, http.StatusInternalServerError, httpErrorBody{Error: "internal"})
+		httpInternal(w_, r_, err_, o)
 	}
 }
 

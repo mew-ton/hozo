@@ -19,9 +19,10 @@ func TestRequirements(t *testing.T) {
 // 要求のテストだけを走らせる（docs/plugin-go-http.md「go-http 自身の要求」の「要求」の表）。
 type requirements struct{}
 
-func (requirements) BodyLimit(t *testing.T)    { behave(t, "limits", "TestBodyLimit") }
-func (requirements) NullIsAbsent(t *testing.T) { behave(t, "routes", "TestNullIsAbsent") }
-func (requirements) FiniteFloat(t *testing.T)  { behave(t, "routes", "TestFiniteFloat") }
+func (requirements) BodyLimit(t *testing.T)         { behave(t, "limits", "TestBodyLimit") }
+func (requirements) NullIsAbsent(t *testing.T)      { behave(t, "routes", "TestNullIsAbsent") }
+func (requirements) FiniteFloat(t *testing.T)       { behave(t, "routes", "TestFiniteFloat") }
+func (requirements) InternalErrorHook(t *testing.T) { behave(t, "routes", "TestInternalErrorHook") }
 
 // behave は、入力 name の出力（基底 go と go-valid の出力と合わせたもの）を、一時のモジュールに置き、testdata/<name>/behavior_test.go の
 // テスト test だけを走らせる（TestBehavior と同じ組み立て）。

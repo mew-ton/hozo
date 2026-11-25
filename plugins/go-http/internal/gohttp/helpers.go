@@ -264,7 +264,7 @@ func (q *httpRequest) ok(w http.ResponseWriter) bool {
 	helperValidate = helper{imports: []string{"errors", "net/http", runtimePath, "strings"}, text: `// httpValidate は、読んだ入力 in の制約を確かめる。in が Validate を持つかどうかは、実行時に見る（持たなければ、確かめるものがない）。
 // 制約に合わなければ、400（http.BadRequest）と違反の一覧を返して false。op は呼ばない。
 // 違反の Path の先頭（入力の model のフィールド名）を、places の通りに通信の上の場所に置き換える。
-func httpValidate(w http.ResponseWriter, in any, places ...httpPlace) bool {
+func httpValidate(w http.ResponseWriter, r *http.Request, o httpOptions, in any, places ...httpPlace) bool {
 	v, has := in.(interface{ Validate() error })
 	if !has {
 		return true
@@ -275,7 +275,7 @@ func httpValidate(w http.ResponseWriter, in any, places ...httpPlace) bool {
 	}
 	var invalid *runtime.ValidationError
 	if !errors.As(err, &invalid) {
-		httpWriteError(w, err)
+		httpInternal(w, r, err, o)
 		return false
 	}
 	violations := make([]httpViolation, 0, len(invalid.Violations))
@@ -326,6 +326,30 @@ func httpWriteResult(w http.ResponseWriter, out any) {
 		out = reflect.MakeMap(v.Type()).Interface()
 	}
 	httpWriteJSON(w, http.StatusOK, out)
+}
+
+`}
+	// NewHandler の設定（HandlerOption が書く先）と、想定していない失敗の応答（500）。いつも出す
+	helperHandlerOptions = helper{imports: []string{"net/http"}, text: `// httpOptions は、NewHandler の設定（HandlerOption が書く先）。
+type httpOptions struct {
+	internal func(r *http.Request, err error) // WithInternalError の関数。なければ nil
+}
+
+// httpNewOptions は、NewHandler に渡された設定を、順に当てる。
+func httpNewOptions(opts []HandlerOption) httpOptions {
+	var o httpOptions
+	for _, opt := range opts {
+		opt(&o)
+	}
+	return o
+}
+
+// httpInternal は、想定していない失敗の応答: WithInternalError の関数があれば、それを、要求とエラーで呼んでから、500 で、中身を出さない。
+func httpInternal(w http.ResponseWriter, r *http.Request, err error, o httpOptions) {
+	if o.internal != nil {
+		o.internal(r, err)
+	}
+	httpWriteJSON(w, http.StatusInternalServerError, httpErrorBody{Error: "internal"})
 }
 
 `}

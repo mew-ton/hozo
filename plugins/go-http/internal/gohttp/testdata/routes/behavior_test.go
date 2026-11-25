@@ -638,5 +638,61 @@ func TestNoStatus(t *testing.T) {
 	expectJSON(t, call(t, h, "GET", "/pong", ""), 200, `"pong"`)
 }
 
-// NewHandler が受け取るのは、入口の Ops（New の戻り値を、そのまま渡す）。http.Handler を返す。
-var _ func(api.Ops) http.Handler = api.NewHandler
+// NewHandler が受け取るのは、入口の Ops（New の戻り値を、そのまま渡す）と、設定。http.Handler を返す。設定は、省ける
+var (
+	_ func(api.Ops, ...api.HandlerOption) http.Handler = api.NewHandler
+	_                                                  = api.NewHandler(api.New(&apiLeaves{}))
+)
+
+// TestInternalErrorHook は、要求 hozo.gohttp.Requirement.InternalErrorHook（plugins/go-http/go-http.hozo）: WithInternalError の関数は、
+// ハンドラが 500 を返すときだけ、その要求と、op が返したエラーで、一度呼ばれる。応答は、渡さないときと同じ。@http.status を持つ例外と、
+// op を呼ぶ前の失敗では、呼ばれない。@http.status を持つ例外のない出力（bare）でも、同じ。
+func TestInternalErrorHook(t *testing.T) {
+	type seen struct {
+		route string
+		err   error
+	}
+	var got []seen
+	hook := api.WithInternalError(func(r *http.Request, err error) {
+		got = append(got, seen{r.Method + " " + r.URL.Path, err})
+	})
+	leaves := &apiLeaves{}
+	h := api.NewHandler(api.New(leaves), hook)
+
+	// 500: 一度、要求とエラーで呼ぶ。応答は、渡さないときと同じ。要求の context は、ハンドラが受けたもの
+	secret := errors.New("secret detail")
+	leaves.err = secret
+	expectJSON(t, call(t, h, "GET", "/items/first?id=1", ""), 500, `{"error":"internal"}`)
+	if len(got) != 1 || got[0].route != "GET /items/first" || got[0].err != secret {
+		t.Fatalf("500 のとき、渡した関数が受け取ったもの = %+v, want GET /items/first と、op が返したエラー、一度", got)
+	}
+	// ステータスを持たない例外も、500 なので、呼ぶ
+	got = nil
+	leaves.err = pkgtype.Broken{}
+	expectJSON(t, call(t, h, "GET", "/health", ""), 500, `{"error":"internal"}`)
+	if len(got) != 1 || !errors.Is(got[0].err, pkgtype.Broken{}) {
+		t.Errorf("ステータスを持たない例外で、渡した関数が受け取ったもの = %+v", got)
+	}
+	// @http.status を持つ例外と、op を呼ぶ前の失敗と、成功では、呼ばない
+	got = nil
+	leaves.err = pkgtype.NotFound{}
+	expectJSON(t, call(t, h, "GET", "/items/first?id=1", ""), 404, `{"error":"type.NotFound"}`)
+	leaves.err = nil
+	call(t, h, "GET", "/items?min=1", "") // q がない: 400
+	expectJSON(t, call(t, h, "GET", "/items?q=x&min=1", ""), 200, `[]`)
+	if len(got) != 0 {
+		t.Errorf("500 でないのに、渡した関数が呼ばれた: %+v", got)
+	}
+	// 渡さなければ、応答は同じ
+	leaves.err = secret
+	expectJSON(t, call(t, api.NewHandler(api.New(leaves)), "GET", "/items/first?id=1", ""), 500, `{"error":"internal"}`)
+
+	// @http.status を持つ例外のない出力でも、同じに呼ぶ
+	got = nil
+	expectJSON(t, call(t, bare.NewHandler(bare.New(bareLeaves{}), bare.WithInternalError(func(r *http.Request, err error) {
+		got = append(got, seen{r.Method + " " + r.URL.Path, err})
+	})), "POST", "/touch", ""), 500, `{"error":"internal"}`)
+	if len(got) != 1 || got[0].route != "POST /touch" || got[0].err == nil {
+		t.Errorf("bare の 500 で、渡した関数が受け取ったもの = %+v", got)
+	}
+}

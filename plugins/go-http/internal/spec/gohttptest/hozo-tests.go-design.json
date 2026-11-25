@@ -1,7 +1,8 @@
 {
   "tests": [
-    {"name": "hozo.gohttp.Requirement.BodyLimit", "file": "internal/spec/gohttptest/design.go", "lines": [30, 30]},
-    {"name": "hozo.gohttp.Requirement.NullIsAbsent", "file": "internal/spec/gohttptest/design.go", "lines": [33, 33]},
-    {"name": "hozo.gohttp.Requirement.FiniteFloat", "file": "internal/spec/gohttptest/design.go", "lines": [36, 36]}
+    {"name": "hozo.gohttp.Requirement.BodyLimit", "file": "internal/spec/gohttptest/design.go", "lines": [35, 35]},
+    {"name": "hozo.gohttp.Requirement.NullIsAbsent", "file": "internal/spec/gohttptest/design.go", "lines": [38, 38]},
+    {"name": "hozo.gohttp.Requirement.FiniteFloat", "file": "internal/spec/gohttptest/design.go", "lines": [41, 41]},
+    {"name": "hozo.gohttp.Requirement.InternalErrorHook", "file": "internal/spec/gohttptest/design.go", "lines": [44, 44]}
   ]
 }

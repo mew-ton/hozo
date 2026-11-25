@@ -27,6 +27,12 @@ namespace hozo.gohttp {
      * 持ち主: docs/plugin-go-http.md「入力の読み方」、docs/plugin-http.md「要求」
      */
     FiniteFloat;
+    /**
+     * NewHandler に WithInternalError(f) を渡せば、ハンドラが 500（{"error":"internal"}）を返す前に、f を、その要求と、op が返した
+     * エラーで、一度呼ぶ。http.status を持つ例外と、op を呼ぶ前の失敗では、呼ばない。渡さなければ、応答は同じで、何も呼ばない。
+     * 持ち主: docs/plugin-go-http.md「出力」「補助」
+     */
+    InternalErrorHook;
   }
 
   /** 単位のオプション [emit.options.go-http]（docs/plugin-go-http.md「オプション」） */
@@ -56,5 +62,14 @@ namespace hozo.gohttp {
     name: string;
     /** 通信の上の文字列 */
     text: string;
+  }
+
+  /** ハンドラが 500 にした失敗一つ: 要求と、op が返したエラー。WithInternalError の関数が受け取る */
+  @prd.ref(Requirement.InternalErrorHook)
+  model InternalFailure {
+    /** 要求のメソッドとパス */
+    route: string;
+    /** op が返したエラーの文言 */
+    message: string;
   }
 }

@@ -15,13 +15,23 @@ import (
 	"github.com/mew-ton/hozo/runtime"
 )
 
+// HandlerOption は、NewHandler の設定。
+type HandlerOption func(*httpOptions)
+
+// WithInternalError は、ハンドラが 500（{"error":"internal"}）を返す前に、f を、その要求と、op が返したエラーで呼ぶ。
+// 応答は変えない（エラーの中身は、応答に出さない）。記録や通知は、f が決める。
+func WithInternalError(f func(r *http.Request, err error)) HandlerOption {
+	return func(o *httpOptions) { o.internal = f }
+}
+
 // NewHandler は ops を net/http のハンドラにする。@http.get / @http.post の付いた op ごとに経路を一つ持つ。
 // 入力を読んだ後、op を呼ぶ前に、入力の制約を確かめる（単位のオプション validate = true）。
 //
 //	GET /items   app.find
 //	POST /items  app.put
 //	POST /all    app.all
-func NewHandler(ops Ops) http.Handler {
+func NewHandler(ops Ops, opts ...HandlerOption) http.Handler {
+	o := httpNewOptions(opts)
 	mux := http.NewServeMux()
 
 	// app.find
@@ -39,12 +49,12 @@ func NewHandler(ops Ops) http.Handler {
 		if !req.ok(w) {
 			return
 		}
-		if !httpValidate(w, in, httpPlace{"token", "header.Authorization"}, httpPlace{"trace", "header.trace"}, httpPlace{"page", "query.page"}, httpPlace{"keyword", "query.q"}, httpPlace{"ratio", "query.ratio"}, httpPlace{"exact", "query.exact"}, httpPlace{"size", "query.size"}, httpPlace{"owner", "query.owner"}) {
+		if !httpValidate(w, r, o, in, httpPlace{"token", "header.Authorization"}, httpPlace{"trace", "header.trace"}, httpPlace{"page", "query.page"}, httpPlace{"keyword", "query.q"}, httpPlace{"ratio", "query.ratio"}, httpPlace{"exact", "query.exact"}, httpPlace{"size", "query.size"}, httpPlace{"owner", "query.owner"}) {
 			return
 		}
 		out, err := ops.Find(r.Context(), in)
 		if err != nil {
-			httpWriteError(w, err)
+			httpWriteError(w, r, err, o)
 			return
 		}
 		httpWriteResult(w, out)
@@ -62,12 +72,12 @@ func NewHandler(ops Ops) http.Handler {
 		if !req.ok(w) {
 			return
 		}
-		if !httpValidate(w, in, httpPlace{"lang", "header.lang"}, httpPlace{"item", "body.item"}, httpPlace{"note", "body.memo"}, httpPlace{"count", "body.count"}, httpPlace{"copies", "body.copies"}) {
+		if !httpValidate(w, r, o, in, httpPlace{"lang", "header.lang"}, httpPlace{"item", "body.item"}, httpPlace{"note", "body.memo"}, httpPlace{"count", "body.count"}, httpPlace{"copies", "body.copies"}) {
 			return
 		}
 		out, err := ops.Put(r.Context(), in)
 		if err != nil {
-			httpWriteError(w, err)
+			httpWriteError(w, r, err, o)
 			return
 		}
 		httpWriteResult(w, out)
@@ -83,12 +93,12 @@ func NewHandler(ops Ops) http.Handler {
 		if !req.ok(w) {
 			return
 		}
-		if !httpValidate(w, in, httpPlace{"meta", "header"}, httpPlace{"paging", "query"}, httpPlace{"item", "body"}) {
+		if !httpValidate(w, r, o, in, httpPlace{"meta", "header"}, httpPlace{"paging", "query"}, httpPlace{"item", "body"}) {
 			return
 		}
 		out, err := ops.All(r.Context(), in)
 		if err != nil {
-			httpWriteError(w, err)
+			httpWriteError(w, r, err, o)
 			return
 		}
 		httpWriteResult(w, out)
@@ -305,7 +315,7 @@ func (q *httpRequest) ok(w http.ResponseWriter) bool {
 // httpValidate は、読んだ入力 in の制約を確かめる。in が Validate を持つかどうかは、実行時に見る（持たなければ、確かめるものがない）。
 // 制約に合わなければ、400（http.BadRequest）と違反の一覧を返して false。op は呼ばない。
 // 違反の Path の先頭（入力の model のフィールド名）を、places の通りに通信の上の場所に置き換える。
-func httpValidate(w http.ResponseWriter, in any, places ...httpPlace) bool {
+func httpValidate(w http.ResponseWriter, r *http.Request, o httpOptions, in any, places ...httpPlace) bool {
 	v, has := in.(interface{ Validate() error })
 	if !has {
 		return true
@@ -316,7 +326,7 @@ func httpValidate(w http.ResponseWriter, in any, places ...httpPlace) bool {
 	}
 	var invalid *runtime.ValidationError
 	if !errors.As(err, &invalid) {
-		httpWriteError(w, err)
+		httpInternal(w, r, err, o)
 		return false
 	}
 	violations := make([]httpViolation, 0, len(invalid.Violations))
@@ -366,14 +376,36 @@ func httpWriteResult(w http.ResponseWriter, out any) {
 	httpWriteJSON(w, http.StatusOK, out)
 }
 
+// httpOptions は、NewHandler の設定（HandlerOption が書く先）。
+type httpOptions struct {
+	internal func(r *http.Request, err error) // WithInternalError の関数。なければ nil
+}
+
+// httpNewOptions は、NewHandler に渡された設定を、順に当てる。
+func httpNewOptions(opts []HandlerOption) httpOptions {
+	var o httpOptions
+	for _, opt := range opts {
+		opt(&o)
+	}
+	return o
+}
+
+// httpInternal は、想定していない失敗の応答: WithInternalError の関数があれば、それを、要求とエラーで呼んでから、500 で、中身を出さない。
+func httpInternal(w http.ResponseWriter, r *http.Request, err error, o httpOptions) {
+	if o.internal != nil {
+		o.internal(r, err)
+	}
+	httpWriteJSON(w, http.StatusInternalServerError, httpErrorBody{Error: "internal"})
+}
+
 // httpWriteError は op が返したエラーを応答にする。@http.status を持つ例外は、そのステータスと例外の FQN（と運ぶ値）。
 // それ以外（ステータスを持たない例外、ctx のエラー、ほかのエラー）は 500 で、中身を出さない。
-func httpWriteError(w http.ResponseWriter, err error) {
+func httpWriteError(w http.ResponseWriter, r *http.Request, err error, o httpOptions) {
 	switch {
 	case httpThrown[Missing](w, err, 404):
 	case httpThrown[Clash](w, err, 409):
 	default:
-		httpWriteJSON(w, http.StatusInternalServerError, httpErrorBody{Error: "internal"})
+		httpInternal(w, r, err, o)
 	}
 }
 

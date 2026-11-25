@@ -876,5 +876,25 @@ namespace hozo.decisions {
      */
     @adr.proposed
     D796;
+
+    /**
+     * go-http の NewHandler は、設定 HandlerOption を受け取る（NewHandler(ops Ops, opts ...HandlerOption)）。今の設定は
+     * WithInternalError(f) 一つで、ハンドラが 500 を返す前に、f を、その要求と、op が返したエラーで呼ぶ。応答は変えない。
+     * 設定は、ハンドラの中にしかない情報を、外に渡す口だけにする: ログの形、メトリクス、認証、ミドルウェアの順は、net/http の
+     * 組み合わせで、使う側が決め、生成するコードは、そのための仕組みを持たない。go-http 自身の要求
+     * hozo.gohttp.Requirement.InternalErrorHook に書き、そこから作るテストで確かめる（D795）。
+     *
+     * @adr.context 生成したハンドラは、想定していない失敗を 500 にするだけで、エラーの中身を、どこにも渡していなかった（#164 の 4）。
+     * NewHandler を包んでも、エラーは見えない。利用者は、三つの案（A: この決定。B: log/slog に出す。C: 今のまま）について、
+     * 「やりすぎるとフレームワークになってしまうが、問題ないか？問題ないならA」と言い、口を一つに限る線引きを添えて、A にした。
+     * 名前（HandlerOption、WithInternalError）と、補助の形は、聞かずに決めた。
+     * @adr.consequence 入口のパッケージの公開の名前が、NewHandler 一つから三つになる。GOHTTP-10 は、三つを見る。
+     * 今の呼び出し NewHandler(ops) は、そのままコンパイルできる。
+     * @adr.alternative 500 のとき、log/slog の既定に書く: API は変わらないが、生成したコードが、仕様にない出力を持つ
+     * @adr.alternative 今のまま、記録は op の側に任せる: op を呼ぶ前の失敗や、ハンドラの中の失敗は、記録できない
+     * @adr.said やりすぎるとフレームワークになってしまうが、問題ないか？問題ないならA
+     */
+    @adr.proposed
+    D797;
   }
 }
