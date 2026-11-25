@@ -132,6 +132,12 @@ type analyzer struct {
 	carriers         map[*ir.Op][]carrier
 	pendingCaseTypes []pendingCaseType
 
+	// callArgs は、評価している呼び出しの引数の深さ。レコードリテラルの必須のフィールド（BIND-4）は、呼び出しの引数の中なら、
+	// bind を見る internal/check が確かめ、外なら、ここ（fitRecord）が確かめる（docs/check.md「必須の入力」）。
+	callArgs int
+	// records は、当てはめているレコードリテラルの深さ（fitRecord の入れ子）。BIND-4 は、いちばん外のリテラルで、一度に報告する。
+	records int
+
 	diags []diag.Diagnostic
 	refs  []Ref
 }

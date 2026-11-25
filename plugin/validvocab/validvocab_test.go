@@ -3,6 +3,7 @@ package validvocab
 import (
 	"bytes"
 	"encoding/json"
+	"math"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -204,12 +205,12 @@ func TestScalar(t *testing.T) {
 		t.Errorf("app.Tag = %+v, want %+v", got, want)
 	}
 	if got, want := read("app.Page"), []Constraint{
-		{Decorator: Min, Name: "min", Core: ir.CoreInt, Bound: 1, BoundText: "1"},
-		{Decorator: Max, Name: "max", Core: ir.CoreInt, Bound: 100, BoundText: "100"},
+		{Decorator: Min, Name: "min", Core: ir.CoreInt, IntBound: 1, BoundText: "1"},
+		{Decorator: Max, Name: "max", Core: ir.CoreInt, IntBound: 100, BoundText: "100"},
 	}; !reflect.DeepEqual(got, want) {
 		t.Errorf("app.Page = %+v, want %+v", got, want)
 	}
-	if got, want := read("app.SmallPage"), []Constraint{{Decorator: Max, Name: "max", Core: ir.CoreInt, Bound: 10, BoundText: "10"}}; !reflect.DeepEqual(got, want) {
+	if got, want := read("app.SmallPage"), []Constraint{{Decorator: Max, Name: "max", Core: ir.CoreInt, IntBound: 10, BoundText: "10"}}; !reflect.DeepEqual(got, want) {
 		t.Errorf("app.SmallPage = %+v, want %+v", got, want)
 	}
 	if got := read("app.Jan"); got != nil {
@@ -258,5 +259,44 @@ func TestDiagnosticPositions(t *testing.T) {
 				t.Errorf("%s: 位置 %q の診断がない（%v）", name, w, got)
 			}
 		}
+	}
+}
+
+// TestIntBoundExact は「制約」: 元の型が int の先の min / max の value は、整数を、丸めずに読む（2^53 を超える値と、
+// int64 の最小値も）。整数の小数のリテラル（1.0）も、整数として読む。整数でない小数と、int64 に収まらない小数は VALID-2。
+func TestIntBoundExact(t *testing.T) {
+	read := func(lit ir.Literal) (Constraint, []Problem) {
+		s := &ir.Scalar{DeclBase: ir.DeclBase{Name: "app.N", Decorators: []ir.Application{{
+			Decorator: Min, Args: []ir.Arg{{Param: "value", Value: ir.LiteralValue{Literal: lit}}},
+		}}}, Base: ir.Int()}
+		cons, problems := Scalar(&ir.Program{}, s)
+		if len(cons) == 1 {
+			return cons[0], problems
+		}
+		return Constraint{}, problems
+	}
+	for _, v := range []int64{math.MinInt64, math.MaxInt64, 1<<53 + 1, -(1<<53 + 1)} {
+		c, problems := read(ir.IntLiteral{Value: v})
+		if len(problems) != 0 {
+			t.Errorf("%d: 誤り %+v", v, problems)
+			continue
+		}
+		if c.IntBound != v {
+			t.Errorf("%d: IntBound = %d", v, c.IntBound)
+		}
+		if want := strconv.FormatInt(v, 10); c.BoundText != want {
+			t.Errorf("%d: BoundText = %s, want %s", v, c.BoundText, want)
+		}
+	}
+	if c, problems := read(ir.FloatLiteral{Value: 3}); len(problems) != 0 || c.IntBound != 3 {
+		t.Errorf("3.0: IntBound = %d, 誤り %+v", c.IntBound, problems)
+	}
+	for _, f := range []float64{1.5, 1 << 63, math.Inf(1)} {
+		if _, problems := read(ir.FloatLiteral{Value: f}); len(problems) != 1 || problems[0].Code != CodeArgument {
+			t.Errorf("%v: 誤り %+v, want VALID-2", f, problems)
+		}
+	}
+	if c, problems := read(ir.FloatLiteral{Value: -(1 << 63)}); len(problems) != 0 || c.IntBound != math.MinInt64 {
+		t.Errorf("-2^63 の小数: IntBound = %d, 誤り %+v", c.IntBound, problems)
 	}
 }

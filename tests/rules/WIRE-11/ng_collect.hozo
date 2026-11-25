@@ -1,0 +1,17 @@
+// WIRE-11（docs/check.md「値の入れ物」の「値を入れる文」の 2。決定 D549）: 同じ disjoint の、別のアームが集める val には、
+// 入れられない
+namespace a {
+  model M { id: string; }
+  fn one(m: M): M;
+  fn use(ms: M[]);
+  fn f(ms: M[]) {
+    val xs: M[];
+    disjoint {
+      for (val m of ms) {
+        xs collect one(m);
+      }
+      xs = ms;                         // ERROR: WIRE-11
+    }
+    use(xs);
+  }
+}

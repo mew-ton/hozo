@@ -34,12 +34,13 @@ func checkDisjoint(ix *index, c *computer, r *reporter) {
 			continue
 		}
 		ns := ix.namespaceOf(o.Name)
+		rethrown := c.rethrowSigs(o, ns)
 		walkStmts(o.Body.Statements, func(st ir.Statement, _ []int) {
 			switch s := st.(type) {
 			case ir.DisjointStmt:
 				arms := make([]armInfo, len(s.Arms))
 				for i, arm := range s.Arms {
-					arms[i] = c.armInfo(arm.Statements, ns)
+					arms[i] = c.armInfo(arm.Statements, ns, rethrown)
 				}
 				for i := range arms {
 					for j := range arms {
@@ -50,7 +51,7 @@ func checkDisjoint(ix *index, c *computer, r *reporter) {
 				}
 			case ir.ForStmt:
 				if s.Disjoint {
-					info := c.armInfo(s.Body, ns)
+					info := c.armInfo(s.Body, ns, rethrown)
 					c.checkArmPair(&info, &info, true, s.Span, s.Var, r)
 				}
 			}
@@ -58,12 +59,31 @@ func checkDisjoint(ix *index, c *computer, r *reporter) {
 	}
 }
 
-// armInfo は、アームの文の並び（中の for と disjoint も含む）から、E、F、W、R を集める。
-func (c *computer) armInfo(stmts []ir.Statement, ns string) armInfo {
+// rethrowSigs は、op の配線の本体の、受けた例外を投げ直す throw e（位置で引く）の Sc: 受けた例外のうち、
+// 受けた例外の match のアームなら、そのアームのケースに当たるもの（「Sig(O, v)」の手順 0）。アームの文の並びだけからは、
+// 囲んでいる try が見えないので、本体全体の計算から引く。
+func (c *computer) rethrowSigs(o *ir.Op, ns string) map[ir.Span]*sigState {
+	info := c.blockStep(o.Body, ns, newSigState(), declared(o), o.Throws)
+	out := map[ir.Span]*sigState{}
+	for i, r := range info.rows {
+		for j, cr := range r.calls {
+			if cr.rethrow != "" && j < len(info.sigs[i]) {
+				out[cr.call.Span] = info.sigs[i][j]
+			}
+		}
+	}
+	return out
+}
+
+// armInfo は、アームの文の並び（中の for と disjoint も含む）から、E、F、W、R を集める。throw e の Sc は、rethrown から引く。
+func (c *computer) armInfo(stmts []ir.Statement, ns string, rethrown map[ir.Span]*sigState) armInfo {
 	info := armInfo{writes: map[string][]armCall{}}
 	for _, row := range rowsOf(&ir.Wiring{Statements: stmts}) {
 		for _, cr := range row.calls {
 			sig := c.callSig(cr, ns)
+			if cr.rethrow != "" {
+				sig = rethrown[cr.call.Span]
+			}
 			if sig == nil {
 				continue
 			}
@@ -209,7 +229,8 @@ func (c *computer) rowConflict(state string, as, bs []armCall, loopVar string) (
 }
 
 // rowArg は、呼び出しが、状態の行（要素の型 elem）を受け取る引数に、渡した値。行を受け取らない呼び出しなら ok が偽。
-//   - 効果（宣言）の呼び出し: 引数のうち、型が elem と等しいものが、ちょうど一つ（行の引数と、同じ決まり）。
+//   - 効果（宣言）の呼び出し: 引数のうち、型が、elem と等しいか、elem を絞り込んだ型（case）のものが、ちょうど一つ
+//     （「行の遷移」の「結びつき」の、行の引数と、同じ決まり）。
 //   - 直に呼ぶ組み込みの効果: 値の引数。型が elem と等しいとき。
 //   - op の呼び出し: 引数のうち、型が、elem と等しいか、elem を絞り込んだ型（case）のものが、ちょうど一つ。
 func (c *computer) rowArg(call ir.Call, elem ir.Type) (ir.Atom, bool) {
@@ -223,7 +244,7 @@ func (c *computer) rowArg(call ir.Call, elem ir.Type) (ir.Atom, bool) {
 				return nil, false
 			}
 			for _, p := range eff.Params {
-				if sameType(p.Type, elem) {
+				if sameType(stripCase(p.Type), elem) {
 					names = append(names, p.Name)
 				}
 			}
@@ -241,11 +262,7 @@ func (c *computer) rowArg(call ir.Call, elem ir.Type) (ir.Atom, bool) {
 			return nil, false
 		}
 		for _, p := range o.Params {
-			t := p.Type
-			if ct, ok := t.(ir.CaseType); ok {
-				t = ct.Of
-			}
-			if sameType(t, elem) {
+			if sameType(stripCase(p.Type), elem) {
 				names = append(names, p.Name)
 			}
 		}
@@ -259,6 +276,14 @@ func (c *computer) rowArg(call ir.Call, elem ir.Type) (ir.Atom, bool) {
 		}
 	}
 	return nil, false
+}
+
+// stripCase は、絞り込んだ型（case）なら、絞り込みを捨てた型。そうでなければ t。
+func stripCase(t ir.Type) ir.Type {
+	if ct, ok := t.(ir.CaseType); ok {
+		return ct.Of
+	}
+	return t
 }
 
 // sameAtom は、渡した値が同じか: 同じ名前（val、引数、for の変数）の、同じパスか、同じ状態の、同じパス。

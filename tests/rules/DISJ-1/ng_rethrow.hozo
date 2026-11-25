@@ -1,0 +1,30 @@
+// DISJ-1（docs/check.md「disjoint」の「検査」の E(a): アームの本体の throw を含む）: catch のブロックの disjoint の、
+// アームの中の、受けた例外の match の throw e は、受けた例外（そのアームのケースに当たるもの）を出しうる
+namespace a {
+  model Order { id: string; }
+  model Line { id: string; }
+  state lines: list<Line>;
+  exception Declined;
+  exception Busy;
+  classify Fail of any exception {
+    Retry: any exception as Busy;
+    Other: any exception as else;
+  }
+  effect fn addLine(line: Line): effects lines.post;
+  fn charge(order: Order): throws Declined, Busy;
+  fn note();
+  fn f(a: Order, l: Line): throws Busy {
+    try {
+      charge(a);
+    } catch (e) {
+      disjoint {                       // ERROR: DISJ-1
+        addLine(l);
+        match (e by Fail) {
+          Retry => throw e;
+          Other => note();
+        }
+      }
+      note();
+    }
+  }
+}

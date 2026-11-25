@@ -1,0 +1,15 @@
+// TYPE-4（docs/types.md「互換」の規則 11 を、再帰的に）: 多段の scalar の値を、途中の scalar の位置と、核の型の位置に渡せる
+namespace a {
+  scalar Email extends string;
+  scalar WorkEmail extends Email;
+  fn takeEmail(e: Email): void;
+  fn takeOptEmail(e: Email?): void;
+  fn takeString(s: string): void;
+  fn work(): WorkEmail;
+  fn i(): void {
+    val w = work();
+    takeEmail(w);
+    takeOptEmail(w);
+    takeString(w);
+  }
+}
