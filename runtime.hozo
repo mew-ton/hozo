@@ -1,4 +1,4 @@
-// 生成したコードが import する補助の設計（docs/plugin-go-http.md「補助の設計」、決定 D803）。名前空間 hozo.runtime.gohttp。
+// 生成したコードが import する補助の設計（docs/plugin-go-http.md「補助の設計」、決定 D804）。名前空間 hozo.runtime.gohttp。
 // **設計の段**: まだ、単位の対象ではなく、コードにならない。go-http が今出す補助（docs/plugin-go-http.md「補助」）のうち、request body の
 // 読み方だけを書いた。型は、出力先の言語の語彙を持たない（docs/requirements.md「型の仕組みは、出力先の語彙を持たない」）ので、Go の
 // *http.Request や []byte ではなく、値の形で書く。書けなかった所は docs/open.md「語彙とプラグイン」。
