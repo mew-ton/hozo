@@ -212,6 +212,15 @@ func httpWriteError(w http.ResponseWriter, r *http.Request, err error, o httpOpt
 
 この節の細部は、決定 D604、D784、D793 が決めた。
 
+### 補助の設計
+
+**設計の段**（決定 D803。まだコードにならない）: 補助は、今は、生成するファイルごとに、同じテキストを写している（「補助」）。これを、Hozo で設計した、生成したコードが import する Go のパッケージ `runtime/gohttp` に移す。設計は、リポジトリのルートの `runtime.hozo`（名前空間 `hozo.runtime.gohttp`）。今、書いてあるのは、request body の読み方だけ。
+
+- **何が変わるか**: 補助の振る舞いは、op と分類と例外で、仕様に書かれる。基底 go が、その枠（`Ops`、`Leaves`、`New`）と、単体テストの口（葉ごと、例外ごとのケース。`docs/plugin-go.md`「単体テストの口」）を作り、人が葉を実装する。例外を一つ足せば、テストのケースが要り、書くまでコンパイルできない。「go-http 自身の要求」の要求は、これらの op に結べる。
+- **書いた op**: `readBody`（葉。request body を上限まで読み、JSON のオブジェクトにする。`TooLarge`、`InvalidJSON` を投げる）、`bodyItem`（葉。キーの値。キーがないか、値が `null` なら、ない）、分類 `Sent`（送られたか）、`readRequiredItem`（配線。`@http.required` の項目を読み、送られていなければ `Missing`）。
+- **型は、値の形で書く**: `RawBody`（大きさと中身の文字列）、`BodyObject`、`ItemJSON`。Go の `*http.Request`、`io.Reader`、`json.RawMessage` は、型の仕組みに入れない（`docs/requirements.md`「型の仕組みは、出力先の語彙を持たない」）。`net/http` と、これらの型の間の橋渡しは、生成した `http.go` か、葉の実装の側に置く。
+- **次の段**: 単位（`[[emit]]`）を足して、`runtime/gohttp` に枠を生成し、葉を実装し、go-http の `http.go` が、写した補助の代わりに、それを呼ぶ。そこで、写した補助と、文字列の置き換え（「補助」の「union の読み書き」）が、request body の読み方の分だけ、なくなる（#183）。
+
 ## 制約の検査
 
 制約は型の性質で、いつ確かめるかを決めるのは、境界を持つこのトランスパイラ（`docs/plugin-go-valid.md`「この文書が決めること」）。
