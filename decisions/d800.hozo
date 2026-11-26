@@ -83,7 +83,7 @@ namespace hozo.decisions {
 
     /**
      * go-http が生成するファイルに写している補助を、Hozo で設計した Go のパッケージ runtime/gohttp に移す。設計は、リポジトリの
-     * ルートの runtime.hozo（名前空間 hozo.runtime.gohttp）。補助の振る舞いは、op と分類と例外で書き、基底 go が枠と単体テストの口を
+     * ルートの runtime.hozo（名前空間 hozo.gohttp.runtime）。補助の振る舞いは、op と分類と例外で書き、基底 go が枠と単体テストの口を
      * 作り、人が葉を実装し、生成した http.go がそれを呼ぶ。型は、値の形で書く（D801）。まず、request body の読み方だけを、設計の段
      * （単位の対象にせず、コードにしない）で書き、形を確かめてから、生成と実装に進む。
      *

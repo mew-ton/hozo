@@ -214,7 +214,7 @@ func httpWriteError(w http.ResponseWriter, r *http.Request, err error, o httpOpt
 
 ### 補助の設計
 
-**設計の段**（決定 D804。まだコードにならない）: 補助は、今は、生成するファイルごとに、同じテキストを写している（「補助」）。これを、Hozo で設計した、生成したコードが import する Go のパッケージ `runtime/gohttp` に移す。設計は、リポジトリのルートの `runtime.hozo`（名前空間 `hozo.runtime.gohttp`）。今、書いてあるのは、request body の読み方だけ。
+**設計の段**（決定 D804。まだコードにならない）: 補助は、今は、生成するファイルごとに、同じテキストを写している（「補助」）。これを、Hozo で設計した、生成したコードが import する Go のパッケージ `runtime/gohttp` に移す。設計は、リポジトリのルートの `runtime.hozo`（名前空間 `hozo.gohttp.runtime`）。今、書いてあるのは、request body の読み方だけ。
 
 - **何が変わるか**: 補助の振る舞いは、op と分類と例外で、仕様に書かれる。基底 go が、その枠（`Ops`、`Leaves`、`New`）と、単体テストの口（葉ごと、例外ごとのケース。`docs/plugin-go.md`「単体テストの口」）を作り、人が葉を実装する。例外を一つ足せば、テストのケースが要り、書くまでコンパイルできない。「go-http 自身の要求」の要求は、これらの op に結べる。
 - **書いた op**: `readBody`（葉。request body を上限まで読み、JSON のオブジェクトにする。`TooLarge`、`InvalidJSON` を投げる）、`bodyItem`（葉。キーの値。キーがないか、値が `null` なら、ない）、分類 `Sent`（送られたか）、`readRequiredItem`（配線。`@http.required` の項目を読み、送られていなければ `Missing`）。
