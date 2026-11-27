@@ -25,11 +25,14 @@ namespace hozo.gohttp.runtime {
     text: string;
   }
 
-  /** request body が上限より大きい（413、body: too large） */
+  /** request body が上限より大きい */
+  @http.badRequest(413, "body: too large")
   exception TooLarge;
-  /** request body が JSON のオブジェクトとして読めない（400、body: invalid JSON） */
+  /** request body が JSON のオブジェクトとして読めない */
+  @http.badRequest(400, "body: invalid JSON")
   exception InvalidJSON;
-  /** 必須の項目がない（400、<場所> <名前>: missing） */
+  /** 必須の項目がない。place は header、query、body のどれか */
+  @http.badRequest(400, "{place} {name}: missing")
   exception Missing(place: string, name: string);
 
   /** request body を、上限まで読み、JSON のオブジェクトにする */

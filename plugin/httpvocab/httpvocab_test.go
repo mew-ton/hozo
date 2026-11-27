@@ -13,7 +13,7 @@ import (
 	"github.com/mew-ton/hozo/plugin"
 )
 
-// このファイルは、http の語彙の、書いたものの整合の検査（docs/plugin-http.md「診断」の HTTP-1〜HTTP-16）の単体テスト
+// このファイルは、http の語彙の、書いたものの整合の検査（docs/plugin-http.md「診断」の HTTP-1〜HTTP-19）の単体テスト
 // （docs/testing.md「単体テスト」の `plugin/httpvocab`）。
 //
 // 入力は testdata/<名前>/ の .hozo。このパッケージは internal/ を import できない（docs/packages.md「依存の向き」）ので、
@@ -56,25 +56,28 @@ var diagnosticFixtures = []struct{ name, code string }{
 	{"http14", CodeDefault},    // @http.default のリテラルが、フィールドの型に渡せない
 	{"http15", CodeConstraint}, // @http.default の値が、フィールドの制約（@valid.*）に合わない
 	{"http16", CodeLiteral},    // 本文の項目のフィールドの型が、リテラルの型そのもの
+	{"http17", CodeShapeBoth},  // 一つの例外に、@http.status と @http.badRequest の両方がある
+	{"http18", CodeBadStatus},  // @http.badRequest のステータスが、400 から 499 までにない
+	{"http19", CodeTemplate},   // @http.badRequest の文言の中の {<名前>} が、例外の、型が string の引数を指していない
 }
 
-// TestDiagnosticCodes は、「診断」の表の ID（HTTP-1〜HTTP-16。欠番はない）のどれもが、入力を一つ持つこと。
+// TestDiagnosticCodes は、「診断」の表の ID（HTTP-1〜HTTP-19。欠番はない）のどれもが、入力を一つ持つこと。
 func TestDiagnosticCodes(t *testing.T) {
 	seen := map[string]bool{}
 	for _, fx := range diagnosticFixtures {
 		seen[fx.code] = true
 	}
-	for n := 1; n <= 16; n++ {
+	for n := 1; n <= 19; n++ {
 		if code := "HTTP-" + strconv.Itoa(n); !seen[code] {
 			t.Errorf("%s の入力がない", code)
 		}
 	}
-	if len(seen) != 16 {
-		t.Errorf("診断の入力のコードが %d 種類（16 のはず）", len(seen))
+	if len(seen) != 19 {
+		t.Errorf("診断の入力のコードが %d 種類（19 のはず）", len(seen))
 	}
 }
 
-// TestDiagnostics は docs/plugin-http.md「診断」の HTTP-1〜HTTP-16: 診断のコード・位置・メッセージがゴールデンと同じこと。
+// TestDiagnostics は docs/plugin-http.md「診断」の HTTP-1〜HTTP-19: 診断のコード・位置・メッセージがゴールデンと同じこと。
 // 同じ仕様から、同じ診断を返すこと（決定性）も確かめる。
 func TestDiagnostics(t *testing.T) {
 	for _, fx := range diagnosticFixtures {
@@ -139,6 +142,9 @@ func TestDiagnosticPositions(t *testing.T) {
 		"http14": {"app.In"},
 		"http15": {"app.In"},
 		"http16": {"app.putItem"},
+		"http17": {"app.Taken"},
+		"http18": {"app.Broken", "app.Early"},
+		"http19": {"app.Unknown", "app.Open", "app.Close"},
 	} {
 		got := map[string]bool{}
 		for _, d := range Check(loadSpec(t, name).Program) {

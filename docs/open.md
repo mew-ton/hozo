@@ -177,6 +177,7 @@
 | 点 | 要るもの | 持ち主 |
 |---|---|---|
 | 補助の設計（`runtime.hozo`。`plugin-go-http.md`「補助の設計」）で、書けなかった所: (1) バイト列や、中身を見ない値（JSON の値そのもの）を表す型が、核の型にない。`RawBody` と `ItemJSON` は、文字列で写した。(2) プラグインのプロジェクト（`plugins/go-http`）の要求を、ルートのプロジェクトの op（`hozo.gohttp.runtime.readBody`）に `@prd.ref` で結べない（プロジェクトをまたぐ参照が、ない）。(3) 葉の op は、どれも `ctx` を取り、`error` を返す形になる（`docs/plugin-go.md`「op の形」）ので、補助の呼び出しが、今より重くなる | 設計 | `plugin-go-http.md`「補助の設計」 |
+| `@http.badRequest`（`plugin-http.md`「失敗の応答」）を、`go-http` が、まだ読まない。経路の op が、それを持つ例外を投げると、500 になる（読むトランスパイラがないので、CFG-26 の warning が出る）。`runtime.hozo` の補助を生成する段で、`httpWriteError` が読む | 実装 | `plugin-go-http.md`「補助の設計」 |
 | 生成したコードが使う共通の補助（`plugin-go-http.md`「補助」、`plugin-go-sqlite.md`「補助」）を、出力ごとに写さず、プラグインが足して、生成したコードが使う形を、プラグインシステムが支えるか。go-http の、補助のテキストの文字列の置き換え（union の読み書き）も、そこで、なくす | 設計 | #183 |
 | 出力先の言語の中だけの型の表し方（Go の中で `time.Time` そのものを使う、など）を書く、言語ごとの語彙のデコレータ（`docs/requirements.md`「型の仕組みは、出力先の語彙を持たない」）。要る例が出たら、語彙と、そのデコレータを決める | 設計（要る例を待つ） | `requirements.md`「型の仕組みは、出力先の語彙を持たない」 |
 | **イベントストーミングの語彙 `prd.eventstorming.event` が、まだ、ない**（同 500。決めただけ）。README の折りたたみは、この綴りで書いてあり、語彙に入るまで、`hozoc` に、通らない | 実装（#134 と一緒） | `vocab.md`「設計の図の語彙」 |

@@ -30,7 +30,7 @@ hozoc が同梱して常に読み込む語彙（`vocab/*.hozo`）と、その読
 | ファイル | 中身 | 出典 |
 |---|---|---|
 | `vocab/valid.hozo` | `namespace valid { min / max / length / pattern / format }` | §4.2、§6.5 |
-| `vocab/http.hozo` | `namespace http { ServerError / NetworkError / BadRequest / Violation / get / post / status / header / query / body / headerObj / queryObj / bodyObj / required / default / retry }` | §4.2。`BadRequest` と `Violation` は足したもの（下）。`header` / `query` / `body` の引数と、`headerObj` / `queryObj` / `bodyObj`、`required`、`default` は、出典から変えたか、足したもの（「`http` の語彙」） |
+| `vocab/http.hozo` | `namespace http { ServerError / NetworkError / BadRequest / Violation / get / post / status / badRequest / header / query / body / headerObj / queryObj / bodyObj / required / default / retry }` | §4.2。`BadRequest` と `Violation`、`badRequest` は足したもの（下）。`header` / `query` / `body` の引数と、`headerObj` / `queryObj` / `bodyObj`、`required`、`default` は、出典から変えたか、足したもの（「`http` の語彙」） |
 | `vocab/db.hozo` | `namespace db { table / text / int / float / bool / datetime / date / time / json / key / unique / ref / find / list / where / latest / insert / update / delete / conflict / transaction }` | §4.2。`key` / `unique` / `ref` のほかは、出典から変えたか、足したもの（「`db` の語彙」「`db` の表と、しまい方」「`db` の read と効果」） |
 | `vocab/browser.hozo` | `namespace browser { localStorage }` と、その下の `namespace page { Aborted / Route / Query / path / query / route / dialog / fallback / interaction }`（FQN は `browser.page.*`） | §4.2。出典は、グローバルの `localStorage` と、名前空間 `page`。`browser` の下に動かした（決定 D455、D462） |
 | `vocab/fs.hozo` | `namespace fs { files }` | `examples/hozoc.hozo` |
@@ -50,6 +50,13 @@ hozoc が同梱して常に読み込む語彙（`vocab/*.hozo`）と、その読
   model Violation { path: string; constraint: string; }
   /** 要求を op の入力に読めなかった、または入力が制約に合わなかった（op は呼ばれていない） */
   exception BadRequest(message: string, violations: Violation[]);
+```
+
+- `http` には、出典にないデコレータを一つ足す: 例外を、op を呼ぶ前の失敗と同じ形（`http.BadRequest`）で返す印 `badRequest(code: int, message: string)`。意味と、書いたものの整合の決まりの持ち主は `docs/plugin-http.md`「失敗の応答」「対象」。
+
+```ts
+  /** この例外を、op を呼ぶ前の失敗と同じ形（BadRequest）で、ステータス code で返す。message の中の {引数の名前} は、その引数の値に替える */
+  decorator badRequest(code: int, message: string) for exception;
 ```
 
 - `db` は、出典のグローバルのデコレータ `db`（`@db state …`）をなくして `db.table` に置き換え、出典にないデコレータを足す。中身は「`db` の語彙」。

@@ -27,7 +27,7 @@ interprets = [
 ]
 ```
 
-- `interprets`（`docs/plugin-protocol.md`「マニフェスト `hozo-plugin.toml`」）は、読む十一のデコレータ。`http.retry` は、書かない（読まない）。
+- `interprets`（`docs/plugin-protocol.md`「マニフェスト `hozo-plugin.toml`」）は、読む十一のデコレータ。`http.retry` は、書かない（読まない）。`http.badRequest` も、まだ書かない（読まない。「補助の設計」）: 経路の op が、それを持つ例外を投げれば、今は、`@http.status` を持たない例外と同じに、500 になる。
 - 読む語彙は、標準の `http`: op の `@http.get(path)` / `@http.post(path)`、フィールドの `@http.header` / `@http.query` / `@http.body`（項目の形）と `@http.headerObj` / `@http.queryObj` / `@http.bodyObj`（全体の形）、`@http.required` と `@http.default(value)`（項目がないときの扱い）、例外の `@http.status(code)`。`@http.retry` は読まない（印）。語彙は提供しない。
 - **`http` の語彙のプラグインが、要る**（`requires_vocabulary`。`docs/plugin-protocol.md`「語彙のプラグイン」）: このトランスパイラは、`http` の語彙の使い方の検査（HTTP-*。`docs/plugin-http.md`「診断」）を、自分では返さない。語彙のプラグインが入っていなければ CFG-25（`docs/config.md`「診断」）。
 - `go-valid` への依存は、オプションによらない（`docs/config.md`「基底と相乗り」）。`validate = false` でも、単位の `transpilers` に `go-valid` が要る。
@@ -218,6 +218,7 @@ func httpWriteError(w http.ResponseWriter, r *http.Request, err error, o httpOpt
 
 - **何が変わるか**: 補助の振る舞いは、op と分類と例外で、仕様に書かれる。基底 go が、その枠（`Ops`、`Leaves`、`New`）と、単体テストの口（葉ごと、例外ごとのケース。`docs/plugin-go.md`「単体テストの口」）を作り、人が葉を実装する。例外を一つ足せば、テストのケースが要り、書くまでコンパイルできない。「go-http 自身の要求」の要求は、これらの op に結べる。
 - **書いた op**: `readBody`（葉。request body を上限まで読み、JSON のオブジェクトにする。`TooLarge`、`InvalidJSON` を投げる）、`bodyItem`（葉。キーの値。キーがないか、値が `null` なら、ない）、分類 `Sent`（送られたか）、`readRequiredItem`（配線。`@http.required` の項目を読み、送られていなければ `Missing`）。
+- **例外の応答の形は、宣言で書く**（決定 D805）: 三つの例外は、`@http.badRequest(n, m)`（`docs/plugin-http.md`「失敗の応答」）で、op を呼ぶ前の失敗と同じ形の、status code と `message` を言う（`TooLarge` は 413 と `body: too large`、`InvalidJSON` は 400 と `body: invalid JSON`、`Missing` は 400 と `{place} {name}: missing`）。go-http は、まだ、このデコレータを読まない（「マニフェスト」の `interprets` に入れていない）。読むのは、次の段。
 - **型は、値の形で書く**: `RawBody`（大きさと中身の文字列）、`BodyObject`、`ItemJSON`。Go の `*http.Request`、`io.Reader`、`json.RawMessage` は、型の仕組みに入れない（`docs/requirements.md`「型の仕組みは、出力先の語彙を持たない」）。`net/http` と、これらの型の間の橋渡しは、生成した `http.go` か、葉の実装の側に置く。
 - **次の段**: 単位（`[[emit]]`）を足して、`runtime/gohttp` に枠を生成し、葉を実装し、go-http の `http.go` が、写した補助の代わりに、それを呼ぶ。そこで、写した補助と、文字列の置き換え（「補助」の「union の読み書き」）が、request body の読み方の分だけ、なくなる（#183）。
 

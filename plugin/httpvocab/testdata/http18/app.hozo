@@ -1,0 +1,12 @@
+// HTTP-18: 位置は例外。経路の op が投げなくても、当たる。
+namespace app {
+  @http.badRequest(500, "body: broken")
+  exception Broken;
+  @http.badRequest(399, "body: early")
+  exception Early;
+  // 400 と 499 は、当たらない
+  @http.badRequest(400, "body: invalid JSON")
+  exception Invalid;
+  @http.badRequest(499, "body: late")
+  exception Late;
+}

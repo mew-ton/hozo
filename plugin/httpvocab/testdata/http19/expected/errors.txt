@@ -1,0 +1,4 @@
+HTTP-19	app.Unknown	例外 app.Unknown の @http.badRequest の文言 "{where} {name}: missing ({count})" の {where} が、例外の、型が string の引数を指していない
+HTTP-19	app.Unknown	例外 app.Unknown の @http.badRequest の文言 "{where} {name}: missing ({count})" の {count} が、例外の、型が string の引数を指していない
+HTTP-19	app.Open	例外 app.Open の @http.badRequest の文言 "body {name: missing" の 6 バイト目の { が、閉じていない
+HTTP-19	app.Close	例外 app.Close の @http.badRequest の文言 "body name}: missing" の 10 バイト目の } が、開いていない

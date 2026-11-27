@@ -1,0 +1,10 @@
+// HTTP-17: 位置は例外。
+namespace app {
+  @http.status(409) @http.badRequest(400, "body: taken")
+  exception Taken;
+  // 片方だけなら、当たらない
+  @http.status(404)
+  exception Gone;
+  @http.badRequest(400, "body: invalid JSON")
+  exception Invalid;
+}
