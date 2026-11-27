@@ -1,4 +1,4 @@
-// 決定の記録（番号のない決定）。名前空間 hozo.decisions。書き方は decisions/adr.hozo の頭のコメント。
+// 決定の記録（番号のない決定）。名前空間 hozo.decisions。書き方は spec/decisions/adr.hozo の頭のコメント。
 // コードには、ならない（hozo.toml の単位の対象ではない）。
 // どれも、番号を振って移した決定に、置き換えた（D554）。534 からの決定は、番号を振って d500.hozo などに入れる（D536）。
 

@@ -8,7 +8,8 @@
 
 ```
 go.mod                 module github.com/mew-ton/hozo
-hozo.toml, cli.hozo    hozoc 自身の仕様と設定（docs/cli.md）
+hozo.toml              hozoc 自身の設定（docs/cli.md）
+spec/                  hozoc 自身の仕様（cli.hozo。docs/cli.md）と、設計だけのファイル、決定の記録（decisions/。docs/README.md）
 Makefile               build / generate（「自己生成の手順」）/ vet / test
 cmd/hozoc/             CLI の main。app.App の Ops()（実装を compiler.New に渡したもの）と app.Presenter を、生成した cli.Main に渡すだけ
 ir/                    IR の型（公開）
@@ -34,14 +35,14 @@ internal/fakeplugin/   テストのための、にせもののプラグイン（
 internal/project/      一度の解析のすべて
 internal/app/          hozoc の葉の op と状態の単位の実装と表示
 internal/lsp/          言語サーバー（jsonrpc/ は JSON-RPC、protocol/ は LSP の型のうち使うもの）
-internal/gen/hozo/compiler/    cli.hozo からの生成物（名前空間 hozo.compiler: ユースケース）: 入口のパッケージ（go）。inner/ は内側のパッケージ（go）、types/ は型のパッケージ（go）、compilertest/ はテストのパッケージ（go）
-internal/gen/hozo/cli/         cli.hozo からの生成物（名前空間 hozo.cli: コマンドの行）: 入口のパッケージ（go）。inner/ は内側のパッケージ（go）、types/ は型のパッケージ（go と go-valid）、clitest/ はテストのパッケージ（go）、cli/ は go-cli の出力
+internal/gen/hozo/compiler/    spec/cli.hozo からの生成物（名前空間 hozo.compiler: ユースケース）: 入口のパッケージ（go）。inner/ は内側のパッケージ（go）、types/ は型のパッケージ（go）、compilertest/ はテストのパッケージ（go）
+internal/gen/hozo/cli/         spec/cli.hozo からの生成物（名前空間 hozo.cli: コマンドの行）: 入口のパッケージ（go）。inner/ は内側のパッケージ（go）、types/ は型のパッケージ（go と go-valid）、clitest/ はテストのパッケージ（go）、cli/ は go-cli の出力
 internal/tools/        生成の道具: irschema/ と tmgrammar/（go generate）、selfgen/（make generate）
 plugins/<name>/        プラグイン。一つのディレクトリが、一つの WASM（main パッケージをビルドした plugin.wasm。リポジトリには入れない）と hozo-plugin.toml（提供するトランスパイラの一覧を持つ）
 plugins/go/            Go の基底のプラグイン（main。中身は internal/gobase/）
 plugins/go-valid/      go-valid プラグイン（main。中身は internal/govalid/）
-plugins/go-sqlite/     go-sqlite プラグイン（main。中身は internal/gosqlite/）。go-http と同じく、それ自体が一つの Hozo のプロジェクト（go-sqlite.hozo: go-sqlite 自身の要求）で、internal/spec/ はその生成物
-plugins/go-http/       go-http プラグイン（main。中身は internal/gohttp/）。それ自体が一つの Hozo のプロジェクト（hozo.toml と go-http.hozo: go-http 自身の要求）で、internal/spec/ はその生成物（テストのパッケージ gohttptest の、要求のテストの入れ物の口。docs/plugin-go-http.md「go-http 自身の要求」）
+plugins/go-sqlite/     go-sqlite プラグイン（main。中身は internal/gosqlite/）。go-http と同じく、それ自体が一つの Hozo のプロジェクト（spec/go-sqlite.hozo: go-sqlite 自身の要求）で、internal/spec/ はその生成物
+plugins/go-http/       go-http プラグイン（main。中身は internal/gohttp/）。それ自体が一つの Hozo のプロジェクト（hozo.toml と spec/go-http.hozo: go-http 自身の要求。spec/runtime.hozo は補助の設計）で、internal/spec/ はその生成物（テストのパッケージ gohttptest の、要求のテストの入れ物の口。docs/plugin-go-http.md「go-http 自身の要求」）
 plugins/http/          語彙のプラグイン http（main。中身は、公開のライブラリ plugin/httpvocab）
 plugins/valid/         語彙のプラグイン valid（main。中身は、公開のライブラリ plugin/validvocab）
 plugins/db/            語彙のプラグイン db（main。中身は、公開のライブラリ plugin/dbvocab）
@@ -58,7 +59,9 @@ tests/samples/<名前>/  サンプル（仕様と、手で書いた完成した�
 docs/                  設計文書
 ```
 
-この節の細部は、決定 D742、D753 が決めた。
+- **このリポジトリの Hozo のプロジェクト（ルートと、`plugins/go-http`、`plugins/go-sqlite`）は、仕様を、そのプロジェクトの `spec/` の下に置く**（決定 D806）。`hozo.toml` の `sources` は、どれも `spec/**/*.hozo` 一つ。決定の記録（`spec/decisions/`）も、ルートの `spec/` の下。`vocab/`（hozoc が同梱する語彙）と、プラグインが提供する語彙のファイル（マニフェストの `vocabulary` が名指しする。`plugins/go-cli/cli.hozo` など）は、プロジェクトの仕様ではないので、`spec/` の外に置く。
+
+この節の細部は、決定 D742、D753、D806 が決めた。
 
 ## 依存の向き
 
@@ -573,7 +576,7 @@ func WriteJSON(w io.Writer, diags []Diagnostic, fs *source.FileSet) error   // R
 func Count(diags []Diagnostic) (errors, warnings int)
 ```
 
-`internal/app` の `Presenter` は、`cli.hozo` の model `Diagnostic`（位置は既に行と列）を `Rendered` に写して `WriteRenderedText` と `Report` を使う（`docs/cli.md`「手で書くもの」）。
+`internal/app` の `Presenter` は、`spec/cli.hozo` の model `Diagnostic`（位置は既に行と列）を `Rendered` に写して `WriteRenderedText` と `Report` を使う（`docs/cli.md`「手で書くもの」）。
 
 ### `internal/syntax/token`、`internal/syntax/ast`、`internal/syntax`
 
@@ -742,7 +745,7 @@ func Match(tests []Test, covered []sdk.CoveredFile) []Status          // tests �
 
 ### `internal/app`
 
-`docs/cli.md`「手で書くもの」。葉の op と状態の単位の実装を持つ `App`（`*App` が生成した `compiler.Leaves` を満たし、`Sources()` / `Config()` / `Outputs()` / `OutputsSync()` が状態の単位の実装を返し、`Usecases()` がそれらを `compiler.New` に渡し、`Ops()` が、その結果を、コマンドの行の `New` に渡す。状態に触れる `read outputChanges` と効果 `syncOutputs` は、`Outputs()` と `OutputsSync()` が返す単位のメソッド）と、`cli.Presenter`（`internal/gen/hozo/cli/cli`）の実装 `Presenter`。引数の解釈は持たない（生成した `cli.Main`）。入口の `Main(ctx, a, args, env, stdout, stderr)` は、`cli.Main` を呼ぶ前に、古い名前のコマンド（`check`、`emit`）を見て、新しい書き方を示す（`Renamed(args)` が、その文を返す。`docs/cli.md`「build」の「古い名前」）。`App` はプロセスの環境を自分で読まない: ホームディレクトリは `App.Home`（`cmd/hozoc` が入れる）、環境変数は `cli.hozo` の入力のフィールドで届く。特定の言語のコードは持たない: トランスパイラを起動し、返ったファイルを書き出すだけ（`docs/cli.md`「書き出し」）。
+`docs/cli.md`「手で書くもの」。葉の op と状態の単位の実装を持つ `App`（`*App` が生成した `compiler.Leaves` を満たし、`Sources()` / `Config()` / `Outputs()` / `OutputsSync()` が状態の単位の実装を返し、`Usecases()` がそれらを `compiler.New` に渡し、`Ops()` が、その結果を、コマンドの行の `New` に渡す。状態に触れる `read outputChanges` と効果 `syncOutputs` は、`Outputs()` と `OutputsSync()` が返す単位のメソッド）と、`cli.Presenter`（`internal/gen/hozo/cli/cli`）の実装 `Presenter`。引数の解釈は持たない（生成した `cli.Main`）。入口の `Main(ctx, a, args, env, stdout, stderr)` は、`cli.Main` を呼ぶ前に、古い名前のコマンド（`check`、`emit`）を見て、新しい書き方を示す（`Renamed(args)` が、その文を返す。`docs/cli.md`「build」の「古い名前」）。`App` はプロセスの環境を自分で読まない: ホームディレクトリは `App.Home`（`cmd/hozoc` が入れる）、環境変数は `spec/cli.hozo` の入力のフィールドで届く。特定の言語のコードは持たない: トランスパイラを起動し、返ったファイルを書き出すだけ（`docs/cli.md`「書き出し」）。
 
 ### `internal/lsp`
 
@@ -770,21 +773,21 @@ Go のプラグインは、どれも同じ形: `main` パッケージが `plugin
 |---|---|---|
 | `ir` と `plugin` の型 | `schema/ir.schema.json`（`Program` / `View` と、`$defs` にプロトコルの要求と応答） | `internal/tools/irschema`（`go generate ./schema/...`。構造体は reflect で写し、`kind` のユニオンと列挙は道具の表で持つ） |
 | `token.Keywords` | `editors/vscode/syntaxes/hozo.tmLanguage.json`（予約語の部分は `token.Keywords` から、それ以外は道具の中の表から） | `internal/tools/tmgrammar`（`go generate ./editors/...`） |
-| `cli.hozo`（と、それが指す、ルートの `*.hozo`） | `internal/gen/hozo/compiler/**`、`internal/gen/hozo/cli/**` | `internal/tools/selfgen`（`make generate`。下の「自己生成の手順」） |
-| `plugins/go-http/go-http.hozo`（go-http 自身の要求。`plugins/go-http/hozo.toml` のプロジェクト。`docs/plugin-go-http.md`「go-http 自身の要求」） | `plugins/go-http/internal/spec/**` | 同じ |
-| `plugins/go-sqlite/go-sqlite.hozo`（go-sqlite 自身の要求。`plugins/go-sqlite/hozo.toml` のプロジェクト。`docs/plugin-go-sqlite.md`「go-sqlite 自身の要求」） | `plugins/go-sqlite/internal/spec/**` | 同じ |
+| `spec/cli.hozo`（と、それが指す、`spec/` の `*.hozo`） | `internal/gen/hozo/compiler/**`、`internal/gen/hozo/cli/**` | `internal/tools/selfgen`（`make generate`。下の「自己生成の手順」） |
+| `plugins/go-http/spec/go-http.hozo`（go-http 自身の要求。`plugins/go-http/hozo.toml` のプロジェクト。`docs/plugin-go-http.md`「go-http 自身の要求」） | `plugins/go-http/internal/spec/**` | 同じ |
+| `plugins/go-sqlite/spec/go-sqlite.hozo`（go-sqlite 自身の要求。`plugins/go-sqlite/hozo.toml` のプロジェクト。`docs/plugin-go-sqlite.md`「go-sqlite 自身の要求」） | `plugins/go-sqlite/internal/spec/**` | 同じ |
 | `plugins/` の下の `testdata/<名前>/` の `hozo.toml` と `.hozo` | `testdata/<名前>/views.json`（プラグインの単体テストの入力の `View`） | `tests/pluginviews_test.go` の `TestPluginViewFixtures`（`go test ./tests -run TestPluginViewFixtures -update`。遅れていれば、このテストが落ちる。`docs/testing.md`「単体テスト」） |
 
 生成物はコミットする。CI で生成し直して差分がないことを確かめる（`docs/testing.md`「生成物の一致」）。
 
-生成せずに手で写すものは、写しが合っていることをテストで確かめる: `docs/cli.md` に埋め込んだ `cli.hozo` と `hozo.toml`（`docs/testing.md`「コーパス」）。
+生成せずに手で写すものは、写しが合っていることをテストで確かめる: `docs/cli.md` に埋め込んだ `spec/cli.hozo` と `hozo.toml`（`docs/testing.md`「コーパス」）。
 
 ### 自己生成の手順
 
 自己生成は、プロジェクトを生成し直す: リポジトリのルート（`hozo.toml`。出力先は `internal/gen/hozo/compiler` と `internal/gen/hozo/cli`）と、プラグインのプロジェクト（`plugins/<名前>/hozo.toml`。出力先は `plugins/<名前>/internal/spec`。今は `go-http` と `go-sqlite`）。出力先（以下、「置き場」）のうち、前の二つは `cmd/hozoc` が import するパッケージなので、hozoc がそこへ直に書くと、プラグインの不具合でコンパイルできない Go が出たときに hozoc 自身がビルドできなくなり、生成し直すこともできなくなる。そうならないように、`make generate`（`go run ./internal/tools/selfgen`）は、置き場に、コンパイルできると確かめたものしか置かない。
 
 1. 今のソース（今の置き場を含む）で `hozoc` を一時ディレクトリにビルドする。使うプラグイン（`plugins/` の `go`、`go-valid`、`go-cli`、`go-design`）を、WASM にビルドして、それぞれのディレクトリの `plugin.wasm` に置く（`docs/testing.md`「プラグインの WASM」）。
-2. 別の一時ディレクトリに、リポジトリのルートの仕様のファイル（`*.hozo` と `decisions/*.hozo`: `hozo.toml` の `sources` が並べる、`cli.hozo` と、設計だけのファイル。ディレクトリの形は、そのまま写す。`cli.hozo` の宣言が、設計だけのファイルの宣言を指せるように、すべて写す）、`hozo.toml`、`go.mod`、`go.sum` を写し、プラグインの置き場 `plugins` と、3 の vet が要る `ir`、`plugin`、`runtime` をシンボリックリンクで足して、そこで 1 の `hozoc build` を走らせる（`tests/generated_test.go` と同じ組み立て。import パスは、`hozo.toml` の `[options.go]` の `module` から決まるので、同じになる。`go.mod` は、3 の vet とビルドのために写す）。プラグインのプロジェクトは、プロジェクトごとに、もう一つの一時ディレクトリに、リポジトリの中身を、置き場（`plugins/<名前>/internal/spec`）への道の上のディレクトリだけを本物のディレクトリにし、ほかをシンボリックリンクで足して（置き場そのものは足さない）、その `plugins/<名前>` で `hozoc build` を走らせる（`plugins` を丸ごとリンクすれば、hozoc が、確かめる前のものを、リポジトリに直に書く）。プラグインの探索が見るプロジェクトの外の場所（`HOZO_PLUGIN_PATH`、ホーム）は空にして、生成物が実行する人の環境に左右されないようにする。WASM を、機械の言葉に直したものの置き場（`HOZO_CACHE_DIR`）は、ホームを空にする前の、もとの場所を渡す（生成のたびに、直し直さないように。答えは、変わらない）。
+2. 別の一時ディレクトリに、リポジトリの仕様のファイル（`spec/*.hozo` と `spec/decisions/*.hozo`: `hozo.toml` の `sources` が並べる、`spec/cli.hozo` と、設計だけのファイル。ディレクトリの形は、そのまま写す。`spec/cli.hozo` の宣言が、設計だけのファイルの宣言を指せるように、すべて写す）、`hozo.toml`、`go.mod`、`go.sum` を写し、プラグインの置き場 `plugins` と、3 の vet が要る `ir`、`plugin`、`runtime` をシンボリックリンクで足して、そこで 1 の `hozoc build` を走らせる（`tests/generated_test.go` と同じ組み立て。import パスは、`hozo.toml` の `[options.go]` の `module` から決まるので、同じになる。`go.mod` は、3 の vet とビルドのために写す）。プラグインのプロジェクトは、プロジェクトごとに、もう一つの一時ディレクトリに、リポジトリの中身を、置き場（`plugins/<名前>/internal/spec`）への道の上のディレクトリだけを本物のディレクトリにし、仕様の置き場（`plugins/<名前>/spec`）は中のファイルを複製し（`sources` の glob は、シンボリックリンクに合わない）、ほかをシンボリックリンクで足して（置き場そのものは足さない）、その `plugins/<名前>` で `hozoc build` を走らせる（`plugins` を丸ごとリンクすれば、hozoc が、確かめる前のものを、リポジトリに直に書く）。プラグインの探索が見るプロジェクトの外の場所（`HOZO_PLUGIN_PATH`、ホーム）は空にして、生成物が実行する人の環境に左右されないようにする。WASM を、機械の言葉に直したものの置き場（`HOZO_CACHE_DIR`）は、ホームを空にする前の、もとの場所を渡す（生成のたびに、直し直さないように。答えは、変わらない）。
 3. 生成した置き場の中身を、その一時ディレクトリで `go vet` に通し、次に、リポジトリの今のものの代わりに置いたつもりで（`go build -overlay`。ディスクの上の置き場には触れない）、それを import するパッケージ（`cmd/hozoc`、`internal/app`、プラグインのプロジェクトの下のパッケージ）ごと `go build` する。
 4. 3 が通ったときだけ、置き場の中身を生成したものに置き換える（なくなったファイルは消し、同じ内容のファイルには触れない）。通らなければ何も変えず、生成したものを残した一時ディレクトリの場所を示して失敗する。
 

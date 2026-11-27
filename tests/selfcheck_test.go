@@ -28,7 +28,7 @@ func hozocMainIn(dir string, args []string, stdout, stderr io.Writer) int {
 	return cli.Main(context.Background(), a.Ops(), app.Presenter{}, args, func(string) string { return "" }, stdout, stderr)
 }
 
-// TestSelfCheck は hozoc 自身（リポジトリ直下の cli.hozo と hozo.toml）が hozoc build --no-emit を error なしで通ること
+// TestSelfCheck は hozoc 自身（spec/cli.hozo と、リポジトリ直下の hozo.toml）が hozoc build --no-emit を error なしで通ること
 // （docs/testing.md「コーパス」の最後の段落、docs/requirements.md「段階」の 2）。warning は許し、表示する。
 func TestSelfCheck(t *testing.T) {
 	var stdout, stderr bytes.Buffer

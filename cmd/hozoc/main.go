@@ -1,13 +1,13 @@
 // Command hozoc は Hozo の仕様を検査し、各言語のコードに展開する CLI（docs/cli.md）。
 //
-// 骨組みは cli.hozo から生成したもの（docs/requirements.md「自己展開」の 3）: ユースケースの名前空間 hozo.compiler と、コマンドの行の
+// 骨組みは spec/cli.hozo から生成したもの（docs/requirements.md「自己展開」の 3）: ユースケースの名前空間 hozo.compiler と、コマンドの行の
 // 名前空間 hozo.cli の、型と op の形と配線 internal/gen/hozo/compiler、internal/gen/hozo/cli（基底 go と go-valid。docs/plugin-go.md、
 // docs/plugin-go-valid.md）と、go-cli が出した internal/gen/hozo/cli/cli（docs/plugin-go-cli.md「出力」）。ここは、internal/app の Main を呼ぶだけ: internal/app の葉の op と
 // 状態の単位の実装を compiler.New に渡したもの（app.App の Ops）を、表示（cli.Presenter）と一緒に cli.Main に渡す
 // （docs/cli.md「手で書くもの」）。古い名前のコマンド（check、emit）には、新しい書き方を示す。
-// 骨組みを変えるときは cli.hozo を変えて `make generate`。
+// 骨組みを変えるときは spec/cli.hozo を変えて `make generate`。
 //
-// プロセスの環境を読むのはここだけ: 環境変数は os.Getenv を app.Main（から cli.Main）に渡し（cli.hozo の @cli.env のフィールドに入る）、
+// プロセスの環境を読むのはここだけ: 環境変数は os.Getenv を app.Main（から cli.Main）に渡し（spec/cli.hozo の @cli.env のフィールドに入る）、
 // ホームディレクトリ（プラグインの探索の <ホーム>/.hozo/plugins。docs/plugin-protocol.md「探索」）は app.App に渡す。
 package main
 

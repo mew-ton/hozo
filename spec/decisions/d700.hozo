@@ -1,4 +1,4 @@
-// 決定の記録（700〜799）。名前空間 hozo.decisions。書き方は decisions/adr.hozo の頭のコメント。
+// 決定の記録（700〜799）。名前空間 hozo.decisions。書き方は spec/decisions/adr.hozo の頭のコメント。
 // コードには、ならない（hozo.toml の単位の対象ではない）。
 
 namespace hozo.decisions {

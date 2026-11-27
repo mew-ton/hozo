@@ -47,16 +47,16 @@ func TestParseAllHozo(t *testing.T) {
 	}
 }
 
-// TestDocsEmbedRootFiles は、docs/cli.md「cli.hozo」に埋め込んだ二つのコードブロックが、リポジトリ直下の cli.hozo と
-// hozo.toml の写しであること（バイト単位で同じ）を確かめる。文書は「写し」と言っているので、片方だけを直せばここで分かる。
-// 写しが同じなら、cli.hozo が解析と検査を通ること（TestSelfCheck）は文書のブロックにも言える。
+// TestDocsEmbedRootFiles は、docs/cli.md「cli.hozo」に埋め込んだ二つのコードブロックが、spec/cli.hozo と、
+// リポジトリ直下の hozo.toml の写しであること（バイト単位で同じ）を確かめる。文書は「写し」と言っているので、片方だけを直せばここで分かる。
+// 写しが同じなら、spec/cli.hozo が解析と検査を通ること（TestSelfCheck）は文書のブロックにも言える。
 func TestDocsEmbedRootFiles(t *testing.T) {
 	content, err := os.ReadFile("../docs/cli.md")
 	if err != nil {
 		t.Fatal(err)
 	}
 	for _, c := range []struct{ fence, file string }{
-		{"```ts\n", "cli.hozo"},
+		{"```ts\n", "spec/cli.hozo"},
 		{"```toml\n", "hozo.toml"},
 	} {
 		t.Run(c.file, func(t *testing.T) {
@@ -75,7 +75,7 @@ func TestDocsEmbedRootFiles(t *testing.T) {
 				t.Fatal(err)
 			}
 			if block != string(want) {
-				t.Errorf("docs/cli.md の %s のブロックが、リポジトリ直下の %s と違う（どちらかを直して合わせる）:\n%s",
+				t.Errorf("docs/cli.md の %s のブロックが、リポジトリの %s と違う（どちらかを直して合わせる）:\n%s",
 					c.file, c.file, firstDiff(string(want), block))
 			}
 		})

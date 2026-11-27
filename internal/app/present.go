@@ -26,7 +26,7 @@ import (
 //     （{"diagnostics", "errors", "warnings"}）。例外の引数の名前は、表示に出さない。それ以外は cli.JSONPresenter と同じ。
 //
 // 診断の text と json の形は internal/diag が持つ（diag.Rendered、diag.WriteRenderedText、diag.Report）。ここは、
-// cli.hozo の model Diagnostic をその形に写して呼び、結果と例外ごとの包み（warnings / written / removed、error / value）
+// spec/cli.hozo の model Diagnostic をその形に写して呼び、結果と例外ごとの包み（warnings / written / removed、error / value）
 // だけを書く。
 type Presenter struct{}
 
@@ -119,7 +119,7 @@ func (Presenter) PresentError(w io.Writer, command string, input any, f cli.Fail
 	return err
 }
 
-// isJSON は入力の format が json か（cli.hozo の hozo.cli の BuildInput / TestsInput の format。lsp にはない）。
+// isJSON は入力の format が json か（spec/cli.hozo の hozo.cli の BuildInput / TestsInput の format。lsp にはない）。
 func isJSON(input any) bool {
 	switch in := input.(type) {
 	case hozocli.BuildInput:
@@ -130,7 +130,7 @@ func isJSON(input any) bool {
 	return false
 }
 
-// rendered は cli.hozo の model Diagnostic の列を、表示する形（internal/diag.Rendered）に写す。位置は既に行と列なので
+// rendered は spec/cli.hozo の model Diagnostic の列を、表示する形（internal/diag.Rendered）に写す。位置は既に行と列なので
 // 写すだけ。text と json の形そのものは internal/diag が持つ（docs/packages.md「internal/diag」）。
 func rendered(diags []compiler.Diagnostic) []diag.Rendered {
 	out := make([]diag.Rendered, 0, len(diags))

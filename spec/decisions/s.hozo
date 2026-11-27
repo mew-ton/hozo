@@ -1,4 +1,4 @@
-// 決定の記録（設計書から離れた決定 S1〜S30）。名前空間 hozo.decisions。書き方は decisions/adr.hozo の頭のコメント。
+// 決定の記録（設計書から離れた決定 S1〜S30）。名前空間 hozo.decisions。書き方は spec/decisions/adr.hozo の頭のコメント。
 // コードには、ならない（hozo.toml の単位の対象ではない）。
 // 設計書は、出発点のアイデアの集まりで、仕様ではない（docs/README.md「設計書という呼び名」）。
 

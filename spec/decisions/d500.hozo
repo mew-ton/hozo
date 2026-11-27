@@ -1,6 +1,6 @@
-// 決定の記録（500〜599）。名前空間 hozo.decisions。書き方は decisions/adr.hozo の頭のコメント。
+// 決定の記録（500〜599）。名前空間 hozo.decisions。書き方は spec/decisions/adr.hozo の頭のコメント。
 // コードには、ならない（hozo.toml の単位の対象ではない）。
-// 533 までと 534 からで、本文の形が違う（decisions/adr.hozo の頭のコメント）。
+// 533 までと 534 からで、本文の形が違う（spec/decisions/adr.hozo の頭のコメント）。
 
 namespace hozo.decisions {
   /** 決めたこと。500〜599 */

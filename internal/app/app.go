@@ -1,6 +1,6 @@
 // Package app は hozoc の葉の op の実装と表示（docs/cli.md「手で書くもの」）。
 //
-// 骨組み（型、op の形、実装を受け取る口、配線、引数の解釈、例外の見分けと終了コード、使い方の表示）は cli.hozo から生成した
+// 骨組み（型、op の形、実装を受け取る口、配線、引数の解釈、例外の見分けと終了コード、使い方の表示）は spec/cli.hozo から生成した
 // internal/gen/hozo/compiler と internal/gen/hozo/cli（基底 go と go-valid。docs/plugin-go.md、docs/plugin-go-valid.md）と
 // internal/gen/hozo/cli/cli（go-cli。docs/plugin-go-cli.md）が持ち、ここは、生成した口を満たす [App] と、cli.Presenter の実装 [Presenter] を持つ:
 //
@@ -44,9 +44,9 @@ import (
 
 // App は葉の op の実装（docs/cli.md「手で書くもの」の internal/app）と、それらが共有するもの。零値で使える。
 //
-// cli.hozo の model は境界だけを書く（docs/requirements.md「自己展開」）ので、op をまたいで要る中身は
+// spec/cli.hozo の model は境界だけを書く（docs/requirements.md「自己展開」）ので、op をまたいで要る中身は
 // App の中に持つ: Check が解析した Project（CollectOutputs が使う）と、CollectOutputs が集めた書き出す予定の、置き場を含む形
-// （OutputChanges と SyncOutputs が使う）。プラグインに渡す IR（cli.hozo の model View は中身を持たない）は、その Project から
+// （OutputChanges と SyncOutputs が使う）。プラグインに渡す IR（spec/cli.hozo の model View は中身を持たない）は、その Project から
 // 作る。hozoc は一度の実行で一つのコマンドを走らせるので、同時に使われることはない。
 type App struct {
 	// Dir は作業ディレクトリ。hozo.toml を探し始める場所で、--config の相対パスの基準。空なら os の作業ディレクトリ。
@@ -55,7 +55,7 @@ type App struct {
 	Stderr io.Writer
 	// Home はホームディレクトリ。プラグインの探索が <ホーム>/.hozo/plugins を見るのに使う（docs/plugin-protocol.md「探索」の 3）。
 	// 空なら探さない。App はプロセスの環境から読まない: cmd/hozoc/main.go が os.UserHomeDir() を入れる。
-	// 探索のもう一つの外の場所 HOZO_PLUGIN_PATH は、cli.hozo の入力の pluginPath で届く（cli.Main に渡した env から）。
+	// 探索のもう一つの外の場所 HOZO_PLUGIN_PATH は、spec/cli.hozo の入力の pluginPath で届く（cli.Main に渡した env から）。
 	Home string
 	// Stdin と Stdout は lsp が話す相手（docs/lsp.md「通信」）。nil なら os.Stdin / os.Stdout。
 	Stdin  io.Reader
@@ -82,7 +82,7 @@ type App struct {
 var _ compiler.Leaves = (*App)(nil)
 
 // Ops は a の実装で、コマンドの行（名前空間 hozo.cli）の Ops を組み立てる（docs/cli.md「手で書くもの」）: 入口の op は、フラグで、
-// 道を分け（cli.hozo の分類 Flag の match。生成した本体が行う）、ユースケース（[App.Usecases]）を呼ぶ。返る値は a だけを持ち、
+// 道を分け（spec/cli.hozo の分類 Flag の match。生成した本体が行う）、ユースケース（[App.Usecases]）を呼ぶ。返る値は a だけを持ち、
 // パッケージの変数は使わない（App を二つ作れば、互いに何も共有しない）。
 func (a *App) Ops() hozocli.Ops {
 	return hozocli.New(a.Usecases())
@@ -94,7 +94,7 @@ func (a *App) Usecases() compiler.Ops {
 	return compiler.New(a, a.Sources(), a.Config(), a.Outputs(), a.OutputsSync())
 }
 
-// Serve は cli.hozo の op serve: 言語サーバーとして標準入出力で動く（docs/lsp.md、docs/cli.md「lsp」）。
+// Serve は spec/cli.hozo の op serve: 言語サーバーとして標準入出力で動く（docs/lsp.md、docs/cli.md「lsp」）。
 // internal/lsp.Serve を呼び、クライアントが exit を送るまで戻らない。config（--config / HOZO_CONFIG）は
 // hozo.toml の場所で、なければクライアントの rootUri から探す。log（--log / HOZO_LSP_LOG）はログの書き出し先で、
 // 開けなければその誤りを返す（宣言にない例外なので 70。docs/diagnostics.md「終了コード」）。
@@ -131,9 +131,9 @@ func (a *App) Serve(ctx context.Context, in compiler.ServeInput) error {
 	return lsp.Serve(stdin, stdout, opts)
 }
 
-// 診断と誤りの写し（cli.hozo の model と exception ↔ 中の型）。診断を運ぶ例外そのものは exceptions.go。
+// 診断と誤りの写し（spec/cli.hozo の model と exception ↔ 中の型）。診断を運ぶ例外そのものは exceptions.go。
 
-// toDiagnostics は診断の列を cli.hozo の model Diagnostic の列にする。位置は行と列に直す（docs/diagnostics.md「構造」）。
+// toDiagnostics は診断の列を spec/cli.hozo の model Diagnostic の列にする。位置は行と列に直す（docs/diagnostics.md「構造」）。
 func toDiagnostics(diags []diag.Diagnostic, fs *source.FileSet) []compiler.Diagnostic {
 	out := make([]compiler.Diagnostic, 0, len(diags))
 	for i := range diags {
@@ -198,7 +198,7 @@ func (e *unknownNamespace) Error() string {
 
 func (e *unknownNamespace) Unwrap() error { return compiler.UnknownNamespace{} }
 
-// procError は internal/plugin の誤り（ErrCrashed / ErrMalformedOutput）を cli.hozo の compiler.Crashed /
+// procError は internal/plugin の誤り（ErrCrashed / ErrMalformedOutput）を spec/cli.hozo の compiler.Crashed /
 // compiler.MalformedOutput（生成した hozoc の例外の型。docs/cli.md「手で書くもの」）としても見分けられるようにしたもの。メッセージは元の誤りのまま。errors.Is / errors.As は両方を辿る。
 type procError struct {
 	exc   error // compiler.Crashed{} か compiler.MalformedOutput{}

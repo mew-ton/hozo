@@ -2,7 +2,7 @@
 
 ## この文書が決めること
 
-`cli` の語彙（このプラグインの語彙のファイル `plugins/go-cli/cli.hozo`。リポジトリ直下の `cli.hozo`（hozoc 自身の仕様。`docs/cli.md`）とは別のファイル。出典は設計書の `examples/hozoc.hozo`）を Go の CLI の骨組みにするトランスパイラ `go-cli`。Go の基底 `go`（`docs/plugin-go.md`）と、検証の `go-valid`（`docs/plugin-go-valid.md`）に相乗りする。プラグインは `plugins/go-cli/`。hozoc 自身の骨組みもこれで生成する（`docs/requirements.md`「自己展開」）。
+`cli` の語彙（このプラグインの語彙のファイル `plugins/go-cli/cli.hozo`。`spec/cli.hozo`（hozoc 自身の仕様。`docs/cli.md`）とは別のファイル。出典は設計書の `examples/hozoc.hozo`）を Go の CLI の骨組みにするトランスパイラ `go-cli`。Go の基底 `go`（`docs/plugin-go.md`）と、検証の `go-valid`（`docs/plugin-go-valid.md`）に相乗りする。プラグインは `plugins/go-cli/`。hozoc 自身の骨組みもこれで生成する（`docs/requirements.md`「自己展開」）。
 
 デコレータが出すコードは、型に依らない（`docs/requirements.md`「出力を推論しない」）: コマンドごと、フィールドごと、例外ごとに出すコードは、デコレータの引数だけから作り、どの型でも同じ形（同じ補助の呼び出し）にする。値を取らないフラグかどうか、文字列の読み方は、共通の補助が、実行時に決める（「コマンドごとの関数」）。値が与えられなかったときの扱い（誤りにする、決まった値を入れる）は、デコレータ（`@cli.required`、`@cli.default`）が言う（「引数の解釈」）。型は、書いたものが食い違っていないかを確かめるのにだけ使う（「診断」）。
 
@@ -59,7 +59,7 @@ namespace cli {
 - **位置引数は、位置を引数で言う**（`@cli.arg(1) source`、`@cli.arg(2) target`）。フィールドの宣言の順からは読まない。位置は 1 から、重なりも抜けもなく続く（そうでなければ CLI-10）。
 - **名前を取るデコレータ**（`flag`、`env`）は、`http` の語彙の項目の形（`docs/vocab.md`「`http` の語彙」）と同じ決まり: 名前を省けば、フィールドの名前（`@cli.flag verbose` は `--verbose`）。
 - **値が与えられなかったときの扱いは、二つのデコレータが言う**: `@cli.required`（誤り。`@cli.required @cli.arg(1) source`）と、`@cli.default(<リテラル>)`（その値にする。`@cli.flag @cli.default("text") format`）。どちらもないフィールドは、零値のまま op に渡る。フィールドの型（省略可能かどうか）からは決めず、型の宣言に書く既定値は、言語にない（決定 S24）。`http` の語彙の `@http.required` / `@http.default`（`docs/vocab.md`「`http` の語彙」）と同じ決まりで、確かめるのは、このトランスパイラ（「対象」）。`value` の型は、フィールドに書ける型（「対象」）のリテラルの型。
-- **`plugins/go-cli/cli.hozo` のファイルは、この宣言を持ち**（説明のコメントは、ファイルの方が詳しい。`tests/parse_test.go` の `TestDocsEmbedVocabulary` が、宣言の一致を確かめる）、**リポジトリ直下の `cli.hozo` は、`@cli.arg(1) namespaces` と書いてある**（`docs/cli.md`「cli.hozo」）。リポジトリ直下の `cli.hozo` で、`@cli.required` を付けるフィールドは、`TestsInput` の `coverage` だけ（`docs/cli.md`「tests」）。ほかの入力のフィールドは、どれも省略可能か、残りを受け取る配列（0 個でよい）。`@cli.default` を付けるフィールドは、ない。
+- **`plugins/go-cli/cli.hozo` のファイルは、この宣言を持ち**（説明のコメントは、ファイルの方が詳しい。`tests/parse_test.go` の `TestDocsEmbedVocabulary` が、宣言の一致を確かめる）、**`spec/cli.hozo` は、`@cli.arg(1) namespaces` と書いてある**（`docs/cli.md`「cli.hozo」）。`spec/cli.hozo` で、`@cli.required` を付けるフィールドは、`TestsInput` の `coverage` だけ（`docs/cli.md`「tests」）。ほかの入力のフィールドは、どれも省略可能か、残りを受け取る配列（0 個でよい）。`@cli.default` を付けるフィールドは、ない。
 
 ## 出力
 

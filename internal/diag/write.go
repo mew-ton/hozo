@@ -13,7 +13,7 @@ import (
 // ファイルもなければ file も省く。related と data は、なければ省く）。
 //
 // 表示（text と json）はこの形の上にだけ書く。FileSet を持つ側（WriteText / WriteJSON）は [Render] でこの形にし、
-// 行と列に直した診断しか持たない側（internal/app の Presenter。cli.hozo の model Diagnostic）は自分でこの形に写す。
+// 行と列に直した診断しか持たない側（internal/app の Presenter。spec/cli.hozo の model Diagnostic）は自分でこの形に写す。
 type Rendered struct {
 	Severity string            `json:"severity"` // "error" か "warning"
 	Code     string            `json:"code"`

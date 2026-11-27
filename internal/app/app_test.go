@@ -21,7 +21,7 @@ import (
 
 var update = flag.Bool("update", false, "ゴールデンを更新する")
 
-// 終了コード（docs/diagnostics.md「終了コード」、cli.hozo の @cli.exitCode）。
+// 終了コード（docs/diagnostics.md「終了コード」、spec/cli.hozo の @cli.exitCode）。
 const (
 	exitCheckFailed     = 1  // CheckFailed
 	exitConfigInvalid   = 2  // ConfigInvalid / LanguageMismatch
@@ -201,7 +201,7 @@ func TestCheckFailed(t *testing.T) {
 	if f.Error != "hozo.compiler.CheckFailed" || f.Value.Errors != 1 || f.Value.Warnings != 1 {
 		t.Fatalf("%+v", f)
 	}
-	// Diagnostic.Data（docs/check.md「Data」の RES-1 の candidates）は境界（cli.hozo の Diagnostic.data）を越えて json に出る
+	// Diagnostic.Data（docs/check.md「Data」の RES-1 の candidates）は境界（spec/cli.hozo の Diagnostic.data）を越えて json に出る
 	found := false
 	for _, d := range f.Value.Diagnostics {
 		if d.Code == "RES-1" {
@@ -801,7 +801,7 @@ func TestEmitNothing(t *testing.T) {
 	}
 }
 
-// TestUpToDate は cli.hozo の分類 OutputsSync の述語 UpToDate と OutOfDate（docs/cli.md「cli.hozo」「手で書くもの」）: 生成し直した
+// TestUpToDate は spec/cli.hozo の分類 OutputsSync の述語 UpToDate と OutOfDate（docs/cli.md「cli.hozo」「手で書くもの」）: 生成し直した
 // 内容とディスクの内容を比べる。生成したコードの判定関数 compiler.ClassifyOutputsSync が、状態の分類の単位（App.OutputsSync）の
 // 二つの述語を呼び、真がちょうど一つのケースを返す（OutOfDate は UpToDate の否定なので、いつも、どちらか一つ）。
 func TestUpToDate(t *testing.T) {
@@ -1053,7 +1053,7 @@ func readAll(t *testing.T, dir string) map[string]string {
 }
 
 // TestCacheDirEnvironment は docs/plugin-protocol.md「起動」の、機械の言葉に直したものの置き場が、hozoc に届く道:
-// HOZO_CACHE_DIR は、cli.Main に渡した env から、cli.hozo の入力の cacheDir に入る。プロセスの環境変数は、読まない。
+// HOZO_CACHE_DIR は、cli.Main に渡した env から、spec/cli.hozo の入力の cacheDir に入る。プロセスの環境変数は、読まない。
 func TestCacheDirEnvironment(t *testing.T) {
 	dir := t.TempDir()
 	write(t, filepath.Join(dir, "a.hozo"), "namespace a {\n  fn f();\n}\n")
@@ -1095,7 +1095,7 @@ func TestManifestCommandIsGone(t *testing.T) {
 }
 
 // TestPluginSearchEnvironment は docs/plugin-protocol.md「探索」の 2 と 3 が hozoc に届く道: HOZO_PLUGIN_PATH は cli.Main に
-// 渡した env から cli.hozo の入力の pluginPath に入り、ホームは App.Home。プロセスの環境変数とホームディレクトリは読まない。
+// 渡した env から spec/cli.hozo の入力の pluginPath に入り、ホームは App.Home。プロセスの環境変数とホームディレクトリは読まない。
 func TestPluginSearchEnvironment(t *testing.T) {
 	dir := t.TempDir()
 	write(t, filepath.Join(dir, "a.hozo"), "namespace a {\n  fn f();\n}\nnamespace b {\n  fn g();\n}\n")
@@ -1633,7 +1633,7 @@ func TestEmitIn(t *testing.T) {
 	}
 }
 
-// TestRunEmit は cli.hozo の op runEmit（compiler.Leaves のメソッド。docs/cli.md「手で書くもの」）: plugin を起動し、req を JSON に
+// TestRunEmit は spec/cli.hozo の op runEmit（compiler.Leaves のメソッド。docs/cli.md「手で書くもの」）: plugin を起動し、req を JSON に
 // して送り、応答を compiler.EmitResponse に読んで返す。内部の op なので、内側のパッケージの Ops から呼ぶ。動かすのは、
 // plugin.wasm の WASM。compiler.Spec と compiler.OutputView は中身のない model なので、要求の spec と、
 // 出力の view は空のオブジェクト。異常終了は compiler.Crashed、形の違う応答は compiler.MalformedOutput（どちらも、生成した hozoc の型）。
@@ -1713,7 +1713,7 @@ func TestRunEmit(t *testing.T) {
 	}
 }
 
-// TestStateUnits は、cli.hozo の状態 sources、config、outputs の単位の、形で決まる問い合わせ（IsEmpty と Get。docs/cli.md
+// TestStateUnits は、spec/cli.hozo の状態 sources、config、outputs の単位の、形で決まる問い合わせ（IsEmpty と Get。docs/cli.md
 // 「手で書くもの」の表）: 作業ディレクトリから探した設定で、ディスクから読む。outputs は、出力先ごとの記録に載っているファイルで、
 // 効果 syncOutputs（emit）の結果を判定できる。
 func TestStateUnits(t *testing.T) {

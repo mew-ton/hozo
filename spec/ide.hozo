@@ -1,5 +1,5 @@
 // Hozo 自身の仕様（決定 D468）。IDE と、MCP サーバー: 画面（入口）の名前空間 hozo.ide、AI の道具（入口）の
-// 名前空間 hozo.mcp、二つの入口から入る操作（hozo.operation の続き。はじめの分は lsp.hozo）。
+// 名前空間 hozo.mcp、二つの入口から入る操作（hozo.operation の続き。はじめの分は spec/lsp.hozo）。
 // **写し。持ち主は、文書（docs/tools.md、docs/ide-screens.md）。** 食い違えば、文書が正しい。どの単位の対象でもない: コードには、ならない。
 // IDE も、MCP サーバーも、実装は、まだ、ない。文書も、設計の案の段階（docs/tools.md「IDE の設計の段階」）: 文書が決めていない所は、
 // 書かずに、「決めていない」とコメントにしてある。
@@ -18,7 +18,7 @@
 //   前の穴に、ここでも当たったもの: 13（列挙: 差の種類）、17（op の名前に read）、18（運び方: 画面と hozoc の間の、WebSocket の JSON。MCP）、
 //   22（裏で走る処理: ファイルの変化を見張って、画面を追従させる）
 
-/** 入口から入る操作（docs/tools.md「操作」）。IDE と、MCP サーバーの分。言語サーバーの分は lsp.hozo */
+/** 入口から入る操作（docs/tools.md「操作」）。IDE と、MCP サーバーの分。言語サーバーの分は spec/lsp.hozo */
 namespace hozo.operation {
   // 形を、文書が、まだ決めていない値（docs/tools.md「IDE の設計の段階」の段 6: hozoc との口の設計は、まだ、ない）。
   // 項目は、書かない（穴 26）。何を持つかは、説明に書く。
@@ -411,7 +411,7 @@ namespace hozo.ide {
     return hozo.operation.harness(in);
   }
 
-  /** 文面: .hozo と hozo.toml のファイルと、文面。直に直せる（「文面を見る」）。この部分は、言語サーバーのクライアント（lsp.hozo の入口を使う） */
+  /** 文面: .hozo と hozo.toml のファイルと、文面。直に直せる（「文面を見る」）。この部分は、言語サーバーのクライアント（spec/lsp.hozo の入口を使う） */
   model SourceQuery { element: hozo.operation.Element; }
   @browser.page.route("/source", from: query)
   export fn openSource(query: SourceQuery): hozo.operation.Place? {

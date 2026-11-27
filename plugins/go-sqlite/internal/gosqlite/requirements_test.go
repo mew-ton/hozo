@@ -9,7 +9,7 @@ import (
 	"github.com/mew-ton/hozo/plugins/go-sqlite/internal/spec/gosqlitetest"
 )
 
-// TestRequirements は、go-sqlite 自身の要求（docs/plugin-go-sqlite.md「go-sqlite 自身の要求」）を、仕様 plugins/go-sqlite/go-sqlite.hozo
+// TestRequirements は、go-sqlite 自身の要求（docs/plugin-go-sqlite.md「go-sqlite 自身の要求」）を、仕様 plugins/go-sqlite/spec/go-sqlite.hozo
 // から作った口（gosqlitetest.RunRequirements）で走らせる。要求を足せば、requirements のメソッドを書くまで、ここがコンパイルできない。
 func TestRequirements(t *testing.T) {
 	gosqlitetest.RunRequirements(t, requirements{})

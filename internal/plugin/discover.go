@@ -11,7 +11,7 @@ import (
 )
 
 // PluginPathEnv はプラグインを探すディレクトリを OS のパス区切りで並べた環境変数（docs/plugin-protocol.md「探索」の 2）。
-// このパッケージは環境変数を読まない。値は呼ぶ側が [SearchEnv] で渡す（hozoc は cli.hozo の入力の pluginPath から）。
+// このパッケージは環境変数を読まない。値は呼ぶ側が [SearchEnv] で渡す（hozoc は spec/cli.hozo の入力の pluginPath から）。
 const PluginPathEnv = "HOZO_PLUGIN_PATH"
 
 // SearchEnv は探索が使う、プロジェクトの外の場所（docs/plugin-protocol.md「探索」の 2 と 3）。プロセスの環境変数や

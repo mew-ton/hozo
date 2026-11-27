@@ -633,7 +633,7 @@ func shift(p protocol.Position, n int) protocol.Position {
 	return p
 }
 
-// TestStateClassification は、状態を分類で表す決定（decisions/s.hozo の決定）の構文に対する、
+// TestStateClassification は、状態を分類で表す決定（spec/decisions/s.hozo の決定）の構文に対する、
 // 診断の一致・ホバーの見出し（docs/lsp.md「ホバー」）・定義へジャンプ・ドキュメントのシンボル。
 // コーパスは tests/corpus/state（README.md）。
 func TestStateClassification(t *testing.T) {

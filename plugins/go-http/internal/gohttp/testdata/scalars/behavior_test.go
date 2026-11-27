@@ -44,7 +44,7 @@ func post(h http.Handler, path, body string) *httptest.ResponseRecorder {
 
 const event = `{"at":"2026-01-02T03:04:05Z","moment":"2026-01-02T03:04:05.5+09:00","day":"2026-11-21","clock":"09:30:00.25","count":3,"later":"2027-01-01T00:00:00Z","days":["2026-01-01","2026-01-02"]}`
 
-// TestScalarJSON は、要求 hozo.gohttp.Requirement.ScalarJSON（plugins/go-http/go-http.hozo）。
+// TestScalarJSON は、要求 hozo.gohttp.Requirement.ScalarJSON（plugins/go-http/spec/go-http.hozo）。
 func TestScalarJSON(t *testing.T) {
 	l := &leaves{}
 	h := app.NewHandler(app.New(l))

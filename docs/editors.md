@@ -63,7 +63,7 @@ editors/vscode/
 
 - 予約語の部分は `internal/tools/tmgrammar` が `token.Keywords` から生成する（`docs/packages.md`「生成するもの」）。それ以外のパターンも同じ道具の中（`grammar.go`）に手で書き、ファイル全体を `go generate ./editors/...`（`syntaxes/generate.go`）で決定的に生成する。生成物とのずれは `internal/tools/tmgrammar` のテストと CI が見る（`docs/testing.md`「生成物の一致」）。
 - `is`、`omit`、`condition` は予約語ではない（`docs/grammar.md`「予約語」）ので、どのパターンにも現れない。
-- 文法のテストは `editors/vscode/test/`。`vscode-textmate` + `vscode-oniguruma` で、コーパス・標準の語彙・`cli.hozo` を字句に分け、選んだ字句の scope がこの表の通りであることを `npm test` で確かめる。
+- 文法のテストは `editors/vscode/test/`。`vscode-textmate` + `vscode-oniguruma` で、コーパス・標準の語彙・`spec/cli.hozo` を字句に分け、選んだ字句の scope がこの表の通りであることを `npm test` で確かめる。
 - 型の位置と値の位置の区別は TextMate では位置の規則でしか付けられない。残りは命名規則（§3.3）に頼り、正確な区別は段階 4 の後の semantic tokens に任せる（`docs/lsp.md`）。
 
 この節の細部は、決定 D594、D730 が決めた。

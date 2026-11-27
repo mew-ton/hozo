@@ -10,7 +10,7 @@ import (
 	"github.com/mew-ton/hozo/internal/source"
 )
 
-// Check は cli.hozo の op check（docs/cli.md「検査」）。compiler.Leaves のメソッド。internal/project.LoadWith が 1〜4 を行い、ここは 5:
+// Check は spec/cli.hozo の op check（docs/cli.md「検査」）。compiler.Leaves のメソッド。internal/project.LoadWith が 1〜4 を行い、ここは 5:
 // error が一つでもあれば例外（値は error と warning のすべて）、なければ CheckResult（warning）。
 // 解析した Project は CollectOutputs のために a.checked に置く。
 //

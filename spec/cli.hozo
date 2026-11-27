@@ -7,7 +7,7 @@ namespace hozo.compiler {
    * 担い手: hozoc を使うもの。どの担い手が、どのユースケースを使うかは、ユースケースの op の @prd.usecase.of が言う
    * （docs/tools.md「担い手」、docs/requirements.md「書く人と、読む人」、docs/cli.md「tests」、docs/testing.md「CI」）。
    * 担い手は、していることで分ける。道具（エディタ、CLI、MCP サーバー、IDE）は、入口で、担い手ではない。
-   * 設計する人が使う操作と、画面は、ide.hozo
+   * 設計する人が使う操作と、画面は、spec/ide.hozo
    */
   @adr.decided(hozo.decisions.Decision400.D474)
   classify Actor of never {
@@ -17,7 +17,7 @@ namespace hozo.compiler {
     @prd.actor.human Engineer;
     /** CI。検査を走らせる。プロジェクトのやり方でテストを走らせ、カバレッジのファイルを渡す */
     @prd.actor.bot Ci;
-    /** 設計する人。作りたいものを、仕様として決める。AI に書かせ、読み、直し、中身が仕様どおりかを見る。エンジニアでない人を含む。道具は、IDE（ide.hozo） */
+    /** 設計する人。作りたいものを、仕様として決める。AI に書かせ、読み、直し、中身が仕様どおりかを見る。エンジニアでない人を含む。道具は、IDE（spec/ide.hozo） */
     @prd.actor.human Designer;
   }
 

@@ -409,7 +409,7 @@ func TestDateAndTime(t *testing.T) {
 	}
 }
 
-// TestForeignKeysOn は、要求 hozo.gosqlite.Requirement.ForeignKeysOn（plugins/go-sqlite/go-sqlite.hozo）: Schema が外部キーを持つので、
+// TestForeignKeysOn は、要求 hozo.gosqlite.Requirement.ForeignKeysOn（plugins/go-sqlite/spec/go-sqlite.hozo）: Schema が外部キーを持つので、
 // PRAGMA foreign_keys が効いていない db では、CreateTables は、表を作らずにエラーを返す。効いていれば、表を作り、参照の違反を断る。
 func TestForeignKeysOn(t *testing.T) {
 	ctx := context.Background()

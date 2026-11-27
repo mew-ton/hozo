@@ -1,5 +1,5 @@
 // Hozo 自身の仕様（決定 D468、D475）。業務の流れの名前空間 hozo.flows と、hozoc の外の道具 hozo.toolchain。
-// 流れは、ユースケースの op（cli.hozo の hozo.compiler の、@prd.usecase.of を付けた op）を、順に呼ぶ配線。
+// 流れは、ユースケースの op（spec/cli.hozo の hozo.compiler の、@prd.usecase.of を付けた op）を、順に呼ぶ配線。
 // 出どころは、docs/tools.md「仕事の流れ」「ユースケース」と、docs/cli.md「tests」。文書が言っている流れだけを、写してある。
 // どちらの名前空間も、hozo.toml の単位の対象ではない: コードには、ならない。
 
@@ -76,7 +76,7 @@ namespace hozo.flows {
 
   /**
    * エンジニアが、文面を書く（docs/tools.md「エンジニア（言語サーバー、VS Code 拡張、CLI）」）。
-   * 1 と 2 は、言語サーバーという入口（lsp.hozo の hozo.lsp）から入る操作。3 と 4 は、CLI から入るユースケース。
+   * 1 と 2 は、言語サーバーという入口（spec/lsp.hozo の hozo.lsp）から入る操作。3 と 4 は、CLI から入るユースケース。
    *
    * @param workspace エディタで開いているプロジェクト
    * @param at 文面の中の、カーソルの位置
@@ -166,7 +166,7 @@ namespace hozo.flows {
 
   /**
    * 設計する人の、仕事の流れ（docs/tools.md「仕事の流れ」）。どの段も、IDE の中で起きる。IDE は、まだ、ない: 呼んでいるのは、
-   * ide.hozo に、設計として書いた操作（hozo.operation）と、チャットの AI（hozo.assistant。hozoc の外）。
+   * spec/ide.hozo に、設計として書いた操作（hozo.operation）と、チャットの AI（hozo.assistant。hozoc の外）。
    * 二つに分けてあるのは、一つの op の val の数の上限（WIRE-6）のため。
    *
    * @param project 開くプロジェクト

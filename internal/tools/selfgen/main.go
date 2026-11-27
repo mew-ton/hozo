@@ -1,5 +1,5 @@
 // Command selfgen は `make generate` の中身: プロジェクトの生成物を生成し直す（docs/packages.md「生成するもの」「自己生成の手順」）。
-// リポジトリのルートの hozo.toml（hozoc 自身の仕様 cli.hozo から internal/gen/hozo/compiler/** と internal/gen/hozo/cli/**）と、
+// リポジトリのルートの hozo.toml（hozoc 自身の仕様 spec/cli.hozo から internal/gen/hozo/compiler/** と internal/gen/hozo/cli/**）と、
 // プラグインのプロジェクト plugins/<名前>/hozo.toml（そのプラグイン自身の要求から plugins/<名前>/internal/spec/**。pluginProjects）。
 // 単位の out を、以下、「置き場」。
 //
@@ -9,12 +9,12 @@
 //
 //  1. 今のソース（今の置き場を含む）で hozoc をビルドする。使うプラグイン（plugins/ の go、go-valid、go-cli、go-design）を、WASM に
 //     ビルドして、それぞれのディレクトリの plugin.wasm に置く（docs/testing.md「プラグインの WASM」）。
-//  2. 一時ディレクトリに仕様と設定（cli.hozo、hozo.toml、go.mod、go.sum）を写し、プラグインの置き場 plugins と、3 の vet が
+//  2. 一時ディレクトリに仕様と設定（spec/cli.hozo、hozo.toml、go.mod、go.sum）を写し、プラグインの置き場 plugins と、3 の vet が
 //     要るディレクトリ（ir、plugin、runtime）をシンボリックリンクで足して、そこで hozoc build を走らせる。
 //     生成されるコードの import パスは、hozo.toml の [options.go] の module から決まる（docs/plugin-go.md「パッケージと import パス」）
 //     ので、リポジトリで生成したときと同じになる。go.mod は、3 の vet とビルドのために写す。
 //     プラグインのプロジェクトは、プロジェクトごとに、別の一時ディレクトリに、リポジトリの中身を、置き場への道の上のディレクトリ
-//     だけを本物にし、ほかをシンボリックリンクで足して（mirror）、その plugins/<名前> で hozoc build を走らせる。
+//     だけを本物にし、仕様の置き場 plugins/<名前>/spec は複製し、ほかをシンボリックリンクで足して（mirror）、その plugins/<名前> で hozoc build を走らせる。
 //  3. 生成した置き場の中身を、その一時ディレクトリで vet に通し、次に、リポジトリの今のものの代わりに
 //     置いたつもりで（go の -overlay）、それを使うパッケージ（ルートは cmd/hozoc、internal/app。プラグインのプロジェクトは
 //     plugins/<名前>/...）ごとビルドする。
@@ -41,14 +41,14 @@ import (
 
 // 自己生成の入力と出力（リポジトリのルートからの相対パス）。
 var (
-	// genDirs は cli.hozo からの生成物の置き場（hozo.toml の二つの単位の out。docs/cli.md「cli.hozo」）: 名前空間 hozo.compiler
+	// genDirs は spec/cli.hozo からの生成物の置き場（hozo.toml の二つの単位の out。docs/cli.md「cli.hozo」）: 名前空間 hozo.compiler
 	// （ユースケース）の出力（入口、内側の inner）と、名前空間 hozo.cli（コマンドの行）の出力（入口、go-cli の cli）。
 	genDirs = []string{filepath.Join("internal", "gen", "hozo", "compiler"), filepath.Join("internal", "gen", "hozo", "cli")}
-	// inputs は一時ディレクトリに写すファイル。ほかに、ルートの仕様のファイル（*.hozo）を、すべて写す（specFiles）。
-	inputs = []string{"cli.hozo", "hozo.toml", "go.mod", "go.sum"}
+	// inputs は一時ディレクトリに写すファイル。ほかに、仕様のファイル（spec/*.hozo と spec/decisions/*.hozo）を、すべて写す（specFiles）。
+	inputs = []string{"spec/cli.hozo", "hozo.toml", "go.mod", "go.sum"}
 	// links は一時ディレクトリにシンボリックリンクで足すディレクトリ（プラグインの置き場と、生成物の vet が要るパッケージ）。
 	links = []string{"ir", "plugin", "plugins", "runtime"}
-	// plugins は、cli.hozo の出力に使うプラグイン（hozo.toml の単位の transpilers。plugins/ の下の名前）。生成の前に、WASM に
+	// plugins は、spec/cli.hozo の出力に使うプラグイン（hozo.toml の単位の transpilers。plugins/ の下の名前）。生成の前に、WASM に
 	// ビルドする: マニフェストの wasm は plugin.wasm（docs/plugin-go.md「マニフェスト」）。
 	plugins = []string{"go", "go-valid", "go-cli", "go-design"}
 	// users は、生成物を置き換えたつもりでビルドするパッケージ: 生成物そのものと、それを import するもの。
@@ -117,6 +117,9 @@ func run(repo string, stdout, stderr io.Writer) error {
 			}
 			return err
 		}
+		if err := os.MkdirAll(filepath.Dir(filepath.Join(work, name)), 0o755); err != nil {
+			return err
+		}
 		if err := os.WriteFile(filepath.Join(work, name), data, 0o644); err != nil {
 			return err
 		}
@@ -159,8 +162,8 @@ func run(repo string, stdout, stderr io.Writer) error {
 	for _, name := range pluginProjects {
 		root := filepath.Join("plugins", name)
 		set := project{filepath.Join(tmp, "work-"+name), []string{filepath.Join(root, "internal", "spec")}, []string{"./plugins/" + name + "/..."}}
-		if err := mirror(repo, set.work, ".", set.dirs); err != nil {
-			return fmt.Errorf("シンボリックリンクを作れない: %w", err)
+		if err := mirror(repo, set.work, ".", set.dirs, []string{filepath.Join(root, "spec")}); err != nil {
+			return fmt.Errorf("一時ディレクトリに写せない: %w", err)
 		}
 		if err := commandEnv(filepath.Join(set.work, root), env, io.Discard, stderr, hozoc, "build"); err != nil {
 			return fmt.Errorf("%s で hozoc build が失敗した: %w", filepath.ToSlash(root), err)
@@ -192,9 +195,19 @@ func run(repo string, stdout, stderr io.Writer) error {
 }
 
 // mirror は、repo の dir（リポジトリのルートからの相対パス）を、work に足す: 置き場（outs。同じく相対パス）への道の上の
-// ディレクトリは、本物のディレクトリにして中を同じに足し、置き場そのものは足さない（hozoc が書く）。ほかは、シンボリックリンク。
-func mirror(repo, work, dir string, outs []string) error {
+// ディレクトリは、本物のディレクトリにして中を同じに足し、置き場そのものは足さない（hozoc が書く）。仕様のファイルの置き場
+// （copies。同じく相対パス）は、中を複製する（hozo.toml の sources の glob は、普通のファイルにだけ合い、シンボリックリンクには
+// 合わない）。ほかは、シンボリックリンク。
+func mirror(repo, work, dir string, outs, copies []string) error {
 	onPath := dir == "."
+	for _, c := range copies {
+		if c == dir {
+			return copyTree(filepath.Join(repo, dir), filepath.Join(work, dir))
+		}
+		if strings.HasPrefix(c, dir+string(filepath.Separator)) {
+			onPath = true
+		}
+	}
 	for _, out := range outs {
 		if out == dir {
 			return nil
@@ -214,20 +227,45 @@ func mirror(repo, work, dir string, outs []string) error {
 		return err
 	}
 	for _, e := range entries {
-		if err := mirror(repo, work, filepath.Join(dir, e.Name()), outs); err != nil {
+		if err := mirror(repo, work, filepath.Join(dir, e.Name()), outs, copies); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
+// copyTree は、ディレクトリ src の下を、dst に複製する（ディレクトリと普通のファイルだけ。シンボリックリンクは、たどらない）。
+func copyTree(src, dst string) error {
+	return filepath.WalkDir(src, func(p string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		rel, err := filepath.Rel(src, p)
+		if err != nil {
+			return err
+		}
+		target := filepath.Join(dst, rel)
+		if d.IsDir() {
+			return os.MkdirAll(target, 0o755)
+		}
+		if !d.Type().IsRegular() {
+			return nil
+		}
+		data, err := os.ReadFile(p)
+		if err != nil {
+			return err
+		}
+		return os.WriteFile(target, data, 0o644)
+	})
+}
+
 // places は、置き場の一覧（メッセージ用）。
-// specFiles は、リポジトリのルートの仕様のファイル（*.hozo と decisions/*.hozo。hozo.toml の sources が並べるもの: cli.hozo と、
-// 設計だけのファイル）の、ルートからの相対の名前。cli.hozo の宣言が、設計だけのファイルの宣言を指す（決定の記録への @adr.decided など）
+// specFiles は、リポジトリの仕様のファイル（spec/*.hozo と spec/decisions/*.hozo。hozo.toml の sources が並べるもの: spec/cli.hozo と、
+// 設計だけのファイル）の、ルートからの相対の名前。spec/cli.hozo の宣言が、設計だけのファイルの宣言を指す（決定の記録への @adr.decided など）
 // ので、生成するときに、すべて要る（docs/packages.md「自己生成の手順」の 2）。
 func specFiles(repo string) ([]string, error) {
 	var names []string
-	for _, pattern := range []string{"*.hozo", filepath.Join("decisions", "*.hozo")} {
+	for _, pattern := range []string{filepath.Join("spec", "*.hozo"), filepath.Join("spec", "decisions", "*.hozo")} {
 		matches, err := filepath.Glob(filepath.Join(repo, pattern))
 		if err != nil {
 			return nil, err

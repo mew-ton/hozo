@@ -466,7 +466,7 @@ type ArgValue =
   | { kind: "list"; items: ArgValue[] };
 ```
 
-`DeclBase.decorators` の並びは書かれた順（上から下）。`repeatable` なデコレータは、同じ `decorator` の `Application` が、付けた数だけ、書かれた順に並ぶ。§8.2「適用順は op に近いものから」なので、**最後の要素が最も内側で、最初に適用される**。入れ子の構造にはせず、この順序付きの列で表す（`decisions/` の決定）。
+`DeclBase.decorators` の並びは書かれた順（上から下）。`repeatable` なデコレータは、同じ `decorator` の `Application` が、付けた数だけ、書かれた順に並ぶ。§8.2「適用順は op に近いものから」なので、**最後の要素が最も内側で、最初に適用される**。入れ子の構造にはせず、この順序付きの列で表す（`spec/decisions/` の決定）。
 
 ### bind
 

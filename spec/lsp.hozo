@@ -6,10 +6,10 @@
 // 分け方（同 472、473 の線: 入口と、ユースケースを分ける。フラグや、やり取りの形を知っているのは、入口だけ）:
 //   hozo.lsp        入口。LSP の要求と通知。位置の数え方、URI、Markdown など、LSP の形を知っているのは、ここだけ
 //   hozo.operation  入口から入る操作（docs/tools.md「操作」: 道具は、同じ操作への、別々の口）。担い手は、ここに結ぶ
-//   hozo.editor     hozoc の外: 言語サーバーのクライアント（文面のエディタ）。サーバーから送る通知を、op として言う（flows.hozo の
+//   hozo.editor     hozoc の外: 言語サーバーのクライアント（文面のエディタ）。サーバーから送る通知を、op として言う（spec/flows.hozo の
 //                   hozo.toolchain と同じ形）。担い手ではなく、入口の相手（同 474）
 // 操作は、本来は、ユースケースの名前空間 hozo.compiler に置くもの（同 473）。hozo.compiler は、単位の対象で、op を足すと、生成物が変わる
-// ので、この一切れでは、別の名前空間に書いた。cli.hozo の hozo.compiler.serve（葉。「言語サーバーとして動く」）は、ここに書いた入口と操作の
+// ので、この一切れでは、別の名前空間に書いた。spec/cli.hozo の hozo.compiler.serve（葉。「言語サーバーとして動く」）は、ここに書いた入口と操作の
 // 全体を、一つの op にしたもの: 重なっている（どちらに寄せるかは、決めていない: docs/open.md）。
 //
 // 書けなかった所の持ち主は docs/open.md「サンプルと、hozoc 自身の仕様」（下の「穴 21」などは、その番号）:
@@ -60,7 +60,7 @@ namespace hozo.operation {
 
   /**
    * 検査する（docs/tools.md「操作」）: プロジェクトの全体を解析して、hozoc 自身の診断を返す。エンジニアの「文面を書く」「設定する」、
-   * 設計する人の「欠けを知る」、AI の「検査する」（入口は、言語サーバー、IDE、MCP サーバー: ide.hozo）。
+   * 設計する人の「欠けを知る」、AI の「検査する」（入口は、言語サーバー、IDE、MCP サーバー: spec/ide.hozo）。
    * 仕様の誤りと、hozo.toml の誤り（位置のないものは、hozo.toml の 1 行 1 列）、hozo.toml がないときの LSP-1。プラグインは、起動しない。
    *
    * hozo.compiler の検査（check）と、同じ実装（internal/check）の呼び出しで、同じ入力に、同じ診断が出る（docs/lsp.md「診断」）。
