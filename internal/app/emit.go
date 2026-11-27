@@ -34,7 +34,7 @@ type output struct {
 	dir     string // その出力の Dir(U, N)。記録（.hozoc-outputs.json）の置き場
 }
 
-// CollectOutputs は cli.hozo の op collectOutputs（docs/cli.md「書き出し」の 1〜3）: 検査（Check）が、プラグインから受け取った答えから、
+// CollectOutputs は spec/cli.hozo の op collectOutputs（docs/cli.md「書き出し」の 1〜3）: 検査（Check）が、プラグインから受け取った答えから、
 // 出力ごとのファイルを集める。プラグインは、起動しない。compiler.Leaves のメソッド。葉の op なので、状態（生成したファイル）には触れない: 読むのも書くのも、
 // ユースケース write の配線が、この後に呼ぶ read outputChanges（[App.Outputs]）と効果 syncOutputs（[App.OutputsSync]）。内部の op で、
 // テストは、内側のパッケージ internal/gen/hozo/compiler/inner の Ops から呼ぶ。checked は Check が返したもの（warning）で、その中身
@@ -89,7 +89,7 @@ func (a *App) plannedFor(plan compiler.EmitPlan) (*outputPlan, error) {
 	return pl, nil
 }
 
-// VerifyOutputs は cli.hozo の op verifyOutputs（docs/cli.md「書き出し」の 1〜3 を、確かめるためだけに行う）: 検査（Check）が、
+// VerifyOutputs は spec/cli.hozo の op verifyOutputs（docs/cli.md「書き出し」の 1〜3 を、確かめるためだけに行う）: 検査（Check）が、
 // プラグインから受け取った答えから、出力ごとのファイルを集めて、確かめる（[App.collect]: パスの誤り、テストの対応表、ファイルの
 // 衝突）。集めたファイルは、返さない: 返すのは、warning だけの結果。compiler.Leaves のメソッドで、ユースケース verify（検査だけ）の
 // 配線が、check の後に呼ぶ。ファイルには、触れない。設定なし（hozo.toml が見つからない）なら、集めるものがないので、誤りにせず、
@@ -111,7 +111,7 @@ func (a *App) VerifyOutputs(ctx context.Context, in compiler.EmitInput, checked 
 	return compiler.BuildResult{Warnings: toDiagnostics(warnings, p.Files), Written: []compiler.Path{}, Removed: []compiler.Path{}}, nil
 }
 
-// PlannedChanges は cli.hozo の op plannedChanges（docs/cli.md「書き出し」の 4）: 書き出す予定 plan を、結果の形にする。Written は、
+// PlannedChanges は spec/cli.hozo の op plannedChanges（docs/cli.md「書き出し」の 4）: 書き出す予定 plan を、結果の形にする。Written は、
 // 書く予定のファイルのパス（plan.Files の順: パスの辞書順）、Removed は、空（消すファイルは、今の生成したファイルを読まないと
 // 決まらないので、決めない）。compiler.Leaves のメソッドで、ユースケース preview（書き出す予定を見る）の配線が、collectOutputs の後に呼ぶ。
 // ファイルには、触れない。plan は、直前の CollectOutputs が返したもの（[App.plannedFor] が確かめる）。
@@ -186,7 +186,7 @@ func (pl *outputPlan) record(dir string) []byte {
 }
 
 // collect は docs/cli.md「書き出し」の 1〜3: 対象を決め、対象の出力ごとに、単位のトランスパイラの答え（p.Answers）から files を
-// 集め、パスの重複を確かめる。ファイルには触れない。誤りは cli.hozo の例外で返す（UnknownNamespace、compiler.MalformedOutput、
+// 集め、パスの重複を確かめる。ファイルには触れない。誤りは spec/cli.hozo の例外で返す（UnknownNamespace、compiler.MalformedOutput、
 // OutputConflict）。
 //
 // hozoc 本体はコードを出力しない（docs/plugin-protocol.md「この文書が決めること」）。どのトランスパイラも、一つの出力の答えを、
@@ -317,7 +317,7 @@ func (a *App) collect(ctx context.Context, p *project.Project, namespaces []stri
 	return pl, nil
 }
 
-// RunEmit は cli.hozo の op runEmit: プラグインを一つ起動して、受け持つ出力のすべてを、まとめて展開させる
+// RunEmit は spec/cli.hozo の op runEmit: プラグインを一つ起動して、受け持つ出力のすべてを、まとめて展開させる
 // （docs/plugin-protocol.md「起動」）。compiler.Leaves のメソッド。どの配線からも呼ばれない内部の op で、プラグインとの境界の記述と
 // してある（docs/cli.md「手で書くもの」）: plugin を起動し（WASM のファイルは plugin.wasm。サンドボックスの中で動かす）、
 // req を JSON にして送り、応答を compiler.EmitResponse に読んで返す。compiler.Spec と compiler.OutputView は中身のない

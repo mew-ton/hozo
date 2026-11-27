@@ -1,6 +1,6 @@
 # 設計文書
 
-Hozo の言語と、その実装（このリポジトリ）の設計。言語の意味（何が正しい Hozo か）の持ち主は、ここに並ぶ文書。決定の持ち主は、リポジトリ直下の `decisions/` の、分類のケース（決定ごとに一つ。決定 D541）。文書が「決定 D479」「決定 S13」と書けば、そこのケース `D479`、`S13` のこと。まだ決めていないことの一覧は `open.md`。作業の進め方の決まりは、リポジトリ直下の `CLAUDE.md`。
+Hozo の言語と、その実装（このリポジトリ）の設計。言語の意味（何が正しい Hozo か）の持ち主は、ここに並ぶ文書。決定の持ち主は、リポジトリの `spec/decisions/` の、分類のケース（決定ごとに一つ。決定 D541）。文書が「決定 D479」「決定 S13」と書けば、そこのケース `D479`、`S13` のこと。まだ決めていないことの一覧は `open.md`。作業の進め方の決まりは、リポジトリ直下の `CLAUDE.md`。
 
 ## 設計書という呼び名
 
@@ -33,7 +33,7 @@ Hozo の言語と、その実装（このリポジトリ）の設計。言語の
 | [`plugin-go-cli.md`](plugin-go-cli.md) | `cli` の語彙を Go の CLI にする相乗り `go-cli` | `plugins/go-cli` |
 | [`plugin-go-design.md`](plugin-go-design.md) | 設計の図の語彙（`prd.business.flow`、`prd.usecase.of`、`prd.ref`）から、フローの E2E テストの口と、要求ごとの、テストの入れ物の口を出す相乗り `go-design` | `plugins/go-design` |
 | [`diagnostics.md`](diagnostics.md) | 診断の形、表示、終了コード | `internal/diag` |
-| [`cli.md`](cli.md) | `hozoc` の振る舞いと `cli.hozo` | `cli.hozo`、`internal/app`、`cmd/hozoc` |
+| [`cli.md`](cli.md) | `hozoc` の振る舞いと `spec/cli.hozo` | `spec/cli.hozo`、`internal/app`、`cmd/hozoc` |
 | [`lsp.md`](lsp.md) | 言語サーバー | `internal/lsp` |
 | [`packages.md`](packages.md) | ディレクトリ、Go のパッケージと API、依存の向き、生成するもの | 全体 |
 | [`testing.md`](testing.md) | テストの置き場と書き方、CI | `tests/`、`.github/workflows` |
@@ -103,9 +103,9 @@ Hozo の言語と、その実装（このリポジトリ）の設計。言語の
 | 「値がない」「返らない」（式の型） | `types.md`「型の種類」 |
 | 状態の単位（生成した Go の中の、状態ごとのインターフェース。設定の単位とは別） | `plugin-go.md`「状態の単位」 |
 | 語彙の名前空間 | `vocab.md`「語彙の名前空間」 |
-| `cli.hozo`（リポジトリ直下の、hozoc 自身の仕様）と `plugins/go-cli/cli.hozo`（go-cli の語彙） | `cli.md`「cli.hozo」 |
-| hozoc の担い手（`Actor`）と、hozoc の要求（`Requirement`） | `cli.hozo` の、その名前の分類（写しは `cli.md`「cli.hozo」） |
+| `spec/cli.hozo`（hozoc 自身の仕様）と `plugins/go-cli/cli.hozo`（go-cli の語彙） | `cli.md`「cli.hozo」 |
+| hozoc の担い手（`Actor`）と、hozoc の要求（`Requirement`） | `spec/cli.hozo` の、その名前の分類（写しは `cli.md`「cli.hozo」） |
 
 ## 書き方
 
-一段落に一つの主張を、見出しの下に置く。別の文書が決めたことは、その文書と見出しを名指しして引き、書き写さない。決めた理由は、決定に置く（`decisions/`。書き方は `decisions/adr.hozo` の頭のコメント）。`open.md` は未決の点と持ち主の一覧で、問いの中身は、持ち主の文書に置く（持ち主のない点だけ、`open.md` が持つ）。
+一段落に一つの主張を、見出しの下に置く。別の文書が決めたことは、その文書と見出しを名指しして引き、書き写さない。決めた理由は、決定に置く（`spec/decisions/`。書き方は `spec/decisions/adr.hozo` の頭のコメント）。`open.md` は未決の点と持ち主の一覧で、問いの中身は、持ち主の文書に置く（持ち主のない点だけ、`open.md` が持つ）。

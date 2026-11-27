@@ -46,7 +46,7 @@ func post(h http.Handler, path, body string) *httptest.ResponseRecorder {
 	return rec
 }
 
-// TestBodyLimit は、要求 hozo.gohttp.Requirement.BodyLimit（plugins/go-http/go-http.hozo）。
+// TestBodyLimit は、要求 hozo.gohttp.Requirement.BodyLimit（plugins/go-http/spec/go-http.hozo）。
 func TestBodyLimit(t *testing.T) {
 	const tooLarge = `{"error":"http.BadRequest","value":{"message":"body: too large","violations":[]}}`
 	sl, pl := &smallLeaves{}, &plainLeaves{}

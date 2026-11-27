@@ -1,6 +1,6 @@
 # go-sqlite 自身の要求（docs/plugin-go-sqlite.md「go-sqlite 自身の要求」）。このディレクトリを、一つの Hozo のプロジェクトにする
 [hozo]
-sources     = ["go-sqlite.hozo"]
+sources     = ["spec/**/*.hozo"]
 plugin_dirs = [".."]
 
 # Go のモジュールのパスに、このディレクトリまでのパスを足したもの（モジュールは、リポジトリのルートの go.mod）

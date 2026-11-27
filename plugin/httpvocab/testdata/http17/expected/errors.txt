@@ -1,0 +1,1 @@
+HTTP-17	app.Taken	例外 app.Taken に、@http.status と @http.badRequest の両方が付いている（通信の上の形は、どちらか一つ）

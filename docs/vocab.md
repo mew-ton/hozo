@@ -30,7 +30,7 @@ hozoc が同梱して常に読み込む語彙（`vocab/*.hozo`）と、その読
 | ファイル | 中身 | 出典 |
 |---|---|---|
 | `vocab/valid.hozo` | `namespace valid { min / max / length / pattern / format }` | §4.2、§6.5 |
-| `vocab/http.hozo` | `namespace http { ServerError / NetworkError / BadRequest / Violation / get / post / status / header / query / body / headerObj / queryObj / bodyObj / required / default / retry }` | §4.2。`BadRequest` と `Violation` は足したもの（下）。`header` / `query` / `body` の引数と、`headerObj` / `queryObj` / `bodyObj`、`required`、`default` は、出典から変えたか、足したもの（「`http` の語彙」） |
+| `vocab/http.hozo` | `namespace http { ServerError / NetworkError / BadRequest / Violation / get / post / status / badRequest / header / query / body / headerObj / queryObj / bodyObj / required / default / retry }` | §4.2。`BadRequest` と `Violation`、`badRequest` は足したもの（下）。`header` / `query` / `body` の引数と、`headerObj` / `queryObj` / `bodyObj`、`required`、`default` は、出典から変えたか、足したもの（「`http` の語彙」） |
 | `vocab/db.hozo` | `namespace db { table / text / int / float / bool / datetime / date / time / json / key / unique / ref / find / list / where / latest / insert / update / delete / conflict / transaction }` | §4.2。`key` / `unique` / `ref` のほかは、出典から変えたか、足したもの（「`db` の語彙」「`db` の表と、しまい方」「`db` の read と効果」） |
 | `vocab/browser.hozo` | `namespace browser { localStorage }` と、その下の `namespace page { Aborted / Route / Query / path / query / route / dialog / fallback / interaction }`（FQN は `browser.page.*`） | §4.2。出典は、グローバルの `localStorage` と、名前空間 `page`。`browser` の下に動かした（決定 D455、D462） |
 | `vocab/fs.hozo` | `namespace fs { files }` | `examples/hozoc.hozo` |
@@ -40,7 +40,7 @@ hozoc が同梱して常に読み込む語彙（`vocab/*.hozo`）と、その読
 - 各ファイルの中身は出典の宣言をそのまま写す。ドキュメンテーションコメントも写す（ホバーに出るため）。ただし、出典の書き方のうち、言語からなくしたものは直す: 省略可能な引数の `x?: T` は `x: T?` に（`length(min: int?, max: int?)`、`route(path: string, from: any state?, onInvalid: any effect?)`）、節に並べるものの区切りの `|` は `,` に（`decorator fn get(path: string): throws ServerError, NetworkError;`。決定 S25）。どちらも `docs/grammar.md`「決めたこと」。
 - `valid.length` は、付けた先で、数えるものが変わる: 文字列（scalar か、フィールド）なら、文字の数。配列のフィールドなら、要素の数。配列の要素に掛けるなら、要素の型（scalar）に付ける。意味の持ち主は `docs/plugin-valid.md`「制約」（決定 D400、D401）。
 - `prd` と、その下の `prd.actor`、`prd.usecase`、`prd.business` は、設計書にはない。設計の図（ユースケース図、業務フロー図、要求の文書）から決めたもので、中身は「設計の図の語彙」。
-- `fs` は `examples/hozoc.hozo` では同じファイルの中に語彙として書かれているが、hozoc 自身の境界（ファイル）なので標準に入れる。`cli.hozo` からは、その宣言を外す（二重に宣言すると RES-6）。
+- `fs` は `examples/hozoc.hozo` では同じファイルの中に語彙として書かれているが、hozoc 自身の境界（ファイル）なので標準に入れる。`spec/cli.hozo` からは、その宣言を外す（二重に宣言すると RES-6）。
 - 出典の `examples/hozoc.hozo` の語彙 `proc`（外部プロセスの起動: `stdio`、`Crashed`、`MalformedOutput`）は、標準に入れない（決定 D434）: プラグインは、hozoc の中の WASM の実行環境で動き、外部プロセスを起動しない。二つの例外は、hozoc 自身の仕様の、名前空間 `hozoc` の例外（`docs/cli.md`「cli.hozo」）。
 - `@http.get` / `@http.post` は、境界の入口（`@entry`）で、通信の途中の失敗（`ServerError`、`NetworkError`）は、fn の外で起きる例外（`outer throws`）として、宣言する（出典の `@external` は、なくした: `docs/grammar.md`「decorator の宣言」）。
 - `http` には、出典にない例外を一つ足す: op を呼ぶ前の失敗（要求を入力に読めない、入力が制約に合わない）を伝える `BadRequest`。運ぶ値は、例外の引数で書く（`docs/grammar.md`「exception / effect / read」）。HTTP のサーバーのトランスパイラが返し（`docs/plugin-go-http.md`「op を呼ぶ前の失敗」）、通信の上の名前 `http.BadRequest` と値の形の持ち主になる。`@http.get` / `@http.post` の `throws`（外から見たときに加わる例外）には、まだ入れない: 入れると、HTTP の op を呼ぶすべての配線が `http.BadRequest` を書くことになる。呼ぶ側のトランスパイラを作るときに決める。
@@ -50,6 +50,13 @@ hozoc が同梱して常に読み込む語彙（`vocab/*.hozo`）と、その読
   model Violation { path: string; constraint: string; }
   /** 要求を op の入力に読めなかった、または入力が制約に合わなかった（op は呼ばれていない） */
   exception BadRequest(message: string, violations: Violation[]);
+```
+
+- `http` には、出典にないデコレータを一つ足す: 例外を、op を呼ぶ前の失敗と同じ形（`http.BadRequest`）で返す印 `badRequest(code: int, message: string)`。意味と、書いたものの整合の決まりの持ち主は `docs/plugin-http.md`「失敗の応答」「対象」。
+
+```ts
+  /** この例外を、op を呼ぶ前の失敗と同じ形（BadRequest）で、ステータス code で返す。message の中の {引数の名前} は、その引数の値に替える */
+  decorator badRequest(code: int, message: string) for exception;
 ```
 
 - `db` は、出典のグローバルのデコレータ `db`（`@db state …`）をなくして `db.table` に置き換え、出典にないデコレータを足す。中身は「`db` の語彙」。

@@ -1,5 +1,5 @@
 // TextMate の文法を VS Code と同じ字句解析器（vscode-textmate + vscode-oniguruma）で動かし、
-// 実物の .hozo（コーパス、標準の語彙、cli.hozo）の選んだ字句が docs/editors.md「TextMate の文法」の
+// 実物の .hozo（コーパス、標準の語彙、spec/cli.hozo）の選んだ字句が docs/editors.md「TextMate の文法」の
 // scope になることを確かめる。
 'use strict';
 const test = require('node:test');
@@ -15,7 +15,7 @@ const files = {
   http: path.join(root, 'vocab', 'http.hozo'),
   page: path.join(root, 'vocab', 'browser.hozo'),
   valid: path.join(root, 'vocab', 'valid.hozo'),
-  cli: path.join(root, 'cli.hozo'),
+  cli: path.join(root, 'spec', 'cli.hozo'),
   // 状態の分類・遷移の効果・状態での match（docs/grammar.md「exception / effect / read」「classify」「配線」）
   state: path.join(root, 'tests', 'corpus', 'state', 'shop.hozo'),
   // export、reads、extends / override、op の分類とケースの as、throw、read の宣言、直に呼ぶ組み込みの効果（docs/grammar.md「model」「exception / effect / read」「classify」「op」「配線」）と、

@@ -15894,6 +15894,72 @@
           },
           {
             "kind": "decorator",
+            "name": "http.badRequest",
+            "description": {
+              "summary": "この例外を、op を呼ぶ前の失敗と同じ形（BadRequest）で、ステータス code で返す。message の中の {引数の名前} は、その引数の値に替える",
+              "body": "この例外を、op を呼ぶ前の失敗と同じ形（BadRequest）で、ステータス code で返す。message の中の {引数の名前} は、その引数の値に替える",
+              "params": [],
+              "throws": [],
+              "see": []
+            },
+            "decorators": [],
+            "span": {
+              "file": "hozo:vocab/http.hozo",
+              "start": {
+                "line": 19,
+                "col": 3
+              },
+              "end": {
+                "line": 19,
+                "col": 66
+              }
+            },
+            "params": [
+              {
+                "name": "code",
+                "type": {
+                  "kind": "type",
+                  "types": [
+                    {
+                      "kind": "core",
+                      "name": "int"
+                    }
+                  ]
+                },
+                "optional": false,
+                "rest": false
+              },
+              {
+                "name": "message",
+                "type": {
+                  "kind": "type",
+                  "types": [
+                    {
+                      "kind": "core",
+                      "name": "string"
+                    }
+                  ]
+                },
+                "optional": false,
+                "rest": false
+              }
+            ],
+            "fn": false,
+            "targets": [
+              "exception"
+            ],
+            "caseTargets": [],
+            "entry": false,
+            "hint": false,
+            "repeatable": false,
+            "throws": [],
+            "outerThrows": [],
+            "catches": [],
+            "reads": [],
+            "effects": []
+          },
+          {
+            "kind": "decorator",
             "name": "http.header",
             "description": {
               "summary": "このフィールドを、要求のヘッダ一つから読む。name を省けば、フィールドの名前",
@@ -15906,11 +15972,11 @@
             "span": {
               "file": "hozo:vocab/http.hozo",
               "start": {
-                "line": 20,
+                "line": 22,
                 "col": 3
               },
               "end": {
-                "line": 20,
+                "line": 22,
                 "col": 45
               }
             },
@@ -15958,11 +16024,11 @@
             "span": {
               "file": "hozo:vocab/http.hozo",
               "start": {
-                "line": 22,
+                "line": 24,
                 "col": 3
               },
               "end": {
-                "line": 22,
+                "line": 24,
                 "col": 44
               }
             },
@@ -16010,11 +16076,11 @@
             "span": {
               "file": "hozo:vocab/http.hozo",
               "start": {
-                "line": 24,
+                "line": 26,
                 "col": 3
               },
               "end": {
-                "line": 24,
+                "line": 26,
                 "col": 43
               }
             },
@@ -16062,11 +16128,11 @@
             "span": {
               "file": "hozo:vocab/http.hozo",
               "start": {
-                "line": 27,
+                "line": 29,
                 "col": 3
               },
               "end": {
-                "line": 27,
+                "line": 29,
                 "col": 33
               }
             },
@@ -16099,11 +16165,11 @@
             "span": {
               "file": "hozo:vocab/http.hozo",
               "start": {
-                "line": 29,
+                "line": 31,
                 "col": 3
               },
               "end": {
-                "line": 29,
+                "line": 31,
                 "col": 32
               }
             },
@@ -16136,11 +16202,11 @@
             "span": {
               "file": "hozo:vocab/http.hozo",
               "start": {
-                "line": 31,
+                "line": 33,
                 "col": 3
               },
               "end": {
-                "line": 31,
+                "line": 33,
                 "col": 31
               }
             },
@@ -16173,11 +16239,11 @@
             "span": {
               "file": "hozo:vocab/http.hozo",
               "start": {
-                "line": 34,
+                "line": 36,
                 "col": 3
               },
               "end": {
-                "line": 34,
+                "line": 36,
                 "col": 32
               }
             },
@@ -16210,11 +16276,11 @@
             "span": {
               "file": "hozo:vocab/http.hozo",
               "start": {
-                "line": 36,
+                "line": 38,
                 "col": 3
               },
               "end": {
-                "line": 36,
+                "line": 38,
                 "col": 81
               }
             },
@@ -16271,11 +16337,11 @@
             "span": {
               "file": "hozo:vocab/http.hozo",
               "start": {
-                "line": 38,
+                "line": 40,
                 "col": 3
               },
               "end": {
-                "line": 38,
+                "line": 40,
                 "col": 34
               }
             },

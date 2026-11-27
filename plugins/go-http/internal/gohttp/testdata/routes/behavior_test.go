@@ -213,7 +213,7 @@ func TestRouting(t *testing.T) {
 }
 
 // ヘッダと本文の項目: 名前を書いたものと省いたもの、項目がないときの三つの扱い。
-// TestNullIsAbsent は、要求 hozo.gohttp.Requirement.NullIsAbsent（plugins/go-http/go-http.hozo）: 本文の項目の値が null なら、
+// TestNullIsAbsent は、要求 hozo.gohttp.Requirement.NullIsAbsent（plugins/go-http/spec/go-http.hozo）: 本文の項目の値が null なら、
 // その項目を送らなかったものと読む。@http.required の項目は 400 の missing、@http.default の項目は、その値、どちらもなければ零値。
 func TestNullIsAbsent(t *testing.T) {
 	leaves, h := newAPI()
@@ -385,7 +385,7 @@ func TestQuery(t *testing.T) {
 	expectJSON(t, call(t, h, "GET", "/items?q=x&min=1", ""), 200, `[]`)
 }
 
-// TestFiniteFloat は、要求 hozo.gohttp.Requirement.FiniteFloat（plugins/go-http/go-http.hozo）: クエリの float の値は、有限の値だけを
+// TestFiniteFloat は、要求 hozo.gohttp.Requirement.FiniteFloat（plugins/go-http/spec/go-http.hozo）: クエリの float の値は、有限の値だけを
 // 読む。strconv.ParseFloat が読む NaN と無限大は、読めない値で、op を呼ばずに 400 の "query <名前>: invalid float"。核の型、省略可能、
 // scalar の、どれも。有限の値は、指数の形でも、読む。
 func TestFiniteFloat(t *testing.T) {
@@ -644,7 +644,7 @@ var (
 	_                                                  = api.NewHandler(api.New(&apiLeaves{}))
 )
 
-// TestInternalErrorHook は、要求 hozo.gohttp.Requirement.InternalErrorHook（plugins/go-http/go-http.hozo）: WithInternalError の関数は、
+// TestInternalErrorHook は、要求 hozo.gohttp.Requirement.InternalErrorHook（plugins/go-http/spec/go-http.hozo）: WithInternalError の関数は、
 // ハンドラが 500 を返すときだけ、その要求と、op が返したエラーで、一度呼ばれる。応答は、渡さないときと同じ。@http.status を持つ例外と、
 // op を呼ぶ前の失敗では、呼ばれない。@http.status を持つ例外のない出力（bare）でも、同じ。
 func TestInternalErrorHook(t *testing.T) {

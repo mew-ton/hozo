@@ -536,7 +536,7 @@ func dbConflict(err, conflict error) error {
 
 ## go-sqlite 自身の要求
 
-go-sqlite の出力の振る舞いのうち、テストで確かめ続けるものは、要求として、仕様 `plugins/go-sqlite/go-sqlite.hozo`（名前空間 `hozo.gosqlite`）に書く。形は go-http と同じ（`docs/plugin-go-http.md`「go-http 自身の要求」）: `plugins/go-sqlite` は、自分の `hozo.toml` を持つ一つの Hozo のプロジェクトで（`module` は `github.com/mew-ton/hozo/plugins/go-sqlite`）、要求ごとの、テストの入れ物の口（`plugins/go-sqlite/internal/spec/gosqlitetest` の `Requirements` と `RunRequirements`）は go-design が作り、`plugins/go-sqlite/internal/gosqlite/requirements_test.go` の `TestRequirements` が満たす。go-sqlite を使う人は、これらのテストを書かない。仕様は、この文書の写し。
+go-sqlite の出力の振る舞いのうち、テストで確かめ続けるものは、要求として、仕様 `plugins/go-sqlite/spec/go-sqlite.hozo`（名前空間 `hozo.gosqlite`）に書く。形は go-http と同じ（`docs/plugin-go-http.md`「go-http 自身の要求」）: `plugins/go-sqlite` は、自分の `hozo.toml` を持つ一つの Hozo のプロジェクトで（`module` は `github.com/mew-ton/hozo/plugins/go-sqlite`）、要求ごとの、テストの入れ物の口（`plugins/go-sqlite/internal/spec/gosqlitetest` の `Requirements` と `RunRequirements`）は go-design が作り、`plugins/go-sqlite/internal/gosqlite/requirements_test.go` の `TestRequirements` が満たす。go-sqlite を使う人は、これらのテストを書かない。仕様は、この文書の写し。
 
 | 要求（`hozo.gosqlite.Requirement` のケース） | 振る舞いの持ち主 |
 |---|---|

@@ -12,10 +12,10 @@
 // 書けなかった所の持ち主は docs/open.md「サンプルと、hozoc 自身の仕様」（下の「穴 30」などは、その番号）:
 //   穴 30: 診断の ID を、そのままの綴りで書けない（RES-1 の - は、名前に書けない）。RES_1 と書き、もとの綴りは、説明に書いた
 //   穴 31: 印の付け方の決まり（どのケースにも、重さか欠番の、どちらかが、ちょうど一つ）を、言えない
-//   穴 32: 要求を、それを確かめる内部の op（cli.hozo の check、collectOutputs、matchTests）に、結べない。自前の印 @checkedBy で、
+//   穴 32: 要求を、それを確かめる内部の op（spec/cli.hozo の check、collectOutputs、matchTests）に、結べない。自前の印 @checkedBy で、
 //          外から呼べるユースケース（verify、confirmTests）に結んだ
 //   穴 33: プラグインの診断を、そのプラグインに結べない（プラグインは、別の製品で、Hozo の宣言を持たない）。やり取りの op
-//          （plugin.hozo の readVocabulary、emit）に、@prd.ref で結んだ: どのプラグインかは、分類の名前が言うだけ
+//          （spec/plugin.hozo の readVocabulary、emit）に、@prd.ref で結んだ: どのプラグインかは、分類の名前が言うだけ
 //   穴 34: 規則の例（通る例と、落ちる例）を、要求に結ぶ書き方が、ない
 //   穴 35: 文言の型（どの値を埋めるか）は、Data を持つ診断にしか、書けていない
 //   穴 10（兄弟の名前空間を、短く引けない）は、ここでも当たった。重さ（Severity）は、リテラルの型（決定 D482）が
@@ -44,7 +44,7 @@ namespace hozo.diagnostics {
   decorator severity(level: any case of Severity) for case of never;
 
   /**
-   * 出どころの決定（decisions/ の決定の番号）。文書が、番号を言っているものにだけ、付けてある。
+   * 出どころの決定（spec/decisions/ の決定の番号）。文書が、番号を言っているものにだけ、付けてある。
    *
    * @param decisions 決定の番号
    */
@@ -83,7 +83,7 @@ namespace hozo.diagnostics {
   decorator carries(data: any model) for case of never;
 
   /**
-   * その診断を出すユースケース（cli.hozo の hozo.compiler の、外から呼べる op）。確かめる op そのもの（内部の check など）は、
+   * その診断を出すユースケース（spec/cli.hozo の hozo.compiler の、外から呼べる op）。確かめる op そのもの（内部の check など）は、
    * 別の名前空間からは、指せない（NS-5: 穴 32）。
    *
    * @param ops ユースケースの op

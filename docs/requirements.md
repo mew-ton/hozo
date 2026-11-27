@@ -121,7 +121,7 @@ Hozo が、約束しないもの:
 
 ### ただ一つの正
 
-要件: 設計を言うものは、仕様（`.hozo`）だけ。レビューで見せる形（図を含む。「レビューで見せる形」）、生成するコードの枠、テストは、どれも仕様から作る。設計を言うものを、仕様の横に、手で保守しない（決定 D175）。hozoc の要求としては、`cli.hozo` の `Requirement.SingleSource`（コマンド `build` に結んである）。
+要件: 設計を言うものは、仕様（`.hozo`）だけ。レビューで見せる形（図を含む。「レビューで見せる形」）、生成するコードの枠、テストは、どれも仕様から作る。設計を言うものを、仕様の横に、手で保守しない（決定 D175）。hozoc の要求としては、`spec/cli.hozo` の `Requirement.SingleSource`（コマンド `build` に結んである）。
 
 今の状態: 仕様から作っているのは、コードと、テストの口（`hozoc build`。`docs/cli.md`「書き出し」。口の持ち主は、「ハーネス」の表）。レビューで見せる形と、行の遷移の保証は、まだ作っていない（「段階」）。
 
@@ -129,7 +129,7 @@ Hozo が、約束しないもの:
 
 ### 書く人と、読む人
 
-`.hozo` の文面を書くのは、主に AI（と、エンジニア）。人は、UI で読み、手直しする（「UI での手直し」）。hozoc を呼ぶ担い手（設計する人、文面を書く AI とエンジニア、CI）の一覧と、どの担い手が、どのコマンドを呼ぶかの持ち主は、`cli.hozo` の分類 `Actor` と `@prd.usecase.of`（`docs/cli.md`「cli.hozo」）。だから、文面は、長く、厳密でよい: 手で書きやすいことより、検査が、曖昧なく確かめられることを取る（決定 D176）。
+`.hozo` の文面を書くのは、主に AI（と、エンジニア）。人は、UI で読み、手直しする（「UI での手直し」）。hozoc を呼ぶ担い手（設計する人、文面を書く AI とエンジニア、CI）の一覧と、どの担い手が、どのコマンドを呼ぶかの持ち主は、`spec/cli.hozo` の分類 `Actor` と `@prd.usecase.of`（`docs/cli.md`「cli.hozo」）。だから、文面は、長く、厳密でよい: 手で書きやすいことより、検査が、曖昧なく確かめられることを取る（決定 D176）。
 
 AI の下書きを読む流れのほかに、人が、先に置く流れも、要件にする（同 526）: マネージャー（PdM、PjM）が、UI で、配線のない fn（ユースケース）を置き、開発者が、それをつないで、設計の正にする。細部は、決めていない（`docs/open.md`「次の段」）。
 
@@ -286,8 +286,8 @@ hozoc は自分自身の境界（コマンド、ファイル、プラグイン�
 進め方は三つ:
 
 1. **仮の CLI**: 手で書いた Go で、`.hozo` を解析・検査し、Go のコード（§4.3 の、言語ごとの既定の出力。今は基底のプラグイン `plugins/go/` が出す）を書き出せるところまで作る。`cli` の語彙（`examples/hozoc.hozo` の `cli.command` / `cli.arg` / `cli.flag` / `cli.env` / `cli.exitCode`）を Go の CLI の骨組み（サブコマンドの振り分け、フラグと環境変数の読み取り、終了コード）にするプラグイン `plugins/go-cli/` もここで作る。
-2. **hozoc を `.hozo` で書く**: `examples/hozoc.hozo` を元に、リポジトリ直下の `cli.hozo` と `hozo.toml` を書く。`lsp` サブコマンドもここに op として入れる。仮の CLI の `check` を通す。
-3. **置き換え**: 仮の CLI が `cli.hozo` から Go を生成し、`cmd/hozoc` の手書きの骨組みをそれで置き換える。葉の op（解析、検査、展開、プラグインの呼び出し、言語サーバー）の中身は手で書いたものをつなぐ。以降、CLI の骨組みの変更は `cli.hozo` を変えて生成し直す。
+2. **hozoc を `.hozo` で書く**: `examples/hozoc.hozo` を元に、`spec/cli.hozo` と、リポジトリ直下の `hozo.toml` を書く。`lsp` サブコマンドもここに op として入れる。仮の CLI の `check` を通す。
+3. **置き換え**: 仮の CLI が `spec/cli.hozo` から Go を生成し、`cmd/hozoc` の手書きの骨組みをそれで置き換える。葉の op（解析、検査、展開、プラグインの呼び出し、言語サーバー）の中身は手で書いたものをつなぐ。以降、CLI の骨組みの変更は `spec/cli.hozo` を変えて生成し直す。
 
 この順番にする理由は、最初の利用者を hozoc 自身にして、基底の出力とプラグインのプロトコルを本物の入力で確かめるため。`examples/hozoc.hozo` が「書けなかったもの」として挙げた三つの解き方は `docs/cli.md`「cli.hozo」。
 
@@ -446,10 +446,10 @@ IR の構造と JSON の形は `docs/ir.md` が持ち主。Go の `ir` パッケ
 
 | 段階 | 入口 | 終わったと言える条件 |
 |---|---|---|
-| 0 | 詳細設計 | `docs/README.md` に並ぶ設計文書がそろい、実装の判断を残さない。決定は `decisions/` にある |
+| 0 | 詳細設計 | `docs/README.md` に並ぶ設計文書がそろい、実装の判断を残さない。決定は `spec/decisions/` にある |
 | 1 | 仮の CLI（「自己展開」の 1） | `tests/corpus/` の設計書の例（`docs/testing.md`「コーパス」）がすべて `check` を通り、「検査の規則の一覧」のうち語彙に固有でない規則が `docs/testing.md`「規則ごとのテスト」の形で確かめられている。`hozo.toml`（`docs/config.md`）を読み、Go のコード（`docs/plugin-go.md`）を書き出せる。プラグインのプロトコル（`docs/plugin-protocol.md`）で `plugins/go-cli/` を呼べる |
-| 2 | hozoc を `.hozo` で書く（「自己展開」の 2） | `cli.hozo` が仮の CLI の `check` を通る |
-| 3 | 置き換え（「自己展開」の 3） | `cmd/hozoc` の骨組みが `cli.hozo` から生成したもので、`hozoc build --no-emit` と `hozoc build` が生成後も同じ結果を返す。生成物が `cli.hozo` から遅れていないことをテストで確かめる |
+| 2 | hozoc を `.hozo` で書く（「自己展開」の 2） | `spec/cli.hozo` が仮の CLI の `check` を通る |
+| 3 | 置き換え（「自己展開」の 3） | `cmd/hozoc` の骨組みが `spec/cli.hozo` から生成したもので、`hozoc build --no-emit` と `hozoc build` が生成後も同じ結果を返す。生成物が `spec/cli.hozo` から遅れていないことをテストで確かめる |
 | 4 | `hozoc lsp`、シンタックスハイライト | 「言語サーバー」の段階 4 の機能が VS Code で動き、`.hozo` に色が付く |
 | 5 | TS の基底のプラグインと、TS 向けの一次プラグイン | 言語が `ts` の単位（設計書の例の `browser`）に対して、react-router などの最初のトランスパイラが一つ動く。TS の単位でも、出力の衝突（CFG-5）・単位の言語の不一致（CFG-16）・`unsupported` の warning（CFG-6）が Go の単位と同じに働く（`docs/config.md`「診断」） |
 | 6 | `hozoc import` / `hozoc extract`、§12 のアサーションとカバレッジ | 段階 5 が終わってから要件を書く |
@@ -475,10 +475,10 @@ IR の構造と JSON の形は `docs/ir.md` が持ち主。Go の `ir` パッケ
 |---|---|---|
 | R1 | 言語の変更（決定 S15〜S23） | 済み。`reads`、純粋さ、op の分類、ケースの型、`throw`、`never`、状態の参照、形の型、model の継承、`export` を、解析・検査・IR が持つ |
 | R2 | 基底と相乗りのプラグイン（同「決めたこと」67〜88） | 済み。hozoc 本体が、特定の言語のコードを持たない（`internal/emit` がない）。Go のコードは、基底 `go` と、相乗りの `go-valid`、`go-sqlite`、`go-http`、`go-cli` が出す。サンプル `shop-server` の `TestSamples` が、飛ばしも、言語の検査だけへの落としもなく、すべて通る（サンプルの中のプラグイン `go-ratelimit` の分を含む）。hozoc 自身の骨組み（`internal/gen/`）を、`go` + `go-valid` + `go-cli` で生成し直してある。文書とコードの一致を見るテスト（`docs/testing.md`「文書とコードの一致」）が通る |
-| R3 | デコレータで言う読み書きと、型に依らない出力（同「決めたこと」91〜123、「設計書から離れた決定」S24） | 済み。文書とサンプルを先に書き、その後に実装を入れた。条件: 言語（デコレータの対象 `effect`、`reads` / `effects` の節、残りの引数、予約語のデコレータ名、DEC-17、`Op.carried`、版 0.5。フィールドの既定値がないこと）を、解析・検査・IR・スキーマ・SDK が持つ。語彙のファイルが、文書の形になる: `vocab/db.hozo`（`docs/vocab.md`「`db` の読み書きのデコレータ」の全文）、`vocab/http.hozo`（同「`http` の語彙」）、`plugins/go-cli/cli.hozo`（`docs/plugin-go-cli.md`「語彙」）。三つとも、値がないときの扱いのデコレータ（`db.nullable`、`http.required` / `http.default`、`cli.required` / `cli.default`）を持つ。今の語彙で書いてある仕様を、それに合わせて直す: リポジトリ直下の `cli.hozo` と、その写し（`docs/cli.md`「cli.hozo」の `@cli.arg(1)`）、コーパスと規則ごとのテストとプラグインの単体テストの入力のうち、`@db state …`、引数のない `@cli.arg`、一つの `@http.body` を「本文そのもの」と読ませているもの、フィールドの既定値（`= 1`）、`@db.nullable` のない省略可能な列、`@http.required` / `@cli.required` を書かずに「なければ誤り」を当てにしているもの。基底 `go` が op の置き場を直に持つ効果と読む状態で決め（`SharedState` の命令）、`New<Model>` を出さず、`go-sqlite`、`go-http`、`go-cli` が、それぞれの文書の通りに出す（`docs/plugin-go-sqlite.md`「しまい方」「op の中身」「補助」、`docs/plugin-go-http.md`「出力」「入力の読み方」「通信の形」、`docs/plugin-go-cli.md`「引数の解釈」「コマンドごとの関数」）。`go-valid` が GOVALID-2 を返さない。hozoc 自身の骨組み（`internal/gen/`）を、生成し直してある。すべてのプラグインのマニフェスト（サンプルの中の `go-ratelimit` を含む）の `protocol` が 0.5 になる。サンプル `shop-server` の `TestSamples` が、飛ばしなしで、すべて通る（`tests/samples/README.md`「移行の間」）。残っていた二点は決めた（決定 D123） |
-| R4 | 例外、効果、`read` を同じ書き方にする（同「決めたこと」124、127 の（a）、132〜144、「設計書から離れた決定」S25〜S28） | 済み。文書とサンプルを先に書き、その後に実装を入れた。条件: 言語（節の区切りの `,`、引数を持つ `exception` / `effect` / `read` の宣言、配線からの `read` と効果の呼び出しと、直に呼ぶ組み込みの効果、引数を持つ `throw`、葉の op が `reads` / `effects` を書けないこと、核の印 `@repeatable`、版）を、解析・検査・IR・スキーマ・SDK が持つ（`docs/grammar.md`「exception / effect / read」「decorator の宣言」「配線」、`docs/check.md`「状態に触れるもの」、`docs/ir.md`「版」）。語彙のファイルが、文書の形になる: `vocab/db.hozo`（`docs/vocab.md`「`db` の語彙」の全文）、`vocab/http.hozo`（同「同梱する語彙」の `BadRequest`）。今の語彙と言語で書いてある、サンプル `shop-server` の外の、すべての仕様（リポジトリ直下の `cli.hozo` と、その写し `docs/cli.md`「cli.hozo」、コーパス、規則ごとのテスト、プラグインの単体テストの入力と、その `views.json`。サンプルの中の `go-ratelimit` の `views.json` と、それに合わせる `testdata/seams/behavior_test.go` を含む）を、新しい書き方と版に直す。基底 `go` が、`read` と効果を状態の単位のメソッドにし、配線からそれを呼び、`SharedState` を出さず、例外を引数ごとのフィールドで出す（`docs/plugin-go.md`「op の置き場」「状態の単位」「呼び出し」「exception」）。`go-sqlite` が、`read` と効果の中身を宣言から作り、`@db.transaction` の継ぎ目を宣言して、その実装を出す（`docs/plugin-go-sqlite.md`「マニフェスト」「read の中身」「効果の中身」「トランザクション」「診断」）。`go-http` と `go-cli` が、例外の値を、引数の名前をキーにしたオブジェクトで返す（`docs/plugin-go-http.md`「失敗の応答」、`docs/plugin-go-cli.md`「実行と表示」）。hozoc 自身の骨組み（`internal/gen/`）を、生成し直してある。すべてのプラグインのマニフェスト（サンプルの中の `go-ratelimit` を含む）の `protocol` が、`docs/ir.md`「版」の今の版になる。サンプル `shop-server` の `TestSamples` が、飛ばしなしで、すべて通る（`tests/samples/README.md`「移行の間」） |
+| R3 | デコレータで言う読み書きと、型に依らない出力（同「決めたこと」91〜123、「設計書から離れた決定」S24） | 済み。文書とサンプルを先に書き、その後に実装を入れた。条件: 言語（デコレータの対象 `effect`、`reads` / `effects` の節、残りの引数、予約語のデコレータ名、DEC-17、`Op.carried`、版 0.5。フィールドの既定値がないこと）を、解析・検査・IR・スキーマ・SDK が持つ。語彙のファイルが、文書の形になる: `vocab/db.hozo`（`docs/vocab.md`「`db` の読み書きのデコレータ」の全文）、`vocab/http.hozo`（同「`http` の語彙」）、`plugins/go-cli/cli.hozo`（`docs/plugin-go-cli.md`「語彙」）。三つとも、値がないときの扱いのデコレータ（`db.nullable`、`http.required` / `http.default`、`cli.required` / `cli.default`）を持つ。今の語彙で書いてある仕様を、それに合わせて直す: リポジトリ直下の `spec/cli.hozo` と、その写し（`docs/cli.md`「cli.hozo」の `@cli.arg(1)`）、コーパスと規則ごとのテストとプラグインの単体テストの入力のうち、`@db state …`、引数のない `@cli.arg`、一つの `@http.body` を「本文そのもの」と読ませているもの、フィールドの既定値（`= 1`）、`@db.nullable` のない省略可能な列、`@http.required` / `@cli.required` を書かずに「なければ誤り」を当てにしているもの。基底 `go` が op の置き場を直に持つ効果と読む状態で決め（`SharedState` の命令）、`New<Model>` を出さず、`go-sqlite`、`go-http`、`go-cli` が、それぞれの文書の通りに出す（`docs/plugin-go-sqlite.md`「しまい方」「op の中身」「補助」、`docs/plugin-go-http.md`「出力」「入力の読み方」「通信の形」、`docs/plugin-go-cli.md`「引数の解釈」「コマンドごとの関数」）。`go-valid` が GOVALID-2 を返さない。hozoc 自身の骨組み（`internal/gen/`）を、生成し直してある。すべてのプラグインのマニフェスト（サンプルの中の `go-ratelimit` を含む）の `protocol` が 0.5 になる。サンプル `shop-server` の `TestSamples` が、飛ばしなしで、すべて通る（`tests/samples/README.md`「移行の間」）。残っていた二点は決めた（決定 D123） |
+| R4 | 例外、効果、`read` を同じ書き方にする（同「決めたこと」124、127 の（a）、132〜144、「設計書から離れた決定」S25〜S28） | 済み。文書とサンプルを先に書き、その後に実装を入れた。条件: 言語（節の区切りの `,`、引数を持つ `exception` / `effect` / `read` の宣言、配線からの `read` と効果の呼び出しと、直に呼ぶ組み込みの効果、引数を持つ `throw`、葉の op が `reads` / `effects` を書けないこと、核の印 `@repeatable`、版）を、解析・検査・IR・スキーマ・SDK が持つ（`docs/grammar.md`「exception / effect / read」「decorator の宣言」「配線」、`docs/check.md`「状態に触れるもの」、`docs/ir.md`「版」）。語彙のファイルが、文書の形になる: `vocab/db.hozo`（`docs/vocab.md`「`db` の語彙」の全文）、`vocab/http.hozo`（同「同梱する語彙」の `BadRequest`）。今の語彙と言語で書いてある、サンプル `shop-server` の外の、すべての仕様（リポジトリ直下の `spec/cli.hozo` と、その写し `docs/cli.md`「cli.hozo」、コーパス、規則ごとのテスト、プラグインの単体テストの入力と、その `views.json`。サンプルの中の `go-ratelimit` の `views.json` と、それに合わせる `testdata/seams/behavior_test.go` を含む）を、新しい書き方と版に直す。基底 `go` が、`read` と効果を状態の単位のメソッドにし、配線からそれを呼び、`SharedState` を出さず、例外を引数ごとのフィールドで出す（`docs/plugin-go.md`「op の置き場」「状態の単位」「呼び出し」「exception」）。`go-sqlite` が、`read` と効果の中身を宣言から作り、`@db.transaction` の継ぎ目を宣言して、その実装を出す（`docs/plugin-go-sqlite.md`「マニフェスト」「read の中身」「効果の中身」「トランザクション」「診断」）。`go-http` と `go-cli` が、例外の値を、引数の名前をキーにしたオブジェクトで返す（`docs/plugin-go-http.md`「失敗の応答」、`docs/plugin-go-cli.md`「実行と表示」）。hozoc 自身の骨組み（`internal/gen/`）を、生成し直してある。すべてのプラグインのマニフェスト（サンプルの中の `go-ratelimit` を含む）の `protocol` が、`docs/ir.md`「版」の今の版になる。サンプル `shop-server` の `TestSamples` が、飛ばしなしで、すべて通る（`tests/samples/README.md`「移行の間」） |
 | R5 | op の中身に立ち入らない: 基底 `go` の関数の形を一通りにする（同「決めたこと」145〜148） | 済み。文書とサンプルを先に書き、その後に実装を入れた。条件: 基底 `go` が、仕様の宣言を写した関数（op、`read` と効果のメソッド、分類の述語と判定関数、継ぎ目のメソッドと `body`）のすべてに、最初の引数 `ctx context.Context` と、最後の戻り値 `error` を出し、純粋さで形を分けない。判定の誤りを `panic` にするコードを出さない（`docs/plugin-go.md`「op の形」「呼び出し」「分類」）。`plugin/golang` が、その形を写す（`docs/packages.md`「`plugin/golang`（公開）」）。相乗り（`go-valid`、`go-sqlite`、`go-http`、`go-cli`、サンプルの中の `go-ratelimit`）の出力と入力が、その形に合う。hozoc 自身の骨組み（`internal/gen/`）を生成し直し、`internal/app` の葉が `ctx` を取る（`docs/cli.md`「手で書くもの」）。`hozoc` の外から見える振る舞い（コマンド、フラグ、環境変数、終了コード、出力）は変わらない。サンプル `shop-server` の `TestSamples` が、飛ばしなしで、すべて通る |
-| R6 | IDE の設計から出た、言語と語彙の変更（同「決めたこと」224、229、230、233、234、245、264、265、267〜270、278〜285、294〜299、302、303、307〜381） | **まだ。** 二つに分けて入れる（同 333）: 言語の部分と、プラグインの部分。言語の部分は、文書、サンプル、実装が、入った（下の「R6 の、言語の部分」。終わったと言える条件は、案のままで、利用者が確かめていない）。プラグインの部分は、設計が決まり、四つの段が、入った: ユースケースと、フローと、テスト用の単位が出す形は、決まった（同 364〜367）。効果の入口の確かめの形も、決まった（同 371、372）。テストの段と、作る役（単体テストは基底、インテグレーションテストと E2E テストは、デコレータを読むプラグイン）と、必要なケースの数え方も、決まった（同 373〜376）。要求のテストの形（要求ごとに、入れ物を一つ）も、決まった（同 377）。終わったと言える条件は、下の「R6 の、プラグインの部分」（同 378）。四つの段は、すべて、入った: 段 1（条件と、標準の語彙）、段 2（基底 `go`: 単体テストの口と、効果の入口の確かめ）、段 3（`go-http`: インテグレーションテストの口）、段 4（テストのプラグイン `go-design` と、サンプル）。条件の一つずつを、どこが満たしているかは、同じ見出しの「条件を満たしている所」。残るのは、利用者が、聞かずに決めた細部（`decisions/` の、`@adr.proposed` の決定）と、言語の部分の条件を、確かめること。どちらも、文書とサンプルを先に書き、その後に実装を入れる。入れるものは、下の「R6 に入れるもの」 |
+| R6 | IDE の設計から出た、言語と語彙の変更（同「決めたこと」224、229、230、233、234、245、264、265、267〜270、278〜285、294〜299、302、303、307〜381） | **まだ。** 二つに分けて入れる（同 333）: 言語の部分と、プラグインの部分。言語の部分は、文書、サンプル、実装が、入った（下の「R6 の、言語の部分」。終わったと言える条件は、案のままで、利用者が確かめていない）。プラグインの部分は、設計が決まり、四つの段が、入った: ユースケースと、フローと、テスト用の単位が出す形は、決まった（同 364〜367）。効果の入口の確かめの形も、決まった（同 371、372）。テストの段と、作る役（単体テストは基底、インテグレーションテストと E2E テストは、デコレータを読むプラグイン）と、必要なケースの数え方も、決まった（同 373〜376）。要求のテストの形（要求ごとに、入れ物を一つ）も、決まった（同 377）。終わったと言える条件は、下の「R6 の、プラグインの部分」（同 378）。四つの段は、すべて、入った: 段 1（条件と、標準の語彙）、段 2（基底 `go`: 単体テストの口と、効果の入口の確かめ）、段 3（`go-http`: インテグレーションテストの口）、段 4（テストのプラグイン `go-design` と、サンプル）。条件の一つずつを、どこが満たしているかは、同じ見出しの「条件を満たしている所」。残るのは、利用者が、聞かずに決めた細部（`spec/decisions/` の、`@adr.proposed` の決定）と、言語の部分の条件を、確かめること。どちらも、文書とサンプルを先に書き、その後に実装を入れる。入れるものは、下の「R6 に入れるもの」 |
 
 R6 に入れるもの（決定 D279〜D285、D294〜D299、D302、D303、D307〜D381）。一つずつ足すと、互いの整合が、点ごとに決まってしまうので、部分（言語、プラグイン）ごとにまとめて、一度に見る。それぞれの、決まっていることと、決めていないことの持ち主は、右の列:
 
@@ -508,7 +508,7 @@ R2 の成果物:
 | プロトコル: 版 0.4（`requires`、`seams`、`View.config` の `index` / `base` / `options` / `seams`、`select` の廃止） | `docs/plugin-protocol.md`、`docs/ir.md`「その名前空間から見た IR」 |
 | 公開の SDK: `plugin`（`Options`）、`plugin/golang`（形の規則）、`plugin/govalid` | `docs/packages.md` |
 | プラグイン `plugins/go`、`plugins/go-valid`、`plugins/go-sqlite`、`plugins/go-http`、`plugins/go-cli`（作り直し） | `docs/plugin-go.md`、`docs/plugin-go-valid.md`、`docs/plugin-go-sqlite.md`、`docs/plugin-go-http.md`、`docs/plugin-http.md`、`docs/plugin-valid.md`、`docs/plugin-db.md`、`docs/plugin-go-cli.md` |
-| `emit` の手順（本体は出力を作らない）、`cli.hozo` と `hozo.toml`、`internal/app` | `docs/cli.md` |
+| `emit` の手順（本体は出力を作らない）、`spec/cli.hozo` と `hozo.toml`、`internal/app` | `docs/cli.md` |
 | 語彙: `http.BadRequest` | `docs/vocab.md`「同梱する語彙」 |
 | テスト: サンプルのサブテスト、コーパスのゴールデンの作り直し、`select` のコーパスと `pick` の削除 | `docs/testing.md`、`tests/samples/README.md` |
 | サンプルの中のプラグイン `go-ratelimit`（継ぎ目の中身を出す、プロジェクトの中のプラグインの例）の実装 | `tests/samples/shop-server/README.md`「サンプルの中のプラグイン」 |
@@ -523,13 +523,13 @@ R6 のうち、言語（解析、検査、IR）が変わる部分。「R6 に入
 
 - 言語を、解析・検査・IR・スキーマ・SDK が持つ: 対象のない分類（`classify … of never`）、分類のケースへのデコレータ、デコレータの宣言の、分類のケース（`case of …`。付ける先と、引数の種類）、引数でケースを指すこと、配線の `val`、`=`、`disjoint`、`for`、`disjoint for`、`collect`、文の終わりの `;` の決まり、`match` の頭の丸括弧、それぞれの検査、版。
 - 古い書き方（`const x = …`、丸括弧のない `match x by C { … }`）は、新しい書き方をメッセージで示す、SYNTAX になる。
-- リポジトリの `.hozo` のすべて（コーパス、規則ごとのテスト、単体テストの入力、サンプル、語彙、`cli.hozo`）が、新しい書き方で、`check` を通る。
+- リポジトリの `.hozo` のすべて（コーパス、規則ごとのテスト、単体テストの入力、サンプル、語彙、`spec/cli.hozo`）が、新しい書き方で、`check` を通る。
 - 新しい検査の規則（`docs/check.md`「診断」の WIRE-10〜WIRE-14、DISJ-1〜DISJ-3、CLS-9。`docs/types.md`「診断」の TYPE-17）が、`docs/testing.md`「規則ごとのテスト」の形で、確かめてある。
 - 基底 `go` が、新しい文（`val`、`=`、`disjoint`、`for`、`collect`）を出す。サンプル `shop-server` に、新しい文を使う op（`server.getMyPage`、`server.resendNotices`）を足し、手で書いた、期待する出力と、`TestSamples` が、飛ばしなく、一致する（決定 D340、D342）。
 - 仕様だけのサンプル `order-app` の、五つの op（`docs/wiring-trial.md`「書き直し」）が、新しい文で、書き直してある（同 340）。
 - 対象のない分類に、基底 `go` は、何も出さない。
 - 言語サーバーと、シンタックスハイライトが、新しい予約語と、ブロックの中の名前を、扱う（`docs/lsp.md`）。
-- hozoc と、すべてのプラグインのマニフェストが、新しい版になる。hozoc 自身の骨組み（`internal/gen/`）を、書き換えた `cli.hozo` から、生成し直してある。
+- hozoc と、すべてのプラグインのマニフェストが、新しい版になる。hozoc 自身の骨組み（`internal/gen/`）を、書き換えた `spec/cli.hozo` から、生成し直してある。
 - 文書とコードの一致を見るテスト（`docs/testing.md`「文書とコードの一致」）と、CI（同「CI」）が通る。
 
 条件に入れないもの: 実際に、並列に動かすこと（出力する言語のオプション）。TS の基底（「段階」の 5）。IDE の図。プラグインの部分と、その語彙を使う、サンプルの宣言（担い手、要求）。
@@ -558,9 +558,9 @@ R6 のうち、語彙と、基底・プラグインの出力が変わる部分�
 | 段 | 入れるもの | 状態 |
 |---|---|---|
 | 1 | この見出しの条件と、標準の語彙（`prd` と、その下の `prd.actor`、`prd.usecase`、`prd.business`） | 入った |
-| 2 | 基底 `go`: 単体テストの口と、効果の入口の確かめ | 入った（形の持ち主は `docs/plugin-go.md`「単体テストの口」「効果の入口の確かめ」。聞かずに決めた細部は `decisions/` の、`@adr.proposed` の決定） |
-| 3 | `go-http`: インテグレーションテストの口 | 入った（形の持ち主は `docs/plugin-go-http.md`「インテグレーションテストの口」。聞かずに決めた細部は `decisions/` の、`@adr.proposed` の決定） |
-| 4 | テストのプラグイン: フローの E2E テストの口と、要求の入れ物の口。サンプル `shop-server` に、担い手、操作の op、フロー、要求を足す | 入った（プラグインの名前は `go-design`。形の持ち主は `docs/plugin-go-design.md`。サンプルに足したものは `tests/samples/shop-server/README.md`「R6 のプラグインの部分で足したこと」。聞かずに決めた細部は `decisions/` の、`@adr.proposed` の決定） |
+| 2 | 基底 `go`: 単体テストの口と、効果の入口の確かめ | 入った（形の持ち主は `docs/plugin-go.md`「単体テストの口」「効果の入口の確かめ」。聞かずに決めた細部は `spec/decisions/` の、`@adr.proposed` の決定） |
+| 3 | `go-http`: インテグレーションテストの口 | 入った（形の持ち主は `docs/plugin-go-http.md`「インテグレーションテストの口」。聞かずに決めた細部は `spec/decisions/` の、`@adr.proposed` の決定） |
+| 4 | テストのプラグイン: フローの E2E テストの口と、要求の入れ物の口。サンプル `shop-server` に、担い手、操作の op、フロー、要求を足す | 入った（プラグインの名前は `go-design`。形の持ち主は `docs/plugin-go-design.md`。サンプルに足したものは `tests/samples/shop-server/README.md`「R6 のプラグインの部分で足したこと」。聞かずに決めた細部は `spec/decisions/` の、`@adr.proposed` の決定） |
 
 終わったと言える条件:
 
@@ -623,7 +623,7 @@ R6 のうち、語彙と、基底・プラグインの出力が変わる部分�
 | 担保の言い方を、三つ（欠けていない、走った、通った）に分けること | `docs/ide-chain.md`「テストの規約」の「担保すること」 |
 | サンプル `shop-server` の、対応表の期待する出力と、突き合わせのテスト | `tests/samples/README.md`、`docs/testing.md`「サンプル」 |
 
-聞かずに決めた細部は、`decisions/` の、`@adr.proposed` の決定。
+聞かずに決めた細部は、`spec/decisions/` の、`@adr.proposed` の決定。
 
 ## 最初に決めること
 
@@ -639,7 +639,7 @@ Go にした理由は「プラグインの書き方」に依る。設計書の�
 
 ## 実装に要るものと、決めた文書
 
-実装に要るものを、どの文書が決めたか。「設計書にあったもの」の列は、出発点のアイデア集（`docs/README.md`「設計書という呼び名」）にあった元の考えで、今の持ち主は「決めた文書」の列。決定は `decisions/`。
+実装に要るものを、どの文書が決めたか。「設計書にあったもの」の列は、出発点のアイデア集（`docs/README.md`「設計書という呼び名」）にあった元の考えで、今の持ち主は「決めた文書」の列。決定は `spec/decisions/`。
 
 | 要るもの | 設計書にあったもの | 決めた文書 |
 |---|---|---|
@@ -655,7 +655,7 @@ Go にした理由は「プラグインの書き方」に依る。設計書の�
 | 語彙ごとの出力（検証、HTTP、DB） | §4.2、§4.3 に方針 | `docs/plugin-go-valid.md`、`docs/plugin-valid.md`（制約の意味）、`docs/plugin-go-http.md`、`docs/plugin-http.md`（HTTP の通信の形）、`docs/plugin-go-sqlite.md`、`docs/plugin-db.md`（表と、`read` と効果の決まり） |
 | `cli` の語彙の意味 | `examples/hozoc.hozo` | `docs/plugin-go-cli.md` |
 | 診断の形と終了コード | `examples/hozoc.hozo` に一部 | `docs/diagnostics.md` |
-| hozoc の振る舞いと `cli.hozo` | `examples/hozoc.hozo` | `docs/cli.md` |
+| hozoc の振る舞いと `spec/cli.hozo` | `examples/hozoc.hozo` | `docs/cli.md` |
 | 言語サーバー | なし | `docs/lsp.md` |
 | 命名規則の違反の強さ、束縛の数の閾値 | なし | `docs/check.md`（NAME-1、WIRE-6） |
 
@@ -665,7 +665,7 @@ Go にした理由は「プラグインの書き方」に依る。設計書の�
 
 - **規則の意味の持ち主は、この表の「規則」の列（今の規則を短く言ったもの）と、その手続きを書く文書**（`docs/check.md`「診断」と、「節」の列が名指しする文書）。
 - 「節」の列の §n は、その規則の出どころ（設計書の節。`docs/README.md`「設計書という呼び名」）で、持ち主ではない。
-- 設計書の案から離れた決定（`decisions/s.hozo` の、S の番号の決定）で意味が変わった行は、「節」の列に、決定の番号と持ち主の文書を添える。
+- 設計書の案から離れた決定（`spec/decisions/s.hozo` の、S の番号の決定）で意味が変わった行は、「節」の列に、決定の番号と持ち主の文書を添える。
 
 この表に載せるのは、設計書に出どころのある規則だけ。そのほかの規則は、それぞれの設計文書の「診断」の表（`docs/check.md`、`docs/resolve.md`、`docs/types.md`、`docs/config.md`、`docs/plugin-protocol.md`、`docs/plugin-go.md`、`docs/plugin-go-valid.md`、`docs/plugin-go-sqlite.md`、`docs/plugin-go-http.md`、`docs/plugin-go-cli.md`、`docs/plugin-go-design.md`、`docs/lsp.md`、規則の ID でないコードは `docs/diagnostics.md`「規則の ID でないコード」）が持ち主で、この表には載せない。
 
@@ -800,14 +800,14 @@ TextMate の文法（`editors/vscode/syntaxes/hozo.tmLanguage.json`）で色を�
 
 ## 品質の要件
 
-次の四つは、hozoc の要求で、要求の文面の持ち主は、hozoc 自身の仕様 `cli.hozo` の分類 `Requirement` のケース（写しは `docs/cli.md`「cli.hozo」。決定 D468）。どの宣言が、その要求のためのものかは、同じ仕様の `@prd.ref` が言う。ここに書くのは、理由と、仕様に書いていない補足だけ。
+次の四つは、hozoc の要求で、要求の文面の持ち主は、hozoc 自身の仕様 `spec/cli.hozo` の分類 `Requirement` のケース（写しは `docs/cli.md`「cli.hozo」。決定 D468）。どの宣言が、その要求のためのものかは、同じ仕様の `@prd.ref` が言う。ここに書くのは、理由と、仕様に書いていない補足だけ。
 
 - 配布（`Requirement.SingleBinary`）: 出どころは §4.4。補足: VS Code 拡張は、対応する OS のバイナリを同梱するか、初回に取得する。
 - 共有（`Requirement.SharedDiagnostics`）: 理由は、同じ入力に対する診断が、二つの入口（`hozoc build --no-emit` と `hozoc lsp`）で食い違わないため。
 - 決定性（`Requirement.Deterministic`）: 理由は、生成物の差分がレビューできるため。
 - 診断（`Requirement.NamedOmission`）: 出どころは §7.2「どれが漏れているかまで示す」。
 
-次の二つは、作り方についての要求で、仕様（`cli.hozo`）には、書いていない（結ぶ先の宣言がない。`docs/open.md`「サンプルと、hozoc 自身の仕様」）。
+次の二つは、作り方についての要求で、仕様（`spec/cli.hozo`）には、書いていない（結ぶ先の宣言がない。`docs/open.md`「サンプルと、hozoc 自身の仕様」）。
 
 - テスト: 規則ごとに通る例と落ちる例があり、設計書の例が `hozoc build --no-emit` を通り、言語サーバーの診断が `hozoc build --no-emit` と一致する。置き場と書き方は `docs/testing.md`。
 - 追跡: 規則を実装するコードとテストは ID を書く。規則が変わったとき、ID の表から変える場所を引けるようにするため。

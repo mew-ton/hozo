@@ -2,11 +2,11 @@
 // **写し。持ち主は、文書（docs/plugin-protocol.md）と、Go の型（plugin/plugin.go、internal/plugin/manifest.go）。
 // 生成に使うようになるまで。** 食い違えば、文書が正しい。どの単位の対象でもない: コードには、ならない。
 //
-// cli.hozo の hozo.compiler にも、やり取りの、仮の model がある（Plugin、EmitRequest、EmitOutput、PluginWarning、PluginError、
+// spec/cli.hozo の hozo.compiler にも、やり取りの、仮の model がある（Plugin、EmitRequest、EmitOutput、PluginWarning、PluginError、
 // TranspilerResult、OutputResult、EmitResponse、空の Spec と OutputView、例外 Crashed と MalformedOutput）。hozoc の葉の op runEmit の
 // 引数と戻り値で、生成物が使っている。ここの model と、重なっている（どちらに寄せるかは、決めていない: docs/open.md）。
 //
-// 書けなかった所の持ち主は docs/open.md「サンプルと、hozoc 自身の仕様」（下の「穴 17」などは、その番号。14〜16 は ir.hozo の頭）:
+// 書けなかった所の持ち主は docs/open.md「サンプルと、hozoc 自身の仕様」（下の「穴 17」などは、その番号。14〜16 は spec/ir.hozo の頭）:
 //   穴 17: 頼みごとの名前 read を、op の名前に書けない（read は予約語）。readVocabulary にした
 //   穴 18: やり取りの運び方（WASM の標準入力に JSON の要求、標準出力に JSON の応答、終了コード）を言う語彙が、ない
 //   穴 19: ファイルの形（TOML のマニフェスト）と、省いたときの値を言う語彙が、ない

@@ -1,7 +1,7 @@
 // go-sqlite 自身の要求（docs/plugin-go-sqlite.md「go-sqlite 自身の要求」、決定 D799）。名前空間 hozo.gosqlite。
 // **写し。持ち主は、docs/plugin-go-sqlite.md**（要求の説明が、振る舞いを決める見出しを名指しする）。食い違えば、文書が正しい。
 //
-// このディレクトリの hozo.toml の単位が、go-design で、要求ごとの、テストの入れ物の口（plugins/go-sqlite/internal/spec/gosqlitetest の
+// plugins/go-sqlite/hozo.toml の単位が、go-design で、要求ごとの、テストの入れ物の口（plugins/go-sqlite/internal/spec/gosqlitetest の
 // Requirements と RunRequirements）を作る。満たすのは、go-sqlite の単体テスト（plugins/go-sqlite/internal/gosqlite/requirements_test.go）。
 // go-sqlite を使う人は、これらのテストを書かない。振る舞いを足すか変えるときは、先に、ここに要求を足す。
 

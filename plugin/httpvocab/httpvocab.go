@@ -35,6 +35,8 @@ const (
 	Required  = "http.required"
 	Default   = "http.default"
 	Status    = "http.status"
+	// BadRequestAs は、例外を、op を呼ぶ前の失敗と同じ形（http.BadRequest）で返す印（docs/plugin-http.md「失敗の応答」）。
+	BadRequestAs = "http.badRequest"
 )
 
 // 診断の ID（docs/plugin-http.md「診断」）。
@@ -55,6 +57,9 @@ const (
 	CodeDefault    = "HTTP-14" // @http.default のリテラルが、フィールドの型に渡せない
 	CodeConstraint = "HTTP-15" // @http.default の値が、フィールドの制約（@valid.*）に合わない
 	CodeLiteral    = "HTTP-16" // 本文の項目のフィールドの型が、リテラルの型そのもの（項目を、リテラルの型で読む形を、まだ決めていない）
+	CodeShapeBoth  = "HTTP-17" // 一つの例外に、@http.status と @http.badRequest の両方がある
+	CodeBadStatus  = "HTTP-18" // @http.badRequest のステータスが、400 から 499 までにない
+	CodeTemplate   = "HTTP-19" // @http.badRequest の文言の中の {<名前>} が、例外の、型が string の引数を指していない（括弧の閉じ忘れを含む）
 )
 
 // Place は、入力の model のフィールドを読む、通信の上の場所。
@@ -195,8 +200,67 @@ func Check(p *ir.Program) []plugin.Diagnostic {
 		for i := range p.Namespaces {
 			r.Routes(p.Namespaces[i].Name, nil)
 		}
+		for i := range p.Namespaces {
+			for _, d := range p.Namespaces[i].Decls {
+				if x, ok := d.(*ir.Exception); ok {
+					r.checkExceptionShape(x)
+				}
+			}
+		}
 	}
 	return r.Errors()
+}
+
+// checkExceptionShape は、例外 x の、応答の形のデコレータ（@http.status、@http.badRequest）の整合（HTTP-17〜HTTP-19。
+// docs/plugin-http.md「対象」）。経路の op が投げるかどうかによらない。
+func (r *Reader) checkExceptionShape(x *ir.Exception) {
+	var status, bad *ir.Application
+	for i := range x.Decorators {
+		switch x.Decorators[i].Decorator {
+		case Status:
+			status = &x.Decorators[i]
+		case BadRequestAs:
+			bad = &x.Decorators[i]
+		}
+	}
+	if bad == nil {
+		return
+	}
+	if status != nil {
+		r.errorf(CodeShapeBoth, x.Name, "例外 %s に、@%s と @%s の両方が付いている（通信の上の形は、どちらか一つ）", x.Name, Status, BadRequestAs)
+	}
+	if l, ok := argLiteral(bad, "code"); ok {
+		if n, ok := l.(ir.IntLiteral); ok && (n.Value < 400 || n.Value > 499) {
+			r.errorf(CodeBadStatus, x.Name, "例外 %s の @%s のステータス %d が、400 から 499 までにない（op を呼ぶ前の失敗と同じ形で返すのは、要求の側の誤り）", x.Name, BadRequestAs, n.Value)
+		}
+	}
+	message, ok := stringArg(bad, "message")
+	if !ok {
+		return
+	}
+	text := map[string]bool{}
+	for _, prm := range x.Params {
+		if c, ok := r.coreOf(prm.Type); ok && c == ir.CoreString {
+			text[prm.Name] = true
+		}
+	}
+	for i := 0; i < len(message); i++ {
+		switch message[i] {
+		case '}':
+			r.errorf(CodeTemplate, x.Name, "例外 %s の @%s の文言 %q の %d バイト目の } が、開いていない", x.Name, BadRequestAs, message, i+1)
+		case '{':
+			end := strings.IndexAny(message[i+1:], "{}")
+			if end < 0 || message[i+1+end] == '{' {
+				r.errorf(CodeTemplate, x.Name, "例外 %s の @%s の文言 %q の %d バイト目の { が、閉じていない", x.Name, BadRequestAs, message, i+1)
+				continue
+			}
+			name := message[i+1 : i+1+end]
+			if !text[name] {
+				r.errorf(CodeTemplate, x.Name, "例外 %s の @%s の文言 %q の {%s} が、例外の、型が string の引数を指していない", x.Name, BadRequestAs, message, name)
+			}
+			i += 1 + end
+		}
+	}
 }
 
 // Errors は、ここまでに読み解いたものの診断（HTTP-*）。返した順。同じ診断は、一度だけ。

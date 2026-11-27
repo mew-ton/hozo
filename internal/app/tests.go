@@ -19,7 +19,7 @@ import (
 	sdk "github.com/mew-ton/hozo/plugin"
 )
 
-// MatchTests は cli.hozo の op matchTests（docs/cli.md「tests」の 1〜6）: 検査を通った仕様から、テストの対応表を集め、
+// MatchTests は spec/cli.hozo の op matchTests（docs/cli.md「tests」の 1〜6）: 検査を通った仕様から、テストの対応表を集め、
 // カバレッジの「実行された行」と突き合わせる。compiler.Leaves のメソッド。ファイルは書き出さない（置き場のファイルと、
 // カバレッジのファイルを、読むだけ）。hozoc は、テストを走らせず、カバレッジの形も知らない: 形を読むのは、単位の基底の
 // プラグイン（direction "coverage"。docs/plugin-protocol.md「coverage」）。checked は Check が返したもの（[App.CollectOutputs]

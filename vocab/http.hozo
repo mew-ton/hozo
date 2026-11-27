@@ -15,6 +15,8 @@ namespace http {
   decorator fn post(path: string): outer throws ServerError, NetworkError;
 
   decorator status(code: int) for exception;
+  /** この例外を、op を呼ぶ前の失敗と同じ形（BadRequest）で、ステータス code で返す。message の中の {引数の名前} は、その引数の値に替える */
+  decorator badRequest(code: int, message: string) for exception;
 
   /** このフィールドを、要求のヘッダ一つから読む。name を省けば、フィールドの名前 */
   decorator header(name: string?) for field;

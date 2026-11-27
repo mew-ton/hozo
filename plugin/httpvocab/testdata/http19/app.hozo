@@ -1,0 +1,15 @@
+// HTTP-19: 位置は例外。
+namespace app {
+  scalar Place extends string;
+  // 引数でない名前と、型が string でない引数
+  @http.badRequest(400, "{where} {name}: missing ({count})")
+  exception Unknown(name: string, count: int);
+  // 閉じていない {、開いていない }
+  @http.badRequest(400, "body {name: missing")
+  exception Open(name: string);
+  @http.badRequest(400, "body name}: missing")
+  exception Close(name: string);
+  // string と、元が string の scalar の引数なら、当たらない
+  @http.badRequest(400, "{place} {name}: missing")
+  exception Missing(place: Place, name: string);
+}

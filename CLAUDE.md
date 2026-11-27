@@ -12,7 +12,7 @@ Hozo は、アプリの設計の、ただ一つの正（SSOT）になる、仕�
 | どの文書が、何を決めているか。言葉の持ち主 | `docs/README.md`「読む順」「言葉」 |
 | プラグインが守る原則 | `docs/requirements.md`「出力を推論しない」「op の中身に立ち入らない」 |
 | 仕様（`.hozo`）の書き方の勧め | `docs/requirements.md`「書き方の指針」 |
-| 決めたこと | `decisions/`（決定ごとに、一つのケース。書き方は `decisions/adr.hozo` の頭のコメント） |
+| 決めたこと | `spec/decisions/`（決定ごとに、一つのケース。書き方は `spec/decisions/adr.hozo` の頭のコメント） |
 | まだ決めていないこと。次に何をするか | `docs/open.md` |
 | テストの置き場と、CI が確かめること | `docs/testing.md` |
 | サンプル（手で書いた、期待する出力）の扱い | `tests/samples/README.md` |
@@ -37,7 +37,7 @@ Hozo は、アプリの設計の、ただ一つの正（SSOT）になる、仕�
 
 ### 聞かずに決めたことは、報告する
 
-聞かずに決めたことは、作業の報告に、必ず並べる。文書が決めていない点を、実装の都合で決めたときも、同じ。確かめてもらっていない決定は、`decisions/` に、`@adr.proposed` で足す（「決定は、decisions/ に足す」）。
+聞かずに決めたことは、作業の報告に、必ず並べる。文書が決めていない点を、実装の都合で決めたときも、同じ。確かめてもらっていない決定は、`spec/decisions/` に、`@adr.proposed` で足す（「決定は、spec/decisions/ に足す」）。
 
 ### 未決の点は、一覧に置く
 
@@ -47,9 +47,9 @@ Hozo は、アプリの設計の、ただ一つの正（SSOT）になる、仕�
 
 規則と診断の ID（`STATE-9`、`GOSQL-30` など）は、なくしても、別の意味に使い回さない。なくした ID は欠番にする（`docs/requirements.md`「検査の規則の一覧」の欠番の表）。
 
-### 決定は、decisions/ に足す
+### 決定は、spec/decisions/ に足す
 
-決定の持ち主は、`decisions/` のケース（決定 D533、D541）。番号の百の位ごとに、ファイルと分類が一つ（`d500.hozo` の `Decision500` など）。書き方は、`decisions/adr.hozo` の頭のコメント。
+決定の持ち主は、`spec/decisions/` のケース（決定 D533、D541）。番号の百の位ごとに、ファイルと分類が一つ（`spec/decisions/d500.hozo` の `Decision500` など）。書き方は、`spec/decisions/adr.hozo` の頭のコメント。
 
 - 足すとき: 次の番号を振り（`D<番号>`。百の位のファイルがなければ、作る）、状態の印を、ちょうど一つ付ける。会話から生まれた決定も、聞かずに決めた決定も、`@adr.proposed` で入れる。
 - 認める、却下するとき: `@adr.proposed` を `@adr.accepted` か `@adr.rejected` に替えるのは、利用者が、自分の言葉で、決定を名指しして、認めた、または、却下したときだけ。その言葉（会話でも、issue でもよい）を `@adr.said` に写してから、印を替える。

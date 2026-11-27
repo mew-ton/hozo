@@ -1,4 +1,4 @@
-// 決定の記録（800〜899）。名前空間 hozo.decisions。書き方は decisions/adr.hozo の頭のコメント。
+// 決定の記録（800〜899）。名前空間 hozo.decisions。書き方は spec/decisions/adr.hozo の頭のコメント。
 // コードには、ならない（hozo.toml の単位の対象ではない）。
 
 namespace hozo.decisions {
@@ -80,5 +80,63 @@ namespace hozo.decisions {
     @adr.proposed
     @adr.amends(Decision200.D295)
     D803;
+
+    /**
+     * go-http が生成するファイルに写している補助を、Hozo で設計した Go のパッケージ runtime/gohttp に移す。設計は、go-http の
+     * プラグインのプロジェクトの plugins/go-http/spec/runtime.hozo（名前空間 hozo.gohttp.runtime）。補助の振る舞いは、op と分類と例外で書き、
+     * 基底 go が枠と単体テストの口を作り、人が葉を実装し、生成した http.go がそれを呼ぶ。型は、値の形で書く（D801）。まず、
+     * request body の読み方だけを、設計の段（単位の対象にせず、コードにしない）で書き、形を確かめてから、生成と実装に進む。
+     *
+     * @adr.context プラグイン自身の振る舞いを要求に書き、テストの入れ物に結ぶだけでは、Hozo を、設計の正から枠とハーネスを作る
+     * ものとして使っていない（docs/requirements.md「価値と位置づけ」）。要求の付く先もなく、補助の振る舞いは文書に残り、テストは
+     * 人が手で書いて結ぶだけだった。補助を、仕様から枠とテストの口を作るパッケージにすれば、例外を足せばテストが要る形が、補助にも効き、
+     * 出力ごとの写しもなくなる（#183）。置き場は、生成したコードが、もう import している runtime の下にし、使う側の依存を増やさない。
+     * @adr.consequence 補助の呼び出しは、葉の op の形（ctx を取り、error を返す）になる。net/http と、値の形の型の間の橋渡しが要る。
+     * @adr.alternative 補助を、出力ごとに写すまま、要求だけを仕様に書く（D795 の形）: 枠もハーネスも仕様から作られず、要求の付く先がない
+     * @adr.alternative 補助を、plugins/go-http の下の公開のパッケージに置く: 使う側が、プラグインのパスを import する
+     * @adr.alternative 補助の置き場と版の合わせ方（#183）を、先に決めてから始める: 設計の形を、具体的に確かめないまま決めることになる
+     */
+    @adr.proposed
+    D804;
+
+    /**
+     * http の語彙に、例外のデコレータ badRequest(code: int, message: string) を足す。それを持つ例外を op が投げたら、op を呼ぶ前の
+     * 失敗と同じ形（http.BadRequest。status code は code、message は、その中の {引数の名前} を、その引数の値に替えたもの。
+     * violations は空）で返す。書いたものの整合は、語彙のプラグイン http が確かめる: http.status と一緒に書かない（HTTP-17）、
+     * code は 400 から 499 まで（HTTP-18）、{} の中は、型が string の、例外の引数の名前（HTTP-19）。runtime.hozo の補助の例外
+     * （TooLarge、InvalidJSON、Missing）に付ける。go-http が読むのは、補助を生成する段から。
+     *
+     * @adr.context 補助の例外は、op を呼ぶ前の失敗で、通信の上では http.BadRequest の形と、決まった文言で返す
+     * （docs/plugin-http.md「op を呼ぶ前の失敗」）。status code と文言を、例外のコメントに写しておくと、仕様から確かめられない。
+     * http.status は、例外の FQN を通信に出す形で、この形を言えない。
+     * @adr.consequence 補助の例外の FQN は、通信に出ない。例外の名前空間を動かしても、通信の上の形は変わらない。
+     * 文言に引数を入れる書き方（{名前}）は、http.get のパスの書き方と揃える。
+     * @adr.alternative 今の http.status を付ける: 新しい語彙は要らないが、request body が上限を超えたときなどの応答が、補助の
+     *   例外の FQN（hozo.gohttp.runtime.TooLarge）を出す形に変わり、補助の内側の名前が通信に出る
+     * @adr.alternative デコレータを付けず、status code と文言への変換を、生成した http.go が持つ: 対応が仕様に載らず、
+     *   仕様から作るテストで確かめられない
+     * @adr.alternative 文言に引数を入れず、決まった文字列だけにする: <場所> <名前>: missing のような、項目ごとの文言が書けない
+     */
+    @adr.proposed
+    D805;
+
+    /**
+     * このリポジトリの Hozo のプロジェクト（ルートと、plugins/go-http、plugins/go-sqlite）は、仕様を、そのプロジェクトの spec/ の下に
+     * 置き、hozo.toml の sources は、spec/ の下の、すべての .hozo を読む glob 一つにする。決定の記録も、ルートの spec/decisions/ に置く。hozoc が同梱する語彙
+     * （vocab/）と、プラグインが提供する語彙のファイルは、プロジェクトの仕様ではないので、動かさない。go-http の補助の設計
+     * （plugins/go-http/spec/runtime.hozo）は、単位の in で出力から外し、まだコードにしない。
+     *
+     * @adr.context 仕様のファイルが、プロジェクトのルートにほかのファイルと並び、sources が、ファイルを一つずつ並べていた。ファイルを
+     * 足すたびに sources を直す必要があり、プラグイン自身の仕様も、プラグインのコードと同じ所に置かれていた。補助の設計を、go-http の
+     * 要求と同じプロジェクトに置けば、要求を、補助の op に結べる。
+     * @adr.consequence 古い決定の本文の中のパス（cli.hozo、decisions/ など）は、書き直さない決まりなので、古いまま残る。
+     * 自己生成は、プラグインのプロジェクトの spec/ を、シンボリックリンクでなく、複製して足す（sources の glob は、
+     * シンボリックリンクをたどらない）。
+     * @adr.alternative decisions/ は、ルートに残す: パスの書き換えは減るが、ルートの sources が二つになり、本体の仕様が spec/ の下だけ、
+     *   とは言えなくなる
+     * @adr.alternative 組み替えを、別の変更に分ける: 補助の設計を、プラグインのプロジェクトへ移すことと、組み替えが、二度に分かれる
+     */
+    @adr.proposed
+    D806;
   }
 }

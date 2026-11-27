@@ -281,7 +281,7 @@ func TestNested(t *testing.T) {
 	}
 }
 
-// TestNestedRollback は、要求 hozo.gosqlite.Requirement.NestedRollback（plugins/go-sqlite/go-sqlite.hozo）: 入れ子の内側が失敗すれば、
+// TestNestedRollback は、要求 hozo.gosqlite.Requirement.NestedRollback（plugins/go-sqlite/spec/go-sqlite.hozo）: 入れ子の内側が失敗すれば、
 // 内側がしたことだけが消える（SAVEPOINT）。外側がその失敗を受けて成功すれば、外側の残りは確定する。確定するのは、いちばん外側。
 // 失敗を受ける道（catches … recovers の継ぎ目）は、外側の継ぎ目の body の中で、内側の継ぎ目のエラーを捨てることで作る。
 func TestNestedRollback(t *testing.T) {

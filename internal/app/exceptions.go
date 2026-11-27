@@ -6,12 +6,12 @@ import (
 	"github.com/mew-ton/hozo/internal/source"
 )
 
-// このファイルは、診断を運ぶ例外（cli.hozo の CheckFailed、ConfigInvalid、LanguageMismatch、OutputConflict、TestsNotRun、
+// このファイルは、診断を運ぶ例外（spec/cli.hozo の CheckFailed、ConfigInvalid、LanguageMismatch、OutputConflict、TestsNotRun、
 // CoverageUnusable）の作り方と読み方。六つとも、引数は一つ（error と warning のすべて。`Diagnostic[]`）で、生成した構造体は、その引数の名前のフィールドを一つ持つ
 // （docs/plugin-go.md「exception」）。
 //
 // **引数の名前（= 生成した構造体のフィールドの名前）を書くのは、carried の宣言と、carriedBy の最後の行の二か所だけ**で、
-// internal/app のほかのコードとテストは、下の関数を通す。cli.hozo の引数の名前を変えたら、carried のフィールドの名前を合わせる:
+// internal/app のほかのコードとテストは、下の関数を通す。spec/cli.hozo の引数の名前を変えたら、carried のフィールドの名前を合わせる:
 // 合っていなければ、下の型変換（生成した構造体と、フィールドの名前と型が同じでなければ書けない）がコンパイルできない。
 // hozoc の json の表示は、この名前によらない（[Presenter] が docs/diagnostics.md「json」の形で出す）。
 

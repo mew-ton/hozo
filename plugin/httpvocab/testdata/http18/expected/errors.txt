@@ -1,0 +1,2 @@
+HTTP-18	app.Broken	例外 app.Broken の @http.badRequest のステータス 500 が、400 から 499 までにない（op を呼ぶ前の失敗と同じ形で返すのは、要求の側の誤り）
+HTTP-18	app.Early	例外 app.Early の @http.badRequest のステータス 399 が、400 から 499 までにない（op を呼ぶ前の失敗と同じ形で返すのは、要求の側の誤り）

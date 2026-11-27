@@ -9,7 +9,7 @@ import (
 	"github.com/mew-ton/hozo/plugins/go-http/internal/spec/gohttptest"
 )
 
-// TestRequirements は、go-http 自身の要求（docs/plugin-go-http.md「go-http 自身の要求」）を、仕様 plugins/go-http/go-http.hozo
+// TestRequirements は、go-http 自身の要求（docs/plugin-go-http.md「go-http 自身の要求」）を、仕様 plugins/go-http/spec/go-http.hozo
 // から作った口（gohttptest.RunRequirements）で走らせる。要求を足せば、requirements のメソッドを書くまで、ここがコンパイルできない。
 func TestRequirements(t *testing.T) {
 	gohttptest.RunRequirements(t, requirements{})

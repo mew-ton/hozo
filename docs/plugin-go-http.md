@@ -27,7 +27,7 @@ interprets = [
 ]
 ```
 
-- `interprets`（`docs/plugin-protocol.md`「マニフェスト `hozo-plugin.toml`」）は、読む十一のデコレータ。`http.retry` は、書かない（読まない）。
+- `interprets`（`docs/plugin-protocol.md`「マニフェスト `hozo-plugin.toml`」）は、読む十一のデコレータ。`http.retry` は、書かない（読まない）。`http.badRequest` も、まだ書かない（読まない。「補助の設計」）: 経路の op が、それを持つ例外を投げれば、今は、`@http.status` を持たない例外と同じに、500 になる。
 - 読む語彙は、標準の `http`: op の `@http.get(path)` / `@http.post(path)`、フィールドの `@http.header` / `@http.query` / `@http.body`（項目の形）と `@http.headerObj` / `@http.queryObj` / `@http.bodyObj`（全体の形）、`@http.required` と `@http.default(value)`（項目がないときの扱い）、例外の `@http.status(code)`。`@http.retry` は読まない（印）。語彙は提供しない。
 - **`http` の語彙のプラグインが、要る**（`requires_vocabulary`。`docs/plugin-protocol.md`「語彙のプラグイン」）: このトランスパイラは、`http` の語彙の使い方の検査（HTTP-*。`docs/plugin-http.md`「診断」）を、自分では返さない。語彙のプラグインが入っていなければ CFG-25（`docs/config.md`「診断」）。
 - `go-valid` への依存は、オプションによらない（`docs/config.md`「基底と相乗り」）。`validate = false` でも、単位の `transpilers` に `go-valid` が要る。
@@ -211,6 +211,16 @@ func httpWriteError(w http.ResponseWriter, r *http.Request, err error, o httpOpt
 - 補助に、受け付けない型の値が渡ることは、HTTP-4、HTTP-5、HTTP-16（`docs/plugin-http.md`「診断」）が先に断るので、ない（そのときの振る舞いは、決めない）。読む先を型引数にしないのは、省略可能な読む先（`**T`）と、そうでない読む先（`*T`）を、一つの関数で、型を書かずに受け取れないため（Go は、その二つの和の制約から T を推論できない）。
 
 この節の細部は、決定 D604、D784、D793 が決めた。
+
+### 補助の設計
+
+**設計の段**（決定 D804。まだコードにならない）: 補助は、今は、生成するファイルごとに、同じテキストを写している（「補助」）。これを、Hozo で設計した、生成したコードが import する Go のパッケージ `runtime/gohttp` に移す。設計は、go-http のプラグインのプロジェクトの `plugins/go-http/spec/runtime.hozo`（名前空間 `hozo.gohttp.runtime`）。同じプロジェクトの単位の `in`（`docs/config.md`「in」）に入れないので、単位の対象にならず、コードにならない（「仕様と、口の置き場」）。今、書いてあるのは、request body の読み方だけ。
+
+- **何が変わるか**: 補助の振る舞いは、op と分類と例外で、仕様に書かれる。基底 go が、その枠（`Ops`、`Leaves`、`New`）と、単体テストの口（葉ごと、例外ごとのケース。`docs/plugin-go.md`「単体テストの口」）を作り、人が葉を実装する。例外を一つ足せば、テストのケースが要り、書くまでコンパイルできない。「go-http 自身の要求」の要求は、これらの op に結べる。
+- **書いた op**: `readBody`（葉。request body を上限まで読み、JSON のオブジェクトにする。`TooLarge`、`InvalidJSON` を投げる）、`bodyItem`（葉。キーの値。キーがないか、値が `null` なら、ない）、分類 `Sent`（送られたか）、`readRequiredItem`（配線。`@http.required` の項目を読み、送られていなければ `Missing`）。
+- **例外の応答の形は、宣言で書く**（決定 D805）: 三つの例外は、`@http.badRequest(n, m)`（`docs/plugin-http.md`「失敗の応答」）で、op を呼ぶ前の失敗と同じ形の、status code と `message` を言う（`TooLarge` は 413 と `body: too large`、`InvalidJSON` は 400 と `body: invalid JSON`、`Missing` は 400 と `{place} {name}: missing`）。go-http は、まだ、このデコレータを読まない（「マニフェスト」の `interprets` に入れていない）。読むのは、次の段。
+- **型は、値の形で書く**: `RawBody`（大きさと中身の文字列）、`BodyObject`、`ItemJSON`。Go の `*http.Request`、`io.Reader`、`json.RawMessage` は、型の仕組みに入れない（`docs/requirements.md`「型の仕組みは、出力先の語彙を持たない」）。`net/http` と、これらの型の間の橋渡しは、生成した `http.go` か、葉の実装の側に置く。
+- **次の段**: 単位（`[[emit]]`）を足して、`runtime/gohttp` に枠を生成し、葉を実装し、go-http の `http.go` が、写した補助の代わりに、それを呼ぶ。そこで、写した補助と、文字列の置き換え（「補助」の「union の読み書き」）が、request body の読み方の分だけ、なくなる（#183）。
 
 ## 制約の検査
 
@@ -436,13 +446,13 @@ func RunHTTP(t *testing.T, leaves server.Leaves, c HTTPCases) {
 
 ## go-http 自身の要求
 
-go-http の出力の振る舞いのうち、テストで確かめ続けるものは、**要求**として、仕様 `plugins/go-http/go-http.hozo`（名前空間 `hozo.gohttp`）に書く。要求ごとの、テストの入れ物の口は、その仕様から go-design が作り（`docs/plugin-go-design.md`「要求の、テストの入れ物の口」）、go-http の単体テストが満たす。go-http を使う人（サンプル `shop-server` を含む）は、これらのテストを書かない。
+go-http の出力の振る舞いのうち、テストで確かめ続けるものは、**要求**として、仕様 `plugins/go-http/spec/go-http.hozo`（名前空間 `hozo.gohttp`）に書く。要求ごとの、テストの入れ物の口は、その仕様から go-design が作り（`docs/plugin-go-design.md`「要求の、テストの入れ物の口」）、go-http の単体テストが満たす。go-http を使う人（サンプル `shop-server` を含む）は、これらのテストを書かない。
 
 この節の細部は、決定 D795 が決めた。
 
 ### 仕様と、口の置き場
 
-- **`plugins/go-http` は、それ自体で一つの Hozo のプロジェクト**: `plugins/go-http/hozo.toml` が、`sources = ["go-http.hozo"]`、`plugin_dirs = [".."]`（リポジトリの `plugins/`）と、単位を一つ持つ: 名前空間 `hozo.gohttp`、トランスパイラ `go` と `go-design`、出力先 `internal/spec`、`[emit.options.go-design]` の `requirements = ["hozo.gohttp.Requirement"]`。リポジトリのルートの `hozo.toml` には、入れない（ルートの `plugin_dirs` の下は、`sources` から除かれる: `docs/config.md`「形」）。
+- **`plugins/go-http` は、それ自体で一つの Hozo のプロジェクト**: `plugins/go-http/hozo.toml` が、`sources = ["spec/**/*.hozo"]`、`plugin_dirs = [".."]`（リポジトリの `plugins/`）と、単位を一つ持つ: 名前空間 `hozo.gohttp`、トランスパイラ `go` と `go-design`、出力先 `internal/spec`、対象のファイル `in = ["spec/go-http.hozo"]`（補助の設計 `spec/runtime.hozo` を、対象から外す。「補助の設計」）、`[emit.options.go-design]` の `requirements = ["hozo.gohttp.Requirement"]`。リポジトリのルートの `hozo.toml` には、入れない（ルートの `plugin_dirs` の下は、`sources` から除かれる: `docs/config.md`「形」）。
 - **Go のモジュールは、リポジトリのルートの `go.mod`**。`[options.go]` の `module` は、モジュールのパスに、このディレクトリまでのパスを足したもの（`github.com/mew-ton/hozo/plugins/go-http`）にし、生成物の import パスを、リポジトリの中のものに合わせる。
 - **生成物**は `plugins/go-http/internal/spec/**`: 入口のパッケージ `gohttp`（宣言を持たないので、`doc.go` だけ）と、テストのパッケージ `gohttptest`（`design.go` の `Requirements` と `RunRequirements`）。`make generate` で作り直す（`docs/packages.md`「生成するもの」「自己生成の手順」）。
 - 仕様は、この文書の**写し**: 振る舞いの持ち主は、この文書の見出しで、要求の説明が、それを名指しする。食い違えば、この文書が正しい（`docs/README.md`「書き方」）。
