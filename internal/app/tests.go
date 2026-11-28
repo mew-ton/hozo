@@ -19,7 +19,7 @@ import (
 	sdk "github.com/mew-ton/hozo/plugin"
 )
 
-// MatchTests は spec/cli.hozo の op matchTests（docs/cli.md「tests」の 1〜6）: 検査を通った仕様から、テストの対応表を集め、
+// MatchTests は spec/cli.hozo の op matchTests（spec/cli.hozo の confirmTests の手順の 1〜6）: 検査を通った仕様から、テストの対応表を集め、
 // カバレッジの「実行された行」と突き合わせる。compiler.Leaves のメソッド。ファイルは書き出さない（置き場のファイルと、
 // カバレッジのファイルを、読むだけ）。hozoc は、テストを走らせず、カバレッジの形も知らない: 形を読むのは、単位の基底の
 // プラグイン（direction "coverage"。docs/plugin-protocol.md「coverage」）。checked は Check が返したもの（[App.CollectOutputs]
@@ -90,7 +90,7 @@ func testsDiagnostic(code, file string, line int, message string) compiler.Diagn
 	return d
 }
 
-// staleOutputs は docs/cli.md「tests」の 3: 対応表と、対応表が指すファイルのうち、置き場にないもの、集めたものと内容が
+// staleOutputs は spec/cli.hozo の confirmTests の手順の 3: 対応表と、対応表が指すファイルのうち、置き場にないもの、集めたものと内容が
 // 違うものごとに、TESTS-2 を一つ（パスの辞書順）。
 func staleOutputs(pl *outputPlan) []compiler.Diagnostic {
 	want := map[string]bool{}
@@ -127,7 +127,7 @@ func basePlugin(p *project.Project, unit int) *hostplugin.Plugin {
 	return nil
 }
 
-// readCoverage は docs/cli.md「tests」の 4: カバレッジのファイル path（相対パスの基準は作業ディレクトリ）を読み、対応表を
+// readCoverage は spec/cli.hozo の confirmTests の手順の 4: カバレッジのファイル path（相対パスの基準は作業ディレクトリ）を読み、対応表を
 // 持つ単位の基底のプラグインごとに direction "coverage" を送る（docs/plugin-protocol.md「coverage」）。戻り値の covered は、
 // プラグインの名前 → 実行された行。unusable は TESTS-3。誤りは、プラグインの異常終了など（compiler.Crashed /
 // compiler.MalformedOutput / ConfigInvalid）。

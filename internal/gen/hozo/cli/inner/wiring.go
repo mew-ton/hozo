@@ -10,6 +10,19 @@ import (
 
 // Build は仕様を検査し、プラグインから受け取ったファイルを書き出す。--no-emit なら、検査だけを行い、ファイルを書き出さない。
 //
+//   - --no-emit の表示は、検査の結果だけ: text は、warning と、数の行（0 errors, 0 warnings。docs/diagnostics.md「text」）。warning だけなら、
+//     終了コードは 0。json は {"warnings": [...]}。written と removed は、出さない（いつも空）。--no-emit のない build は、warning と、
+//     written: <パス> / removed: <パス> の行（json は、warnings、written、removed）。
+//   - --no-emit と --dry-run を、両方書けば、--no-emit（書き出す予定も、表示しない）: build が、先に noEmit を見て、verify に入るので、
+//     dryRun は、見ない。
+//   - 名前空間の引数は、--no-emit でも、集めて確かめるファイルの範囲を選ぶ（write の手順の 1。UnknownNamespace も、同じ）。
+//   - hozo.toml がないとき: build --no-emit は、設定なしで検査する（check の手順の 1）。build は、書き出す単位がないので、CFG-7 で
+//     ConfigInvalid（write の手順の 0）。
+//   - 古い名前: hozoc check と hozoc emit は、なくした。その名前で呼ばれたら、何もせずに、新しい書き方を標準エラーに示して、使い方の誤りの
+//     終了コード（64。docs/diagnostics.md「終了コード」）で終わる。示すのは、残りの引数を付けたもの: hozoc check --format json には
+//     hozoc build --no-emit --format json、hozoc emit --dry-run server には hozoc build --dry-run server。仕様にないコマンドの名前は、
+//     go-cli の Main には、知らないコマンドとしか見えないので、この案内は、Main の前で、手で書く。
+//
 // 引数:
 //   - in: コマンドの入力
 //

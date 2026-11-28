@@ -37,10 +37,10 @@ type LanguageMismatch = inner.LanguageMismatch
 // OutputConflict: 複数の出どころが同じファイルに書こうとした
 type OutputConflict = inner.OutputConflict
 
-// TestsNotRun: 求めるテストのうち、走ったと確かめられないものがある（docs/cli.md「tests」の TESTS-1）
+// TestsNotRun: 求めるテストのうち、走ったと確かめられないものがある（docs/cli.md「診断」の TESTS-1）
 type TestsNotRun = inner.TestsNotRun
 
-// CoverageUnusable: カバレッジを、求めるテストと突き合わせられない（docs/cli.md「tests」の TESTS-2、TESTS-3）
+// CoverageUnusable: カバレッジを、求めるテストと突き合わせられない（docs/cli.md「診断」の TESTS-2、TESTS-3）
 type CoverageUnusable = inner.CoverageUnusable
 
 // UnknownNamespace: 書き出す名前空間として指定されたものも、その子孫も、どの単位の対象でもない。build の引数の書き間違いを、何も書かずに成功したことにしない

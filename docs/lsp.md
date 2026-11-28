@@ -26,7 +26,7 @@ capabilities: `textDocumentSync: { openClose: true, change: Full, save: { includ
 
 - ワークスペースのディレクトリから親へ向かって `hozo.toml` を探す（`--config` があればそれ）。見つかったディレクトリがルート。
 - 見つからなければ、ワークスペースのディレクトリをルートにし、設定なしで動く: `sources` は既定、設定に関わる検査（CFG-*）は行わない。各ファイルの先頭（1 行 1 列）に warning LSP-1 を出す（「診断」）。
-- 解析の単位はプロジェクト全体。`internal/project.LoadWith`（`docs/packages.md`「internal/project」）を呼び直す。`Overlay` は開いている文書の最新の内容（保存していなくても）で、ディスクより優先する。プラグインの探索が見るプロジェクトの外の場所（`HOZO_PLUGIN_PATH` とホーム。`docs/plugin-protocol.md`「探索」）は、`hozoc lsp` の入力から渡されたもの（`spec/cli.hozo` の `LspInput`、`docs/cli.md`「手で書くもの」）。
+- 解析の単位はプロジェクト全体。`internal/project.LoadWith`（`docs/packages.md`「internal/project」）を呼び直す。`Overlay` は開いている文書の最新の内容（保存していなくても）で、ディスクより優先する。プラグインの探索が見るプロジェクトの外の場所（`HOZO_PLUGIN_PATH` とホーム。`docs/plugin-protocol.md`「探索」）は、`hozoc lsp` の入力から渡されたもの（`spec/cli.hozo` の `LspInput`、`internal/app`（パッケージ `app` の説明））。
 - `didOpen` / `didChange` / `didClose` / `didSave`、および `hozo.toml` の変更（`workspace/didChangeWatchedFiles` を `**/hozo.toml` と `**/*.hozo` で登録）で解析し直す。`didChange` は最後の変更から 150 ms 待ってまとめる。
 - 解析し直すたびに、診断のあるファイル（語彙のファイルと `hozo.toml` を含む）について `publishDiagnostics` を送る。前に診断を送っていて、今回は診断がなくなったファイルには、空の配列を送る。前回と同じ内容なら送らない。一度も診断を送っていないファイルには、空の配列を送らない（診断のないファイルと語彙のファイルの数だけ、最初に空の通知が並ぶのを避ける。クライアントは、通知の来ていないファイルを診断なしとして扱う）。
 - 語彙のファイルの URI は `Span.file`（`docs/ir.md`「Program」の `hozo:` の形）をそのまま使う。クライアントが開けるよう、要求 `hozo/vocabulary`（params `{ uri }`、result `{ content }`）を提供する。`docs/editors.md`。
@@ -47,7 +47,7 @@ capabilities: `textDocumentSync: { openClose: true, change: Full, save: { includ
 
 `hozoc build --no-emit` と同じ `internal/check` の呼び出しなので、同じ入力に同じ診断が出る（`docs/testing.md`「言語サーバーと check の一致」）。設定とマニフェストだけで決まる診断（CFG-6、CFG-26 など。`docs/config.md`「診断」）も、プラグインを起動せずに、解析のたびに出る。違いは、二つ。
 
-- プラグインの診断（`docs/cli.md`「検査」の 4。HTTP-5 など、語彙のプラグインが返す誤りと、GOHTTP-16 など、トランスパイラが返す誤りと、warning）は、解析のたびには出さず、後から足す（「プラグインの診断」）。
+- プラグインの診断（`spec/cli.hozo` の `check` の手順の 4。HTTP-5 など、語彙のプラグインが返す誤りと、GOHTTP-16 など、トランスパイラが返す誤りと、warning）は、解析のたびには出さず、後から足す（「プラグインの診断」）。
 - 言語サーバーだけが出す診断が、二つある:
 
 | ID | 重さ | 意味 |
@@ -59,7 +59,7 @@ capabilities: `textDocumentSync: { openClose: true, change: Full, save: { includ
 
 ### プラグインの診断
 
-決定 D405、D412。プラグインの診断（`docs/cli.md`「検査」の 4）は、プラグインを起動する（頼むのは、`hozoc build --no-emit` と同じ: 語彙のプラグインへの `read` と、トランスパイラへの `emit`。使うのは、応答の診断だけで、ファイルは、書かない: `docs/plugin-protocol.md`「語彙のプラグイン」「起動」）ので、解析より、桁が違って遅い: サンプル `shop-server` で、解析が 5 ミリ秒、プラグインを足すと、13.7 秒（実測。同「起動」の「速さ」。言語サーバーは、途中で止められる形で、動かすので、`hozoc build --no-emit` の 3.7 秒より、遅い）。なので、解析と、分ける。この見出しは、プラグインを起動して、診断を求めることを、「プラグインの check」と呼ぶ。
+決定 D405、D412。プラグインの診断（`spec/cli.hozo` の `check` の手順の 4）は、プラグインを起動する（頼むのは、`hozoc build --no-emit` と同じ: 語彙のプラグインへの `read` と、トランスパイラへの `emit`。使うのは、応答の診断だけで、ファイルは、書かない: `docs/plugin-protocol.md`「語彙のプラグイン」「起動」）ので、解析より、桁が違って遅い: サンプル `shop-server` で、解析が 5 ミリ秒、プラグインを足すと、13.7 秒（実測。同「起動」の「速さ」。言語サーバーは、途中で止められる形で、動かすので、`hozoc build --no-emit` の 3.7 秒より、遅い）。なので、解析と、分ける。この見出しは、プラグインを起動して、診断を求めることを、「プラグインの check」と呼ぶ。
 
 - **プラグインを起動するのは、クライアントが、許したときだけ**（同 412。下の「許し」）。既定は、許していない: プラグインは、どのきっかけでも、起動せず、出るのは、hozoc 自身の診断だけ。この見出しの、ほかの決まりは、許されているときのもの。
 - **解析（「プロジェクト」の、解析し直し）は、プラグインを起動しない。** hozoc 自身の診断を、すぐ出す。

@@ -49,7 +49,7 @@ type Project struct {
 	// namespaces のどれかの名前空間のデコレータが、仕様のどこかに付いているもの。名前の辞書順。protocol の合わないもの（MAN-2 を
 	// 報告して、起動しない）も含む。設定なしなら空。
 	Readers []*hostplugin.Plugin
-	// Answers は、プラグインから受け取った答え（docs/cli.md「検査」の 4、docs/plugin-protocol.md「起動」）: トランスパイラ一つの、
+	// Answers は、プラグインから受け取った答え（spec/cli.hozo の check の手順の 4、docs/plugin-protocol.md「起動」）: トランスパイラ一つの、
 	// 出力一つへの答え。単位の設定の順、名前空間の IR の順、transpilers に書いた順。プラグインを起動しなかったとき
 	// （Options.NoPlugins、1〜3 に error がある、設定なし）は、空。途中で止まったとき（RunErr）は、そこまでの分。
 	Answers []Answer
@@ -125,7 +125,7 @@ type Options struct {
 	// Home はホームディレクトリ（同 3 の <ホーム>/.hozo/plugins）。空なら探さない。
 	// このパッケージは PluginPath も Home もプロセスの環境から読まない。hozoc と言語サーバーが渡す（internal/app）。
 	Home string
-	// NoPlugins は、プラグインを、起動しない（docs/cli.md「検査」の 4 を、しない）。仕様を読むだけの呼び出し（状態の単位が、
+	// NoPlugins は、プラグインを、起動しない（spec/cli.hozo の check の手順の 4 を、しない）。仕様を読むだけの呼び出し（状態の単位が、
 	// 設定とソースを読み直すとき）と、言語サーバーの解析（docs/lsp.md「診断」）が、真にする。
 	NoPlugins bool
 	// Context は、プラグインの起動を、やめさせる口（言語サーバーの、裏の check。docs/lsp.md「プラグインの診断」）。nil なら、
@@ -138,7 +138,7 @@ type Options struct {
 // （docs/packages.md「internal/project」）。hozo.toml がなければ既定の設定で解析し、CFG-* の診断を除く。
 // overlay の内容はディスクの内容より優先し、ディスクにないファイルも足せる。
 // プラグインを探すのは [hozo].plugin_dirs だけ（HOZO_PLUGIN_PATH とホームは LoadWith の Options で渡す）。プラグインは、起動しない
-// （docs/cli.md「検査」の 1〜3 だけ。4 を含めるのは LoadWith）。
+// （spec/cli.hozo の check の手順の 1〜3 だけ。4 を含めるのは LoadWith）。
 func Load(root, configPath string, overlay map[string][]byte) *Project {
 	return LoadWith(Options{Root: root, ConfigPath: configPath, Overlay: overlay, NoPlugins: true})
 }
@@ -148,7 +148,7 @@ func LoadWith(opts Options) *Project {
 	p := &Project{Files: source.NewFileSet()}
 	var diags []diag.Diagnostic
 
-	// 1. 設定（docs/cli.md「検査」の 1）
+	// 1. 設定（spec/cli.hozo の check の手順の 1）
 	start := opts.Root
 	if start == "" {
 		start = "."
@@ -218,7 +218,7 @@ func LoadWith(opts Options) *Project {
 		diags = append(diags, pl.Mismatch...)
 	}
 
-	// 4. プラグインに頼む（docs/cli.md「検査」の 4）。1〜3 に error があれば、起動しない: View は、検査を通っていない仕様のもので、
+	// 4. プラグインに頼む（spec/cli.hozo の check の手順の 4）。1〜3 に error があれば、起動しない: View は、検査を通っていない仕様のもので、
 	// トランスパイラは、それを前提にしていない（docs/plugin-protocol.md「起動」）
 	if errs, _ := diag.Count(diags); errs == 0 && !opts.NoPlugins {
 		pds, err := p.runPlugins(opts)
@@ -821,7 +821,7 @@ func (p *Project) runReaders(opts Options, runner hostplugin.Runner, add func(di
 
 // runPlugins は、はじめに、語彙のプラグインに direction "read" を送り（runReaders）、その応答に error がなければ、
 // 使うプラグインごとに一回、direction "emit" を送り、返った答えを p.Answers に置いて、その診断を返す
-// （docs/cli.md「検査」の 4、docs/plugin-protocol.md「起動」「emit」）。一つの要求に、仕様を一度と、そのプラグインが受け持つ
+// （spec/cli.hozo の check の手順の 4、docs/plugin-protocol.md「起動」「emit」）。一つの要求に、仕様を一度と、そのプラグインが受け持つ
 // 出力を並べる。errors は error の診断、warnings は PLUGIN の warning。重さ、code、位置、メッセージが、すべて同じ診断は、最初の
 // 一つだけを残す（同じ名前空間を、二つの単位が出力しているとき）。
 // code "protocol" / "unsupported" の応答は MAN-2 / MAN-5 の診断（そのプラグインの答えは、ない）。hozo.compiler.Crashed /

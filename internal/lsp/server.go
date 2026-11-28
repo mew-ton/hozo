@@ -23,7 +23,7 @@ import (
 type Options struct {
 	// Root はクライアントが rootUri も workspaceFolders も送らなかったときのワークスペース。空なら作業ディレクトリ。
 	Root string
-	// ConfigPath は --config / HOZO_CONFIG の hozo.toml（docs/cli.md「lsp」）。空ならワークスペースから親へ探す
+	// ConfigPath は --config / HOZO_CONFIG の hozo.toml（spec/cli.hozo の serve）。空ならワークスペースから親へ探す
 	// （docs/lsp.md「プロジェクト」）。相対パスならワークスペースからの相対。
 	ConfigPath string
 	// Log はログの書き出し先（--log）。nil なら捨てる。標準エラーには書かない（docs/lsp.md「通信」）。

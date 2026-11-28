@@ -1,4 +1,4 @@
-// Package app は hozoc の葉の op の実装と表示（docs/cli.md「手で書くもの」）。
+// Package app は hozoc の葉の op の実装と表示（パッケージの説明）。
 //
 // 骨組み（型、op の形、実装を受け取る口、配線、引数の解釈、例外の見分けと終了コード、使い方の表示）は spec/cli.hozo から生成した
 // internal/gen/hozo/compiler と internal/gen/hozo/cli（基底 go と go-valid。docs/plugin-go.md、docs/plugin-go-valid.md）と
@@ -42,7 +42,7 @@ import (
 	"github.com/mew-ton/hozo/internal/source"
 )
 
-// App は葉の op の実装（docs/cli.md「手で書くもの」の internal/app）と、それらが共有するもの。零値で使える。
+// App は葉の op の実装（パッケージの説明の internal/app）と、それらが共有するもの。零値で使える。
 //
 // spec/cli.hozo の model は境界だけを書く（docs/requirements.md「自己展開」）ので、op をまたいで要る中身は
 // App の中に持つ: Check が解析した Project（CollectOutputs が使う）と、CollectOutputs が集めた書き出す予定の、置き場を含む形
@@ -81,7 +81,7 @@ type App struct {
 // メソッドが一つでも足りなければ、ここでコンパイルできない。
 var _ compiler.Leaves = (*App)(nil)
 
-// Ops は a の実装で、コマンドの行（名前空間 hozo.cli）の Ops を組み立てる（docs/cli.md「手で書くもの」）: 入口の op は、フラグで、
+// Ops は a の実装で、コマンドの行（名前空間 hozo.cli）の Ops を組み立てる（パッケージの説明）: 入口の op は、フラグで、
 // 道を分け（spec/cli.hozo の分類 Flag の match。生成した本体が行う）、ユースケース（[App.Usecases]）を呼ぶ。返る値は a だけを持ち、
 // パッケージの変数は使わない（App を二つ作れば、互いに何も共有しない）。
 func (a *App) Ops() hozocli.Ops {
@@ -94,7 +94,7 @@ func (a *App) Usecases() compiler.Ops {
 	return compiler.New(a, a.Sources(), a.Config(), a.Outputs(), a.OutputsSync())
 }
 
-// Serve は spec/cli.hozo の op serve: 言語サーバーとして標準入出力で動く（docs/lsp.md、docs/cli.md「lsp」）。
+// Serve は spec/cli.hozo の op serve: 言語サーバーとして標準入出力で動く（docs/lsp.md、spec/cli.hozo の serve）。
 // internal/lsp.Serve を呼び、クライアントが exit を送るまで戻らない。config（--config / HOZO_CONFIG）は
 // hozo.toml の場所で、なければクライアントの rootUri から探す。log（--log / HOZO_LSP_LOG）はログの書き出し先で、
 // 開けなければその誤りを返す（宣言にない例外なので 70。docs/diagnostics.md「終了コード」）。
@@ -199,7 +199,7 @@ func (e *unknownNamespace) Error() string {
 func (e *unknownNamespace) Unwrap() error { return compiler.UnknownNamespace{} }
 
 // procError は internal/plugin の誤り（ErrCrashed / ErrMalformedOutput）を spec/cli.hozo の compiler.Crashed /
-// compiler.MalformedOutput（生成した hozoc の例外の型。docs/cli.md「手で書くもの」）としても見分けられるようにしたもの。メッセージは元の誤りのまま。errors.Is / errors.As は両方を辿る。
+// compiler.MalformedOutput（生成した hozoc の例外の型。パッケージの説明）としても見分けられるようにしたもの。メッセージは元の誤りのまま。errors.Is / errors.As は両方を辿る。
 type procError struct {
 	exc   error // compiler.Crashed{} か compiler.MalformedOutput{}
 	cause error

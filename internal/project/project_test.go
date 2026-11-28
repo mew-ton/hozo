@@ -386,7 +386,7 @@ func asked(t *testing.T, dir, name string) string {
 }
 
 // TestPluginAnswers はプラグインの探索、使うプラグインの語彙の読み込み、プラグインへの頼みごと（direction "emit"）と、その答えと
-// 診断（docs/cli.md「検査」の 4、docs/plugin-protocol.md「起動」「emit」）: errors は error の診断、warnings は PLUGIN の warning。
+// 診断（spec/cli.hozo の check の手順の 4、docs/plugin-protocol.md「起動」「emit」）: errors は error の診断、warnings は PLUGIN の warning。
 // 答え（files を含む）は、Project.Answers に残る。
 func TestPluginAnswers(t *testing.T) {
 	dir := t.TempDir()

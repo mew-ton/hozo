@@ -82,7 +82,7 @@ func TestParse(t *testing.T) {
 	}
 }
 
-// 突き合わせ（docs/cli.md「tests」の 5）。
+// 突き合わせ（spec/cli.hozo の confirmTests の手順の 5）。
 func TestMatch(t *testing.T) {
 	test := func(transpiler, name, file string, first, last int) Test {
 		return Test{Transpiler: transpiler, TestEntry: sdk.TestEntry{Name: name, File: file, Lines: [2]int{first, last}}}

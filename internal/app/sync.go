@@ -16,7 +16,7 @@ import (
 // このファイルは、状態の分類 OutputsSync（spec/cli.hozo の `classify OutputsSync of outputs`）の単位の実装と、生成したファイルと
 // 出力先ごとの記録に触れる補助。
 
-// OutputsFile は、出力（単位と名前空間の組）ごとの Dir(U, N) に置く、前回書いたパスの一覧（docs/cli.md「書き出し」の 5 と 7）。
+// OutputsFile は、出力（単位と名前空間の組）ごとの Dir(U, N) に置く、前回書いたパスの一覧（spec/cli.hozo の write の手順の 5 と 7）。
 // JSON の文字列の配列で、パスはルートからの相対パス（"/" 区切り）、辞書順。
 const OutputsFile = ".hozoc-outputs.json"
 
@@ -27,7 +27,7 @@ func (a *App) OutputsSync() compiler.OutputsSyncState { return outputsSync{a} }
 // outputsSync は [App.OutputsSync] が返す値。
 type outputsSync struct{ a *App }
 
-// SyncOutputs は spec/cli.hozo の効果 syncOutputs（on OutputsSync: any -> UpToDate。docs/cli.md「書き出し」の 5〜7）: 生成したファイルを、
+// SyncOutputs は spec/cli.hozo の効果 syncOutputs（on OutputsSync: any -> UpToDate。spec/cli.hozo の write の手順の 5〜7）: 生成したファイルを、
 // 書き出す予定 plan に合わせる。ユースケース write の配線が、collectOutputs と outputChanges の後に呼ぶ。plan は、直前の
 // CollectOutputs が返したもの（置き場は [App.plannedFor] から取る）。
 //
@@ -85,7 +85,7 @@ func (s outputsSync) SyncOutputs(ctx context.Context, plan compiler.EmitPlan) er
 	return nil
 }
 
-// UpToDate は spec/cli.hozo の分類 OutputsSync の述語（docs/cli.md「手で書くもの」）: 生成したファイルが、今の仕様と
+// UpToDate は spec/cli.hozo の分類 OutputsSync の述語（パッケージの説明）: 生成したファイルが、今の仕様と
 // 設定から生成し直したものと一致しているか。生成したコードでは、状態の分類 OutputsSync の単位の問い合わせになり、判定関数
 // compiler.ClassifyOutputsSync が呼ぶ。
 //
@@ -133,7 +133,7 @@ func (s outputsSync) UpToDate(ctx context.Context) (bool, error) {
 	return true, nil
 }
 
-// OutOfDate は spec/cli.hozo の分類 OutputsSync の述語（docs/cli.md「手で書くもの」）: 生成したファイルに、足りない、
+// OutOfDate は spec/cli.hozo の分類 OutputsSync の述語（パッケージの説明）: 生成したファイルに、足りない、
 // 古い、または余分なものがあるか。UpToDate の否定で、同じ比べ方を使う（分類のケースは、どれも述語を持つ: docs/check.md
 // 「ケースの判定」）。生成し直せなければ、UpToDate と同じ例外を返す。
 func (s outputsSync) OutOfDate(ctx context.Context) (bool, error) {
@@ -151,7 +151,7 @@ type staleFile struct {
 }
 
 // stale は、予定 pl の対象の各出力の記録（<Dir(U, N)>/.hozoc-outputs.json。前回書いたパスの一覧）にあって、今回は書かないパスの
-// うち、ディスクにあるもの（docs/cli.md「書き出し」の 5 が消すファイル）。並びは、対象の出力の順、その中は記録の順。読むだけで、
+// うち、ディスクにあるもの（spec/cli.hozo の write の手順の 5 が消すファイル）。並びは、対象の出力の順、その中は記録の順。読むだけで、
 // 何も変えない: 何を消すかを決める read outputChanges（[outputsState.OutputChanges]）と、消す効果 syncOutputs
 // （[outputsSync.SyncOutputs]）が、同じこの一覧を使う。
 //
@@ -204,7 +204,7 @@ func readOutputsFile(root, dir string) ([]string, error) {
 }
 
 // removeEmptyDirs は、消したファイル removed（ルートからの相対パス）のディレクトリが空になっていれば、出力先 dir の下の範囲で、
-// そのディレクトリも消す（docs/cli.md「書き出し」の 5: Go の基底の内側のフォルダ inner が要らなくなったとき）。親へ向かって、
+// そのディレクトリも消す（spec/cli.hozo の write の手順の 5: Go の基底の内側のフォルダ inner が要らなくなったとき）。親へ向かって、
 // 空でないディレクトリか dir そのものに当たるまで続ける。dir そのものは消さない。
 func removeEmptyDirs(root, dir, removed string) {
 	for d := path.Dir(removed); config.Under(d, dir); d = path.Dir(d) {

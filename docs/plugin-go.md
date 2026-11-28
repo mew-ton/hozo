@@ -1391,7 +1391,7 @@ func RunSeams(t *testing.T, c SeamCases) {
 
 ### テストの対応表
 
-走らせる関数（`RunLeaves`、`Run<C>`。相乗りの `RunHTTP`、`RunFlows`、`RunRequirements`）を出すトランスパイラは、テストのパッケージのディレクトリに、テストの対応表 `hozo-tests.<トランスパイラの名前>.json` を出す（形と、hozoc の読み方の持ち主は `docs/plugin-protocol.md`「テストの対応表」）。走らせる関数を呼ぶ一行を、人が書き忘れても、`hozoc tests` が、走っていないテストを名指せるようにする（`docs/cli.md`「tests」）。
+走らせる関数（`RunLeaves`、`Run<C>`。相乗りの `RunHTTP`、`RunFlows`、`RunRequirements`）を出すトランスパイラは、テストのパッケージのディレクトリに、テストの対応表 `hozo-tests.<トランスパイラの名前>.json` を出す（形と、hozoc の読み方の持ち主は `docs/plugin-protocol.md`「テストの対応表」）。走らせる関数を呼ぶ一行を、人が書き忘れても、`hozoc tests` が、走っていないテストを名指せるようにする（`spec/cli.hozo` の `confirmTests`）。
 
 ```json
 {

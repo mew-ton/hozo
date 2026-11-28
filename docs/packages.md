@@ -576,7 +576,7 @@ func WriteJSON(w io.Writer, diags []Diagnostic, fs *source.FileSet) error   // R
 func Count(diags []Diagnostic) (errors, warnings int)
 ```
 
-`internal/app` の `Presenter` は、`spec/cli.hozo` の model `Diagnostic`（位置は既に行と列）を `Rendered` に写して `WriteRenderedText` と `Report` を使う（`docs/cli.md`「手で書くもの」）。
+`internal/app` の `Presenter` は、`spec/cli.hozo` の model `Diagnostic`（位置は既に行と列）を `Rendered` に写して `WriteRenderedText` と `Report` を使う（`internal/app`（パッケージ `app` の説明））。
 
 ### `internal/syntax/token`、`internal/syntax/ast`、`internal/syntax`
 
@@ -703,7 +703,7 @@ type Project struct {
     Units   []Unit                   // 解決した単位（Config.Units と同じ順）
     Diags   []diag.Diagnostic        // 解析・解決・検査・設定と、プラグインの診断（emit の errors と warnings）のすべて。並べ替え済み
     Readers []*plugin.Plugin         // 頼む語彙のプラグイン（docs/plugin-protocol.md「語彙のプラグイン」: 仕様が、その語彙を使っている。名前の辞書順）。protocol の合わないものも含む
-    Answers []Answer                 // プラグインから受け取った答え（docs/cli.md「検査」の 4）。単位の設定の順、名前空間の IR の順、transpilers に書いた順。起動しなかったら、空
+    Answers []Answer                 // プラグインから受け取った答え（`spec/cli.hozo` の `check` の手順の 4）。単位の設定の順、名前空間の IR の順、transpilers に書いた順。起動しなかったら、空
 }
 type Answer struct { Unit int; Namespace string; Transpiler Transpiler; Response *sdk.EmitResponse }   // トランスパイラ一つの、出力一つ（Units の添字と、名前空間）への答え
 type Unit struct { *config.Unit; Language, Base string; Transpilers []Transpiler; Seams map[string]string; Files []string }   // 言語、基底の名前（CFG-20 なら空）、解決できたトランスパイラ、単位の継ぎ目（デコレータの FQN → 宣言したトランスパイラ。CFG-23 なら、設定の順で最初のもの）、in に合ったファイル（語彙のファイルを含む）
@@ -713,7 +713,7 @@ type Options struct {
     Overlay map[string][]byte        // ディスクの代わりに使う内容（言語サーバーの開いている文書）
     Stderr io.Writer; CacheDir string // プラグインの標準エラーの流し先と、WASM を、機械の言葉に直したものの置き場（HOZO_CACHE_DIR。"" なら、ふだんの置き場）
     PluginPath, Home string          // プラグインの探索が見るプロジェクトの外の場所（internal/plugin.SearchEnv）。空なら探さない
-    NoPlugins bool                   // プラグインを、起動しない（docs/cli.md「検査」の 4 を、しない）。仕様を読み直すだけの呼び出しと、言語サーバーの解析（docs/lsp.md「プラグインの診断」）
+    NoPlugins bool                   // プラグインを、起動しない（`spec/cli.hozo` の `check` の手順の 4 を、しない）。仕様を読み直すだけの呼び出しと、言語サーバーの解析（docs/lsp.md「プラグインの診断」）
     Context context.Context          // プラグインの起動を、やめさせる口（言語サーバーの、裏の check）。nil なら、やめさせない。動いているプラグインも、その場で止まり（docs/plugin-protocol.md「起動」）、やめたら、Project.RunErr が、その誤り
 }
 func LoadWith(opts Options) *Project                                            // 解析の本体。NoConfig なら CFG-* の診断を除く
@@ -729,11 +729,11 @@ func (p *Project) PluginDiagnostic(plugin string, d sdk.Diagnostic) diag.Diagnos
 func (p *Project) PluginWarning(transpiler string, w sdk.Warning) diag.Diagnostic     // トランスパイラの warning を PLUGIN の診断に
 ```
 
-`hozoc` の検査の op `check`（`internal/app`。`hozoc build` と `hozoc tests` が、はじめに呼ぶ）と言語サーバー（`internal/lsp`）は `LoadWith` を呼ぶ。`Project` は `Root`、`Sources`、`RunErr`（プラグインが `Crashed` / `MalformedOutput` で終わったときの誤り）も持つ。`Covered` 以下の六つは、`internal/app` が `emit` の手順（`docs/cli.md`「書き出し」）で使うためのもの。
+`hozoc` の検査の op `check`（`internal/app`。`hozoc build` と `hozoc tests` が、はじめに呼ぶ）と言語サーバー（`internal/lsp`）は `LoadWith` を呼ぶ。`Project` は `Root`、`Sources`、`RunErr`（プラグインが `Crashed` / `MalformedOutput` で終わったときの誤り）も持つ。`Covered` 以下の六つは、`internal/app` が `emit` の手順（`spec/cli.hozo` の `write`）で使うためのもの。
 
 ### `internal/testmap`
 
-テストの対応表と、カバレッジの「実行された行」の突き合わせ（`docs/cli.md`「tests」の 2 と 5）。言語も、カバレッジの形も、知らない。診断は作らない（`internal/app` が、結果から作る）。
+テストの対応表と、カバレッジの「実行された行」の突き合わせ（`spec/cli.hozo` の `confirmTests` の手順の 2 と 5）。言語も、カバレッジの形も、知らない。診断は作らない（`internal/app` が、結果から作る）。
 
 ```go
 func IsMap(path string) bool                                          // 名前が hozo-tests.<…>.json か
@@ -745,7 +745,7 @@ func Match(tests []Test, covered []sdk.CoveredFile) []Status          // tests �
 
 ### `internal/app`
 
-`docs/cli.md`「手で書くもの」。葉の op と状態の単位の実装を持つ `App`（`*App` が生成した `compiler.Leaves` を満たし、`Sources()` / `Config()` / `Outputs()` / `OutputsSync()` が状態の単位の実装を返し、`Usecases()` がそれらを `compiler.New` に渡し、`Ops()` が、その結果を、コマンドの行の `New` に渡す。状態に触れる `read outputChanges` と効果 `syncOutputs` は、`Outputs()` と `OutputsSync()` が返す単位のメソッド）と、`cli.Presenter`（`internal/gen/hozo/cli/cli`）の実装 `Presenter`。引数の解釈は持たない（生成した `cli.Main`）。入口の `Main(ctx, a, args, env, stdout, stderr)` は、`cli.Main` を呼ぶ前に、古い名前のコマンド（`check`、`emit`）を見て、新しい書き方を示す（`Renamed(args)` が、その文を返す。`docs/cli.md`「build」の「古い名前」）。`App` はプロセスの環境を自分で読まない: ホームディレクトリは `App.Home`（`cmd/hozoc` が入れる）、環境変数は `spec/cli.hozo` の入力のフィールドで届く。特定の言語のコードは持たない: トランスパイラを起動し、返ったファイルを書き出すだけ（`docs/cli.md`「書き出し」）。
+持ち主は、パッケージ `app` の説明（`internal/app/app.go`）。葉の op と状態の単位の実装を持つ `App`（`*App` が生成した `compiler.Leaves` を満たし、`Sources()` / `Config()` / `Outputs()` / `OutputsSync()` が状態の単位の実装を返し、`Usecases()` がそれらを `compiler.New` に渡し、`Ops()` が、その結果を、コマンドの行の `New` に渡す。状態に触れる `read outputChanges` と効果 `syncOutputs` は、`Outputs()` と `OutputsSync()` が返す単位のメソッド）と、`cli.Presenter`（`internal/gen/hozo/cli/cli`）の実装 `Presenter`。引数の解釈は持たない（生成した `cli.Main`）。入口の `Main(ctx, a, args, env, stdout, stderr)` は、`cli.Main` を呼ぶ前に、古い名前のコマンド（`check`、`emit`）を見て、新しい書き方を示す（`Renamed(args)` が、その文を返す。`spec/cli.hozo` の `build` の説明の「古い名前」）。`App` はプロセスの環境を自分で読まない: ホームディレクトリは `App.Home`（`cmd/hozoc` が入れる）、環境変数は `spec/cli.hozo` の入力のフィールドで届く。特定の言語のコードは持たない: トランスパイラを起動し、返ったファイルを書き出すだけ（`spec/cli.hozo` の `write`）。
 
 ### `internal/lsp`
 

@@ -1,13 +1,13 @@
 // Hozo 自身の仕様（決定 D468、D475）。業務の流れの名前空間 hozo.flows と、hozoc の外の道具 hozo.toolchain。
 // 流れは、ユースケースの op（spec/cli.hozo の hozo.compiler の、@prd.usecase.of を付けた op）を、順に呼ぶ配線。
-// 出どころは、docs/tools.md「仕事の流れ」「ユースケース」と、docs/cli.md「tests」。文書が言っている流れだけを、写してある。
+// 出どころは、docs/tools.md「仕事の流れ」「ユースケース」と、spec/cli.hozo の confirmTests。文書が言っている流れだけを、写してある。
 // どちらの名前空間も、hozo.toml の単位の対象ではない: コードには、ならない。
 
 /** hozoc の外にある、利用者の道具。hozoc は、これを呼ばない: 流れの中で、人か CI が行う手順を、op として言う */
 namespace hozo.toolchain {
   /**
    * 生成されたテストを、プロジェクトのやり方で、カバレッジを取りながら走らせる（go test -coverprofile など）。
-   * hozoc は、テストを走らせない（docs/cli.md「tests」）。
+   * hozoc は、テストを走らせない（spec/cli.hozo の confirmTests）。
    *
    * @returns カバレッジのファイルの場所
    */
@@ -26,7 +26,7 @@ namespace hozo.flows {
   }
 
   /**
-   * 生成したテストが、走ったことを確かめる（docs/cli.md「tests」、docs/requirements.md「もとの考えと、Hozo が守るもの」）。
+   * 生成したテストが、走ったことを確かめる（spec/cli.hozo の confirmTests、docs/requirements.md「もとの考えと、Hozo が守るもの」）。
    * 担い手は、枠を出して、テストと中身を書くのが、AI か、エンジニア。テストを走らせて、確かめるのが、利用者か、CI。
    *
    * @param in 書き出す対象

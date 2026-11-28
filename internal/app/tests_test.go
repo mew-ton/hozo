@@ -8,7 +8,7 @@ import (
 	"testing"
 )
 
-// hozoc tests（docs/cli.md「tests」）のテスト。プラグインは、にせもの（fakePlugin。internal/fakeplugin）: emit の応答に、テストの
+// hozoc tests（spec/cli.hozo の confirmTests）のテスト。プラグインは、にせもの（fakePlugin。internal/fakeplugin）: emit の応答に、テストの
 // 対応表を入れ、direction "coverage" には、coverage.json をそのまま返す。
 
 const (

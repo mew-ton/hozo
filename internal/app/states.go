@@ -13,7 +13,7 @@ import (
 	"github.com/mew-ton/hozo/internal/source"
 )
 
-// このファイルは、spec/cli.hozo の状態 sources、config、outputs の単位の実装（docs/cli.md「手で書くもの」の表）。どれも、形で決まる
+// このファイルは、spec/cli.hozo の状態 sources、config、outputs の単位の実装（パッケージの説明の表）。どれも、形で決まる
 // 問い合わせ（IsEmpty と Get）を持つ。生成した配線は、それを呼ばない（spec/cli.hozo の配線は、状態を名前で読まない）: テストが、
 // 効果の結果の判定に使うためのもの。値は、作業ディレクトリから探した設定で、ディスクから読む。呼ぶたびに読み直す。
 // outputs の単位は、read outputChanges（ユースケース write の配線が呼ぶ）も持つ。
@@ -100,7 +100,7 @@ func (s configState) IsEmpty(ctx context.Context) (bool, error) {
 	return file == nil, err
 }
 
-// Outputs は、状態 outputs（生成したファイル）の単位の実装: 出力先ごとの記録（.hozoc-outputs.json。docs/cli.md「書き出し」の 5 と 7）に
+// Outputs は、状態 outputs（生成したファイル）の単位の実装: 出力先ごとの記録（.hozoc-outputs.json。spec/cli.hozo の write の手順の 5 と 7）に
 // 載っているファイルと、それに触れる read outputChanges。compiler.New の引数 outputs に渡す（[App.Ops]）。
 func (a *App) Outputs() compiler.OutputsState { return outputsState{a} }
 
@@ -152,7 +152,7 @@ func (s outputsState) IsEmpty(ctx context.Context) (bool, error) {
 	return len(files) == 0, err
 }
 
-// OutputChanges は spec/cli.hozo の read outputChanges（on outputs。docs/cli.md「書き出し」の 4〜7 の、書くファイルと消すファイルを決める
+// OutputChanges は spec/cli.hozo の read outputChanges（on outputs。spec/cli.hozo の write の手順の 4〜7 の、書くファイルと消すファイルを決める
 // ところ）: 書き出す予定 plan を、今の生成したファイルと比べる。読むだけで、何も変えない（書き出すのは、効果 syncOutputs。
 // [outputsSync.SyncOutputs]）。ユースケース write の配線が、collectOutputs の後、syncOutputs の前に呼び、その結果を返す。plan は、
 // 直前の CollectOutputs が返したもの（置き場は [App.plannedFor] から取る）。

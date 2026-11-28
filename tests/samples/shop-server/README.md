@@ -573,7 +573,7 @@ func (s RateSeams) <Op>RateLimited(<op の形の引数>, body func(<op の形の
 | `gen/flows/doc.go` `types.go` `ops.go` `wiring.go` | `go` |
 | `gen/flows/flowstest/doc.go` `fakes.go` | `go`（テストのパッケージ: `Fakes` と `NewOps`。`client` の出力を、本物で通す） |
 | `gen/flows/flowstest/design.go` `hozo-tests.go-design.json` | `go-design`（テストのパッケージ: フローの E2E テストの口と、要求ごとの、テストの入れ物の口と、その、テストの対応表。`docs/plugin-go-design.md`。基底が、同じパッケージに出すのは、`doc.go` と `fakes.go`） |
-| `gen/*/.hozoc-outputs.json` | hozoc の記録（`docs/cli.md`「書き出し」）。その出力のすべてのファイルのパス（`gen/server` の記録は、`inner/` の下のファイルも持つ） |
+| `gen/*/.hozoc-outputs.json` | hozoc の記録（`spec/cli.hozo` の `write`）。その出力のすべてのファイルのパス（`gen/server` の記録は、`inner/` の下のファイルも持つ） |
 | `app/leaves.go`、`app/mailer.go`、`app/limiter.go` | 人が書く: `server` の葉の op 十の本体（`server.Leaves` を満たす型）、`mailer.send` の実装（`server.MailerOps` を満たす型）、`@rate.limited` の数え方（`server.RateLimiter` を満たす型）。保存先を知らない |
 | `app/onsqlite/compose.go` | 人が書く: 組み立て（`server` を `gen/store` の上に）。`NewFlows` は、その上に、`client` と `flows` を重ねる |
 | `app/cmd/shop-sqlite/main.go` | 人が書く: その組み立てで待ち受ける main |
