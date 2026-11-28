@@ -41,7 +41,7 @@ import (
 
 // 自己生成の入力と出力（リポジトリのルートからの相対パス）。
 var (
-	// genDirs は spec/cli.hozo からの生成物の置き場（hozo.toml の二つの単位の out。docs/cli.md「cli.hozo」）: 名前空間 hozo.compiler
+	// genDirs は spec/cli.hozo からの生成物の置き場（hozo.toml の二つの単位の out）: 名前空間 hozo.compiler
 	// （ユースケース）の出力（入口、内側の inner）と、名前空間 hozo.cli（コマンドの行）の出力（入口、go-cli の cli）。
 	genDirs = []string{filepath.Join("internal", "gen", "hozo", "compiler"), filepath.Join("internal", "gen", "hozo", "cli")}
 	// inputs は一時ディレクトリに写すファイル。ほかに、仕様のファイル（spec/*.hozo と spec/decisions/*.hozo）を、すべて写す（specFiles）。

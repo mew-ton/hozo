@@ -85,7 +85,7 @@ func (s outputsSync) SyncOutputs(ctx context.Context, plan compiler.EmitPlan) er
 	return nil
 }
 
-// UpToDate は spec/cli.hozo の分類 OutputsSync の述語（docs/cli.md「cli.hozo」「手で書くもの」）: 生成したファイルが、今の仕様と
+// UpToDate は spec/cli.hozo の分類 OutputsSync の述語（docs/cli.md「手で書くもの」）: 生成したファイルが、今の仕様と
 // 設定から生成し直したものと一致しているか。生成したコードでは、状態の分類 OutputsSync の単位の問い合わせになり、判定関数
 // compiler.ClassifyOutputsSync が呼ぶ。
 //
@@ -133,7 +133,7 @@ func (s outputsSync) UpToDate(ctx context.Context) (bool, error) {
 	return true, nil
 }
 
-// OutOfDate は spec/cli.hozo の分類 OutputsSync の述語（docs/cli.md「cli.hozo」「手で書くもの」）: 生成したファイルに、足りない、
+// OutOfDate は spec/cli.hozo の分類 OutputsSync の述語（docs/cli.md「手で書くもの」）: 生成したファイルに、足りない、
 // 古い、または余分なものがあるか。UpToDate の否定で、同じ比べ方を使う（分類のケースは、どれも述語を持つ: docs/check.md
 // 「ケースの判定」）。生成し直せなければ、UpToDate と同じ例外を返す。
 func (s outputsSync) OutOfDate(ctx context.Context) (bool, error) {

@@ -44,7 +44,7 @@
 
 テスト用のプラグイン `tests/plugins/pick`（選択だけを返す代役）は消す。コーパスの `plugins/pick/` も消す。
 
-`tests/parse_test.go` は、コーパス・標準の語彙・プラグインの語彙のすべての `.hozo` が構文エラーなしに解析できることと、`docs/cli.md`「cli.hozo」に埋め込んだ `spec/cli.hozo` と `hozo.toml` のブロックがリポジトリのファイルとバイト単位で同じであること（`TestDocsEmbedRootFiles`）を確かめる。語彙のファイルが文書の写しであることも、同じファイルが確かめる（`TestDocsEmbedVocabulary`）: `vocab/db.hozo` は `docs/vocab.md`「`db` の語彙」の全文とバイト単位で同じ、`vocab/http.hozo` は同「`http` の語彙」のブロックをそのまま含み、`plugins/go-cli/cli.hozo` は `docs/plugin-go-cli.md`「語彙」のブロックの宣言を、同じ順に、過不足なく持つ。
+`tests/parse_test.go` は、コーパス・標準の語彙・プラグインの語彙のすべての `.hozo` が構文エラーなしに解析できることを確かめる。語彙のファイルが文書の写しであることも、同じファイルが確かめる（`TestDocsEmbedVocabulary`）: `vocab/db.hozo` は `docs/vocab.md`「`db` の語彙」の全文とバイト単位で同じ、`vocab/http.hozo` は同「`http` の語彙」のブロックをそのまま含み、`plugins/go-cli/cli.hozo` は `docs/plugin-go-cli.md`「語彙」のブロックの宣言を、同じ順に、過不足なく持つ。
 
 hozoc 自身（`spec/cli.hozo` と、リポジトリ直下の `hozo.toml`）はコーパスには入れない。`hozoc build --no-emit` が error なしで通ることを `tests/selfcheck_test.go` で確かめ、`emit` の結果は「生成物の一致」で確かめる。
 
@@ -58,7 +58,7 @@ hozoc 自身（`spec/cli.hozo` と、リポジトリ直下の `hozo.toml`）は�
 
 CI で `go generate ./...` と `make generate`（自己生成。`docs/packages.md`「自己生成の手順」）を実行し、`git diff --exit-code` で差分がないことを確かめる。対象は `docs/packages.md`「生成するもの」の表。`hozoc build` の分は `tests/generated_test.go` も確かめる: 一時ディレクトリに、仕様のファイルと `hozo.toml` を、`make generate` と同じに写して emit し、コミット済みの置き場（`docs/packages.md`「自己生成の手順」）とバイト単位で比べる（`go test ./...` だけで遅れが分かる）。`tests/selfcheck_test.go` は、リポジトリ直下での `emit --dry-run` が、コミット済みの生成物とちょうど同じファイルを書く予定にすることを確かめる。
 
-手で写すもの（生成しないもの）の一致もテストで確かめる: `docs/cli.md` のブロックがリポジトリのファイルと同じであること（「コーパス」の `TestDocsEmbedRootFiles`）。
+手で写すもの（生成しないもの）の一致もテストで確かめる: 語彙のファイルが、文書のブロックの写しであること（「コーパス」の `TestDocsEmbedVocabulary`）。
 
 ## 文書とコードの一致
 

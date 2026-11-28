@@ -1,6 +1,10 @@
 /**
  * hozo の仕様を検査し、各言語のコードに展開するコンパイラの、ユースケース。
- * コマンドの行（入口）は、名前空間 hozo.cli で、フラグを知っているのは、そちらだけ（docs/cli.md「cli.hozo」）。
+ * コマンドの行（入口）は、名前空間 hozo.cli で、フラグを知っているのは、そちらだけ: ユースケースの入力（EmitInput、CoverageInput、
+ * ServeInput）は、フラグに当たる項目を持たない（決定 D472、D473）。
+ * 例外は、投げるユースケースの側（この名前空間）に宣言し、終了コード（@cli.exitCode）も、その宣言に付ける。go-cli は、コマンドの op が
+ * 投げうる例外を、どの名前空間のものでも見分ける（docs/plugin-go-cli.md「コマンドごとの関数」）。例外の名前の表示（--format json の
+ * "error"）は、hozo.compiler.CheckFailed のように、名前空間から書く（決定 D742）。
  */
 namespace hozo.compiler {
   /**
@@ -54,6 +58,7 @@ namespace hozo.compiler {
   model Position { line: int; col: int; }
 
   /** 指摘の、機械が読む補足（docs/check.md「Data」）。項目の名前から、値の並びを引く */
+  @adr.decided(hozo.decisions.Decision600.D603)
   model DiagnosticData { [key: string]: string[]; }
 
   /** 検査やプラグインが報告する一件の指摘（docs/diagnostics.md） */
@@ -82,7 +87,10 @@ namespace hozo.compiler {
   @fs.files("hozo.toml")
   state config: nullable<SourceFile>;
 
-  /** 生成したファイル。置き場は hozo.toml の各単位の out（docs/config.md「単位の対象」） */
+  /**
+   * 生成したファイル。置き場は hozo.toml の各単位の out（docs/config.md「単位の対象」）。置き場は設定で決まり、仕様の宣言の時点では
+   * 決まらないので、@fs.files を付けない
+   */
   state outputs: list<OutputFile>;
 
   /**
@@ -133,20 +141,28 @@ namespace hozo.compiler {
   @cli.exitCode(5)
   exception CoverageUnusable(diagnostics: Diagnostic[]);
 
-  /** 書き出す名前空間として指定されたものも、その子孫も、どの単位の対象でもない */
+  /** 書き出す名前空間として指定されたものも、その子孫も、どの単位の対象でもない。build の引数の書き間違いを、何も書かずに成功したことにしない */
   @cli.exitCode(64)
   exception UnknownNamespace;
 
-  /** プラグインが異常終了した（WASM の実行環境で、0 と 2 のほかの終了コードで終わった、途中で止まった、起動できなかった。docs/plugin-protocol.md「起動」） */
+  /**
+   * プラグインが異常終了した（WASM の実行環境で、0 と 2 のほかの終了コードで終わった、途中で止まった、起動できなかった。docs/plugin-protocol.md「起動」）。
+   * 外部プロセスを起動する語彙 proc は、なくしたので、この名前空間の例外として宣言する（MalformedOutput も同じ）
+   */
+  @adr.decided(hozo.decisions.Decision400.D434)
   exception Crashed;
 
   /** プラグインの出力が、約束した形（JSON）でなかった（docs/plugin-protocol.md「応答の形」） */
+  @adr.decided(hozo.decisions.Decision400.D434)
   exception MalformedOutput;
 
   /** 検査の結果（誤りではない指摘） */
   model CheckResult { warnings: Diagnostic[]; }
 
-  /** 検査と書き出しのユースケース（verify、preview、write）の結果。検査だけ（verify）なら、written も removed も空 */
+  /**
+   * 検査と書き出しのユースケース（verify、preview、write）の結果。検査だけ（verify）なら、written も removed も空。
+   * 三つのユースケースの結果を同じ型にするのは、build の match のアームの型が、そろっていなければならないため（TYPE-8）
+   */
   model BuildResult {
     warnings: Diagnostic[];
     /** 書いたファイル（新規と更新） */
@@ -162,7 +178,12 @@ namespace hozo.compiler {
     ran: string[];
   }
 
-  /** 検査（check）の入力。ユースケースの入力（EmitInput、CoverageInput）から、配線が作る */
+  /**
+   * 検査（check）の入力。ユースケースの入力（EmitInput、CoverageInput）から、配線が作る。
+   * 環境変数（HOZO_PLUGIN_PATH、HOZO_CACHE_DIR）も、コマンドの入力のフィールドとして受け取り、ここまで配線で渡す: 葉の op の実装が、
+   * プロセスの環境を自分で読まないので、同じ入力から同じ結果になり、テストが、実行する人の環境に左右されない
+   */
+  @adr.decided(hozo.decisions.Decision600.D694)
   model CheckInput {
     /** 設定ファイルの場所 */
     config: Path?;
@@ -208,11 +229,14 @@ namespace hozo.compiler {
     cacheDir: Path?;
   }
 
-  /** 生成したファイルが、今の仕様と設定から生成し直したものと一致しているか */
+  /**
+   * 生成したファイルが、今の仕様と設定から生成し直したものと一致しているか。書き出しの三つの変化（追加、書き換え、削除）は、
+   * この分類の遷移 syncOutputs 一つにする（一つの効果が変えるのは、一つの状態の一つの変化: docs/check.md「効果の宛先」）
+   */
   classify OutputsSync of outputs {
-    /** 一致している */
+    /** 一致している: 生成し直して、差分がない。docs/testing.md「生成物の一致」の検査と同じ中身 */
     UpToDate;
-    /** 足りない、古い、または余分なファイルがある */
+    /** 足りない、古い、または余分なファイルがある。UpToDate の否定 */
     OutOfDate;
   }
 
@@ -238,6 +262,8 @@ namespace hozo.compiler {
 
   /**
    * 仕様を検査する。使うプラグインに、展開を頼み、その診断も集める。ファイルは書き出さない。
+   * コマンドでも、ユースケースでもない、内部の葉の op で、ユースケースの配線が、はじめに呼ぶ。プラグインを一つずつ起動する繰り返しは、
+   * この op の中に置く（配線は、繰り返しを持たない）。
    *
    * @param in 検査の入力
    * @throws LanguageMismatch 一つの単位のトランスパイラの language がそろっていない（docs/config.md の CFG-16）
@@ -246,6 +272,7 @@ namespace hozo.compiler {
    * @see verify
    */
   @prd.ref(Requirement.SharedDiagnostics, Requirement.NamedOmission)
+  @adr.decided(hozo.decisions.Decision400.D417, hozo.decisions.Decision600.D694)
   fn check(in: CheckInput): CheckResult
     throws CheckFailed, ConfigInvalid, LanguageMismatch
     throws Crashed, MalformedOutput;
@@ -267,6 +294,7 @@ namespace hozo.compiler {
    * 検査がプラグインから受け取った答えから、出力ごとのファイルを集めて、確かめる（パスと、ファイルの衝突）。集めたファイルは、返さない:
    * 返すのは、warning だけの結果（written も removed も空）。プラグインは、起動しない。ファイルには触れない。
    * hozo.toml がなければ、集めるものがなく、検査の warning だけを返す。
+   * 配線でなく葉なのは、配線が、並びのリテラルも、並びの写しも書けないため（docs/open.md「サンプルと、hozoc 自身の仕様」。plannedChanges も同じ）。
    *
    * @param in ユースケースの入力
    * @param checked 検査の結果
@@ -286,7 +314,7 @@ namespace hozo.compiler {
    */
   @prd.usecase.of(Actor.Agent, Actor.Engineer, Actor.Ci)
   @prd.ref(Requirement.SharedDiagnostics)
-  @adr.decided(hozo.decisions.Decision400.D472, hozo.decisions.Decision400.D473)
+  @adr.decided(hozo.decisions.Decision400.D472, hozo.decisions.Decision400.D473, hozo.decisions.Decision700.D751)
   export fn verify(in: EmitInput): BuildResult {
     val checked = check({ config: in.config, pluginPath: in.pluginPath, cacheDir: in.cacheDir });
     return verifyOutputs(in, checked);
@@ -307,7 +335,7 @@ namespace hozo.compiler {
    * @see write
    */
   @prd.usecase.of(Actor.Agent, Actor.Engineer)
-  @adr.decided(hozo.decisions.Decision400.D472, hozo.decisions.Decision400.D473)
+  @adr.decided(hozo.decisions.Decision400.D472, hozo.decisions.Decision400.D473, hozo.decisions.Decision700.D751)
   export fn preview(in: EmitInput): BuildResult {
     val checked = check({ config: in.config, pluginPath: in.pluginPath, cacheDir: in.cacheDir });
     val plan = collectOutputs(in, checked);
@@ -316,6 +344,9 @@ namespace hozo.compiler {
 
   /**
    * 仕様を検査し、プラグインから受け取ったファイルを書き出す。例外は、どれも書き出しを始める前に起きる（集めるのが先）。
+   * 配線にしたのは、検査を通った結果だけを書き出しに渡すことと、check の例外が、ユースケースとコマンド build に伝わることを、検査器に
+   * 確かめさせるため。MalformedOutput も prevents effects なのは、ファイルをすべて集めて、パスと衝突を確かめてから書き始めるため
+   * （docs/cli.md「書き出し」）。それは、例外を投げる collectOutputs が、効果 syncOutputs より上の行にあることから、検査器が確かめる（REL-4）。
    *
    * @param in ユースケースの入力
    * @see verify
@@ -323,7 +354,7 @@ namespace hozo.compiler {
    */
   @prd.usecase.of(Actor.Agent, Actor.Engineer)
   @prd.ref(Requirement.SingleSource, Requirement.Deterministic)
-  @adr.decided(hozo.decisions.Decision400.D472, hozo.decisions.Decision400.D473, hozo.decisions.Decision700.D743)
+  @adr.decided(hozo.decisions.Decision400.D472, hozo.decisions.Decision400.D473, hozo.decisions.Decision700.D743, hozo.decisions.Decision700.D751)
   export fn write(in: EmitInput): BuildResult
     effects syncOutputs
     throws CheckFailed, ConfigInvalid, LanguageMismatch, OutputConflict, UnknownNamespace prevents effects
@@ -338,6 +369,8 @@ namespace hozo.compiler {
 
   /**
    * 検査がプラグインから受け取った答えから、テストの対応表を集め、カバレッジの「実行された行」と突き合わせる。ファイルは書き出さない。
+   * 対応表を集めるところは、collectOutputs を呼ばずに、この op の中に置く: 配線は、並びのリテラルを書けず、EmitInput（namespaces を持つ）を、
+   * 配線の中で作れない。
    *
    * @param in ユースケースの入力
    * @param checked 検査の結果
@@ -347,6 +380,7 @@ namespace hozo.compiler {
    * @throws CoverageUnusable 置き場の出力が今の仕様からのものと違う、または、カバレッジを読めない
    * @throws Crashed カバレッジを読むプラグインが異常終了した
    */
+  @adr.decided(hozo.decisions.Decision600.D649)
   fn matchTests(in: CoverageInput, checked: CheckResult): TestsResult
     throws ConfigInvalid, OutputConflict, TestsNotRun, CoverageUnusable
     throws Crashed, MalformedOutput;
@@ -359,7 +393,7 @@ namespace hozo.compiler {
    */
   @prd.usecase.of(Actor.Agent, Actor.Engineer, Actor.Ci)
   @prd.ref(Requirement.RequiredTestsRan)
-  @adr.decided(hozo.decisions.Decision400.D472, hozo.decisions.Decision400.D473)
+  @adr.decided(hozo.decisions.Decision300.D380, hozo.decisions.Decision400.D472, hozo.decisions.Decision400.D473, hozo.decisions.Decision600.D649, hozo.decisions.Decision700.D751)
   export fn confirmTests(in: CoverageInput): TestsResult {
     val checked = check({ config: in.config, pluginPath: in.pluginPath, cacheDir: in.cacheDir });
     return matchTests(in, checked);
@@ -372,10 +406,14 @@ namespace hozo.compiler {
    */
   @prd.usecase.of(Actor.Engineer)
   @prd.ref(Requirement.SharedDiagnostics)
-  @adr.decided(hozo.decisions.Decision400.D472, hozo.decisions.Decision400.D473, hozo.decisions.Decision400.D474)
+  @adr.decided(hozo.decisions.Decision400.D472, hozo.decisions.Decision400.D473, hozo.decisions.Decision400.D474, hozo.decisions.Decision700.D751)
   export fn serve(in: ServeInput);
 
-  /** プラグインの起動のしかた（docs/plugin-protocol.md「起動」）。wasm は、プラグインの本体（WASM）のファイル */
+  /**
+   * プラグインの起動のしかた（docs/plugin-protocol.md「起動」）。wasm は、プラグインの本体（WASM）のファイル。
+   * プラグインは、hozoc の中のサンドボックスで動き、作業ディレクトリも、引数も、渡さないので、名前と WASM の場所だけを持つ
+   */
+  @adr.decided(hozo.decisions.Decision700.D703)
   model Plugin { name: string; wasm: Path; }
 
   /** 仕様: IR の、出力に依らない部分（docs/ir.md「まとめた形」の Spec）。中身はこの仕様では書かない */
@@ -388,6 +426,7 @@ namespace hozo.compiler {
   model EmitOutput { transpilers: string[]; view: OutputView; }
 
   /** 展開のときのプラグインへの入力（同「emit」の要求）。仕様を一度と、プラグインが受け持つ出力の並び */
+  @adr.decided(hozo.decisions.Decision400.D411)
   model EmitRequest { protocol: string; direction: string; spec: Spec; outputs: EmitOutput[]; }
 
   /** トランスパイラの warning（同「emit」の応答の warnings の要素） */
@@ -408,6 +447,8 @@ namespace hozo.compiler {
   /**
    * プラグインを一つ、hozoc の中の WASM の実行環境で動かして、受け持つ出力のすべてを、まとめて展開させる
    * （docs/plugin-protocol.md「起動」）。入力は、標準入力に JSON で渡し、標準出力の JSON を、出力として受け取る。
+   * どの配線からも呼ばれないが、プラグインとの境界の記述として残す（docs/cli.md「手で書くもの」）。動かすプラグインは、引数 plugin で
+   * 渡す: デコレータの引数に、実行時の値は書けない。
    *
    * @param plugin 動かすプラグイン
    * @param req プラグインへの入力
@@ -420,14 +461,19 @@ namespace hozo.compiler {
 
 /**
  * hozoc のコマンドの行（入口）。引数とフラグを読んで、名前空間 hozo.compiler のユースケースに入る。
- * フラグ（--no-emit、--dry-run、--format）を知っているのは、ここだけ（docs/cli.md「cli.hozo」）。
+ * フラグ（--no-emit、--dry-run、--format）を知っているのは、ここだけ: コマンドの op が、入力から、レコードリテラルで、ユースケースの
+ * 入力を組んで渡す（決定 D472、D473）。コマンドは build、tests、lsp の三つ（決定 D417）。言語サーバーは、別のバイナリにせず、
+ * サブコマンド lsp にする（hozo.compiler.Requirement.SingleBinary）。
+ * コマンドの op は export: go-cli の Main が、名前空間の外から、入口の Ops を通して呼ぶ（docs/plugin-go-cli.md「対象」の CLI-6）。
  */
 namespace hozo.cli {
-  /** 表示の形式。text か json */
+  /** 表示の形式。text か json。json は、診断を機械が読むためのもの（docs/diagnostics.md「json」） */
   @valid.pattern("^(text|json)$")
   scalar OutputFormat extends string;
 
-  /** build の入力 */
+  /**
+   * build の入力。フラグ（noEmit、dryRun）は、省略可能でない boolean で、付いていなければ偽（docs/plugin-go-cli.md「語彙」）
+   */
   model BuildInput {
     /** 設定ファイルの場所 */
     @cli.flag("config") @cli.env("HOZO_CONFIG") config: hozo.compiler.Path?;
@@ -465,7 +511,7 @@ namespace hozo.cli {
    * @see tests
    */
   @cli.command("build")
-  @adr.decided(hozo.decisions.Decision400.D472, hozo.decisions.Decision400.D473)
+  @adr.decided(hozo.decisions.Decision400.D417, hozo.decisions.Decision400.D472, hozo.decisions.Decision400.D473, hozo.decisions.Decision700.D751)
   export fn build(in: BuildInput): hozo.compiler.BuildResult {
     return match (in.noEmit by Flag) {
       On => hozo.compiler.verify({ config: in.config, namespaces: in.namespaces, pluginPath: in.pluginPath, cacheDir: in.cacheDir });

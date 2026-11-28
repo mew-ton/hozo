@@ -801,7 +801,7 @@ func TestEmitNothing(t *testing.T) {
 	}
 }
 
-// TestUpToDate は spec/cli.hozo の分類 OutputsSync の述語 UpToDate と OutOfDate（docs/cli.md「cli.hozo」「手で書くもの」）: 生成し直した
+// TestUpToDate は spec/cli.hozo の分類 OutputsSync の述語 UpToDate と OutOfDate（docs/cli.md「手で書くもの」）: 生成し直した
 // 内容とディスクの内容を比べる。生成したコードの判定関数 compiler.ClassifyOutputsSync が、状態の分類の単位（App.OutputsSync）の
 // 二つの述語を呼び、真がちょうど一つのケースを返す（OutOfDate は UpToDate の否定なので、いつも、どちらか一つ）。
 func TestUpToDate(t *testing.T) {

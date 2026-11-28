@@ -111,7 +111,7 @@ func (CoverageUnusable) HozoException() string { return "hozo.compiler.CoverageU
 
 var _ runtime.Exception = CoverageUnusable{}
 
-// UnknownNamespace: 書き出す名前空間として指定されたものも、その子孫も、どの単位の対象でもない
+// UnknownNamespace: 書き出す名前空間として指定されたものも、その子孫も、どの単位の対象でもない。build の引数の書き間違いを、何も書かずに成功したことにしない
 type UnknownNamespace struct{}
 
 func (UnknownNamespace) Error() string         { return "hozo.compiler.UnknownNamespace" }
@@ -119,7 +119,8 @@ func (UnknownNamespace) HozoException() string { return "hozo.compiler.UnknownNa
 
 var _ runtime.Exception = UnknownNamespace{}
 
-// Crashed: プラグインが異常終了した（WASM の実行環境で、0 と 2 のほかの終了コードで終わった、途中で止まった、起動できなかった。docs/plugin-protocol.md「起動」）
+// Crashed: プラグインが異常終了した（WASM の実行環境で、0 と 2 のほかの終了コードで終わった、途中で止まった、起動できなかった。docs/plugin-protocol.md「起動」）。
+// 外部プロセスを起動する語彙 proc は、なくしたので、この名前空間の例外として宣言する（MalformedOutput も同じ）
 type Crashed struct{}
 
 func (Crashed) Error() string         { return "hozo.compiler.Crashed" }
@@ -140,7 +141,8 @@ type CheckResult struct {
 	Warnings []Diagnostic `json:"warnings"`
 }
 
-// BuildResult は検査と書き出しのユースケース（verify、preview、write）の結果。検査だけ（verify）なら、written も removed も空
+// BuildResult は検査と書き出しのユースケース（verify、preview、write）の結果。検査だけ（verify）なら、written も removed も空。
+// 三つのユースケースの結果を同じ型にするのは、build の match のアームの型が、そろっていなければならないため（TYPE-8）
 type BuildResult struct {
 	Warnings []Diagnostic `json:"warnings"`
 	// 書いたファイル（新規と更新）
@@ -156,7 +158,9 @@ type TestsResult struct {
 	Ran []string `json:"ran"`
 }
 
-// CheckInput は検査（check）の入力。ユースケースの入力（EmitInput、CoverageInput）から、配線が作る
+// CheckInput は検査（check）の入力。ユースケースの入力（EmitInput、CoverageInput）から、配線が作る。
+// 環境変数（HOZO_PLUGIN_PATH、HOZO_CACHE_DIR）も、コマンドの入力のフィールドとして受け取り、ここまで配線で渡す: 葉の op の実装が、
+// プロセスの環境を自分で読まないので、同じ入力から同じ結果になり、テストが、実行する人の環境に左右されない
 type CheckInput struct {
 	// 設定ファイルの場所
 	Config *Path `json:"config,omitempty"`
@@ -212,7 +216,8 @@ type EmitPlan struct {
 // effects hozo.compiler.OutputsSync as any -> UpToDate
 const EffectSyncOutputs runtime.Effect = "hozo.compiler.syncOutputs"
 
-// Plugin はプラグインの起動のしかた（docs/plugin-protocol.md「起動」）。wasm は、プラグインの本体（WASM）のファイル
+// Plugin はプラグインの起動のしかた（docs/plugin-protocol.md「起動」）。wasm は、プラグインの本体（WASM）のファイル。
+// プラグインは、hozoc の中のサンドボックスで動き、作業ディレクトリも、引数も、渡さないので、名前と WASM の場所だけを持つ
 type Plugin struct {
 	Name string `json:"name"`
 	Wasm Path   `json:"wasm"`

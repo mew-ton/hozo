@@ -27,6 +27,9 @@ type Ops interface {
 	Preview(ctx context.Context, in EmitInput) (BuildResult, error)
 
 	// Write は仕様を検査し、プラグインから受け取ったファイルを書き出す。例外は、どれも書き出しを始める前に起きる（集めるのが先）。
+	// 配線にしたのは、検査を通った結果だけを書き出しに渡すことと、check の例外が、ユースケースとコマンド build に伝わることを、検査器に
+	// 確かめさせるため。MalformedOutput も prevents effects なのは、ファイルをすべて集めて、パスと衝突を確かめてから書き始めるため
+	// （docs/cli.md「書き出し」）。それは、例外を投げる collectOutputs が、効果 syncOutputs より上の行にあることから、検査器が確かめる（REL-4）。
 	//
 	// 引数:
 	//   - in: ユースケースの入力
