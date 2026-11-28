@@ -43,10 +43,11 @@ type TestsNotRun = inner.TestsNotRun
 // CoverageUnusable: カバレッジを、求めるテストと突き合わせられない（docs/cli.md「tests」の TESTS-2、TESTS-3）
 type CoverageUnusable = inner.CoverageUnusable
 
-// UnknownNamespace: 書き出す名前空間として指定されたものも、その子孫も、どの単位の対象でもない
+// UnknownNamespace: 書き出す名前空間として指定されたものも、その子孫も、どの単位の対象でもない。build の引数の書き間違いを、何も書かずに成功したことにしない
 type UnknownNamespace = inner.UnknownNamespace
 
-// Crashed: プラグインが異常終了した（WASM の実行環境で、0 と 2 のほかの終了コードで終わった、途中で止まった、起動できなかった。docs/plugin-protocol.md「起動」）
+// Crashed: プラグインが異常終了した（WASM の実行環境で、0 と 2 のほかの終了コードで終わった、途中で止まった、起動できなかった。docs/plugin-protocol.md「起動」）。
+// 外部プロセスを起動する語彙 proc は、なくしたので、この名前空間の例外として宣言する（MalformedOutput も同じ）
 type Crashed = inner.Crashed
 
 // MalformedOutput: プラグインの出力が、約束した形（JSON）でなかった（docs/plugin-protocol.md「応答の形」）
@@ -55,13 +56,16 @@ type MalformedOutput = inner.MalformedOutput
 // CheckResult は検査の結果（誤りではない指摘）
 type CheckResult = inner.CheckResult
 
-// BuildResult は検査と書き出しのユースケース（verify、preview、write）の結果。検査だけ（verify）なら、written も removed も空
+// BuildResult は検査と書き出しのユースケース（verify、preview、write）の結果。検査だけ（verify）なら、written も removed も空。
+// 三つのユースケースの結果を同じ型にするのは、build の match のアームの型が、そろっていなければならないため（TYPE-8）
 type BuildResult = inner.BuildResult
 
 // TestsResult は突き合わせの結果
 type TestsResult = inner.TestsResult
 
-// CheckInput は検査（check）の入力。ユースケースの入力（EmitInput、CoverageInput）から、配線が作る
+// CheckInput は検査（check）の入力。ユースケースの入力（EmitInput、CoverageInput）から、配線が作る。
+// 環境変数（HOZO_PLUGIN_PATH、HOZO_CACHE_DIR）も、コマンドの入力のフィールドとして受け取り、ここまで配線で渡す。葉の op の実装は、
+// プロセスの環境を自分で読まない（docs/testing.md「環境からの独立」）
 type CheckInput = inner.CheckInput
 
 // EmitInput は検査と書き出しのユースケース（verify、preview、write）の入力
@@ -80,7 +84,8 @@ type EmitPlan = inner.EmitPlan
 // effects hozo.compiler.OutputsSync as any -> UpToDate
 const EffectSyncOutputs = inner.EffectSyncOutputs
 
-// Plugin はプラグインの起動のしかた（docs/plugin-protocol.md「起動」）。wasm は、プラグインの本体（WASM）のファイル
+// Plugin はプラグインの起動のしかた（docs/plugin-protocol.md「起動」）。wasm は、プラグインの本体（WASM）のファイル。
+// プラグインは、hozoc の中のサンドボックスで動き、作業ディレクトリも、引数も、渡さないので、名前と WASM の場所だけを持つ
 type Plugin = inner.Plugin
 
 // Spec は仕様: IR の、出力に依らない部分（docs/ir.md「まとめた形」の Spec）。中身はこの仕様では書かない

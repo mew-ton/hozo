@@ -8,13 +8,14 @@ import (
 	"github.com/mew-ton/hozo/runtime"
 )
 
-// OutputsSync は生成したファイルが、今の仕様と設定から生成し直したものと一致しているか
+// OutputsSync は生成したファイルが、今の仕様と設定から生成し直したものと一致しているか。書き出しの三つの変化（追加、書き換え、削除）は、
+// この分類の遷移 syncOutputs 一つにする（一つの効果が変えるのは、一つの状態の一つの変化: docs/check.md「効果の宛先」）
 type OutputsSync int
 
 const (
-	// 一致している
+	// 一致している: 生成し直して、差分がない。docs/testing.md「生成物の一致」の検査と同じ中身
 	OutputsSyncUpToDate OutputsSync = iota
-	// 足りない、古い、または余分なファイルがある
+	// 足りない、古い、または余分なファイルがある。UpToDate の否定
 	OutputsSyncOutOfDate
 )
 

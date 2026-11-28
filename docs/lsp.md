@@ -26,7 +26,7 @@ capabilities: `textDocumentSync: { openClose: true, change: Full, save: { includ
 
 - ワークスペースのディレクトリから親へ向かって `hozo.toml` を探す（`--config` があればそれ）。見つかったディレクトリがルート。
 - 見つからなければ、ワークスペースのディレクトリをルートにし、設定なしで動く: `sources` は既定、設定に関わる検査（CFG-*）は行わない。各ファイルの先頭（1 行 1 列）に warning LSP-1 を出す（「診断」）。
-- 解析の単位はプロジェクト全体。`internal/project.LoadWith`（`docs/packages.md`「internal/project」）を呼び直す。`Overlay` は開いている文書の最新の内容（保存していなくても）で、ディスクより優先する。プラグインの探索が見るプロジェクトの外の場所（`HOZO_PLUGIN_PATH` とホーム。`docs/plugin-protocol.md`「探索」）は、`hozoc lsp` の入力から渡されたもの（`docs/cli.md`「cli.hozo」の `LspInput`、「手で書くもの」）。
+- 解析の単位はプロジェクト全体。`internal/project.LoadWith`（`docs/packages.md`「internal/project」）を呼び直す。`Overlay` は開いている文書の最新の内容（保存していなくても）で、ディスクより優先する。プラグインの探索が見るプロジェクトの外の場所（`HOZO_PLUGIN_PATH` とホーム。`docs/plugin-protocol.md`「探索」）は、`hozoc lsp` の入力から渡されたもの（`spec/cli.hozo` の `LspInput`、`docs/cli.md`「手で書くもの」）。
 - `didOpen` / `didChange` / `didClose` / `didSave`、および `hozo.toml` の変更（`workspace/didChangeWatchedFiles` を `**/hozo.toml` と `**/*.hozo` で登録）で解析し直す。`didChange` は最後の変更から 150 ms 待ってまとめる。
 - 解析し直すたびに、診断のあるファイル（語彙のファイルと `hozo.toml` を含む）について `publishDiagnostics` を送る。前に診断を送っていて、今回は診断がなくなったファイルには、空の配列を送る。前回と同じ内容なら送らない。一度も診断を送っていないファイルには、空の配列を送らない（診断のないファイルと語彙のファイルの数だけ、最初に空の通知が並ぶのを避ける。クライアントは、通知の来ていないファイルを診断なしとして扱う）。
 - 語彙のファイルの URI は `Span.file`（`docs/ir.md`「Program」の `hozo:` の形）をそのまま使う。クライアントが開けるよう、要求 `hozo/vocabulary`（params `{ uri }`、result `{ content }`）を提供する。`docs/editors.md`。
