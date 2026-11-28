@@ -1,6 +1,5 @@
 // go-cli 自身の要求（決定 D807、D811）。名前空間 hozo.gocli。**持ち主は、このファイル**: go-cli が生成する CLI の骨組みの
-// 振る舞いは、ここのケースの説明が言う。語彙 cli の宣言の意味は plugins/go-cli/cli.hozo、マニフェストは plugins/go-cli/hozo-plugin.toml、
-// 受け付けない書き方と診断（CLI-*）は docs/plugin-go-cli.md「対象」「補う値と制約」「診断」。
+// 振る舞いは、ここのケースの説明が言う。go-cli のほかのことの持ち主は、docs/plugin-go-cli.md「この文書が決めること」が並べる。
 //
 // plugins/go-cli/hozo.toml の単位が、go-design で、要求ごとの、テストの入れ物の口（plugins/go-cli/internal/spec/goclitest の
 // Requirements と RunRequirements）を作る。満たすのは、go-cli の単体テスト（plugins/go-cli/internal/gocli/requirements_test.go）。
@@ -63,10 +62,10 @@ namespace hozo.gocli {
      * - フラグは --name value、--name=value。boolean は --name で true（値は取らない。--name=false は取れる）。値を取らないフラグか
      *   どうかは、補助が、実行時に、読む先の Go の型が真偽値（か、そのポインタ）かどうかで見る。同じフラグが二度あれば、後のものが勝つ。
      *   -x の形は、フラグではなく位置引数（-h を除く。負の数を渡せるようにするため）。-- 以降は位置引数。
-     * - 知らないフラグ、フラグの値がない、値を型に変換できない（int に "x"）、必須のフィールド（下）に値が与えられない、位置引数が多い
+     * - 知らないフラグ、フラグの値がない、値を型に変換できない（int に "x"）、必須のフィールド（@cli.required の付いたもの）に値が与えられない、位置引数が多い
      *   → 使い方を標準エラーに出して 64。
      * - 値が与えられなかったフィールド（フラグでも、位置引数でも、@cli.env の環境変数でも）の扱いは、デコレータだけで決まる。必須
-     *   （@cli.required）なら、誤り（上）。残りを受け取る array の @cli.arg に付ければ、位置引数が一つは要る。@cli.default(v) なら、
+     *   （@cli.required）なら、誤り（使い方を標準エラーに出して 64）。残りを受け取る array の @cli.arg に付ければ、位置引数が一つは要る。@cli.default(v) なら、
      *   読む先を v にする。どちらもなければ、読む先に何も書かない（零値のまま。足りない位置引数も同じ）。フィールドの型は、見ない。
      * - @cli.env は、フラグ（@cli.arg と一緒なら、その位置引数）が与えられなかったときに、環境変数の値を使う（フラグと位置引数が優先）。
      *   環境変数が空文字列なら、「ない」とみなす。
