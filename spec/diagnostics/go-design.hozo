@@ -37,13 +37,13 @@ namespace hozo.diagnostics {
     GODESIGN_5;
 
     /**
-     * GODESIGN-6: テストのパッケージに足す公開の名前（`<Op>FlowCase`、`FlowCases`、`RunFlows`、`Requirements`、`RunRequirements`）が、そのパッケージの、基底の公開の名前か、自分のほかの名前と当たる。一つの `<Op>FlowCase` のフィールドの名前どうしが当たる。`Requirements` のメソッドの名前どうしが当たる。フローの op の名前か、要求のケースの名前が `_` で始まる（`docs/plugin-go-design.md`「出力」）。位置は、当たった自分の名前を生んだフローの op か、要求の分類。決まった名前が当たったなら、相手の名前を生んだ宣言
+     * GODESIGN-6: テストのパッケージに足す公開の名前（`<Op>FlowCase`、`FlowCases`、`RunFlows`、`Requirements`、`RunRequirements`）が、そのパッケージの、基底の公開の名前か、自分のほかの名前と当たる。一つの `<Op>FlowCase` のフィールドの名前どうしが当たる。`Requirements` のメソッドの名前どうしが当たる。フローの op の名前か、要求のケースの名前が `_` で始まる（plugins/go-design/spec/go-design.hozo の Requirement.Output）。位置は、当たった自分の名前を生んだフローの op か、要求の分類。決まった名前が当たったなら、相手の名前を生んだ宣言
      */
     @severity(Severity.Error)
     GODESIGN_6;
 
     /**
-     * GODESIGN-7: テストのパッケージのディレクトリが、同じ単位が出力する、子の名前空間 `N.<N のパッケージ名>test` の出力先と重なる（`docs/plugin-go-design.md`「出力」）。基底が、同じことを GO-4 で返す出力（基底も、テストのパッケージを作る）では、返さない。置き場が要るので、`go.mod` がないときも、返さない。位置は、最初のフローの op。フローがなければ、最初の要求の分類
+     * GODESIGN-7: テストのパッケージのディレクトリが、同じ単位が出力する、子の名前空間 `N.<N のパッケージ名>test` の出力先と重なる（plugins/go-design/spec/go-design.hozo の Requirement.Output）。基底が、同じことを GO-4 で返す出力（基底も、テストのパッケージを作る）では、返さない。置き場が要るので、`go.mod` がないときも、返さない。位置は、最初のフローの op。フローがなければ、最初の要求の分類
      */
     @severity(Severity.Error)
     GODESIGN_7;

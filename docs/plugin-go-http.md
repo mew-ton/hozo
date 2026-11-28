@@ -446,7 +446,7 @@ func RunHTTP(t *testing.T, leaves server.Leaves, c HTTPCases) {
 
 ## go-http 自身の要求
 
-go-http の出力の振る舞いのうち、テストで確かめ続けるものは、**要求**として、仕様 `plugins/go-http/spec/go-http.hozo`（名前空間 `hozo.gohttp`）に書く。要求ごとの、テストの入れ物の口は、その仕様から go-design が作り（`docs/plugin-go-design.md`「要求の、テストの入れ物の口」）、go-http の単体テストが満たす。go-http を使う人（サンプル `shop-server` を含む）は、これらのテストを書かない。
+go-http の出力の振る舞いのうち、テストで確かめ続けるものは、**要求**として、仕様 `plugins/go-http/spec/go-http.hozo`（名前空間 `hozo.gohttp`）に書く。要求ごとの、テストの入れ物の口は、その仕様から go-design が作り（`plugins/go-design/spec/go-design.hozo` の `Requirement.RequirementPort`）、go-http の単体テストが満たす。go-http を使う人（サンプル `shop-server` を含む）は、これらのテストを書かない。
 
 この節の細部は、決定 D795 が決めた。
 
@@ -456,7 +456,7 @@ go-http の出力の振る舞いのうち、テストで確かめ続けるもの
 - **Go のモジュールは、リポジトリのルートの `go.mod`**。`[options.go]` の `module` は、モジュールのパスに、このディレクトリまでのパスを足したもの（`github.com/mew-ton/hozo/plugins/go-http`）にし、生成物の import パスを、リポジトリの中のものに合わせる。
 - **生成物**は `plugins/go-http/internal/spec/**`: 入口のパッケージ `gohttp`（宣言を持たないので、`doc.go` だけ）と、テストのパッケージ `gohttptest`（`design.go` の `Requirements` と `RunRequirements`）。`make generate` で作り直す（`docs/packages.md`「生成するもの」「自己生成の手順」）。
 - 仕様は、この文書の**写し**: 振る舞いの持ち主は、この文書の見出しで、要求の説明が、それを名指しする。食い違えば、この文書が正しい（`docs/README.md`「書き方」）。
-- 仕様は、要求の分類だけを持つ。要求を結ぶ宣言（`@prd.ref` の付く先）は、持たない: go-http の振る舞いを決める宣言は、仕様の外（文書と、語彙 `http` の宣言）にあり、写した宣言を置けば、何からも使われない形が、仕様に残る。そのため、go-design は、要求ごとに「指している設計: なし」の warning を返す（`docs/plugin-go-design.md`「指している設計」。`plugins/go-http` で `hozoc build` を走らせたときだけ。`docs/open.md`「サンプルと、hozoc 自身の仕様」）。`docs/plugin-go-sqlite.md`「go-sqlite 自身の要求」も同じ。
+- 仕様は、要求の分類だけを持つ。要求を結ぶ宣言（`@prd.ref` の付く先）は、持たない: go-http の振る舞いを決める宣言は、仕様の外（文書と、語彙 `http` の宣言）にあり、写した宣言を置けば、何からも使われない形が、仕様に残る。そのため、go-design は、要求ごとに「指している設計: なし」の warning を返す（`plugins/go-design/spec/go-design.hozo` の `Requirement.Designs`。`plugins/go-http` で `hozoc build` を走らせたときだけ。`docs/open.md`「サンプルと、hozoc 自身の仕様」）。`docs/plugin-go-sqlite.md`「go-sqlite 自身の要求」も同じ。
 
 ### 要求
 

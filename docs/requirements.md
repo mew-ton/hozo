@@ -185,7 +185,7 @@ UI が変えるのは、文面と同じ IR（`docs/ir.md`「この文書が決�
 | 実装の漏れは、コンパイルエラーになる | `docs/plugin-go.md`「実装を受け取る口」（Go の基底） |
 | 閉じた分類: 宣言したケースの外の値は、誤り | `docs/check.md`「閉じた分類」 |
 | 行の遷移: 宣言と、呼ぶ側の検査 | `docs/check.md`「行の遷移」 |
-| テストの口（求めるケースが欠ければ、コンパイルエラー）と、例外の出どころごとのテスト | `docs/plugin-go.md`「単体テストの口」、`docs/plugin-go-http.md`「インテグレーションテストの口」、`docs/plugin-go-design.md`「E2E テストの口」「要求の、テストの入れ物の口」 |
+| テストの口（求めるケースが欠ければ、コンパイルエラー）と、例外の出どころごとのテスト | `docs/plugin-go.md`「単体テストの口」、`docs/plugin-go-http.md`「インテグレーションテストの口」、`plugins/go-design/spec/go-design.hozo` の `Requirement.FlowPort`、`Requirement.RequirementPort` |
 | テストの生成の残り（行の遷移の保証、アサーション）。**まだない** | 「段階」 |
 
 ### PRD の水準の記述
@@ -582,8 +582,8 @@ R6 のうち、語彙と、基底・プラグインの出力が変わる部分�
 | 基底 `go`、単体テスト | `docs/plugin-go.md`「単体テストの口」。サンプルの `gen/server/servertest/leaves.go` |
 | 基底 `go`、入口の確かめ | `docs/plugin-go.md`「効果の入口の確かめ」。`plugins/go` の単体テスト |
 | `go-http` | `docs/plugin-go-http.md`「インテグレーションテストの口」。サンプルの `gen/server/servertest/http.go` |
-| テストのプラグイン、フロー | `docs/plugin-go-design.md`「E2E テストの口」。操作の op のほかを呼ぶフローは GODESIGN-3（error） |
-| テストのプラグイン、要求 | `docs/plugin-go-design.md`「要求の、テストの入れ物の口」。どこからも指されていない要求は、warning（同「指している設計」） |
+| テストのプラグイン、フロー | `plugins/go-design/spec/go-design.hozo` の `Requirement.FlowPort`。操作の op のほかを呼ぶフローは GODESIGN-3（error） |
+| テストのプラグイン、要求 | `plugins/go-design/spec/go-design.hozo` の `Requirement.RequirementPort`。どこからも指されていない要求は、warning（同 `Requirement.Designs`） |
 | サンプル | `tests/samples/shop-server/` の `design.hozo`（担い手、要求）、`client.hozo`（操作の op）、`flows.hozo`（フロー）。四つの口の期待する出力は、`gen/server/servertest/leaves.go`（単体）、`gen/server/servertest/http.go`（インテグレーション）、`gen/flows/flowstest/design.go`（E2E と、要求）。`TestSamples` が、hozoc の出力と比べる |
 | サンプルのテスト | `tests/samples/shop-server/app/` のテスト（`README.md`「R6 のプラグインの部分で足したこと」）。口を一つ欠いた実装が、コンパイルできないことは、サンプルでは、口のメソッドの数を、リフレクションで数え、コンパイルそのものは、プラグインの単体テストが確かめる（`plugins/go` の単体テスト、`plugins/go-http` の `TestIncompleteHTTPCasesDoNotCompile`、`plugins/go-design` の `TestIncompleteDoNotCompile`） |
 | 確かめ | `docs/testing.md`「文書とコードの一致」「CI」の確かめを、手元で走らせた。`main` の先頭（`13e7633`）で、CI（GitHub Actions）も緑 |
@@ -601,13 +601,13 @@ R6 のうち、語彙と、基底・プラグインの出力が変わる部分�
 - **テスト用の単位と、アプリの単位の、基底の違い**: 今回は、どちらも Go なので、当たらない。画面が、TS の基底で出るようになるときに、決める（使う型の名前空間は、同じ基底の出力を持つ、という決まりは `docs/config.md` の CFG-22）。
 - **入口の確かめと、「出力を推論しない」**: 確かめは、宣言（引数の型）から決まる。推論ではない。判定は、今ある口を使い、述語で決まる分類では、述語が正しければ、という前提が残る。
 - **サンプルの期待する出力を、手で書く決まり**（`docs/testing.md`「トランスパイラのテスト」）: テストの口も、期待する出力に含める。
-- **要求が、どのケースかを、どう見分けるか**: 段 4 で、設定で言う、と決めた（`go-design` のオプション `requirements`。`docs/plugin-go-design.md`「要求の、テストの入れ物の口」の「要求の分類」。利用者は、確かめていない: 決定 D787）。
+- **要求が、どのケースかを、どう見分けるか**: 段 4 で、設定で言う、と決めた（`go-design` のオプション `requirements`。`plugins/go-design/spec/go-design.hozo` の `Requirement.RequirementPort`。利用者は、確かめていない: 決定 D787）。
 
 段を作るときに決める点（`docs/open.md`「Hozo の側の改善する点」）:
 
 - 基底が、単体テストの口を、どのパッケージに出すか（`docs/plugin-go.md`「実装を受け取る口」との関係）。op を包むデコレータと、継ぎ目を持つ op を、単体テストで、どう呼ぶか（段 2）。
 - 相乗りするプラグイン（`go-http`）が、テストのコードを足すこと（段 3）。決めた形は、`docs/plugin-go.md`「相乗りのファイル」（テストのパッケージに、プラグインごとのファイル一つ）。
-- E2E テストの口と、要求の入れ物の口の、置き場と名前（段 4）。決めた形は、`docs/plugin-go-design.md`「出力」（フローの名前空間の、テストのパッケージに、`design.go`）。
+- E2E テストの口と、要求の入れ物の口の、置き場と名前（段 4）。決めた形は、`plugins/go-design/spec/go-design.hozo` の `Requirement.Output`（フローの名前空間の、テストのパッケージに、`design.go`）。
 
 手で書いた配線の op（`generated` と `slot`）は、この部分には、入れない（同 326）。
 

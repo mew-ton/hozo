@@ -1,12 +1,15 @@
+# go-design のマニフェスト（決定 D638、D643、D719、D813。持ち主は、このファイル。形は docs/plugin-protocol.md「マニフェスト `hozo-plugin.toml`」）
 name     = "go-design"
 wasm     = "plugin.wasm"
 protocol = "0.27"
 
-# 提供するトランスパイラは一つ。Go の基底 go に相乗りする（docs/plugin-go-design.md「マニフェスト」）
+# 提供するトランスパイラは一つ。Go の基底 go に相乗りする。語彙は提供しない
 [[transpiler]]
 name     = "go-design"
 language = "go"
 requires = ["go"]
+# 読むのは、標準の語彙の三つ: op の prd.business.flow と prd.usecase.of、宣言の prd.ref。prd.actor（担い手の種類）は、読まない（印のまま）。
+# 三つとも @hint を持つので、このトランスパイラを並べなくても、CFG-26 は出ない（docs/vocab.md「解釈されなくてよいデコレータ」）
 interprets = [
   "prd.business.flow", "prd.usecase.of", "prd.ref",
 ]

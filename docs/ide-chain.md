@@ -193,7 +193,7 @@
 
 テスト用の単位が出す形。フローの名前空間を対象にした単位に、基底と、テストのプラグイン（`go-design`。基底に相乗りする）を並べる。プラグインが足すのは、テストを受け取る口だけ: フローごとの、ケースの型（フローの引数、`Given`、`Then`）、フローごとにケースを返すメソッドを並べたインターフェース、フローごとにテストを一つ走らせる関数。今は、Go だけ（フロントエンドが、TS の基底で出るようになったら、同じ形を、TS で出す）。
 
-`go-design` が出す口の形（口の置き場、`<Op>FlowCase`、まとめの `FlowCases`、走らせる `RunFlows`、フローの op の決まり）の持ち主は、`plugin-go-design.md`「E2E テストの口」。
+`go-design` が出す口の形（口の置き場、`<Op>FlowCase`、まとめの `FlowCases`、走らせる `RunFlows`）の持ち主は、`plugins/go-design/spec/go-design.hozo` の `Requirement.Output` と `Requirement.FlowPort`。フローの op の決まりは、`docs/plugin-go-design.md`「フローの op の決まり」。
 
 担保の仕方（`CLAUDE.md`「実装の漏れは、コンパイルエラーにする」の当てはめ）:
 
@@ -216,7 +216,7 @@
 
 **どの分類のケースが、要求かは、設定で言う**: テストのプラグインのオプションに、要求の分類を並べる。語彙の印にしないのは、同じ、対象のない分類のケースでも、担い手は、要求でないから。
 
-`go-design` が出す口の形（要求の分類の言い方、口の置き場、`Requirements`、走らせる `RunRequirements`、指している設計の一覧、どこからも指されていない要求の扱い）の持ち主は、`plugin-go-design.md`「要求の、テストの入れ物の口」。人か AI が書く側は、`Requirements` を満たす型の、要求ごとのメソッド（要求ごとに、一ファイルにするのが、書き方の勧め）。
+`go-design` が出す口の形（要求の分類の言い方、口の置き場、`Requirements`、走らせる `RunRequirements`、指している設計の一覧、どこからも指されていない要求の扱い）の持ち主は、`plugins/go-design/spec/go-design.hozo` の `Requirement.RequirementPort` と `Requirement.Designs`。人か AI が書く側は、`Requirements` を満たす型の、要求ごとのメソッド（要求ごとに、一ファイルにするのが、書き方の勧め）。
 
 三つの段と、要求のテストに共通して、決めていないこと: テストの名前の細かい形、ラベルから飛ぶ先、カバレッジで何を確かめるか、テストのコードの置き場、仕様から決まる確かめを、どこまで作れるか（`open.md`「Hozo の側の改善する点」）。
 

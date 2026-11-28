@@ -1,5 +1,5 @@
 // Package flowtest は、サンプル shop-server の、フローの E2E テストと、要求のテスト
-// （docs/plugin-go-design.md「E2E テストの口」「要求の、テストの入れ物の口」）。
+// （plugins/go-design/spec/go-design.hozo の Requirement.FlowPort、Requirement.RequirementPort）。
 //
 // go-design が出した二つの口（flowstest.FlowCases、flowstest.Requirements）を満たす型を書き、flowstest.RunFlows と
 // flowstest.RunRequirements に渡す。フローの配線（操作の op を、順に呼ぶ）は、基底が作り、走らせる側（Given、フロー、正常に終わった

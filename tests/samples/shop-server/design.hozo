@@ -2,7 +2,7 @@
 // どちらも、対象のない分類（docs/check.md「分類」の「対象のない分類」）のケースで、値を持たない。単位を置かない（コードを出さない）。
 // 担い手は、ユースケースのデコレータ（client.hozo の @prd.usecase.of）が指し、要求は、設計の側のデコレータ（server.hozo の @prd.ref）が指す
 // （docs/vocab.md「設計の図の語彙」）。要求ごとの、テストの入れ物は、フローの単位（hozo.toml の 8）が出す
-// （docs/plugin-go-design.md「要求の、テストの入れ物の口」）。
+// （plugins/go-design/spec/go-design.hozo の Requirement.RequirementPort）。
 
 /** 設計の図が持つ名前: 担い手と、要求 */
 namespace design {

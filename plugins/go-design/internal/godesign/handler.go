@@ -16,7 +16,7 @@ import (
 	"github.com/mew-ton/hozo/plugin"
 )
 
-// TranspilerName は、このプラグインが提供するただ一つのトランスパイラの名前（docs/plugin-go-design.md「マニフェスト」）。
+// TranspilerName は、このプラグインが提供するただ一つのトランスパイラの名前（plugins/go-design/hozo-plugin.toml）。
 const TranspilerName = "go-design"
 
 // Handler は go-design の plugin.Handler。emit と、emit と同じ検査で答える check を実装する。
@@ -25,7 +25,7 @@ type Handler struct {
 
 var _ plugin.Handler = Handler{}
 
-// Emit は View.viewer の名前空間の、テストのパッケージの design.go を作る（docs/plugin-go-design.md「出力」）。診断（GODESIGN-*）が
+// Emit は View.viewer の名前空間の、テストのパッケージの design.go を作る（plugins/go-design/spec/go-design.hozo の Requirement.Output）。診断（GODESIGN-*）が
 // あれば Files も Warnings も空で、Errors にそれを入れる。フローも、要求もなければ、ファイルを出さず warning を一つ返す。
 // 要求の transpiler が [TranspilerName] でなければ plugin.ErrUnsupported（code "unsupported"）。
 func (h Handler) Emit(req *plugin.EmitRequest) (*plugin.EmitResponse, error) {

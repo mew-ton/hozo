@@ -65,7 +65,7 @@ func newSystem(t *testing.T, f *handlertest.Fixture) flowtest.System {
 	return flowtest.System{Flows: flowOps, Client: clientOps, Store: s}
 }
 
-// TestFlows は、フローの E2E テスト（docs/plugin-go-design.md「E2E テストの口」）: フロー → 操作の op → 機能入口 → 配線 → go-sqlite が
+// TestFlows は、フローの E2E テスト（plugins/go-design/spec/go-design.hozo の Requirement.FlowPort）: フロー → 操作の op → 機能入口 → 配線 → go-sqlite が
 // 出した read と効果。go-design が出した flowstest.RunFlows に、flowtest.FlowCases を渡す。
 func TestFlows(t *testing.T) {
 	t.Parallel()

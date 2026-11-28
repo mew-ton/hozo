@@ -11,14 +11,14 @@ import (
 	"github.com/mew-ton/hozo/plugin/golang"
 )
 
-// このファイルは、テストのパッケージの design.go（docs/plugin-go-design.md「出力」「E2E テストの口」「要求の、テストの入れ物の口」）を
+// このファイルは、テストのパッケージの design.go（plugins/go-design/spec/go-design.hozo の Requirement.Output、Requirement.FlowPort、Requirement.RequirementPort）を
 // 描く。検査（emit.go）を通った入力だけを描く。期待する出力の実物は、サンプル tests/samples/shop-server/ の
 // gen/flows/flowstest/design.go。
 //
 // フローごと、要求ごとに出す行は、宣言（op の名前、引数、戻り値の型、説明。ケースの名前、説明。@prd.ref の引数）だけから作る
 // （docs/requirements.md「出力を推論しない」）。型で、形を変えるのは、フローが値を返すかどうかだけ。
 
-// bodyNames は、design.go の関数の本体が、決まった名前で使う識別子（docs/plugin-go-design.md「出力」）。import の名前に使わない。
+// bodyNames は、design.go の関数の本体が、決まった名前で使う識別子（plugins/go-design/spec/go-design.hozo の Requirement.Output）。import の名前に使わない。
 var bodyNames = []string{"t", "c", "k", "ops", "ctx", "got", "err"}
 
 // stdPackages は、design.go が、決まった名前で書く、標準ライブラリのパッケージ（import パス → 名前）。
@@ -107,7 +107,7 @@ func continued(b *strings.Builder, lines []string) {
 	}
 }
 
-// flowCase は、フロー一つのケースの型 <Op>FlowCase（docs/plugin-go-design.md「E2E テストの口」の「口の形」）: フローの引数、Given、Then。
+// flowCase は、フロー一つのケースの型 <Op>FlowCase（plugins/go-design/spec/go-design.hozo の Requirement.FlowPort）: フローの引数、Given、Then。
 func (f *file) flowCase(fl *flow) string {
 	name := fl.method() + flowCaseSuffix
 	var b strings.Builder
@@ -146,7 +146,7 @@ func (f *file) flowCases(flows []flow) string {
 	return b.String()
 }
 
-// runFlows は、走らせる関数 RunFlows（同「口の形」）: フローごとに、t.Run を一つ。Given、フロー、正常に終わったことの確かめ、
+// runFlows は、走らせる関数 RunFlows（同）: フローごとに、t.Run を一つ。Given、フロー、正常に終わったことの確かめ、
 // Then の順。行の形は、フローが値を返すかどうかだけで決まる。
 func (f *file) runFlows(flows []flow) string {
 	testing, context := f.use("testing"), f.use("context")
@@ -177,7 +177,7 @@ func (f *file) runFlows(flows []flow) string {
 	return b.String()
 }
 
-// requirements は、要求ごとの、テストの入れ物 Requirements（docs/plugin-go-design.md「要求の、テストの入れ物の口」の「口の形」）:
+// requirements は、要求ごとの、テストの入れ物 Requirements（plugins/go-design/spec/go-design.hozo の Requirement.RequirementPort）:
 // 要求ごとに、メソッド一つ（requirements に書いた分類の順、その中は、ケースの宣言順）。
 func (f *file) requirements(classes []class) string {
 	testing := f.use("testing")
@@ -209,7 +209,7 @@ func (f *file) requirements(classes []class) string {
 	return b.String()
 }
 
-// runRequirements は、走らせる関数 RunRequirements（同「口の形」）: 要求ごとに、t.Run を一つ。テストの名前は、要求の名前。
+// runRequirements は、走らせる関数 RunRequirements（同）: 要求ごとに、t.Run を一つ。テストの名前は、要求の名前。
 func (f *file) runRequirements(classes []class) string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "// %s は、要求ごとに、入れ物を一つ走らせる。テストの名前は、要求の名前（<分類の FQN>.<ケース>）。\n"+
