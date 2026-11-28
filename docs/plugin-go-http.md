@@ -473,18 +473,11 @@ go-http の出力の振る舞いのうち、テストで確かめ続けるもの
 
 ## 診断
 
-`emit` の応答の `errors` で返す。検査だけの実行（`hozoc build --no-emit`）も、同じ応答の診断を使う（`docs/plugin-protocol.md`「起動」「emit」）: `hozoc build --no-emit` で出て、`hozoc build` は、どのファイルも書く前に、止まる。位置は、表に書いた宣言の FQN。
+`emit` の応答の `errors` で返す。検査だけの実行（`hozoc build --no-emit`）も、同じ応答の診断を使う（`docs/plugin-protocol.md`「起動」「emit」）: `hozoc build --no-emit` で出て、`hozoc build` は、どのファイルも書く前に、止まる。位置は、ケースの説明に書いた宣言の FQN。
 
-**`http` の語彙の使い方の誤りは、この表にない。** 語彙のプラグイン `http` が、HTTP-* で返す（`docs/plugin-http.md`「診断」）。その検査を通った仕様だけが、このトランスパイラに届く（`docs/plugin-protocol.md`「語彙のプラグイン」）。
+**`http` の語彙の使い方の誤りは、go-http の診断にない。** 語彙のプラグイン `http` が、HTTP-* で返す（`docs/plugin-http.md`「診断」）。その検査を通った仕様だけが、このトランスパイラに届く（`docs/plugin-protocol.md`「語彙のプラグイン」）。
 
-| ID | 重さ | 意味 |
-|---|---|---|
-| GOHTTP-9 | error | `[emit.options.go-http]` に、知らないキーか、型の違う値がある。位置なし |
-| GOHTTP-10 | error | 入口のパッケージに足す公開の名前（`HandlerOption`、`WithInternalError`、`NewHandler`）が、N の定義のパッケージの名前（model `NewHandler` など。`docs/plugin-go.md`「名前」）と当たる。位置は当たった宣言 |
-| GOHTTP-11 | error | `validate = true` で、`Validate` を持つ入力の model が別の名前空間のもので、その名前空間の型の置き場の単位が `go-valid` を並べていない（「制約の検査」）。メッセージに、その単位（何番目の `[[emit]]` か）を示す。位置は op |
-| GOHTTP-16 | error | 経路の op の結果の型が、省略可能な配列か、省略可能な、インデックスの model（`T[]?`、`Attrs?`。「対象」）。位置は op |
-| GOHTTP-20 | error | テストのパッケージに足す公開の名前（`<Op>HTTPCases`、`<Op>HTTPCase`、`HTTPCases`、`RunHTTP`）が、そのパッケージの、基底の公開の名前か、自分のほかの名前と当たる。`<Op>HTTPCases` のメソッドの名前どうしが当たるときも（名前空間を前に付けても、同じ名前になる二つの例外。例外の名前と、出どころの名前をつないだものが、同じになる二つのケース。「インテグレーションテストの口」）。位置は、当たった自分の名前を生んだ経路の op。決まった名前（`HTTPCases`、`RunHTTP`）が当たったなら、相手の名前を生んだ宣言（葉の op か、分類） |
-| GOHTTP-21 | error | テストのパッケージのディレクトリが、同じ単位が出力する、子の名前空間 `N.<N のパッケージ名>test` の出力先と重なる（「インテグレーションテストの口」の「置き場と名前」）。基底が、同じことを GO-4 で返す出力（基底も、テストのパッケージを作る）では、返さない。置き場が要るので、`go.mod` がないときも、返さない。位置は、最初の経路の op |
+この見出しの診断の、ID と条件と重さの持ち主は、`spec/diagnostics/go-http.hozo` の分類 `hozo.diagnostics.GoHttp` のケース。
 
 warning（コードは `PLUGIN`）は二つ: 経路の op が一つもない。N の出力の、テストの中の組み立てを、作れない（「インテグレーションテストの口」の「置き場と名前」。メッセージに、理由を入れる。テストのパッケージの `http.go` と、対応表は、出さない）。
 

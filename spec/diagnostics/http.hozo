@@ -1,0 +1,124 @@
+// Hozo 自身の仕様: 診断の分類 hozo.diagnostics.Http（決定 D812。持ち主は、このファイル）。印の意味は spec/diagnostics.hozo。
+// ケースの名前は、ID の - を _ に替えたもの。もとの綴りは、説明の頭に書く。どの単位の対象でもない: コードには、ならない。
+
+namespace hozo.diagnostics {
+  /** 語彙のプラグイン http が返す診断（docs/plugin-http.md） */
+  classify Http of never {
+    // docs/plugin-http.md「診断」が説明する規則
+
+    /**
+     * HTTP-1: `@http.get` / `@http.post` の付いた op に `export` がない。位置は op
+     */
+    @severity(Severity.Error)
+    @adr.decided(hozo.decisions.Decision400.D410)
+    HTTP_1;
+
+    /**
+     * HTTP-2: 経路の op の引数が、0 個でも、フィールドを持つ model 一つでもない（インデックスの model は、入力の model にできない）。位置は op
+     */
+    @severity(Severity.Error)
+    HTTP_2;
+
+    /**
+     * HTTP-3: 入力の model のフィールドが、要求のどこから読むかを言う六つのデコレータ（`@http.header` / `@http.query` / `@http.body` / `@http.headerObj` / `@http.queryObj` / `@http.bodyObj`）のどれも持たない、または二つ以上持つ。位置は model
+     */
+    @severity(Severity.Error)
+    HTTP_3;
+
+    /**
+     * HTTP-4: ヘッダかクエリから読むフィールド（全体の形なら、その model のフィールド）の型が受け付けられない（`docs/plugin-http.md`「対象」の表）。位置は、そのフィールドを持つ model（全体の形なら、全体の形で受け取る model）
+     */
+    @severity(Severity.Error)
+    HTTP_4;
+
+    /**
+     * HTTP-5: 本文、結果、`@http.status` を持つ例外の引数の型（の中）に、通信に出せない union がある（`docs/plugin-http.md`「通信の形」の「union」の三つの条件）。メッセージに、union と、満たさないアームと、理由（アームの型が、フィールドを持つ model でも、リテラルの型でもない。リテラルの型の二つのアームの、JSON の値が同じ。印も、決め手もない）を示す。位置は op
+     */
+    @severity(Severity.Error)
+    HTTP_5;
+
+    /**
+     * HTTP-6: `@http.get` の op の入力が、本文のデコレータ（`@http.body`、`@http.bodyObj`）のフィールドを持つ。位置は op
+     */
+    @severity(Severity.Error)
+    HTTP_6;
+
+    /**
+     * HTTP-7: パスが `/` で始まらない、または `{` か `}` を含む。位置は op
+     */
+    @severity(Severity.Error)
+    HTTP_7;
+
+    /**
+     * HTTP-8: 一つの名前空間の中に、同じメソッドとパスの経路が二つある。位置は後ろの op
+     */
+    @severity(Severity.Error)
+    HTTP_8;
+
+    /**
+     * HTTP-9: 全体の形（`@http.headerObj` / `@http.queryObj` / `@http.bodyObj`）を付けたフィールドの型が、フィールドを持つ model でない（省略可能な model、配列、インデックスの model を含む。`docs/plugin-http.md`「対象」）。位置は model
+     */
+    @severity(Severity.Error)
+    HTTP_9;
+
+    /**
+     * HTTP-10: 入力の model の一つの場所に、全体の形が二つ以上ある、または、全体の形と項目の形の両方がある（`docs/plugin-http.md`「対象」）。位置は model
+     */
+    @severity(Severity.Error)
+    HTTP_10;
+
+    /**
+     * HTTP-11: `@http.required` か `@http.default` の付いたフィールドが、項目の形（`@http.header` / `@http.query` / `@http.body`）を持たない。入力の model のフィールドと、全体の形で受け取る model のフィールドを見る（`docs/plugin-http.md`「対象」）。位置は、そのフィールドを持つ model
+     */
+    @severity(Severity.Error)
+    HTTP_11;
+
+    /**
+     * HTTP-12: `@http.required` か `@http.default` の付いたフィールドの型が、省略可能（`T?`）。見るフィールドと位置は HTTP-11 と同じ
+     */
+    @severity(Severity.Error)
+    HTTP_12;
+
+    /**
+     * HTTP-13: 一つのフィールドに、`@http.required` と `@http.default` の両方がある。見るフィールドと位置は HTTP-11 と同じ
+     */
+    @severity(Severity.Error)
+    HTTP_13;
+
+    /**
+     * HTTP-14: `@http.default` のリテラルが、フィールドの型（scalar は元の核の型）に渡せない（`docs/plugin-http.md`「対象」）。メッセージに、フィールド、リテラル、型を示す。見るフィールドと位置は HTTP-11 と同じ
+     */
+    @severity(Severity.Error)
+    HTTP_14;
+
+    /**
+     * HTTP-15: `@http.default` の値が、フィールドの制約（`@valid.*`）に合わない（`docs/plugin-http.md`「補う値と制約」）。メッセージに、フィールド名と、合わなかった制約を入れる。リテラルが型に渡せないフィールド（HTTP-14）は、見ない。見るフィールドと位置は HTTP-11 と同じ
+     */
+    @severity(Severity.Error)
+    HTTP_15;
+
+    /**
+     * HTTP-16: 本文の項目（`@http.body`）のフィールドの型が、リテラルの型そのもの（`docs/plugin-http.md`「対象」: 項目を、リテラルの型で読む形を、まだ決めていない）。メッセージに、そのフィールドと、リテラルの型を示す。位置は op
+     */
+    @severity(Severity.Error)
+    HTTP_16;
+
+    /**
+     * HTTP-17: 一つの例外に、`@http.status` と `@http.badRequest` の両方がある（`docs/plugin-http.md`「対象」）。位置は例外
+     */
+    @severity(Severity.Error)
+    HTTP_17;
+
+    /**
+     * HTTP-18: `@http.badRequest` のステータスが、400 から 499 までにない（`docs/plugin-http.md`「対象」）。メッセージに、その値を示す。位置は例外
+     */
+    @severity(Severity.Error)
+    HTTP_18;
+
+    /**
+     * HTTP-19: `@http.badRequest` の文言の中の `{<名前>}` が、例外の、型が `string` の引数を指していない。または、`{` が閉じていない、`}` が開いていない（`docs/plugin-http.md`「対象」）。メッセージに、その名前か、閉じていない括弧の位置を示す。位置は例外
+     */
+    @severity(Severity.Error)
+    HTTP_19;
+  }
+}

@@ -25,17 +25,14 @@ type Related struct {
 }
 ```
 
-- `Code` は `docs/requirements.md`「検査の規則の一覧」と、各設計文書の「診断」の表のもの。トランスパイラが `emit` の応答の `errors` で返したコード（`docs/plugin-protocol.md`「emit」）は、そのまま `Code` になる。規則の ID でないコードは下の「規則の ID でないコード」。コードが出しうる `Code` がどれかの表にあり、表の重さがコードと合っていることは `tests/codes_test.go` が確かめる。
+- `Code` は、仕様の名前空間 `hozo.diagnostics` の分類のケースの ID（`spec/diagnostics/`）。トランスパイラが `emit` の応答の `errors` で返したコード（`docs/plugin-protocol.md`「emit」）は、そのまま `Code` になる。規則の ID でないコードは下の「規則の ID でないコード」。コードが出しうる `Code` がどれかの表にあり、表の重さがコードと合っていることは `tests/codes_test.go` が確かめる。
 - `Message` は、`docs/` の文書の言葉で書く。例: BIND-4 → `openOrders の呼び出しで必須の入力 token が明示でも bind でも埋まっていない`。
 - `Message` は、設計書（`docs/README.md`「設計書という呼び名」）と、その節番号（「§n」）を引かない。設計書は仕様の持ち主ではなく、利用者が読んで確かめる先にならない。文書を引くなら、`docs/` の文書と見出しを引く（`docs/check.md`「残りのケース」）。
 - `Data` の中身は `docs/check.md`「Data」。
 
 ### 規則の ID でないコード
 
-| ID | 重さ | 意味 |
-|---|---|---|
-| SYNTAX | error | 構文エラー（`docs/grammar.md` の文法に合わない）。誤りのある箇所を読み飛ばして続ける（回復のしかたは `docs/packages.md`「パッケージ」の `internal/syntax` の項） |
-| IO | error | `sources` に合うファイルを探せない、または読めない（`spec/cli.hozo` の `check` の手順の 2）。読めたファイルの検査は続ける。位置は持たず、読めなかったファイルが分かればそのファイル |
+この見出しの診断の、ID と条件と重さの持ち主は、`spec/diagnostics/hozoc.hozo` の分類 `hozo.diagnostics.Hozoc` のケース。
 
 ほかに、トランスパイラの warning の `PLUGIN`（`docs/plugin-protocol.md`「診断」）、Go の基底の不具合の `GO-INTERNAL`（`docs/plugin-go.md`「診断」）、言語サーバーだけが出す `LSP-1`（`docs/lsp.md`「診断」）がある。持ち主はそれぞれの文書。
 

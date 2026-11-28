@@ -355,7 +355,7 @@ func TestDiagnostics(t *testing.T) {
 	}
 }
 
-// TestDiagnosticPositions は、診断の位置と数（docs/plugin-go-cli.md「診断」の表）: 表に書いた宣言の FQN。CLI-7 と CLI-8 は位置なし。
+// TestDiagnosticPositions は、診断の位置と数（spec/diagnostics/go-cli.hozo のケースの説明）: 説明に書いた宣言の FQN。CLI-7 と CLI-8 は位置なし。
 func TestDiagnosticPositions(t *testing.T) {
 	for name, want := range map[string][]string{
 		"cli1":  {"app.two", "app.core", "app.named", "app.optional", "app.many"},

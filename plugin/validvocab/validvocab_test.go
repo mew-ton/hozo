@@ -88,7 +88,7 @@ var diagnosticFixtures = []struct{ name, code string }{
 	{"valid4", CodeFormat},   // format の name が、四つの形式のどれでもない
 }
 
-// TestDiagnosticCodes は、「診断」の表の ID（VALID-1〜VALID-4。欠番はない）のどれもが、入力を一つ持つこと。
+// TestDiagnosticCodes は、spec/diagnostics/valid.hozo の ID（VALID-1〜VALID-4。欠番はない）のどれもが、入力を一つ持つこと。
 func TestDiagnosticCodes(t *testing.T) {
 	seen := map[string]bool{}
 	for _, fx := range diagnosticFixtures {

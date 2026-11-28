@@ -237,15 +237,7 @@ func RunRequirements(t *testing.T, c Requirements) {
 
 ## 診断
 
-| ID | 重さ | 条件 |
-|---|---|---|
-| GODESIGN-1 | error | `@prd.business.flow` の付いた op に `export` がない（「フローの op の決まり」）。位置は、その op |
-| GODESIGN-2 | error | `@prd.business.flow` の付いた op が、本体を持たない（葉）、または `never` を返す。位置は、その op |
-| GODESIGN-3 | error | フローの op の配線が、操作の op（`@prd.usecase.of` の付いた op）でないものを呼ぶ: `@prd.usecase.of` のない op、`read`、効果。位置は、フローの op。呼んだ先ごとに、一つ |
-| GODESIGN-4 | error | フローを持つ名前空間 N に、`@prd.usecase.of` の付いた op がある。位置は、その op |
-| GODESIGN-5 | error | `[emit.options.go-design]` に、知らないキーがある。`requirements` が、文字列の配列でない。`requirements` の項目が、対象のない分類の FQN でない（宣言がない、分類でない、対象を持つ分類）。同じ FQN を、二度書いた。位置なし |
-| GODESIGN-6 | error | テストのパッケージに足す公開の名前（`<Op>FlowCase`、`FlowCases`、`RunFlows`、`Requirements`、`RunRequirements`）が、そのパッケージの、基底の公開の名前か、自分のほかの名前と当たる。一つの `<Op>FlowCase` のフィールドの名前どうしが当たる。`Requirements` のメソッドの名前どうしが当たる。フローの op の名前か、要求のケースの名前が `_` で始まる（「出力」）。位置は、当たった自分の名前を生んだフローの op か、要求の分類。決まった名前が当たったなら、相手の名前を生んだ宣言 |
-| GODESIGN-7 | error | テストのパッケージのディレクトリが、同じ単位が出力する、子の名前空間 `N.<N のパッケージ名>test` の出力先と重なる（「出力」）。基底が、同じことを GO-4 で返す出力（基底も、テストのパッケージを作る）では、返さない。置き場が要るので、`go.mod` がないときも、返さない。位置は、最初のフローの op。フローがなければ、最初の要求の分類 |
+この見出しの診断の、ID と条件と重さの持ち主は、`spec/diagnostics/go-design.hozo` の分類 `hozo.diagnostics.GoDesign` のケース。
 
 warning（コードは `PLUGIN`）は二つ: フローも、要求もない（「対象」）。どこからも指されていない要求（「指している設計」）。
 

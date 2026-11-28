@@ -1,0 +1,34 @@
+// Hozo 自身の仕様: 診断の分類 hozo.diagnostics.Valid（決定 D812。持ち主は、このファイル）。印の意味は spec/diagnostics.hozo。
+// ケースの名前は、ID の - を _ に替えたもの。もとの綴りは、説明の頭に書く。どの単位の対象でもない: コードには、ならない。
+
+namespace hozo.diagnostics {
+  /** 語彙のプラグイン valid が返す診断（docs/plugin-valid.md） */
+  classify Valid of never {
+    // docs/plugin-valid.md「診断」が説明する規則
+
+    /**
+     * VALID-1: 制約が、付けた先に合わない（`docs/plugin-valid.md`「制約」の表の「付けられる先」）: `min` / `max` の先の元の型が `int` でも `float` でもない、`length` / `pattern` / `format` の先の元の型が `string` でない、配列のフィールドに `length` のほかの制約が付いている、インデックスの model を型に持つフィールドに制約が付いている
+     */
+    @severity(Severity.Error)
+    @adr.decided(hozo.decisions.Decision400.D410)
+    VALID_1;
+
+    /**
+     * VALID-2: 制約の引数が、足りないか、先に合わない: 元の型が `int` の先に付けた `min` / `max` の `value` が整数でない（64 ビット符号付きの範囲の外を含む）、`length` に `min` も `max` もない
+     */
+    @severity(Severity.Error)
+    VALID_2;
+
+    /**
+     * VALID-3: `pattern` の `regex` を、RE2 で解釈できない。メッセージに、正規表現と、解釈できない理由を示す
+     */
+    @severity(Severity.Error)
+    VALID_3;
+
+    /**
+     * VALID-4: `format` の `name` が、`docs/plugin-valid.md`「形式」の四つのどれでもない。メッセージに、名前と、四つの名前を示す
+     */
+    @severity(Severity.Error)
+    VALID_4;
+  }
+}

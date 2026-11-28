@@ -2,15 +2,14 @@
 
 ## この文書が決めること
 
-トランスパイラ `go-cli`（プラグインは `plugins/go-cli/`）が受け付けない書き方と、その診断（CLI-*）。`go-cli` は、語彙 `cli` を Go の CLI の骨組みにし、Go の基底 `go`（`docs/plugin-go.md`）と、検証の `go-valid`（`docs/plugin-go-valid.md`）に相乗りする。hozoc 自身の骨組みも、これで生成する（`docs/requirements.md`「自己展開」）。
+トランスパイラ `go-cli`（プラグインは `plugins/go-cli/`）が受け付けない書き方。`go-cli` は、語彙 `cli` を Go の CLI の骨組みにし、Go の基底 `go`（`docs/plugin-go.md`）と、検証の `go-valid`（`docs/plugin-go-valid.md`）に相乗りする。hozoc 自身の骨組みも、これで生成する（`docs/requirements.md`「自己展開」）。
 
 ほかのことの持ち主は、プラグインのファイル（決定 D811）:
 
 - 生成する CLI の骨組みの形と振る舞い: `plugins/go-cli/spec/go-cli.hozo` の要求 `hozo.gocli.Requirement`。
 - 語彙 `cli` の宣言と意味: `plugins/go-cli/cli.hozo`。
 - マニフェスト: `plugins/go-cli/hozo-plugin.toml`。
-
-診断は、検査の規則と診断を仕様に移すときに、一緒に移す（`docs/open.md`「持ち主を仕様へ移す作業」）。
+- 診断（CLI-*）の ID と条件と重さ: `spec/diagnostics/go-cli.hozo`（「診断」）。
 
 ## 対象
 
@@ -40,22 +39,7 @@ CLI-* は emit の応答の `errors` で返す。検査だけの実行（`hozoc 
 
 ## 診断
 
-| ID | 重さ | 意味 |
-|---|---|---|
-| CLI-1 | error | `@cli.command` の op の引数が、0 個でも model 一つでもない。位置は op |
-| CLI-2 | error | 入力の model のフィールドに、値の出どころ（`@cli.arg`、`@cli.flag`、`@cli.env`）が一つもない（`@cli.required` か `@cli.default` だけのフィールドを含む）、または `@cli.arg` と `@cli.flag` の両方がある。位置は model |
-| CLI-3 | error | フィールドの型が受け付けられない。位置は model |
-| CLI-4 | error | `array` の `@cli.arg` が、いちばん後ろの位置でない（二つ以上あるときを含む）。位置は model |
-| CLI-5 | error | フラグ名（`@cli.flag` の引数。省いていれば、フィールドの名前）かコマンド名の重複。位置は、フラグ名なら model、コマンド名なら後ろの op |
-| CLI-6 | error | `@cli.command` の付いた op に `export` がない。位置は op |
-| CLI-7 | error | このトランスパイラのディレクトリ `cli` が、同じ単位が出力する子の名前空間 `N.cli` の出力先と重なる。位置なし |
-| CLI-8 | error | `[emit.options.go-cli]` に、知らないキーがある。位置なし |
-| CLI-9 | error | `Validate` を持つ入力の model が別の名前空間のもので、その名前空間の型の置き場の単位が `go-valid` を並べていない（「対象」）。メッセージに、その単位（何番目の `[[emit]]` か）を示す。位置は op |
-| CLI-10 | error | `@cli.arg` の位置が、1 から、重なりも抜けもなく続いていない（1 より小さい、同じ位置が二つ、抜けている。「対象」）。位置は model |
-| CLI-11 | error | `@cli.required` か `@cli.default` の付いたフィールドの型が、省略可能（`T?`。「対象」）。位置は model |
-| CLI-12 | error | 一つのフィールドに、`@cli.required` と `@cli.default` の両方がある。位置は model |
-| CLI-13 | error | `@cli.default` のリテラルが、フィールドの型（scalar は元の核の型）に渡せない（「対象」）。メッセージに、フィールド、リテラル、型を示す。位置は model |
-| CLI-14 | error | `@cli.default` の値が、フィールドの制約（`@valid.*`）に合わない（「補う値と制約」）。メッセージに、フィールド名と、合わなかった制約を入れる。位置は model |
+この見出しの診断の、ID と条件と重さの持ち主は、`spec/diagnostics/go-cli.hozo` の分類 `hozo.diagnostics.GoCli` のケース。
 
 warning（コードは `PLUGIN`）は一つ: `@cli.command` の op が一つもない。
 

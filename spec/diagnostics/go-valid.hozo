@@ -1,0 +1,60 @@
+// Hozo 自身の仕様: 診断の分類 hozo.diagnostics.GoValid（決定 D812。持ち主は、このファイル）。印の意味は spec/diagnostics.hozo。
+// ケースの名前は、ID の - を _ に替えたもの。もとの綴りは、説明の頭に書く。どの単位の対象でもない: コードには、ならない。
+
+namespace hozo.diagnostics {
+  /** トランスパイラ go-valid が返す診断（docs/plugin-go-valid.md） */
+  classify GoValid of never {
+    // docs/plugin-go-valid.md「診断」が説明する規則
+
+    /**
+     * GOVALID-3: `Validate` を持つ別の名前空間の型を、フィールドに持つか、scalar の元の型にするが、その名前空間の型の置き場の単位が `go-valid` を並べていない。メッセージに、その単位（何番目の `[[emit]]` か）を示す。位置は model（元の型なら、その scalar）
+     */
+    @severity(Severity.Error)
+    GOVALID_3;
+
+    /**
+     * GOVALID-4: フィールドの型が union で、そのアームの型が、`ref` でないか、インデックスの model か、別の union への `ref` で、その中に `Validate` を持つ型がある（`docs/plugin-go-valid.md`「Validate を持つ型」。確かめる形が、まだない）。位置は model
+     */
+    @severity(Severity.Error)
+    GOVALID_4;
+
+    /**
+     * GOVALID-5: 標準でない `valid` の制約（ほかのプラグインの語彙のファイルが `valid` に足したデコレータ）が付いている。位置は、付いた scalar か model
+     */
+    @severity(Severity.Error)
+    @adr.decided(hozo.decisions.Decision400.D463)
+    GOVALID_5;
+
+    /**
+     * GOVALID-6: `Validate` を持つ model が、`validate` という名前のフィールドを持つ（Go で、フィールド `Validate` とメソッド `Validate` が当たる）。位置は model
+     */
+    @severity(Severity.Error)
+    GOVALID_6;
+
+    /**
+     * GOVALID-7: `[emit.options.go-valid]` に、知らないキーがある。位置なし
+     */
+    @severity(Severity.Error)
+    GOVALID_7;
+
+    // 欠番: なくした ID。別の意味に、使い回さない（決定 D52）
+
+    /**
+     * GOVALID-1: 欠番。`go-valid` が返していた、`valid` の制約の使い方の検査。言語に依らないので、語彙のプラグイン `valid` に移した（決定 D410）ときになくなった。行き先（VALID-1〜VALID-4）の対応は、持ち主の文書
+     *
+     * 経緯のある所: `docs/plugin-go-valid.md`「診断」の「欠番」
+     */
+    @retired
+    @adr.decided(hozo.decisions.Decision400.D410)
+    GOVALID_1;
+
+    /**
+     * GOVALID-2: 欠番。フィールドの既定値が、その型かフィールドの制約に合わないこと。フィールドの既定値を言語からなくした（決定 S24）ときになくなった
+     *
+     * 経緯のある所: `docs/plugin-go-valid.md`「診断」
+     */
+    @retired
+    @adr.decided(hozo.decisions.DecisionS.S24)
+    GOVALID_2;
+  }
+}

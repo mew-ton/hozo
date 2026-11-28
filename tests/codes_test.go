@@ -14,7 +14,7 @@ import (
 	"testing"
 )
 
-// このファイルは、Go のコードが出しうる診断のコードと、設計文書の「診断」の表を突き合わせる。
+// このファイルは、Go のコードが出しうる診断のコードと、仕様（名前空間 hozo.diagnostics）のケースを突き合わせる。
 //
 // コードの側は、テストでない Go のソース（internal、plugin、plugins、cmd。生成物と go generate の道具は除く）を構文木で読んで集める:
 //
@@ -25,7 +25,7 @@ import (
 //   - それ以外の場所に書かれた、規則の ID の形（`CFG-16`）の文字列リテラル（比較、代入など）。重さは分からない。
 //   - 文字列の頭の `PLG-1: ` の形。診断ではなく例外のメッセージに書く ID（docs/plugin-protocol.md「診断」）。
 //
-// 文書の側は、docs/*.md の、先頭の列が ID の表（各文書の「診断」の表）の行。重さの列（error / warning / —）を持つ。
+// 仕様の側は、名前空間 hozo.diagnostics の分類のケース（tests/diagspec_test.go の specDiagnostics）。重さは @severity。
 
 // codeUse はコードの側で見つけた一か所。
 type codeUse struct {
@@ -274,84 +274,78 @@ type docCode struct {
 	doc string
 }
 
-var docCodeRowRE = regexp.MustCompile("^\\|\\s*`?([A-Z]+(?:-[A-Z0-9]+)*)`?\\s*\\|")
-
-// documentedCodes は docs/*.md の、先頭の列が ID で「重さ」の列を持つ表（各文書の「診断」の表）の行を集める。
-// 先頭の列が ID で「意味」か「手続き」の列を持つのに「重さ」の列を持たない表は noSeverity に入れる
-// （docs/requirements.md の索引は、規則の意味の持ち主ではないので数えない）。
-func documentedCodes(t *testing.T) (codes map[string]docCode, noSeverity []string) {
+// docTables は docs/*.md の、先頭の列が ID の表のうち、診断の表（「重さ」の列を持つもの withSeverity と、「意味」か「手続き」の列を
+// 持つのに「重さ」の列を持たないもの noSeverity）の場所（<文書>:<行>）を集める。ほかの ID の表（対応の表など）は数えない。
+func docTables(t *testing.T) (all, noSeverity, withSeverity []string) {
 	t.Helper()
 	paths, err := filepath.Glob(filepath.Join("..", "docs", "*.md"))
 	if err != nil || len(paths) == 0 {
 		t.Fatalf("docs を読めない: %v", err)
 	}
-	codes = map[string]docCode{}
 	for _, p := range paths {
 		name := filepath.Base(p)
-		if name == "requirements.md" {
-			continue
-		}
 		data, err := os.ReadFile(p)
 		if err != nil {
 			t.Fatal(err)
 		}
-		sevCol := -1
 		inTable := false
 		for i, line := range strings.Split(string(data), "\n") {
 			if !strings.HasPrefix(line, "|") {
-				inTable, sevCol = false, -1
+				inTable = false
 				continue
 			}
+			if inTable {
+				continue
+			}
+			inTable = true
 			cells := strings.Split(strings.Trim(line, "|"), "|")
 			for j := range cells {
 				cells[j] = strings.TrimSpace(cells[j])
 			}
-			if !inTable {
-				inTable = true
-				if cells[0] != "ID" {
-					sevCol = -2 // ID の表ではない
-					continue
-				}
-				meaning := false
-				for j, c := range cells {
-					switch c {
-					case "重さ":
-						sevCol = j
-					case "意味", "手続き":
-						meaning = true
-					}
-				}
-				if sevCol < 0 {
-					if meaning { // 診断の表（意味か手続きの列を持つ）なのに重さがない。ほかの ID の表（Data の表など）は数えない
-						noSeverity = append(noSeverity, name+":"+strconv.Itoa(i+1))
-					}
-					sevCol = -2
-				}
+			if cells[0] != "ID" {
 				continue
 			}
-			m := docCodeRowRE.FindStringSubmatch(line)
-			if sevCol < 0 || m == nil || sevCol >= len(cells) {
-				continue
+			at := name + ":" + strconv.Itoa(i+1)
+			all = append(all, at)
+			sev, meaning := false, false
+			for _, c := range cells {
+				switch c {
+				case "重さ":
+					sev = true
+				case "意味", "手続き", "条件":
+					meaning = true
+				}
 			}
-			if prev, dup := codes[m[1]]; dup {
-				t.Errorf("%s が二つの表にある（%s と %s）。持ち主は一つ", m[1], prev.doc, name)
-				continue
+			switch {
+			case sev:
+				withSeverity = append(withSeverity, at)
+			case meaning:
+				noSeverity = append(noSeverity, at)
 			}
-			codes[m[1]] = docCode{sev: cells[sevCol], doc: name}
 		}
 	}
-	return codes, noSeverity
+	return all, noSeverity, withSeverity
 }
 
-// TestDiagnosticCodesAreDocumented は、Go のコードが出しうる診断のコードがどれも設計文書の「診断」の表にあり、
-// 表の重さがコードの重さと合っていることを確かめる。規則の ID でないコード（SYNTAX、IO、PLUGIN、GO-INTERNAL）も同じ。
-// 例外のメッセージにだけ書く ID（PLG-*）は、表の重さが「—」（診断にならない）であること。
+// documentedCodes は、仕様（名前空間 hozo.diagnostics。specDiagnostics）のケースを、ID から引ける形にする。欠番は入れない。
+func documentedCodes(t *testing.T) map[string]docCode {
+	t.Helper()
+	codes := map[string]docCode{}
+	for _, d := range specDiagnostics(t) {
+		if d.retired {
+			continue
+		}
+		codes[d.id] = docCode{sev: d.sev, doc: d.class}
+	}
+	return codes
+}
+
+// TestDiagnosticCodesAreDocumented は、Go のコードが出しうる診断のコードがどれも仕様（hozo.diagnostics）のケースにあり、
+// ケースの重さがコードの重さと合っていることを確かめる。規則の ID でないコード（SYNTAX、IO、PLUGIN、GO-INTERNAL）も同じ。
+// 例外のメッセージにだけ書く ID（PLG-*）は、ケースの重さが Silent（診断にならない）であること。
 func TestDiagnosticCodesAreDocumented(t *testing.T) {
 	uses := collectCodeUses(t)
-	docs, noSeverity := documentedCodes(t)
-	for _, table := range noSeverity {
-		t.Errorf("docs/%s の ID の表に「重さ」の列がない（error / warning / — を書く）", table)
-	}
+	docs := documentedCodes(t)
 	seen := map[string]bool{}
 	for _, u := range uses {
 		seen[u.code] = true
@@ -371,11 +365,11 @@ func TestDiagnosticCodesAreDocumented(t *testing.T) {
 		var msg string
 		switch {
 		case !ok:
-			msg = "は、どの設計文書の「診断」の表にもない"
+			msg = "は、仕様（spec/diagnostics/）のどの分類のケースにもない"
 		case u.sev == "message" && d.sev != "—":
-			msg = "は例外のメッセージに書く ID で診断にならないのに、docs/" + d.doc + " の重さが " + d.sev
+			msg = "は例外のメッセージに書く ID で診断にならないのに、分類 " + d.doc + " のケースの重さが " + d.sev
 		case (u.sev == "error" || u.sev == "warning") && d.sev != u.sev:
-			msg = "を " + u.sev + " で出しているのに、docs/" + d.doc + " の重さは " + d.sev
+			msg = "を " + u.sev + " で出しているのに、分類 " + d.doc + " のケースの重さは " + d.sev
 		default:
 			continue
 		}
@@ -388,7 +382,7 @@ func TestDiagnosticCodesAreDocumented(t *testing.T) {
 	for _, p := range problems {
 		t.Error(p.msg)
 	}
-	// 逆向き: 表が error か warning と言うコードは、コードのどこかで出している。出さないものは、理由を持つ表にあること
+	// 逆向き: ケースが error か warning と言うコードは、コードのどこかで出している。出さないものは、理由を持つ表にあること
 	// （文法で閉じる規則、別の ID で出る規則、索引として残す ID。tests/rules_test.go の grammarClosed / reportedAs / notTestable）。
 	for code, d := range docs {
 		if d.sev != "error" && d.sev != "warning" {
@@ -398,7 +392,7 @@ func TestDiagnosticCodesAreDocumented(t *testing.T) {
 		if seen[code] || grammarClosed[code] || reportedAs[code] != "" || indexOnly {
 			continue
 		}
-		t.Errorf("docs/%s の %s（%s）を、コードのどこも出していない", d.doc, code, d.sev)
+		t.Errorf("分類 %s の %s（%s）を、コードのどこも出していない", d.doc, code, d.sev)
 	}
 }
 

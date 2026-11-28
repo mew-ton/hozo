@@ -6,7 +6,7 @@
 
 ## 規則ごとのテスト
 
-`tests/rules/<ID>/` に、その規則が通る例 `ok_*.hozo` と落ちる例 `ng_*.hozo` を少なくとも一つずつ置く。対象は `.hozo` と `hozo.toml` だけで出せる診断（`docs/check.md`、`docs/resolve.md`、`docs/types.md`、`docs/config.md` の「診断」）。プラグイン・言語サーバーでしか出ないもの（GO-*、GOVALID-*、GOSQL-*、GOHTTP-*、CLI-*、MAN-*、PLG-*、LSP-1）は、それぞれのパッケージの単体テスト（下）で確かめる。期待を例のそばに置くために、このコメントの形にする。
+`tests/rules/<ID>/` に、その規則が通る例 `ok_*.hozo` と落ちる例 `ng_*.hozo` を少なくとも一つずつ置く。対象は `.hozo` と `hozo.toml` だけで出せる診断（`spec/diagnostics/rule.hozo` の分類 `hozo.diagnostics.Rule` のケース）。プラグイン・言語サーバーでしか出ないもの（GO-*、GOVALID-*、GOSQL-*、GOHTTP-*、CLI-*、MAN-*、PLG-*、LSP-1）は、それぞれのパッケージの単体テスト（下）で確かめる。期待を例のそばに置くために、このコメントの形にする。
 
 - 落ちる例は、診断が出る行の末尾に `// ERROR: <ID>` か `// WARN: <ID>` のコメントを書く。同じ行に複数なら `// ERROR: A, B`。
 - テストはディレクトリごとに `hozo.toml`（なければ `tests/rules/hozo.toml` を使う）で `Project` を作り、診断の集合を「ファイル、行、重さ、ID」の組で比べる。期待にない診断、出なかった期待はどちらも失敗。
@@ -65,7 +65,7 @@ CI で `go generate ./...` と `make generate`（自己生成。`docs/packages.m
 文書が持ち主の事実のうち、コードから機械的に確かめられるものはテストにする。
 
 - 規則ごとのテストがそろっていること（`tests/rules_test.go` の `TestRulesCoverDocs`。「規則ごとのテスト」）。
-- 診断のコード: Go のコードが出しうる診断のコード（規則の ID と、`SYNTAX` / `IO` / `PLUGIN` / `GO-INTERNAL`。プラグインが `errors` で返すコードを含む）がどれも設計文書の「診断」の表にあり、表の重さ（error / warning。診断にならない ID は「—」）がコードと合っていること（`tests/codes_test.go` の `TestDiagnosticCodesAreDocumented`。コードの側はソースを構文木で読んで集める）。
+- 診断のコード: Go のコードが出しうる診断のコード（規則の ID と、`SYNTAX` / `IO` / `PLUGIN` / `GO-INTERNAL`。プラグインが `errors` で返すコードを含む）がどれも仕様（名前空間 `hozo.diagnostics`。`spec/diagnostics/`）のケースにあり、ケースの重さ（`Error` / `Warning`。診断にならない ID は `Silent`）がコードと合っていること（`tests/codes_test.go` の `TestDiagnosticCodesAreDocumented`。コードの側はソースを構文木で読んで集める）。文書が、診断の条件と重さの表を持たないことも確かめる（`TestDocsHaveNoDiagnosticTables`）。
 - 診断のメッセージ: Go のコードの文字列が「設計書」を引いていないこと（`docs/diagnostics.md`「構造」。`tests/codes_test.go` の `TestMessagesDoNotCiteDraft`。コメントは見ない）。
 - 依存の向き: `docs/packages.md`「依存の向き」の表が Go のパッケージの実際の import と同じで、箇条書きの規則がテストのファイルの import を含めて守られていること（`tests/deps_test.go`）。
 - 予約語（下の「予約語の一致」）。

@@ -465,7 +465,7 @@ var diagnosticFixtures = []struct{ name, code string }{
 	{"gohttp21", codeHTTPTestDir},  // テストのパッケージのディレクトリが、同じ単位が出力する子の名前空間の出力先と重なる
 }
 
-// TestDiagnosticCodes は、「診断」の表の ID（GOHTTP-9〜GOHTTP-11、GOHTTP-16、GOHTTP-20、GOHTTP-21）のどれもが、入力を一つ持つこと。
+// TestDiagnosticCodes は、spec/diagnostics/go-http.hozo の ID（GOHTTP-9〜GOHTTP-11、GOHTTP-16、GOHTTP-20、GOHTTP-21）のどれもが、入力を一つ持つこと。
 // ほかの番号は欠番（語彙のプラグイン http の HTTP-* に移した。docs/plugin-go-http.md「診断」の「欠番」。その入力は plugin/httpvocab）。
 func TestDiagnosticCodes(t *testing.T) {
 	seen := map[string]bool{}
@@ -483,7 +483,7 @@ func TestDiagnosticCodes(t *testing.T) {
 	}
 }
 
-// TestDiagnostics は docs/plugin-go-http.md「診断」の表の GOHTTP-*: 診断のコード・位置・メッセージがゴールデンと同じで、
+// TestDiagnostics は spec/diagnostics/go-http.hozo のケースの説明の GOHTTP-*: 診断のコード・位置・メッセージがゴールデンと同じで、
 // 診断を返した出力がファイルも warning も返さないこと（emitViews が確かめる）。
 func TestDiagnostics(t *testing.T) {
 	for _, fx := range diagnosticFixtures {
@@ -504,7 +504,7 @@ func TestDiagnostics(t *testing.T) {
 	}
 }
 
-// TestDiagnosticPositions は、診断の位置（docs/plugin-go-http.md「診断」の表）: 表に書いた宣言の FQN。GOHTTP-9 は位置なし。
+// TestDiagnosticPositions は、診断の位置（spec/diagnostics/go-http.hozo のケースの説明）: 説明に書いた宣言の FQN。GOHTTP-9 は位置なし。
 func TestDiagnosticPositions(t *testing.T) {
 	for name, want := range map[string][]string{
 		"gohttp9":  {""},

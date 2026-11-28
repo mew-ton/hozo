@@ -44,7 +44,7 @@ var (
 	// genDirs は spec/cli.hozo からの生成物の置き場（hozo.toml の二つの単位の out）: 名前空間 hozo.compiler
 	// （ユースケース）の出力（入口、内側の inner）と、名前空間 hozo.cli（コマンドの行）の出力（入口、go-cli の cli）。
 	genDirs = []string{filepath.Join("internal", "gen", "hozo", "compiler"), filepath.Join("internal", "gen", "hozo", "cli")}
-	// inputs は一時ディレクトリに写すファイル。ほかに、仕様のファイル（spec/*.hozo と spec/decisions/*.hozo）を、すべて写す（specFiles）。
+	// inputs は一時ディレクトリに写すファイル。ほかに、仕様のファイル（spec/ の下の、すべての .hozo）を、すべて写す（specFiles）。
 	inputs = []string{"spec/cli.hozo", "hozo.toml", "go.mod", "go.sum"}
 	// links は一時ディレクトリにシンボリックリンクで足すディレクトリ（プラグインの置き場と、生成物の vet が要るパッケージ）。
 	links = []string{"ir", "plugin", "plugins", "runtime"}
@@ -260,23 +260,27 @@ func copyTree(src, dst string) error {
 }
 
 // places は、置き場の一覧（メッセージ用）。
-// specFiles は、リポジトリの仕様のファイル（spec/*.hozo と spec/decisions/*.hozo。hozo.toml の sources が並べるもの: spec/cli.hozo と、
+// specFiles は、リポジトリの仕様のファイル（spec/ の下の、すべての .hozo。hozo.toml の sources が並べるもの: spec/cli.hozo と、
 // 設計だけのファイル）の、ルートからの相対の名前。spec/cli.hozo の宣言が、設計だけのファイルの宣言を指す（決定の記録への @adr.decided など）
 // ので、生成するときに、すべて要る（docs/packages.md「自己生成の手順」の 2）。
 func specFiles(repo string) ([]string, error) {
 	var names []string
-	for _, pattern := range []string{filepath.Join("spec", "*.hozo"), filepath.Join("spec", "decisions", "*.hozo")} {
-		matches, err := filepath.Glob(filepath.Join(repo, pattern))
+	err := filepath.WalkDir(filepath.Join(repo, "spec"), func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
-			return nil, err
+			return err
 		}
-		for _, m := range matches {
-			rel, err := filepath.Rel(repo, m)
-			if err != nil {
-				return nil, err
-			}
-			names = append(names, rel)
+		if d.IsDir() || filepath.Ext(path) != ".hozo" {
+			return nil
 		}
+		rel, err := filepath.Rel(repo, path)
+		if err != nil {
+			return err
+		}
+		names = append(names, rel)
+		return nil
+	})
+	if err != nil {
+		return nil, err
 	}
 	sort.Strings(names)
 	return names, nil

@@ -1,0 +1,93 @@
+// Hozo 自身の仕様: 診断の分類 hozo.diagnostics.GoCli（決定 D812。持ち主は、このファイル）。印の意味は spec/diagnostics.hozo。
+// ケースの名前は、ID の - を _ に替えたもの。もとの綴りは、説明の頭に書く。どの単位の対象でもない: コードには、ならない。
+
+namespace hozo.diagnostics {
+  /** トランスパイラ go-cli が返す診断（docs/plugin-go-cli.md） */
+  classify GoCli of never {
+    // docs/plugin-go-cli.md「診断」が説明する規則
+
+    /**
+     * CLI-1: `@cli.command` の op の引数が、0 個でも model 一つでもない。位置は op
+     */
+    @severity(Severity.Error)
+    CLI_1;
+
+    /**
+     * CLI-2: 入力の model のフィールドに、値の出どころ（`@cli.arg`、`@cli.flag`、`@cli.env`）が一つもない（`@cli.required` か `@cli.default` だけのフィールドを含む）、または `@cli.arg` と `@cli.flag` の両方がある。位置は model
+     */
+    @severity(Severity.Error)
+    CLI_2;
+
+    /**
+     * CLI-3: フィールドの型が受け付けられない。位置は model
+     */
+    @severity(Severity.Error)
+    CLI_3;
+
+    /**
+     * CLI-4: `array` の `@cli.arg` が、いちばん後ろの位置でない（二つ以上あるときを含む）。位置は model
+     */
+    @severity(Severity.Error)
+    CLI_4;
+
+    /**
+     * CLI-5: フラグ名（`@cli.flag` の引数。省いていれば、フィールドの名前）かコマンド名の重複。位置は、フラグ名なら model、コマンド名なら後ろの op
+     */
+    @severity(Severity.Error)
+    CLI_5;
+
+    /**
+     * CLI-6: `@cli.command` の付いた op に `export` がない。位置は op
+     */
+    @severity(Severity.Error)
+    CLI_6;
+
+    /**
+     * CLI-7: このトランスパイラのディレクトリ `cli` が、同じ単位が出力する子の名前空間 `N.cli` の出力先と重なる。位置なし
+     */
+    @severity(Severity.Error)
+    CLI_7;
+
+    /**
+     * CLI-8: `[emit.options.go-cli]` に、知らないキーがある。位置なし
+     */
+    @severity(Severity.Error)
+    CLI_8;
+
+    /**
+     * CLI-9: `Validate` を持つ入力の model が別の名前空間のもので、その名前空間の型の置き場の単位が `go-valid` を並べていない（`docs/plugin-go-cli.md`「対象」）。メッセージに、その単位（何番目の `[[emit]]` か）を示す。位置は op
+     */
+    @severity(Severity.Error)
+    CLI_9;
+
+    /**
+     * CLI-10: `@cli.arg` の位置が、1 から、重なりも抜けもなく続いていない（1 より小さい、同じ位置が二つ、抜けている。`docs/plugin-go-cli.md`「対象」）。位置は model
+     */
+    @severity(Severity.Error)
+    CLI_10;
+
+    /**
+     * CLI-11: `@cli.required` か `@cli.default` の付いたフィールドの型が、省略可能（`T?`。`docs/plugin-go-cli.md`「対象」）。位置は model
+     */
+    @severity(Severity.Error)
+    CLI_11;
+
+    /**
+     * CLI-12: 一つのフィールドに、`@cli.required` と `@cli.default` の両方がある。位置は model
+     */
+    @severity(Severity.Error)
+    CLI_12;
+
+    /**
+     * CLI-13: `@cli.default` のリテラルが、フィールドの型（scalar は元の核の型）に渡せない（`docs/plugin-go-cli.md`「対象」）。メッセージに、フィールド、リテラル、型を示す。位置は model
+     */
+    @severity(Severity.Error)
+    CLI_13;
+
+    /**
+     * CLI-14: `@cli.default` の値が、フィールドの制約（`@valid.*`）に合わない（`docs/plugin-go-cli.md`「補う値と制約」）。メッセージに、フィールド名と、合わなかった制約を入れる。位置は model
+     */
+    @severity(Severity.Error)
+    CLI_14;
+  }
+}

@@ -50,10 +50,7 @@ capabilities: `textDocumentSync: { openClose: true, change: Full, save: { includ
 - プラグインの診断（`spec/cli.hozo` の `check` の手順の 4。HTTP-5 など、語彙のプラグインが返す誤りと、GOHTTP-16 など、トランスパイラが返す誤りと、warning）は、解析のたびには出さず、後から足す（「プラグインの診断」）。
 - 言語サーバーだけが出す診断が、二つある:
 
-| ID | 重さ | 意味 |
-|---|---|---|
-| LSP-1 | warning | `hozo.toml` が見つからない。設定の検査は行っていない（「プロジェクト」）。ユーザーの各 `.hozo` の 1 行 1 列に出す |
-| LSP-2 | warning | プラグインの check が、最後まで走らなかった（プラグインの異常終了、形の違う応答。`docs/plugin-protocol.md`「応答の形」）。プラグインの診断は、出ていない。`hozo.toml` の 1 行 1 列に出す。メッセージに、その誤りを入れる |
+この見出しの診断の、ID と条件と重さの持ち主は、`spec/diagnostics/hozoc.hozo` の分類 `hozo.diagnostics.Hozoc` のケース。
 
 この節の細部は、決定 D680 が決めた。
 

@@ -337,7 +337,7 @@ var diagnosticFixtures = []struct{ name, code string }{
 	{"godesign7", codeTestDir},    // テストのパッケージのディレクトリが、同じ単位が出力する子の名前空間の出力先と重なる
 }
 
-// TestDiagnosticCodes は、「診断」の表の ID（GODESIGN-1〜GODESIGN-7。欠番はない）のどれもが、入力を一つ持つこと。
+// TestDiagnosticCodes は、spec/diagnostics/go-design.hozo の ID（GODESIGN-1〜GODESIGN-7。欠番はない）のどれもが、入力を一つ持つこと。
 func TestDiagnosticCodes(t *testing.T) {
 	seen := map[string]bool{}
 	for _, fx := range diagnosticFixtures {
@@ -374,7 +374,7 @@ func TestDiagnostics(t *testing.T) {
 	}
 }
 
-// TestDiagnosticPositions は、診断の位置（docs/plugin-go-design.md「診断」の表）と、その数。GODESIGN-5 は位置なし。
+// TestDiagnosticPositions は、診断の位置（spec/diagnostics/go-design.hozo のケースの説明）と、その数。GODESIGN-5 は位置なし。
 func TestDiagnosticPositions(t *testing.T) {
 	for name, want := range map[string]map[string]int{
 		"godesign1": {"flows.hidden": 1, "flows.also": 1},

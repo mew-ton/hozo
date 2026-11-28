@@ -76,12 +76,7 @@ Go の実装は `runtime.CheckFormat`（`docs/plugin-go-valid.md`「runtime」�
 
 `read` の応答の `errors` で返す（`docs/plugin-protocol.md`「read」）。順は、名前空間の IR の順、その中は、宣言順、フィールドの順、制約の書かれた順。位置は、制約の付いた scalar か、フィールドを持つ model の FQN。warning は、返さない。
 
-| ID | 重さ | 意味 |
-|---|---|---|
-| VALID-1 | error | 制約が、付けた先に合わない（「制約」の表の「付けられる先」）: `min` / `max` の先の元の型が `int` でも `float` でもない、`length` / `pattern` / `format` の先の元の型が `string` でない、配列のフィールドに `length` のほかの制約が付いている、インデックスの model を型に持つフィールドに制約が付いている |
-| VALID-2 | error | 制約の引数が、足りないか、先に合わない: 元の型が `int` の先に付けた `min` / `max` の `value` が整数でない（64 ビット符号付きの範囲の外を含む）、`length` に `min` も `max` もない |
-| VALID-3 | error | `pattern` の `regex` を、RE2 で解釈できない。メッセージに、正規表現と、解釈できない理由を示す |
-| VALID-4 | error | `format` の `name` が、「形式」の四つのどれでもない。メッセージに、名前と、四つの名前を示す |
+この見出しの診断の、ID と条件と重さの持ち主は、`spec/diagnostics/valid.hozo` の分類 `hozo.diagnostics.Valid` のケース。
 
 - **どの診断も、書いたものの整合の検査**: 制約が言ったことと、付けた先の型が食い違っていれば、error にする。
 - **VALID-* は、`go-valid` の GOVALID-1 を、四つに分けて移したもの。** 分け方の表は `docs/plugin-go-valid.md`「診断」の「欠番」。

@@ -549,17 +549,7 @@ go-sqlite の出力の振る舞いのうち、テストで確かめ続けるも�
 
 `emit` の応答の `errors` で返す。検査だけの実行（`hozoc build --no-emit`）も、同じ応答の診断を使う（`docs/plugin-protocol.md`「起動」「emit」）。
 
-| ID | 重さ | 意味 |
-|---|---|---|
-| GOSQL-3 | error | 表の model に、どのしまい方でも列にできない型のフィールドがある（union と、union を中に持つ型）。位置は model |
-| GOSQL-4 | error | このトランスパイラの公開の名前（`Schema`、`CreateTables`、`Querier`、`Conn`、`<状態>Table`、`New<状態>Table`、出すなら `DbSeams`、`NewDbSeams`）が、N の定義のパッケージの名前（型など。`docs/plugin-go.md`「名前」）と当たる。位置は当たった宣言。このトランスパイラの公開の名前どうし（状態 `users` の `NewUsersTable` と、状態 `newUsers` の `NewUsersTable`）も同じで、位置は後ろの宣言 |
-| GOSQL-6 | error | `[emit.options.go-sqlite]` に、知らないキーがある。位置なし |
-| GOSQL-16 | error | 表の model のフィールドが、しまい方のデコレータ（`@db.text` / `@db.int` / `@db.float` / `@db.bool` / `@db.datetime` / `@db.date` / `@db.time` / `@db.json`）を一つも持たないか、二つ以上持つ（「しまい方」）。位置は model |
-| GOSQL-17 | error | しまい方が、フィールドの型に合わない（「しまい方」の表）。メッセージに、フィールド、しまい方、型を示す。位置は model |
-| GOSQL-27 | error | `@db.latest` の列のしまい方が、`@db.datetime` / `@db.date` / `@db.time` / `@db.int` / `@db.float` のどれでもない。位置は `read` |
-| GOSQL-29 | error | N の単位の対象の op に `@db.transaction` が付いているのに、N に表の状態が一つもない（継ぎ目の実装を出せない。「出力」）。位置は op |
-| GOSQL-33 | error | `@db.insert` / `@db.update` / `@db.delete` を付けた効果の `throws` に、`@db.conflict` が名指ししていない例外がある（このトランスパイラは、それを投げるコードを出せない）。メッセージに、その例外。位置は効果 |
-| GOSQL-34 | error | 表の model に、リテラルの型のフィールドを持つ model を中に持つ型のフィールドがある（「しまい方」: JSON での形を、まだ決めていない）。位置は model |
+この見出しの診断の、ID と条件と重さの持ち主は、`spec/diagnostics/go-sqlite.hozo` の分類 `hozo.diagnostics.GoSqlite` のケース。
 
 - **`go-sqlite` は、`db` の語彙の検査（DB-*。`docs/plugin-db.md`「診断」）を通っていない仕様を受け取ったら、診断にせず、異常終了する**（`Crashed`。`docs/plugin-protocol.md`「起動」）。hozoc からは、起きない: 語彙のプラグイン `db` が error を返せば、`emit` は頼まれず、入っていなければ CFG-25（「マニフェスト」）。見るのは、N の検査だけ（ほかの名前空間の DB-* は、見ない）。
 - **残した診断は、このトランスパイラが、出すときに要るもの**: しまい方（GOSQL-3、GOSQL-16、GOSQL-17、GOSQL-27、GOSQL-34。語彙のプラグイン `db` は、しまい方を確かめない: `docs/plugin-db.md`「しまい方」）、出力の形と設定（GOSQL-4、GOSQL-6）、このトランスパイラが出せないもの（GOSQL-29: 継ぎ目の実装を置くファイルがない。GOSQL-33: 投げるコードを出せない例外）。
@@ -572,7 +562,7 @@ go-sqlite の出力の振る舞いのうち、テストで確かめ続けるも�
 
 ### 欠番
 
-番号は別の意味に使い回さない（欠番の一覧は `docs/requirements.md`「検査の規則の一覧」）。
+番号は別の意味に使い回さない（欠番は、`spec/diagnostics/` のケースの `@retired`）。
 
 - **言語にも、保存先にも依らない 19 個は、語彙のプラグイン `db` の診断に移した**（`docs/plugin-db.md`「診断」。決定 D410）。規則は、同じ。メッセージも同じで、変えたのは、型の書き方（言語の綴り）と、DB-19 の「引数を持つ」の言い方だけ。
 

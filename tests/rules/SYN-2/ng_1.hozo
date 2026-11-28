@@ -1,4 +1,4 @@
-// SYN-2（docs/requirements.md「検査の規則の一覧」。文法で閉じる）: ドキュメンテーションコメントはデコレータより上
+// SYN-2（spec/diagnostics/rule.hozo。文法で閉じる）: ドキュメンテーションコメントはデコレータより上
 namespace a {
   @browser.localStorage
   /** 状態 */                          // ERROR: SYNTAX

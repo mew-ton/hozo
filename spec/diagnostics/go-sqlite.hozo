@@ -1,0 +1,289 @@
+// Hozo 自身の仕様: 診断の分類 hozo.diagnostics.GoSqlite（決定 D812。持ち主は、このファイル）。印の意味は spec/diagnostics.hozo。
+// ケースの名前は、ID の - を _ に替えたもの。もとの綴りは、説明の頭に書く。どの単位の対象でもない: コードには、ならない。
+
+namespace hozo.diagnostics {
+  /** トランスパイラ go-sqlite が返す診断（docs/plugin-go-sqlite.md） */
+  classify GoSqlite of never {
+    // docs/plugin-go-sqlite.md「診断」が説明する規則
+
+    /**
+     * GOSQL-3: 表の model に、どのしまい方でも列にできない型のフィールドがある（union と、union を中に持つ型）。位置は model
+     */
+    @severity(Severity.Error)
+    GOSQL_3;
+
+    /**
+     * GOSQL-4: このトランスパイラの公開の名前（`Schema`、`CreateTables`、`Querier`、`Conn`、`<状態>Table`、`New<状態>Table`、出すなら `DbSeams`、`NewDbSeams`）が、N の定義のパッケージの名前（型など。`docs/plugin-go.md`「名前」）と当たる。位置は当たった宣言。このトランスパイラの公開の名前どうし（状態 `users` の `NewUsersTable` と、状態 `newUsers` の `NewUsersTable`）も同じで、位置は後ろの宣言
+     */
+    @severity(Severity.Error)
+    GOSQL_4;
+
+    /**
+     * GOSQL-6: `[emit.options.go-sqlite]` に、知らないキーがある。位置なし
+     */
+    @severity(Severity.Error)
+    GOSQL_6;
+
+    /**
+     * GOSQL-16: 表の model のフィールドが、しまい方のデコレータ（`@db.text` / `@db.int` / `@db.float` / `@db.bool` / `@db.datetime` / `@db.date` / `@db.time` / `@db.json`）を一つも持たないか、二つ以上持つ（`docs/plugin-go-sqlite.md`「しまい方」）。位置は model
+     */
+    @severity(Severity.Error)
+    GOSQL_16;
+
+    /**
+     * GOSQL-17: しまい方が、フィールドの型に合わない（`docs/plugin-go-sqlite.md`「しまい方」の表）。メッセージに、フィールド、しまい方、型を示す。位置は model
+     */
+    @severity(Severity.Error)
+    GOSQL_17;
+
+    /**
+     * GOSQL-27: `@db.latest` の列のしまい方が、`@db.datetime` / `@db.date` / `@db.time` / `@db.int` / `@db.float` のどれでもない。位置は `read`
+     */
+    @severity(Severity.Error)
+    GOSQL_27;
+
+    /**
+     * GOSQL-29: N の単位の対象の op に `@db.transaction` が付いているのに、N に表の状態が一つもない（継ぎ目の実装を出せない。`docs/plugin-go-sqlite.md`「出力」）。位置は op
+     */
+    @severity(Severity.Error)
+    GOSQL_29;
+
+    /**
+     * GOSQL-33: `@db.insert` / `@db.update` / `@db.delete` を付けた効果の `throws` に、`@db.conflict` が名指ししていない例外がある（このトランスパイラは、それを投げるコードを出せない）。メッセージに、その例外。位置は効果
+     */
+    @severity(Severity.Error)
+    GOSQL_33;
+
+    /**
+     * GOSQL-34: 表の model に、リテラルの型のフィールドを持つ model を中に持つ型のフィールドがある（`docs/plugin-go-sqlite.md`「しまい方」: JSON での形を、まだ決めていない）。位置は model
+     */
+    @severity(Severity.Error)
+    GOSQL_34;
+
+    // 欠番: なくした ID。別の意味に、使い回さない（決定 D52）
+
+    /**
+     * GOSQL-5: 欠番。状態の単位のメソッドの名前が、`go-sqlite` の型のフィールド `db` と当たること（op `db`）。起きない条件だったので、`go-sqlite` を実装したときになくした（メソッドの名前は op 名の先頭を大文字にした `Db` で、フィールド `db` とは別の名前）
+     *
+     * 経緯のある所: `docs/plugin-go-sqlite.md`「診断」
+     */
+    @retired
+    GOSQL_5;
+
+    /**
+     * GOSQL-1: 欠番（GOSQL-1、GOSQL-2、GOSQL-7〜GOSQL-13、GOSQL-15、GOSQL-20、GOSQL-22、GOSQL-24〜GOSQL-26、GOSQL-28、GOSQL-30〜GOSQL-32 を、まとめて、なくした）。`go-sqlite` が返していた、`db` の語彙の、デコレータと宣言の整合の検査（19 個）。言語にも保存先にも依らないので、語彙のプラグイン `db` に移した（決定 D410）ときになくなった。行き先（DB-1〜DB-19）の対応は、持ち主の文書
+     *
+     * 経緯のある所: `docs/plugin-go-sqlite.md`「診断」の「欠番」
+     */
+    @retired(Db.DB_1)
+    @adr.decided(hozo.decisions.Decision400.D410)
+    GOSQL_1;
+
+    /**
+     * GOSQL-2: 欠番（GOSQL-1、GOSQL-2、GOSQL-7〜GOSQL-13、GOSQL-15、GOSQL-20、GOSQL-22、GOSQL-24〜GOSQL-26、GOSQL-28、GOSQL-30〜GOSQL-32 を、まとめて、なくした）。`go-sqlite` が返していた、`db` の語彙の、デコレータと宣言の整合の検査（19 個）。言語にも保存先にも依らないので、語彙のプラグイン `db` に移した（決定 D410）ときになくなった。行き先（DB-1〜DB-19）の対応は、持ち主の文書
+     *
+     * 経緯のある所: `docs/plugin-go-sqlite.md`「診断」の「欠番」
+     */
+    @retired
+    @adr.decided(hozo.decisions.Decision400.D410)
+    GOSQL_2;
+
+    /**
+     * GOSQL-7: 欠番（GOSQL-1、GOSQL-2、GOSQL-7〜GOSQL-13、GOSQL-15、GOSQL-20、GOSQL-22、GOSQL-24〜GOSQL-26、GOSQL-28、GOSQL-30〜GOSQL-32 を、まとめて、なくした）。`go-sqlite` が返していた、`db` の語彙の、デコレータと宣言の整合の検査（19 個）。言語にも保存先にも依らないので、語彙のプラグイン `db` に移した（決定 D410）ときになくなった。行き先（DB-1〜DB-19）の対応は、持ち主の文書
+     *
+     * 経緯のある所: `docs/plugin-go-sqlite.md`「診断」の「欠番」
+     */
+    @retired
+    @adr.decided(hozo.decisions.Decision400.D410)
+    GOSQL_7;
+
+    /**
+     * GOSQL-8: 欠番（GOSQL-1、GOSQL-2、GOSQL-7〜GOSQL-13、GOSQL-15、GOSQL-20、GOSQL-22、GOSQL-24〜GOSQL-26、GOSQL-28、GOSQL-30〜GOSQL-32 を、まとめて、なくした）。`go-sqlite` が返していた、`db` の語彙の、デコレータと宣言の整合の検査（19 個）。言語にも保存先にも依らないので、語彙のプラグイン `db` に移した（決定 D410）ときになくなった。行き先（DB-1〜DB-19）の対応は、持ち主の文書
+     *
+     * 経緯のある所: `docs/plugin-go-sqlite.md`「診断」の「欠番」
+     */
+    @retired
+    @adr.decided(hozo.decisions.Decision400.D410)
+    GOSQL_8;
+
+    /**
+     * GOSQL-9: 欠番（GOSQL-1、GOSQL-2、GOSQL-7〜GOSQL-13、GOSQL-15、GOSQL-20、GOSQL-22、GOSQL-24〜GOSQL-26、GOSQL-28、GOSQL-30〜GOSQL-32 を、まとめて、なくした）。`go-sqlite` が返していた、`db` の語彙の、デコレータと宣言の整合の検査（19 個）。言語にも保存先にも依らないので、語彙のプラグイン `db` に移した（決定 D410）ときになくなった。行き先（DB-1〜DB-19）の対応は、持ち主の文書
+     *
+     * 経緯のある所: `docs/plugin-go-sqlite.md`「診断」の「欠番」
+     */
+    @retired
+    @adr.decided(hozo.decisions.Decision400.D410)
+    GOSQL_9;
+
+    /**
+     * GOSQL-10: 欠番（GOSQL-1、GOSQL-2、GOSQL-7〜GOSQL-13、GOSQL-15、GOSQL-20、GOSQL-22、GOSQL-24〜GOSQL-26、GOSQL-28、GOSQL-30〜GOSQL-32 を、まとめて、なくした）。`go-sqlite` が返していた、`db` の語彙の、デコレータと宣言の整合の検査（19 個）。言語にも保存先にも依らないので、語彙のプラグイン `db` に移した（決定 D410）ときになくなった。行き先（DB-1〜DB-19）の対応は、持ち主の文書
+     *
+     * 経緯のある所: `docs/plugin-go-sqlite.md`「診断」の「欠番」
+     */
+    @retired
+    @adr.decided(hozo.decisions.Decision400.D410)
+    GOSQL_10;
+
+    /**
+     * GOSQL-11: 欠番（GOSQL-1、GOSQL-2、GOSQL-7〜GOSQL-13、GOSQL-15、GOSQL-20、GOSQL-22、GOSQL-24〜GOSQL-26、GOSQL-28、GOSQL-30〜GOSQL-32 を、まとめて、なくした）。`go-sqlite` が返していた、`db` の語彙の、デコレータと宣言の整合の検査（19 個）。言語にも保存先にも依らないので、語彙のプラグイン `db` に移した（決定 D410）ときになくなった。行き先（DB-1〜DB-19）の対応は、持ち主の文書
+     *
+     * 経緯のある所: `docs/plugin-go-sqlite.md`「診断」の「欠番」
+     */
+    @retired
+    @adr.decided(hozo.decisions.Decision400.D410)
+    GOSQL_11;
+
+    /**
+     * GOSQL-12: 欠番（GOSQL-1、GOSQL-2、GOSQL-7〜GOSQL-13、GOSQL-15、GOSQL-20、GOSQL-22、GOSQL-24〜GOSQL-26、GOSQL-28、GOSQL-30〜GOSQL-32 を、まとめて、なくした）。`go-sqlite` が返していた、`db` の語彙の、デコレータと宣言の整合の検査（19 個）。言語にも保存先にも依らないので、語彙のプラグイン `db` に移した（決定 D410）ときになくなった。行き先（DB-1〜DB-19）の対応は、持ち主の文書
+     *
+     * 経緯のある所: `docs/plugin-go-sqlite.md`「診断」の「欠番」
+     */
+    @retired
+    @adr.decided(hozo.decisions.Decision400.D410)
+    GOSQL_12;
+
+    /**
+     * GOSQL-13: 欠番（GOSQL-1、GOSQL-2、GOSQL-7〜GOSQL-13、GOSQL-15、GOSQL-20、GOSQL-22、GOSQL-24〜GOSQL-26、GOSQL-28、GOSQL-30〜GOSQL-32 を、まとめて、なくした）。`go-sqlite` が返していた、`db` の語彙の、デコレータと宣言の整合の検査（19 個）。言語にも保存先にも依らないので、語彙のプラグイン `db` に移した（決定 D410）ときになくなった。行き先（DB-1〜DB-19）の対応は、持ち主の文書
+     *
+     * 経緯のある所: `docs/plugin-go-sqlite.md`「診断」の「欠番」
+     */
+    @retired
+    @adr.decided(hozo.decisions.Decision400.D410)
+    GOSQL_13;
+
+    /**
+     * GOSQL-15: 欠番（GOSQL-1、GOSQL-2、GOSQL-7〜GOSQL-13、GOSQL-15、GOSQL-20、GOSQL-22、GOSQL-24〜GOSQL-26、GOSQL-28、GOSQL-30〜GOSQL-32 を、まとめて、なくした）。`go-sqlite` が返していた、`db` の語彙の、デコレータと宣言の整合の検査（19 個）。言語にも保存先にも依らないので、語彙のプラグイン `db` に移した（決定 D410）ときになくなった。行き先（DB-1〜DB-19）の対応は、持ち主の文書
+     *
+     * 経緯のある所: `docs/plugin-go-sqlite.md`「診断」の「欠番」
+     */
+    @retired
+    @adr.decided(hozo.decisions.Decision400.D410)
+    GOSQL_15;
+
+    /**
+     * GOSQL-20: 欠番（GOSQL-1、GOSQL-2、GOSQL-7〜GOSQL-13、GOSQL-15、GOSQL-20、GOSQL-22、GOSQL-24〜GOSQL-26、GOSQL-28、GOSQL-30〜GOSQL-32 を、まとめて、なくした）。`go-sqlite` が返していた、`db` の語彙の、デコレータと宣言の整合の検査（19 個）。言語にも保存先にも依らないので、語彙のプラグイン `db` に移した（決定 D410）ときになくなった。行き先（DB-1〜DB-19）の対応は、持ち主の文書
+     *
+     * 経緯のある所: `docs/plugin-go-sqlite.md`「診断」の「欠番」
+     */
+    @retired
+    @adr.decided(hozo.decisions.Decision400.D410)
+    GOSQL_20;
+
+    /**
+     * GOSQL-22: 欠番（GOSQL-1、GOSQL-2、GOSQL-7〜GOSQL-13、GOSQL-15、GOSQL-20、GOSQL-22、GOSQL-24〜GOSQL-26、GOSQL-28、GOSQL-30〜GOSQL-32 を、まとめて、なくした）。`go-sqlite` が返していた、`db` の語彙の、デコレータと宣言の整合の検査（19 個）。言語にも保存先にも依らないので、語彙のプラグイン `db` に移した（決定 D410）ときになくなった。行き先（DB-1〜DB-19）の対応は、持ち主の文書
+     *
+     * 経緯のある所: `docs/plugin-go-sqlite.md`「診断」の「欠番」
+     */
+    @retired
+    @adr.decided(hozo.decisions.Decision400.D410)
+    GOSQL_22;
+
+    /**
+     * GOSQL-24: 欠番（GOSQL-1、GOSQL-2、GOSQL-7〜GOSQL-13、GOSQL-15、GOSQL-20、GOSQL-22、GOSQL-24〜GOSQL-26、GOSQL-28、GOSQL-30〜GOSQL-32 を、まとめて、なくした）。`go-sqlite` が返していた、`db` の語彙の、デコレータと宣言の整合の検査（19 個）。言語にも保存先にも依らないので、語彙のプラグイン `db` に移した（決定 D410）ときになくなった。行き先（DB-1〜DB-19）の対応は、持ち主の文書
+     *
+     * 経緯のある所: `docs/plugin-go-sqlite.md`「診断」の「欠番」
+     */
+    @retired
+    @adr.decided(hozo.decisions.Decision400.D410)
+    GOSQL_24;
+
+    /**
+     * GOSQL-25: 欠番（GOSQL-1、GOSQL-2、GOSQL-7〜GOSQL-13、GOSQL-15、GOSQL-20、GOSQL-22、GOSQL-24〜GOSQL-26、GOSQL-28、GOSQL-30〜GOSQL-32 を、まとめて、なくした）。`go-sqlite` が返していた、`db` の語彙の、デコレータと宣言の整合の検査（19 個）。言語にも保存先にも依らないので、語彙のプラグイン `db` に移した（決定 D410）ときになくなった。行き先（DB-1〜DB-19）の対応は、持ち主の文書
+     *
+     * 経緯のある所: `docs/plugin-go-sqlite.md`「診断」の「欠番」
+     */
+    @retired
+    @adr.decided(hozo.decisions.Decision400.D410)
+    GOSQL_25;
+
+    /**
+     * GOSQL-26: 欠番（GOSQL-1、GOSQL-2、GOSQL-7〜GOSQL-13、GOSQL-15、GOSQL-20、GOSQL-22、GOSQL-24〜GOSQL-26、GOSQL-28、GOSQL-30〜GOSQL-32 を、まとめて、なくした）。`go-sqlite` が返していた、`db` の語彙の、デコレータと宣言の整合の検査（19 個）。言語にも保存先にも依らないので、語彙のプラグイン `db` に移した（決定 D410）ときになくなった。行き先（DB-1〜DB-19）の対応は、持ち主の文書
+     *
+     * 経緯のある所: `docs/plugin-go-sqlite.md`「診断」の「欠番」
+     */
+    @retired
+    @adr.decided(hozo.decisions.Decision400.D410)
+    GOSQL_26;
+
+    /**
+     * GOSQL-28: 欠番（GOSQL-1、GOSQL-2、GOSQL-7〜GOSQL-13、GOSQL-15、GOSQL-20、GOSQL-22、GOSQL-24〜GOSQL-26、GOSQL-28、GOSQL-30〜GOSQL-32 を、まとめて、なくした）。`go-sqlite` が返していた、`db` の語彙の、デコレータと宣言の整合の検査（19 個）。言語にも保存先にも依らないので、語彙のプラグイン `db` に移した（決定 D410）ときになくなった。行き先（DB-1〜DB-19）の対応は、持ち主の文書
+     *
+     * 経緯のある所: `docs/plugin-go-sqlite.md`「診断」の「欠番」
+     */
+    @retired
+    @adr.decided(hozo.decisions.Decision400.D410)
+    GOSQL_28;
+
+    /**
+     * GOSQL-30: 欠番（GOSQL-1、GOSQL-2、GOSQL-7〜GOSQL-13、GOSQL-15、GOSQL-20、GOSQL-22、GOSQL-24〜GOSQL-26、GOSQL-28、GOSQL-30〜GOSQL-32 を、まとめて、なくした）。`go-sqlite` が返していた、`db` の語彙の、デコレータと宣言の整合の検査（19 個）。言語にも保存先にも依らないので、語彙のプラグイン `db` に移した（決定 D410）ときになくなった。行き先（DB-1〜DB-19）の対応は、持ち主の文書
+     *
+     * 経緯のある所: `docs/plugin-go-sqlite.md`「診断」の「欠番」
+     */
+    @retired
+    @adr.decided(hozo.decisions.Decision400.D410)
+    GOSQL_30;
+
+    /**
+     * GOSQL-31: 欠番（GOSQL-1、GOSQL-2、GOSQL-7〜GOSQL-13、GOSQL-15、GOSQL-20、GOSQL-22、GOSQL-24〜GOSQL-26、GOSQL-28、GOSQL-30〜GOSQL-32 を、まとめて、なくした）。`go-sqlite` が返していた、`db` の語彙の、デコレータと宣言の整合の検査（19 個）。言語にも保存先にも依らないので、語彙のプラグイン `db` に移した（決定 D410）ときになくなった。行き先（DB-1〜DB-19）の対応は、持ち主の文書
+     *
+     * 経緯のある所: `docs/plugin-go-sqlite.md`「診断」の「欠番」
+     */
+    @retired
+    @adr.decided(hozo.decisions.Decision400.D410)
+    GOSQL_31;
+
+    /**
+     * GOSQL-32: 欠番（GOSQL-1、GOSQL-2、GOSQL-7〜GOSQL-13、GOSQL-15、GOSQL-20、GOSQL-22、GOSQL-24〜GOSQL-26、GOSQL-28、GOSQL-30〜GOSQL-32 を、まとめて、なくした）。`go-sqlite` が返していた、`db` の語彙の、デコレータと宣言の整合の検査（19 個）。言語にも保存先にも依らないので、語彙のプラグイン `db` に移した（決定 D410）ときになくなった。行き先（DB-1〜DB-19）の対応は、持ち主の文書
+     *
+     * 経緯のある所: `docs/plugin-go-sqlite.md`「診断」の「欠番」
+     */
+    @retired
+    @adr.decided(hozo.decisions.Decision400.D410)
+    GOSQL_32;
+
+    /**
+     * GOSQL-14: 欠番（GOSQL-14、GOSQL-18、GOSQL-19、GOSQL-21、GOSQL-23 を、まとめて、なくした）。`db` の語彙の、op の中身を言うデコレータ（`@db.reads`、`@db.effects`）、`@db.nullable`、デコレータの引数の表についての規則。`db` の語彙を、`read` と効果の宣言から中身を作る形にした（決定 D134〜D137）ときになくなった
+     *
+     * 経緯のある所: `docs/plugin-go-sqlite.md`「診断」
+     */
+    @retired
+    @adr.decided(hozo.decisions.Decision100.D134, hozo.decisions.Decision100.D137)
+    GOSQL_14;
+
+    /**
+     * GOSQL-18: 欠番（GOSQL-14、GOSQL-18、GOSQL-19、GOSQL-21、GOSQL-23 を、まとめて、なくした）。`db` の語彙の、op の中身を言うデコレータ（`@db.reads`、`@db.effects`）、`@db.nullable`、デコレータの引数の表についての規則。`db` の語彙を、`read` と効果の宣言から中身を作る形にした（決定 D134〜D137）ときになくなった
+     *
+     * 経緯のある所: `docs/plugin-go-sqlite.md`「診断」
+     */
+    @retired
+    @adr.decided(hozo.decisions.Decision100.D134, hozo.decisions.Decision100.D137)
+    GOSQL_18;
+
+    /**
+     * GOSQL-19: 欠番（GOSQL-14、GOSQL-18、GOSQL-19、GOSQL-21、GOSQL-23 を、まとめて、なくした）。`db` の語彙の、op の中身を言うデコレータ（`@db.reads`、`@db.effects`）、`@db.nullable`、デコレータの引数の表についての規則。`db` の語彙を、`read` と効果の宣言から中身を作る形にした（決定 D134〜D137）ときになくなった
+     *
+     * 経緯のある所: `docs/plugin-go-sqlite.md`「診断」
+     */
+    @retired
+    @adr.decided(hozo.decisions.Decision100.D134, hozo.decisions.Decision100.D137)
+    GOSQL_19;
+
+    /**
+     * GOSQL-21: 欠番（GOSQL-14、GOSQL-18、GOSQL-19、GOSQL-21、GOSQL-23 を、まとめて、なくした）。`db` の語彙の、op の中身を言うデコレータ（`@db.reads`、`@db.effects`）、`@db.nullable`、デコレータの引数の表についての規則。`db` の語彙を、`read` と効果の宣言から中身を作る形にした（決定 D134〜D137）ときになくなった
+     *
+     * 経緯のある所: `docs/plugin-go-sqlite.md`「診断」
+     */
+    @retired
+    @adr.decided(hozo.decisions.Decision100.D134, hozo.decisions.Decision100.D137)
+    GOSQL_21;
+
+    /**
+     * GOSQL-23: 欠番（GOSQL-14、GOSQL-18、GOSQL-19、GOSQL-21、GOSQL-23 を、まとめて、なくした）。`db` の語彙の、op の中身を言うデコレータ（`@db.reads`、`@db.effects`）、`@db.nullable`、デコレータの引数の表についての規則。`db` の語彙を、`read` と効果の宣言から中身を作る形にした（決定 D134〜D137）ときになくなった
+     *
+     * 経緯のある所: `docs/plugin-go-sqlite.md`「診断」
+     */
+    @retired
+    @adr.decided(hozo.decisions.Decision100.D134, hozo.decisions.Decision100.D137)
+    GOSQL_23;
+  }
+}

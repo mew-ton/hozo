@@ -1,0 +1,214 @@
+// Hozo 自身の仕様: 診断の分類 hozo.diagnostics.Hozoc（決定 D812。持ち主は、このファイル）。印の意味は spec/diagnostics.hozo。
+// ケースの名前は、ID の - を _ に替えたもの。もとの綴りは、説明の頭に書く。どの単位の対象でもない: コードには、ならない。
+
+namespace hozo.diagnostics {
+  /** 言語と設定の規則のほかに、hozoc 自身が出す診断: マニフェスト、プラグインの応答の誤り、hozoc tests、言語サーバー、規則の ID でないコード */
+  classify Hozoc of never {
+    // docs/plugin-protocol.md「診断」が説明する規則
+
+    /**
+     * MAN-2: `protocol` が合わない（マニフェストの `protocol` が、`docs/plugin-protocol.md`「版の合わせ方」の決まりに合わない。または起動したプラグインが `code: "protocol"` で断った）
+     */
+    @severity(Severity.Error)
+    @adr.decided(hozo.decisions.Decision400.D421, hozo.decisions.Decision400.D467)
+    @checkedBy(hozo.compiler.verify)
+    MAN_2;
+
+    /**
+     * MAN-3: マニフェストの `name` がディレクトリ名と違う
+     */
+    @severity(Severity.Error)
+    @checkedBy(hozo.compiler.verify)
+    MAN_3;
+
+    /**
+     * MAN-4: マニフェストを読めない: ファイルを開けない、TOML の構文の誤り、値の型違い、知らないキー、`name` がない、`wasm` がない・空・文字列でない・相対パスでない・ディレクトリの外に出る、`[[transpiler]]` に `name` か `language` がない、`language` が空、`requires` に自分の名前か同じ名前が二度ある、`seams` に空の文字列か同じ FQN が二度ある、`interprets` に空の文字列か同じ FQN が二度ある、同じ FQN が `seams` と `interprets` の両方にある、`requires_vocabulary` に空の文字列か同じ名前が二度ある、同じ名前の `[[transpiler]]` が二つある、`[read]` の `namespaces` がない・空・空の文字列がある・同じ名前が二度ある。使うプラグインの `vocabulary` のファイルを読めないときも MAN-4
+     */
+    @severity(Severity.Error)
+    @checkedBy(hozo.compiler.verify)
+    MAN_4;
+
+    /**
+     * MAN-5: プラグインがその `direction`（`[read]` を書いたプラグインの `read` を含む）か、頼まれたトランスパイラを実装していない（マニフェストに書いてあるのに。起動したプラグインが `code: "unsupported"` で断った）
+     */
+    @severity(Severity.Error)
+    @checkedBy(hozo.compiler.verify)
+    MAN_5;
+
+    /**
+     * MAN-6: マニフェストに `command` がある（子プロセスで起動するコマンド。なくした書き方: 「マニフェスト」の `wasm`）。メッセージは、`wasm` に、WASM のファイルの場所を書くことを、示す。使っていないプラグインにも、報告する（MAN-4 と同じ）
+     */
+    @severity(Severity.Error)
+    @checkedBy(hozo.compiler.verify)
+    MAN_6;
+
+    /**
+     * PLG-1: 応答の `files` の `path` が、その出力の Dir(U, N) の下にない（`docs/plugin-protocol.md`「emit」）
+     */
+    @severity(Severity.Silent)
+    @checkedBy(hozo.compiler.verify)
+    PLG_1;
+
+    /**
+     * PLG-2: トランスパイラ一つの答えの中で同じ `path` が二度
+     */
+    @severity(Severity.Silent)
+    @checkedBy(hozo.compiler.verify)
+    PLG_2;
+
+    /**
+     * PLG-4: 応答の `files` の、テストの対応表の、名前か中身が、約束の形でない（`docs/plugin-protocol.md`「テストの対応表」）
+     */
+    @severity(Severity.Silent)
+    @adr.decided(hozo.decisions.Decision300.D380)
+    @checkedBy(hozo.compiler.verify)
+    PLG_4;
+
+    /**
+     * PLUGIN: トランスパイラの `warnings`（`docs/plugin-protocol.md`「emit」）と、語彙のプラグインの `warnings`（`docs/plugin-protocol.md`「read」）
+     */
+    @severity(Severity.Warning)
+    @checkedBy(hozo.compiler.verify)
+    PLUGIN;
+
+    // docs/cli.md「診断」が説明する規則
+
+    /**
+     * TESTS-1: 求めるテストが、走ったと確かめられない。二つの場合がある。（1）カバレッジが、そのテストの行を、実行済みと言っていない: テストを受け取る口を呼ぶテストを、書いていない。絞って走らせた。カバレッジを取るときに、測る範囲に、口のパッケージを入れていない（Go なら `-coverpkg`。`docs/plugin-go.md`「カバレッジを読む」）。（2）カバレッジが、そのファイルを測っていない。位置は、対応表の `file` と、`lines` の始まりの行
+     */
+    @severity(Severity.Error)
+    @adr.decided(hozo.decisions.Decision300.D380)
+    @checkedBy(hozo.compiler.confirmTests)
+    TESTS_1;
+
+    /**
+     * TESTS-2: 対応表か、対応表が指すファイルが、置き場にない、または、今の仕様から集めたものと、内容が違う（`hozoc build` をやり直して、テストを走らせ直す）。位置は、そのファイル
+     */
+    @severity(Severity.Error)
+    @adr.decided(hozo.decisions.Decision300.D380)
+    @checkedBy(hozo.compiler.confirmTests)
+    TESTS_2;
+
+    /**
+     * TESTS-3: カバレッジを読めない: `coverage` のファイルを開けない、UTF-8 の文字列でない、単位の基底のプラグインが `[coverage] enabled` でない、プラグインが、その形を読めなかった（`recognized: false`）。位置は、`coverage` のファイル
+     */
+    @severity(Severity.Error)
+    @checkedBy(hozo.compiler.confirmTests)
+    TESTS_3;
+
+    // docs/lsp.md「診断」が説明する規則
+
+    /**
+     * LSP-1: `hozo.toml` が見つからない。設定の検査は行っていない（`docs/lsp.md`「プロジェクト」）。ユーザーの各 `.hozo` の 1 行 1 列に出す
+     */
+    @severity(Severity.Warning)
+    @checkedBy(hozo.compiler.serve)
+    LSP_1;
+
+    /**
+     * LSP-2: プラグインの check が、最後まで走らなかった（プラグインの異常終了、形の違う応答。`docs/plugin-protocol.md`「応答の形」）。プラグインの診断は、出ていない。`hozo.toml` の 1 行 1 列に出す。メッセージに、その誤りを入れる
+     */
+    @severity(Severity.Warning)
+    @checkedBy(hozo.compiler.serve)
+    LSP_2;
+
+    // docs/diagnostics.md「規則の ID でないコード」が説明する規則
+
+    /**
+     * SYNTAX: 構文エラー（`docs/grammar.md` の文法に合わない）。誤りのある箇所を読み飛ばして続ける（回復のしかたは `docs/packages.md`「パッケージ」の `internal/syntax` の項）
+     */
+    @severity(Severity.Error)
+    @checkedBy(hozo.compiler.verify)
+    SYNTAX;
+
+    /**
+     * IO: `sources` に合うファイルを探せない、または読めない（`spec/cli.hozo` の `check` の手順の 2）。読めたファイルの検査は続ける。位置は持たず、読めなかったファイルが分かればそのファイル
+     */
+    @severity(Severity.Error)
+    @checkedBy(hozo.compiler.verify)
+    IO;
+
+    // 欠番: なくした ID。別の意味に、使い回さない（決定 D52）
+
+    /**
+     * MAN-1: 欠番。マニフェストの `[emit]` の `entry` も `decorate` も空であること。`[emit]` を `[[transpiler]]` に替えた（決定 D28）ときになくなった
+     *
+     * 経緯のある所: `docs/plugin-protocol.md`「診断」
+     */
+    @retired
+    @adr.decided(hozo.decisions.Decision000.D28)
+    MAN_1;
+
+    /**
+     * PLG-3: 欠番。`emit` の応答の `select` が、選べない宣言を指していること。`select` をなくした（決定 D77）ときになくなった
+     *
+     * 経緯のある所: `docs/plugin-protocol.md`「診断」
+     */
+    @retired
+    @adr.decided(hozo.decisions.Decision000.D77)
+    PLG_3;
+
+    /**
+     * GOEMIT-1: 欠番（GOEMIT-1〜GOEMIT-6、GOEMIT-INTERNAL を、まとめて、なくした）。本体に組み込んだ Go の出力の規則。出力を基底のプラグインに移した（決定 D80）ときになくなった。行き先（GO-*、GOVALID-*）は持ち主の文書
+     *
+     * 経緯のある所: `docs/plugin-go.md`「診断」
+     */
+    @retired
+    @adr.decided(hozo.decisions.Decision000.D80)
+    GOEMIT_1;
+
+    /**
+     * GOEMIT-2: 欠番（GOEMIT-1〜GOEMIT-6、GOEMIT-INTERNAL を、まとめて、なくした）。本体に組み込んだ Go の出力の規則。出力を基底のプラグインに移した（決定 D80）ときになくなった。行き先（GO-*、GOVALID-*）は持ち主の文書
+     *
+     * 経緯のある所: `docs/plugin-go.md`「診断」
+     */
+    @retired
+    @adr.decided(hozo.decisions.Decision000.D80)
+    GOEMIT_2;
+
+    /**
+     * GOEMIT-3: 欠番（GOEMIT-1〜GOEMIT-6、GOEMIT-INTERNAL を、まとめて、なくした）。本体に組み込んだ Go の出力の規則。出力を基底のプラグインに移した（決定 D80）ときになくなった。行き先（GO-*、GOVALID-*）は持ち主の文書
+     *
+     * 経緯のある所: `docs/plugin-go.md`「診断」
+     */
+    @retired
+    @adr.decided(hozo.decisions.Decision000.D80)
+    GOEMIT_3;
+
+    /**
+     * GOEMIT-4: 欠番（GOEMIT-1〜GOEMIT-6、GOEMIT-INTERNAL を、まとめて、なくした）。本体に組み込んだ Go の出力の規則。出力を基底のプラグインに移した（決定 D80）ときになくなった。行き先（GO-*、GOVALID-*）は持ち主の文書
+     *
+     * 経緯のある所: `docs/plugin-go.md`「診断」
+     */
+    @retired
+    @adr.decided(hozo.decisions.Decision000.D80)
+    GOEMIT_4;
+
+    /**
+     * GOEMIT-5: 欠番（GOEMIT-1〜GOEMIT-6、GOEMIT-INTERNAL を、まとめて、なくした）。本体に組み込んだ Go の出力の規則。出力を基底のプラグインに移した（決定 D80）ときになくなった。行き先（GO-*、GOVALID-*）は持ち主の文書
+     *
+     * 経緯のある所: `docs/plugin-go.md`「診断」
+     */
+    @retired
+    @adr.decided(hozo.decisions.Decision000.D80)
+    GOEMIT_5;
+
+    /**
+     * GOEMIT-6: 欠番（GOEMIT-1〜GOEMIT-6、GOEMIT-INTERNAL を、まとめて、なくした）。本体に組み込んだ Go の出力の規則。出力を基底のプラグインに移した（決定 D80）ときになくなった。行き先（GO-*、GOVALID-*）は持ち主の文書
+     *
+     * 経緯のある所: `docs/plugin-go.md`「診断」
+     */
+    @retired
+    @adr.decided(hozo.decisions.Decision000.D80)
+    GOEMIT_6;
+
+    /**
+     * GOEMIT-INTERNAL: 欠番（GOEMIT-1〜GOEMIT-6、GOEMIT-INTERNAL を、まとめて、なくした）。本体に組み込んだ Go の出力の規則。出力を基底のプラグインに移した（決定 D80）ときになくなった。行き先（GO-*、GOVALID-*）は持ち主の文書
+     *
+     * 経緯のある所: `docs/plugin-go.md`「診断」
+     */
+    @retired
+    @adr.decided(hozo.decisions.Decision000.D80)
+    GOEMIT_INTERNAL;
+  }
+}
