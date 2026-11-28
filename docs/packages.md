@@ -46,7 +46,7 @@ plugins/go-http/       go-http プラグイン（main。中身は internal/gohtt
 plugins/http/          語彙のプラグイン http（main。中身は、公開のライブラリ plugin/httpvocab）
 plugins/valid/         語彙のプラグイン valid（main。中身は、公開のライブラリ plugin/validvocab）
 plugins/db/            語彙のプラグイン db（main。中身は、公開のライブラリ plugin/dbvocab）
-plugins/go-cli/        go-cli プラグイン（main。中身は internal/gocli/）と、その語彙 cli.hozo
+plugins/go-cli/        go-cli プラグイン（main。中身は internal/gocli/）と、その語彙 cli.hozo。go-http と同じく、それ自体が一つの Hozo のプロジェクト（hozo.toml と spec/go-cli.hozo: go-cli 自身の要求）で、internal/spec/ はその生成物（テストのパッケージ goclitest の、要求のテストの入れ物の口）
 plugins/go-design/     go-design プラグイン（main。中身は internal/godesign/）
 schema/                IR の JSON スキーマ（go generate の置き場のパッケージ schema）
 editors/vscode/        VS Code 拡張（syntaxes/ は TextMate の文法と、go generate の置き場のパッケージ syntaxes）
@@ -127,6 +127,8 @@ Go のパッケージごとの、このモジュールの中で import してい
 | `plugins/db` | `plugin`、`plugin/dbvocab` |
 | `plugins/go-cli` | `plugin`、`plugins/go-cli/internal/gocli` |
 | `plugins/go-cli/internal/gocli` | `ir`、`plugin`、`plugin/golang`、`plugin/govalid`、`plugin/validvocab` |
+| `plugins/go-cli/internal/spec` | — |
+| `plugins/go-cli/internal/spec/goclitest` | — |
 | `plugins/go-design` | `plugin`、`plugins/go-design/internal/godesign` |
 | `plugins/go-design/internal/godesign` | `ir`、`plugin`、`plugin/golang` |
 | `tests/corpus/view/plugins/view-dump` | `plugin` |
@@ -764,7 +766,7 @@ Go のプラグインは、どれも同じ形: `main` パッケージが `plugin
 | `plugins/http` | `docs/plugin-http.md` | 語彙のプラグイン: `main` が `plugin.Main(plugin.ReadOnly(…))` を呼び、`plugin/httpvocab` の `Check` の診断を返す。HTTP-* |
 | `plugins/valid` | `docs/plugin-valid.md` | 語彙のプラグイン: 同じ形で、`plugin/validvocab` の `Check` の診断を返す。VALID-* |
 | `plugins/db` | `docs/plugin-db.md` | 語彙のプラグイン: 同じ形で、`plugin/dbvocab` の `Check` の診断を返す。DB-* |
-| `plugins/go-cli` | `docs/plugin-go-cli.md` | `internal/gocli`: `cli/cli.go`。CLI-* |
+| `plugins/go-cli` | `plugins/go-cli/spec/go-cli.hozo`、`docs/plugin-go-cli.md`（受け付けない書き方と診断） | `internal/gocli`: `cli/cli.go`。CLI-* |
 | `plugins/go-design` | `docs/plugin-go-design.md` | `internal/godesign`: テストのパッケージの `design.go`。GODESIGN-* |
 
 ## 生成するもの
@@ -774,6 +776,7 @@ Go のプラグインは、どれも同じ形: `main` パッケージが `plugin
 | `ir` と `plugin` の型 | `schema/ir.schema.json`（`Program` / `View` と、`$defs` にプロトコルの要求と応答） | `internal/tools/irschema`（`go generate ./schema/...`。構造体は reflect で写し、`kind` のユニオンと列挙は道具の表で持つ） |
 | `token.Keywords` | `editors/vscode/syntaxes/hozo.tmLanguage.json`（予約語の部分は `token.Keywords` から、それ以外は道具の中の表から） | `internal/tools/tmgrammar`（`go generate ./editors/...`） |
 | `spec/cli.hozo`（と、それが指す、`spec/` の `*.hozo`） | `internal/gen/hozo/compiler/**`、`internal/gen/hozo/cli/**` | `internal/tools/selfgen`（`make generate`。下の「自己生成の手順」） |
+| `plugins/go-cli/spec/go-cli.hozo`（go-cli 自身の要求。`plugins/go-cli/hozo.toml` のプロジェクト。決定 D811） | `plugins/go-cli/internal/spec/**` | 同じ |
 | `plugins/go-http/spec/go-http.hozo`（go-http 自身の要求。`plugins/go-http/hozo.toml` のプロジェクト。`docs/plugin-go-http.md`「go-http 自身の要求」） | `plugins/go-http/internal/spec/**` | 同じ |
 | `plugins/go-sqlite/spec/go-sqlite.hozo`（go-sqlite 自身の要求。`plugins/go-sqlite/hozo.toml` のプロジェクト。`docs/plugin-go-sqlite.md`「go-sqlite 自身の要求」） | `plugins/go-sqlite/internal/spec/**` | 同じ |
 | `plugins/` の下の `testdata/<名前>/` の `hozo.toml` と `.hozo` | `testdata/<名前>/views.json`（プラグインの単体テストの入力の `View`） | `tests/pluginviews_test.go` の `TestPluginViewFixtures`（`go test ./tests -run TestPluginViewFixtures -update`。遅れていれば、このテストが落ちる。`docs/testing.md`「単体テスト」） |

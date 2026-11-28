@@ -1021,7 +1021,7 @@ N1〜N96 のうち、解決は 16: N3（仕様の直し）、N11（直した P30
 - **N110（解決: 基底 `go` の R3 の実装）基底のファイルの一部は、手で直した後、道具で確かめていなかった**。`gen/server/inner/types.go` と `gen/server/types.go` から `NewGetOrdersInput` を外したのは、手。この直しのときは、リポジトリが言語の実装の途中でビルドできず、`hozoc build` を掛けていなかった。→ `New<Model>` を出さない基底 `go`（`docs/plugin-go.md`「model」）で、この仕様のまま `hozoc build` を掛けると、二つのファイルを含む基底の十九のファイルは、どれも、期待する出力とバイト単位で同じ。手の直しに、食い違いはなかった。
 - **N111 この仕様には、`@db.nullable` の列がない**。表の model のフィールドは、どれも省略可能でない。`gen/store/db.go` に現れるのは、補助が `dbNullable` を受け取れる形（`dbOption`、しまい方の補助の `opts`、`dbCol` の `Value` と `Scan`）だけで、`dbNullable` を渡す行も、`NOT NULL` のない列も、期待する出力にない（`go-sqlite` の単体テストが、小さな入力で確かめることになる。`docs/testing.md`「単体テスト」）。先の決まらない `@db.ref`（GOSQL-20）も、この仕様では起きない。
 - **N112 `default` の値を、制約で確かめる者がいない**。`@http.default(1)` の 1 が、フィールドの制約（`@valid.*`）に合うかは、生成するときには確かめられない（前は、`go-valid` が、既定値を GOVALID-2 で確かめていた）。`validate = true` のこの単位では、入れた値も、実行時に `httpValidate` を通る。`page` に制約はないので、この仕様では起きない。その後、生成するときに確かめると決めた（`docs/plugin-http.md`「補う値と制約」。GOHTTP-19）。
-- **N113 `@cli.required` と `@cli.default` の、期待する出力は、ここにない**。この仕様に CLI はない。`go-cli` の形（`line.required(&in.<F>)`、`line.orDefault(&in.<F>, <リテラル>)`）を固定するのは、`go-cli` の単体テストのゴールデンと、hozoc 自身の生成物（`docs/plugin-go-cli.md`「コマンドごとの関数」）で、hozoc 自身の `cli.hozo` も、この二つを使わない。
+- **N113 `@cli.required` と `@cli.default` の、期待する出力は、ここにない**。この仕様に CLI はない。`go-cli` の形（`line.required(&in.<F>)`、`line.orDefault(&in.<F>, <リテラル>)`）を固定するのは、`go-cli` の単体テストのゴールデンと、hozoc 自身の生成物（`plugins/go-cli/spec/go-cli.hozo` の `Requirement.CommandFunctions`）で、hozoc 自身の `cli.hozo` も、この二つを使わない。
 
 #### 例外、効果、`read` を同じ書き方に（決定 124〜131、S25。125〜131 は、次の節の決定が置き換えた）
 

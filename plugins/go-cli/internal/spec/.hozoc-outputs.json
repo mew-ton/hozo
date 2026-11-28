@@ -1,0 +1,5 @@
+[
+  "internal/spec/doc.go",
+  "internal/spec/goclitest/design.go",
+  "internal/spec/goclitest/hozo-tests.go-design.json"
+]

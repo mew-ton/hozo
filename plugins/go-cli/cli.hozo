@@ -1,7 +1,12 @@
+// 語彙 cli（決定 D811。持ち主は、このファイル）。go-cli プラグインが提供する（docs/vocab.md「同梱しない語彙」）。
+// 生成する CLI の振る舞いは plugins/go-cli/spec/go-cli.hozo、受け付けない書き方と診断（CLI-*）は docs/plugin-go-cli.md「対象」「診断」。
+// 出典は、設計書の examples/hozoc.hozo の namespace cli。変えたのは arg、flag、env の引数（決定 D109）、足したのは required と
+// default（同 114、115）。
+
 /** コマンドラインの語彙（http と同じ位置づけの語彙プラグイン） */
 namespace cli {
   /**
-   * op をサブコマンドとして公開する。
+   * op をサブコマンドとして公開する。付ける op には export が要る（docs/plugin-go-cli.md「対象」の CLI-6）。
    *
    * @param name サブコマンドの名前
    */
@@ -9,38 +14,47 @@ namespace cli {
   decorator fn command(name: string);
 
   /**
-   * 位置引数として受け取る。position は、1 から数える位置
+   * 位置引数として受け取る。位置は、この引数で言い、フィールドの宣言の順からは読まない。位置は、1 から、重なりも抜けもなく続く
+   * （docs/plugin-go-cli.md「対象」の CLI-10）。array のフィールドは、その位置から後ろの、残りすべてを受け取る。
    *
    * @param position 1 から数える位置
    */
   decorator arg(position: int) for field;
 
   /**
-   * フラグとして受け取る。name（`--` を除く）を省けば、フィールドの名前
+   * フラグとして受け取る。name を省けば、フィールドの名前（flag verbose は --verbose）。名前を省いたときの決まりは、http の語彙の
+   * 項目と同じ（docs/vocab.md「`http` の語彙」）。
    *
    * @param name フラグの名前（`--` を除く）。省けば、フィールドの名前
    */
   decorator flag(name: string?) for field;
 
   /**
-   * 環境変数から受け取る。name を省けば、フィールドの名前。フラグと両方付けたときの優先順位は cli のプラグインが決める。
+   * 環境変数から受け取る。name を省けば、フィールドの名前。フラグか位置引数と一緒に付ければ、それが与えられなかったときの代わり
+   * （優先は、hozo.gocli.Requirement.Arguments）。
    *
    * @param name 環境変数の名前。省けば、フィールドの名前
    */
   decorator env(name: string?) for field;
 
-  /** このフィールドに値が与えられなければ、誤り */
+  /**
+   * このフィールドに値が与えられなければ、誤り。
+   *
+   * 値が与えられなかったときの扱いは、この required と default の二つだけが言う。どちらもないフィールドは、零値のまま op に渡る。
+   * フィールドの型（省略可能かどうか）からは決めず、型の宣言に書く既定値は、言語にない（決定 S24）。http の語彙の http.required /
+   * http.default（docs/vocab.md「`http` の語彙」）と同じ決まりで、確かめるのは go-cli（docs/plugin-go-cli.md「対象」）。
+   */
   decorator required for field;
 
   /**
-   * このフィールドに値が与えられなければ、value にする
+   * このフィールドに値が与えられなければ、value にする（扱いの決まりは required の説明）。
    *
-   * @param value 値が与えられなかったときに入れる値
+   * @param value 値が与えられなかったときに入れる値。型は、フィールドに書ける型（docs/plugin-go-cli.md「対象」）のリテラルの型
    */
   decorator default(value: string | int | float | boolean) for field;
 
   /**
-   * この例外で終了するときの終了コード。
+   * この例外で終了するときの終了コード。付いていない例外は 70（hozo.gocli.Requirement.Run）。
    *
    * @param code 終了コード
    */

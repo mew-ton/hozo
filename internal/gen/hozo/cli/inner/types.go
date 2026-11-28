@@ -7,7 +7,7 @@ import "github.com/mew-ton/hozo/internal/gen/hozo/cli/types"
 // OutputFormat は表示の形式。text か json。json は、診断を機械が読むためのもの（docs/diagnostics.md「json」）
 type OutputFormat = types.OutputFormat
 
-// BuildInput は build の入力。フラグ（noEmit、dryRun）は、省略可能でない boolean で、付いていなければ偽（docs/plugin-go-cli.md「語彙」）
+// BuildInput は build の入力。フラグ（noEmit、dryRun）は、省略可能でない boolean で、付いていなければ偽（plugins/go-cli/cli.hozo）
 type BuildInput = types.BuildInput
 
 // TestsInput は tests の入力

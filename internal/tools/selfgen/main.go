@@ -55,9 +55,9 @@ var (
 	users = []string{"./internal/gen/...", "./internal/app/...", "./cmd/hozoc"}
 
 	// pluginProjects は、プラグインのプロジェクト（plugins/ の下の名前。docs/plugin-go-http.md「go-http 自身の要求」、
-	// docs/plugin-go-sqlite.md「go-sqlite 自身の要求」）。置き場は plugins/<名前>/internal/spec で、置き換えたつもりでビルドするのは
+	// docs/plugin-go-sqlite.md「go-sqlite 自身の要求」、plugins/go-cli/spec/go-cli.hozo）。置き場は plugins/<名前>/internal/spec で、置き換えたつもりでビルドするのは
 	// plugins/<名前>/... 。
-	pluginProjects = []string{"go-http", "go-sqlite"}
+	pluginProjects = []string{"go-cli", "go-http", "go-sqlite"}
 )
 
 func main() {

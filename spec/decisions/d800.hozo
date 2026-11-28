@@ -198,5 +198,41 @@ namespace hozo.decisions {
      */
     @adr.proposed
     D809;
+
+    /**
+     * 文書から仕様へ持ち主を移す単位を、関連するまとまり（一つのプラグインと、その語彙と文書、検査の規則と診断の全体、など）にする。
+     * 一つのまとまりは、一つの変更で、移し終える。D807 のうち、「移すのは、文書ごとに、一つずつ」の部分を、置き換える。
+     *
+     * @adr.context 文書ごと、節ごとに分けて移すと、変更の数だけ、レビューの手間と、作業の会話が増える。一つのまとまりの中の
+     * 文書と仕様とテストは、互いを名指ししていて、分けて移すと、途中の形（一部だけが移った名指し）を、何度も作ることになる。
+     * @adr.consequence 一つの変更が大きくなる。移すまとまりを決めたら、その範囲を、全部移してから出す。
+     * @adr.alternative 文書ごとに、一つずつ移す（D807 のまま）: 一つの変更は小さいが、変更の数が増え、まとまりの中の名指しが、
+     *   変更ごとに、途中の形になる
+     */
+    @adr.amends(hozo.decisions.Decision800.D807)
+    @adr.proposed
+    D810;
+
+    /**
+     * go-cli の持ち主を、文書 docs/plugin-go-cli.md から、プラグインのファイルに移した（D807、D810）。生成する CLI の骨組みの形と振る舞いは、
+     * go-cli 自身の仕様 plugins/go-cli/spec/go-cli.hozo の要求
+     * hozo.gocli.Requirement のケース。語彙 cli の宣言と意味は plugins/go-cli/cli.hozo、マニフェストは plugins/go-cli/hozo-plugin.toml。
+     * plugins/go-cli を、go-http、go-sqlite と同じく、一つの Hozo のプロジェクトにし（D795、D799）、go-design が作る要求ごとの口
+     * （goclitest.RunRequirements）を、go-cli の単体テストが満たす。go-http、go-sqlite と違い、要求の説明そのものが持ち主で、文書の写しでは
+     * ない。docs/plugin-go-cli.md に残したのは、受け付けない書き方と診断（「対象」「補う値と制約」「診断」）だけ。
+     *
+     * @adr.context 文書の節が、生成するコードの形を言い、単体テストのコメントが、その見出しを名指ししていた。語彙のファイルと
+     * マニフェストは、文書のブロックの写しで、テストが、写しの一致を確かめていた。
+     * @adr.consequence 要求のケースを足すか変えれば、単体テストの口が変わり、テストを書くまで、コンパイルできない。入力の
+     * behavior_test.go のテストは、どれも、どれかの要求から走る（TestEveryBehaviorIsRequired）。要求と重なる、生成したコードを
+     * 動かす TestBehavior は、なくした。文書のブロックと語彙のファイルの一致の確かめ（TestDocsEmbedVocabulary の go-cli の分）は、
+     * 写しがなくなったので、なくした。受け付けない書き方と診断は、検査の規則と診断を仕様に移すときに、一緒に移す
+     * （tests/codes_test.go は、文書の「診断」の表を読む）。
+     * @adr.alternative 要求を、振る舞いごとの細かいケース（フラグの形、位置引数、値の変換など）に分ける: 文書の見出しとの対応がなくなり、
+     *   名指しを一つずつ選び直すことになる。今のテストの分け方とも合わない
+     * @adr.alternative go-http、go-sqlite と同じく、要求の説明を文書の写しにする: 持ち主が文書のまま残り、D807 にならない
+     */
+    @adr.proposed
+    D811;
   }
 }

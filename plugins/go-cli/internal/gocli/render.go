@@ -12,7 +12,7 @@ import (
 	"github.com/mew-ton/hozo/plugin/golang"
 )
 
-// このファイルは cli.go のテキスト（docs/plugin-go-cli.md「出力」「引数の解釈」「コマンドごとの関数」「実行と表示」「使い方の表示」）。検査（emit.go）を
+// このファイルは cli.go のテキスト（plugins/go-cli/spec/go-cli.hozo の Requirement.Output、Requirement.Arguments、Requirement.CommandFunctions、Requirement.Run、Requirement.Usage）。検査（emit.go）を
 // 通った入力だけを描く。
 //
 // cli.go は自分のパッケージ（cli）なので、非公開の名前に前置きの決まりはない（docs/plugin-go.md「相乗りのファイル」）。ただし、
@@ -150,7 +150,7 @@ func (f *file) draw(commands []command) string {
 	return b.String()
 }
 
-// presenter は Presenter、Failure、JSONPresenter（docs/plugin-go-cli.md「出力」「実行と表示」）。
+// presenter は Presenter、Failure、JSONPresenter（plugins/go-cli/spec/go-cli.hozo の Requirement.Output、Requirement.Run）。
 func (f *file) presenter() string {
 	io, json, fmt_ := f.pkg("io"), f.pkg("encoding/json"), f.pkg("fmt")
 	return `// Presenter は結果と例外の表示。既定は JSON（JSONPresenter）。
@@ -218,7 +218,7 @@ func (f *file) signature() signature {
 	return signature{f.local("ctx"), f.local("ops"), f.local("p"), f.local("prog"), f.local("args"), f.local("env"), f.local("stdout"), f.local("stderr")}
 }
 
-// main は Main と、全体の使い方（docs/plugin-go-cli.md「出力」「引数の解釈」「使い方の表示」）。
+// main は Main と、全体の使い方（plugins/go-cli/spec/go-cli.hozo の Requirement.Output、Requirement.Arguments、Requirement.Usage）。
 func (f *file) main(commands []command) string {
 	s := f.signature()
 	context, io, fmt_ := f.pkg("context"), f.pkg("io"), f.pkg("fmt")
@@ -252,7 +252,7 @@ func (f *file) main(commands []command) string {
 	return b.String()
 }
 
-// command は、サブコマンド一つの run<Op>、fail<Op>、usage<Op>（docs/plugin-go-cli.md「コマンドごとの関数」「実行と表示」）。
+// command は、サブコマンド一つの run<Op>、fail<Op>、usage<Op>（plugins/go-cli/spec/go-cli.hozo の Requirement.CommandFunctions、Requirement.Run）。
 // 中は、フィールドの型と、例外が引数を持つかどうかによらず、同じ形: 出すテキストは、名前と、デコレータの引数と、説明だけから作る。
 func (f *file) command(c *command) string {
 	s := f.signature()
@@ -317,7 +317,7 @@ func (f *file) command(c *command) string {
 	return b.String()
 }
 
-// fail は fail<Op>（docs/plugin-go-cli.md「実行と表示」の 3 と 4）: 例外を、Signature.exceptions の順に、例外ごとに一行の同じ形
+// fail は fail<Op>（plugins/go-cli/spec/go-cli.hozo の Requirement.Run の 3 と 4）: 例外を、Signature.exceptions の順に、例外ごとに一行の同じ形
 // （型引数に例外の型を、引数に終了コードを渡す cliThrown）で見分けて Failure を作り、終了コードを決めてから、p.PresentError を呼ぶ。
 // 引数を持つ例外かどうかは、書かない（補助が、実行時に見る）。
 func (f *file) fail(c *command, s signature) string {
@@ -340,7 +340,7 @@ func (f *file) fail(c *command, s signature) string {
 	return b.String()
 }
 
-// usage は usage<Op>（docs/plugin-go-cli.md「使い方の表示」）: 使い方に出す説明だけを返す。コマンドの名前と一行の説明と、
+// usage は usage<Op>（plugins/go-cli/spec/go-cli.hozo の Requirement.Usage）: 使い方に出す説明だけを返す。コマンドの名前と一行の説明と、
 // 入力のフィールドの順に、フィールドの名前と一行の説明。フラグ、位置引数、環境変数の並びは、補助 cliLine が、並べた行から
 // 実行時に作る（値を取らないフラグか、残りの位置引数かは、読む先の型で決まるので、ここには書かない）。
 func (f *file) usage(c *command) string {
@@ -384,7 +384,7 @@ func (l *cliLine) orDefault(dst any, value any) { l.field(dst).fallback = value 
 
 // helpers は、コマンドごとの関数の後ろの補助。cliProgramName、cliUsageError、cliHelp、cliField、cliLine（と read、parse、usage）は
 // いつも、ほかは使うものだけを出す。型で変わる振る舞い（値を取らないフラグか、残りの位置引数か、省略可能か、文字列の読み方、
-// 入力が Validate を持つか、例外が引数を持つか）は、どれもここにあり、実行時に決める（docs/plugin-go-cli.md「コマンドごとの関数」）。
+// 入力が Validate を持つか、例外が引数を持つか）は、どれもここにあり、実行時に決める（plugins/go-cli/spec/go-cli.hozo の Requirement.CommandFunctions）。
 func (f *file) helpers() string {
 	// 補助のテキストは、標準ライブラリと runtime のパッケージを、その名前のまま書く: 最後に描くとき（render の二度目）は、それらを
 	// 先に import に足すので、名前は変わらない（docs/plugin-go.md「パッケージと import パス」の「import の名前」）。

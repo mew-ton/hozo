@@ -22,8 +22,8 @@ var goldenFixtures = []struct {
 	covers   string
 	behavior bool
 }{
-	{name: "commands", covers: "「出力」「引数の解釈」「コマンドごとの関数」「実行と表示」「使い方の表示」の各行", behavior: true},
-	{name: "shapes", covers: "「コマンドごとの関数」: フィールドの型と、例外が引数を持つかどうかによらず、同じ形（docs/testing.md「単体テスト」の「型に依らない形の確かめ」）", behavior: true},
+	{name: "commands", covers: "hozo.gocli.Requirement.Output、Requirement.Arguments、Requirement.CommandFunctions、Requirement.Run、Requirement.Usage の各行", behavior: true},
+	{name: "shapes", covers: "hozo.gocli.Requirement.CommandFunctions: フィールドの型と、例外が引数を持つかどうかによらず、同じ形（docs/testing.md「単体テスト」の「型に依らない形の確かめ」）", behavior: true},
 	{name: "locals", covers: "名前空間のパッケージの名前が、生成したコードの局所の名前や、標準ライブラリのパッケージの名前と当たるとき（docs/plugin-go.md「パッケージと import パス」の import の名前）", behavior: true},
 }
 
@@ -53,38 +53,10 @@ func TestGolden(t *testing.T) {
 	}
 }
 
-// TestBehavior は、生成したコードを一時のモジュールで実際に動かす（docs/testing.md「単体テスト」）: 入力の behavior_test.go を、
-// 依存するトランスパイラの出力と go-cli の出力を書いたモジュールのルートに置いて、go test を走らせる。確かめることは、
-// それぞれのファイルの頭。
-func TestBehavior(t *testing.T) {
-	for _, fx := range goldenFixtures {
-		if !fx.behavior {
-			continue
-		}
-		t.Run(fx.name, func(t *testing.T) {
-			t.Parallel()
-			root, files := emitFixture(t, fx.name)
-			compose(t, root, loadViews(t, fx.name), files)
-			test, err := os.ReadFile(filepath.Join("testdata", fx.name, "behavior_test.go"))
-			if err != nil {
-				t.Fatal(err)
-			}
-			writeFile(t, filepath.Join(root, "behavior_test.go"), string(test))
-			out, err := runGo(t, root, "test", "-count=1", "-v", ".")
-			if err != nil {
-				t.Fatalf("生成したコードのテストが落ちた: %v\n%s", err, out)
-			}
-			if !strings.Contains(out, "--- PASS: Test") {
-				t.Fatalf("生成したコードのテストが一つも走らなかった:\n%s", out)
-			}
-		})
-	}
-}
-
-// TestPlacement は「出力」の置き場と、公開の名前: cli.go は、Dir(U, N) の下のディレクトリ cli に一つ（パッケージ cli）。
+// outputPlacement は hozo.gocli.Requirement.Output の置き場と、公開の名前: cli.go は、Dir(U, N) の下のディレクトリ cli に一つ（パッケージ cli）。
 // N の入口のパッケージを import し、内側のパッケージは import しない。公開の名前は Main、Presenter、Failure、JSONPresenter。
 // 非公開の名前は、パッケージ名になりうる形（小文字と数字だけ）にしない（名前空間のパッケージの import の名前と当たらないように）。
-func TestPlacement(t *testing.T) {
+func outputPlacement(t *testing.T) {
 	_, files := emitFixture(t, "commands")
 	if got := strings.Join(sortedPaths(files), " "); got != "gen/bare/cli/cli.go gen/demo/cli/cli.go gen/tool/cli/cli.go" {
 		t.Fatalf("ファイル = %s", got)
@@ -137,10 +109,10 @@ func TestPlacement(t *testing.T) {
 	}
 }
 
-// TestLines は「コマンドごとの関数」: run<Op> は `var in <Model>` と `line := cliLine{…}` で始まり、フィールドに付いた cli の
+// functionLines は hozo.gocli.Requirement.CommandFunctions: run<Op> は `var in <Model>` と `line := cliLine{…}` で始まり、フィールドに付いた cli の
 // デコレータごとに一行を、フィールドの順、その中はデコレータを書いた順に並べる。行に書くのは、デコレータの引数（名前を省いて
 // いれば、フィールドの名前）と、読む先だけ。fail<Op> は、Signature.exceptions の順に、例外ごとに一行。
-func TestLines(t *testing.T) {
+func functionLines(t *testing.T) {
 	_, files := emitFixture(t, "commands")
 	tool, demo := files["gen/tool/cli/cli.go"], files["gen/demo/cli/cli.go"]
 	for _, c := range []struct{ file, name, want string }{
@@ -221,10 +193,10 @@ func TestLines(t *testing.T) {
 	}
 }
 
-// TestHelpers: 補助と import は、使うものだけを出す（使わない import はコンパイルできない）。何を使うかは、付いたデコレータと、
+// functionHelpers: 補助と import は、使うものだけを出す（使わない import はコンパイルできない）。何を使うかは、付いたデコレータと、
 // 入力と例外の有無で決まり、型では決まらない: 入力を持つコマンドは、入力が Validate を持つかどうかによらず、同じ補助 cliValidate を呼ぶ。
 // 基底は、初めの値を入れる関数を出さない（New<Model> を呼ばない）。
-func TestHelpers(t *testing.T) {
+func functionHelpers(t *testing.T) {
 	_, files := emitFixture(t, "commands")
 	tool, demo, bare := files["gen/tool/cli/cli.go"], files["gen/demo/cli/cli.go"], files["gen/bare/cli/cli.go"]
 	methods := map[string]string{"flag": "func (l *cliLine) flag(", "env": "func (l *cliLine) env(", "arg": "func (l *cliLine) arg(",
@@ -266,11 +238,11 @@ func TestHelpers(t *testing.T) {
 	}
 }
 
-// TestSameShape は、型に依らない形の確かめ（docs/testing.md「単体テスト」、docs/requirements.md「出力を推論しない」）: 入力 shapes の
+// functionSameShape は、型に依らない形の確かめ（docs/testing.md「単体テスト」、docs/requirements.md「出力を推論しない」）: 入力 shapes の
 // 二つの名前空間は、宣言の名前と cli のデコレータが同じで、型だけが違う（核の型と scalar、省略可能とそうでないもの、文字列と真偽値、
 // 一つの値と array、引数を持つ例外と持たない例外、戻り値と省略可能な戻り値、制約を持つ入力と持たない入力）。出る cli.go は、
 // 名前空間の名前のほかは、同じテキスト。違いが実行時に出ることは、testdata/shapes/behavior_test.go が確かめる。
-func TestSameShape(t *testing.T) {
+func functionSameShape(t *testing.T) {
 	_, files := emitFixture(t, "shapes")
 	a, b := files["gen/shapea/cli/cli.go"], files["gen/shapeb/cli/cli.go"]
 	if a == "" || b == "" {
@@ -284,8 +256,8 @@ func TestSameShape(t *testing.T) {
 	}
 }
 
-// TestNoCommands は「出力」: @cli.command の op が一つもなければ、ファイルを出さず warning を一つ返す。
-func TestNoCommands(t *testing.T) {
+// outputNoCommands は hozo.gocli.Requirement.Output: @cli.command の op が一つもなければ、ファイルを出さず warning を一つ返す。
+func outputNoCommands(t *testing.T) {
 	root := newRoot(t)
 	files, diags, warnings := emitViews(t, root, loadViews(t, "nocommands"))
 	if len(files) != 0 || len(diags) != 0 || len(warnings) != 1 {
@@ -318,9 +290,9 @@ func TestUnitTargets(t *testing.T) {
 	}
 }
 
-// TestDir は「出力」: 置き場と import パスは View.config.dir（Dir(U, N)）から求める。単位の namespace の子孫では、dir が out の
+// outputDir は hozo.gocli.Requirement.Output: 置き場と import パスは View.config.dir（Dir(U, N)）から求める。単位の namespace の子孫では、dir が out の
 // サブディレクトリになっている。
-func TestDir(t *testing.T) {
+func outputDir(t *testing.T) {
 	var demo *ir.View
 	for _, v := range loadViews(t, "commands") {
 		if v.Viewer == "demo" {
@@ -564,7 +536,7 @@ func TestPluginBinary(t *testing.T) {
 	}
 }
 
-// TestManifest は、マニフェスト（docs/plugin-go-cli.md「マニフェスト」）。外部の TOML は使えないので、行で見る。
+// TestManifest は、マニフェスト（plugins/go-cli/hozo-plugin.toml）。外部の TOML は使えないので、行で見る。
 func TestManifest(t *testing.T) {
 	b, err := os.ReadFile(filepath.Join("..", "..", "hozo-plugin.toml"))
 	if err != nil {

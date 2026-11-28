@@ -1,14 +1,19 @@
+# go-cli のマニフェスト（決定 D719、D811。持ち主は、このファイル。形は docs/plugin-protocol.md「マニフェスト `hozo-plugin.toml`」）
 name     = "go-cli"
+# 作り方は、ほかの Go のプラグインと同じ（docs/plugin-go.md「マニフェスト」）
 wasm     = "plugin.wasm"
 protocol = "0.27"
 
 vocabulary = ["cli.hozo"]       # cli の語彙はこのプラグインが提供する（docs/vocab.md「同梱しない語彙」）
 
-# 提供するトランスパイラは一つ。Go の基底 go と、検証の go-valid に相乗りする（docs/plugin-go-cli.md「マニフェスト」）
+# 提供するトランスパイラは go-cli の一つ（頼まれたトランスパイラがそれ以外なら code "unsupported"。docs/plugin-protocol.md「要求と応答」）。
+# Go の基底 go に相乗りし、解釈した入力の制約を確かめるために、検証の go-valid に依存する。オプションはない（[emit.options.go-cli] に
+# キーがあれば CLI-8）。
 [[transpiler]]
 name     = "go-cli"
 language = "go"
 requires = ["go", "go-valid"]
+# 解釈するのは、自分の語彙 cli の七つ。既定値を確かめるために読む valid の制約は、書かない（解釈するのは、requires の go-valid）
 interprets = [
   "cli.command", "cli.arg", "cli.flag", "cli.env",
   "cli.required", "cli.default", "cli.exitCode",

@@ -435,7 +435,7 @@ enabled = false                 # true なら hozoc tests で direction "coverag
 - 番号は別の意味に使い回さない（`docs/config.md`「診断」と同じ。欠番の一覧は `docs/requirements.md`「検査の規則の一覧」）。
 - MAN-4 の「`language` が `"go"` でも `"ts"` でもない」という条件はなくした（言語の名前は基底が決める。「マニフェスト」）。
 - MAN-* は診断で、例外は `ConfigInvalid`。
-- PLG-* は診断にならない（重さが「—」）。応答そのものが信用できないので、診断の一覧に足して続けることはせず、例外 `MalformedOutput` で終わる。ID は、その例外のメッセージの頭に書く（`プラグイン fake の出力が約束した形でない: PLG-1: …`）。`--format json` でも `diagnostics` には現れず、`{"error": "MalformedOutput"}` になる（`docs/plugin-go-cli.md`「実行と表示」の `JSONPresenter`）。「応答の形」の誤りも同じ例外で、ID は持たない。
+- PLG-* は診断にならない（重さが「—」）。応答そのものが信用できないので、診断の一覧に足して続けることはせず、例外 `MalformedOutput` で終わる。ID は、その例外のメッセージの頭に書く（`プラグイン fake の出力が約束した形でない: PLG-1: …`）。`--format json` でも `diagnostics` には現れず、`{"error": "MalformedOutput"}` になる（`plugins/go-cli/spec/go-cli.hozo` の `Requirement.Run` の `JSONPresenter`）。「応答の形」の誤りも同じ例外で、ID は持たない。
 - 終了コードは `docs/diagnostics.md`「終了コード」。
 
 ## SDK

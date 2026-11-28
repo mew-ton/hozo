@@ -12,7 +12,7 @@ import (
 	"github.com/mew-ton/hozo/plugin"
 )
 
-// TranspilerName は、このプラグインが提供するただ一つのトランスパイラの名前（docs/plugin-go-cli.md「マニフェスト」）。
+// TranspilerName は、このプラグインが提供するただ一つのトランスパイラの名前（plugins/go-cli/hozo-plugin.toml）。
 const TranspilerName = "go-cli"
 
 // Handler は go-cli の plugin.Handler。emit と、emit と同じ検査で答える check を実装する。
@@ -21,7 +21,7 @@ type Handler struct {
 
 var _ plugin.Handler = Handler{}
 
-// Emit は View.viewer の名前空間の cli/cli.go を作る（docs/plugin-go-cli.md「出力」）。診断（CLI-*）があれば Files は空で、
+// Emit は View.viewer の名前空間の cli/cli.go を作る（plugins/go-cli/spec/go-cli.hozo の Requirement.Output）。診断（CLI-*）があれば Files は空で、
 // Errors にそれを入れる。`@cli.command` の op が一つもなければ、ファイルを出さず warning を一つ返す。
 // 要求の transpiler が [TranspilerName] でなければ plugin.ErrUnsupported（code "unsupported"）。
 func (h Handler) Emit(req *plugin.EmitRequest) (*plugin.EmitResponse, error) {

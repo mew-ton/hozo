@@ -40,7 +40,7 @@ const (
 	OutputPath = DirName + "/" + FileName
 )
 
-// 読む語彙（このプラグインの cli.hozo。docs/plugin-go-cli.md「マニフェスト」）。
+// 読む語彙（このプラグインの cli.hozo。plugins/go-cli/hozo-plugin.toml）。
 const (
 	cliCommand  = "cli.command"
 	cliArg      = "cli.arg"
@@ -51,7 +51,7 @@ const (
 	cliExitCode = "cli.exitCode"
 )
 
-// defaultExitCode は、@cli.exitCode のない例外と、見分けられなかった誤りの終了コード（docs/plugin-go-cli.md「実行と表示」）。
+// defaultExitCode は、@cli.exitCode のない例外と、見分けられなかった誤りの終了コード（plugins/go-cli/spec/go-cli.hozo の Requirement.Run）。
 const defaultExitCode = 70
 
 // Output は、一つの出力 (U, N) についての応答の中身。Errors が一つでもあれば、Files も Warnings も空。
@@ -61,7 +61,7 @@ type Output struct {
 	Errors   []plugin.Diagnostic
 }
 
-// Emit は、要求の View の出力 (U, N) の cli/cli.go を作る（docs/plugin-go-cli.md「出力」）。読むのは、要求だけ
+// Emit は、要求の View の出力 (U, N) の cli/cli.go を作る（plugins/go-cli/spec/go-cli.hozo の Requirement.Output）。読むのは、要求だけ
 // （ファイルも、環境変数も、読まない）。診断があれば、ファイルは返さない。@cli.command の op が一つもなければ、ファイルを出さず warning を一つ返す。
 // 戻り値の error は、利用者の仕様の誤りでないもの（View が欠けている、生成したコードを整形できない）。
 func Emit(req *plugin.EmitRequest) (*Output, error) {
@@ -179,7 +179,7 @@ type field struct {
 	lines   []line // デコレータを書いた順
 }
 
-// line は、cli のデコレータ一つが出す、run<Op> の一行（docs/plugin-go-cli.md「コマンドごとの関数」）: `line.<method>(…)`。
+// line は、cli のデコレータ一つが出す、run<Op> の一行（plugins/go-cli/spec/go-cli.hozo の Requirement.CommandFunctions）: `line.<method>(…)`。
 type line struct {
 	method string // cliLine のメソッド: flag / env / arg / required / orDefault
 	arg    string // デコレータの引数の、Go での書き方: 名前の文字列、位置、補う値のリテラル。required は ""
@@ -288,7 +288,7 @@ func (g *generator) checkDir() {
 // checkValidateHome は CLI-9: 入力の model m が Validate を持ち（govalid.HasValidate）、別の名前空間 M のものなら、M の型の置き場
 // （docs/config.md「型の置き場」）の単位が、transpilers に go-valid を並べていなければならない。並べていなければ、その入力は、
 // 確かめられないまま op に渡る（cli.go は、どの入力にも同じ補助を呼び、補助は、入力が Validate を持つかを実行時に見るので、
-// コンパイルはできてしまう）。書いたものの整合の検査で、出力は変えない（docs/plugin-go-cli.md「引数の解釈」）。N の model は、
+// コンパイルはできてしまう）。書いたものの整合の検査で、出力は変えない（plugins/go-cli/spec/go-cli.hozo の Requirement.Arguments）。N の model は、
 // 自分の単位が go-valid を並べている（CFG-19）。置き場は、View だけから求まる（govalid.Unlisted）。
 func (g *generator) checkValidateHome(op *ir.Op, m *ir.Model) {
 	ns := g.declNS[m.Name]
@@ -593,7 +593,7 @@ func intArg(app *ir.Application, param string) (int64, bool) {
 }
 
 // nameArg は、名前を取るデコレータ（@cli.flag、@cli.env）の適用 app の名前: 引数 name。省いていれば、フィールドの名前
-// （docs/plugin-go-cli.md「語彙」）。
+// （plugins/go-cli/cli.hozo）。
 func nameArg(app *ir.Application, fieldName string) string {
 	if name, ok := stringArg(app, "name"); ok {
 		return name
@@ -623,7 +623,7 @@ func goLiteral(l ir.Literal) string {
 }
 
 // oneLine は、summary を使い方の一行にする: 改行と連続する空白を一つの空白にし、末尾の句点を落とす
-// （docs/plugin-go-cli.md「使い方の表示」の例は「仕様を検査する。ファイルは書き出さない」と、末尾に句点がない）。
+// （plugins/go-cli/spec/go-cli.hozo の Requirement.Usage の例は「仕様を検査する。ファイルは書き出さない」と、末尾に句点がない）。
 func oneLine(s string) string {
 	s = strings.Join(strings.Fields(s), " ")
 	s = strings.TrimSuffix(s, "。")

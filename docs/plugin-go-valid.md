@@ -154,7 +154,7 @@ func CheckFormat(name, v string) bool                   // valid.format の四�
 
 ## ほかの相乗りとの約束
 
-- `Validate` を呼ぶ相乗りは、`requires` に `go-valid` を書く。**呼ぶコードの形を、相手の型が `Validate` を持つかどうかで変えない**（`docs/requirements.md`「出力を推論しない」）: どの入力にも同じ補助の呼び出しを出し、補助が、実行時に、値が `Validate() error` を持つかを見る（`docs/plugin-go-http.md`「制約の検査」、`docs/plugin-go-cli.md`「引数の解釈」）。自分の単位は `go-valid` を並べている（CFG-19）ので、N の、`Validate` を持つ型のメソッドは必ずある。
+- `Validate` を呼ぶ相乗りは、`requires` に `go-valid` を書く。**呼ぶコードの形を、相手の型が `Validate` を持つかどうかで変えない**（`docs/requirements.md`「出力を推論しない」）: どの入力にも同じ補助の呼び出しを出し、補助が、実行時に、値が `Validate() error` を持つかを見る（`docs/plugin-go-http.md`「制約の検査」、`plugins/go-cli/spec/go-cli.hozo` の `Requirement.Arguments`）。自分の単位は `go-valid` を並べている（CFG-19）ので、N の、`Validate` を持つ型のメソッドは必ずある。
 - どの型が `Validate` を持つか（`govalid.HasValidate(program, <型の FQN>)`。`docs/plugin-protocol.md`「相乗りが基底の形を知る方法」）を相乗りが使うのは、書いたものの整合の検査だけ: **別の名前空間 M の型**が `Validate` を持つのに、M の型の置き場の単位が `go-valid` を並べていなければ、その値は、確かめられないまま通る。呼ぶ側が自分の診断にする（`go-http` の GOHTTP-11、`go-cli` の CLI-9）。確かめ方は、`go-valid` と同じ `govalid.Unlisted(view, <名前空間>)`。
 - 違反を自分の語彙の形にするのは、呼ぶ側（`docs/plugin-go-http.md`「op を呼ぶ前の失敗」）。
 

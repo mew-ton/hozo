@@ -21,7 +21,7 @@
 // 境界の型は生成したもの（compiler.CheckInput、compiler.Diagnostic、compiler.CheckFailed など）で、中の豊かな型
 // （internal/project.Project、internal/diag.Diagnostic）は App の中にとどめる。例外は生成した exception の型を値で
 // 返す（診断を運ぶ六つの例外は、このパッケージの exceptions.go の関数で作る。Crashed と MalformedOutput も、生成した hozoc の型）。cli.go は
-// それを errors.As で見分けて @cli.exitCode の終了コードにする（docs/plugin-go-cli.md「実行と表示」）。
+// それを errors.As で見分けて @cli.exitCode の終了コードにする（plugins/go-cli/spec/go-cli.hozo の Requirement.Run）。
 package app
 
 import (

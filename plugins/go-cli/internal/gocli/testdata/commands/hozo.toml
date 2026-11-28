@@ -1,4 +1,4 @@
-# plugins/go-cli の単体テストの入力（docs/testing.md「単体テスト」）: docs/plugin-go-cli.md「出力」「引数の解釈」「コマンドごとの関数」「実行と表示」「使い方の表示」の各行。
+# plugins/go-cli の単体テストの入力（docs/testing.md「単体テスト」）: plugins/go-cli/spec/go-cli.hozo の Requirement.Output、Requirement.Arguments、Requirement.CommandFunctions、Requirement.Run、Requirement.Usage の各行。
 
 [options.go]
 module = "example.com/app"

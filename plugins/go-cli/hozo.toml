@@ -1,0 +1,17 @@
+# go-cli 自身の要求（plugins/go-cli/spec/go-cli.hozo）。このディレクトリを、一つの Hozo のプロジェクトにする
+[hozo]
+sources     = ["spec/**/*.hozo"]
+plugin_dirs = [".."]
+
+# Go のモジュールのパスに、このディレクトリまでのパスを足したもの（モジュールは、リポジトリのルートの go.mod）
+[options.go]
+module = "github.com/mew-ton/hozo/plugins/go-cli"
+
+# 要求ごとの、テストの入れ物の口は go-design
+[[emit]]
+namespace   = "hozo.gocli"
+transpilers = ["go", "go-design"]
+out         = "internal/spec"
+
+[emit.options.go-design]
+requirements = ["hozo.gocli.Requirement"]

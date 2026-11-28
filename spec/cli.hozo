@@ -3,7 +3,7 @@
  * コマンドの行（入口）は、名前空間 hozo.cli で、フラグを知っているのは、そちらだけ: ユースケースの入力は、フラグに当たる項目を
  * 持たない（決定 D472、D473）。
  * 例外は、投げるユースケースの側（この名前空間）に宣言し、終了コード（@cli.exitCode）も、その宣言に付ける。go-cli は、コマンドの op が
- * 投げうる例外を、どの名前空間のものでも見分ける（docs/plugin-go-cli.md「コマンドごとの関数」）。例外の名前の表示（--format json の
+ * 投げうる例外を、どの名前空間のものでも見分ける（plugins/go-cli/spec/go-cli.hozo の Requirement.CommandFunctions）。例外の名前の表示（--format json の
  * "error"）は、hozo.compiler.CheckFailed のように、名前空間から書く（決定 D742）。
  */
 namespace hozo.compiler {
@@ -567,7 +567,7 @@ namespace hozo.cli {
   scalar OutputFormat extends string;
 
   /**
-   * build の入力。フラグ（noEmit、dryRun）は、省略可能でない boolean で、付いていなければ偽（docs/plugin-go-cli.md「語彙」）
+   * build の入力。フラグ（noEmit、dryRun）は、省略可能でない boolean で、付いていなければ偽（plugins/go-cli/cli.hozo）
    */
   model BuildInput {
     /** 設定ファイルの場所 */
