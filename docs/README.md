@@ -76,7 +76,7 @@ Hozo の言語と、その実装（このリポジトリ）の設計。言語の
 | テストのパッケージ、単体テストの口（人か AI が中身を書く関数の、結果ごとのケースを受け取る口）、効果の入口の確かめ | `plugin-go.md`「単体テストの口」「効果の入口の確かめ」。言語によらない決まりは `ide-chain.md`「テストの規約」「ステートマシン図」 |
 | 通信の形（HTTP の要求と応答の JSON） | `plugin-http.md`「通信の形」 |
 | インテグレーションテストの口（入口のデコレータを持つ op の、結果ごとのケースを受け取る口。HTTP の入口のもの） | `plugin-go-http.md`「インテグレーションテストの口」。言語によらない決まりは `ide-chain.md`「テストの規約」の「インテグレーションテスト」 |
-| E2E テストの口（フローの op の、ケースを受け取る口）、要求の、テストの入れ物の口、要求の分類、指している設計 | `plugins/go-design/spec/go-design.hozo` の `Requirement.FlowPort`、`Requirement.RequirementPort`。言語によらない決まりは `ide-chain.md`「テストの規約」の「E2E テスト」「要求のテスト」 |
+| E2E テストの口（フローの op の、ケースを受け取る口）、要求の、テストの入れ物の口、要求の分類、指している設計 | `plugins/go-design/spec/go-design.hozo` の `Requirement.FlowPort`、`Requirement.RequirementPort`、`Requirement.Designs`。言語によらない決まりは `ide-chain.md`「テストの規約」の「E2E テスト」「要求のテスト」 |
 |書き出しの対象（一度の `hozoc build` が書き出す出力） | `spec/cli.hozo` の `write` |
 | 基底の状態、状態の分類、値の分類 | `check.md`「状態の形」 |
 | op の分類、標準の分類、型で決まる分類、述語で決まる分類 | `check.md`「分類」 |

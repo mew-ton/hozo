@@ -583,7 +583,7 @@ R6 のうち、語彙と、基底・プラグインの出力が変わる部分�
 | 基底 `go`、入口の確かめ | `docs/plugin-go.md`「効果の入口の確かめ」。`plugins/go` の単体テスト |
 | `go-http` | `docs/plugin-go-http.md`「インテグレーションテストの口」。サンプルの `gen/server/servertest/http.go` |
 | テストのプラグイン、フロー | `plugins/go-design/spec/go-design.hozo` の `Requirement.FlowPort`。操作の op のほかを呼ぶフローは GODESIGN-3（error） |
-| テストのプラグイン、要求 | `plugins/go-design/spec/go-design.hozo` の `Requirement.RequirementPort`。どこからも指されていない要求は、warning（同「指している設計」） |
+| テストのプラグイン、要求 | `plugins/go-design/spec/go-design.hozo` の `Requirement.RequirementPort`。どこからも指されていない要求は、warning（同 `Requirement.Designs`） |
 | サンプル | `tests/samples/shop-server/` の `design.hozo`（担い手、要求）、`client.hozo`（操作の op）、`flows.hozo`（フロー）。四つの口の期待する出力は、`gen/server/servertest/leaves.go`（単体）、`gen/server/servertest/http.go`（インテグレーション）、`gen/flows/flowstest/design.go`（E2E と、要求）。`TestSamples` が、hozoc の出力と比べる |
 | サンプルのテスト | `tests/samples/shop-server/app/` のテスト（`README.md`「R6 のプラグインの部分で足したこと」）。口を一つ欠いた実装が、コンパイルできないことは、サンプルでは、口のメソッドの数を、リフレクションで数え、コンパイルそのものは、プラグインの単体テストが確かめる（`plugins/go` の単体テスト、`plugins/go-http` の `TestIncompleteHTTPCasesDoNotCompile`、`plugins/go-design` の `TestIncompleteDoNotCompile`） |
 | 確かめ | `docs/testing.md`「文書とコードの一致」「CI」の確かめを、手元で走らせた。`main` の先頭（`13e7633`）で、CI（GitHub Actions）も緑 |
