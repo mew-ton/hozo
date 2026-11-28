@@ -22,7 +22,7 @@ var goldenFixtures = []struct {
 	name   string
 	covers string
 }{
-	{name: "flows", covers: "「出力」「E2E テストの口」「要求の、テストの入れ物の口」: 値を返すフローと、返さないフロー、引数のないフロー、説明のないフロー、" +
+	{name: "flows", covers: "hozo.godesign.Requirement.Output、Requirement.FlowPort、Requirement.RequirementPort: 値を返すフローと、返さないフロー、引数のないフロー、説明のないフロー、" +
 		"Given・Then と当たる引数の名前、match・for・disjoint の中から操作の op を呼ぶフロー、二つの要求の分類、説明のない要求、どこからも" +
 		"指されていない要求、op のほかの宣言からの @prd.ref、要求だけの単位、フローだけの単位、基底が、テストのパッケージを作る出力と、作らない出力"},
 }
@@ -69,32 +69,41 @@ func writeFlows(t *testing.T, tests ...string) string {
 	return root
 }
 
-// TestBehavior は、生成した口を、一時のモジュールで、基底の出力に当てて走らせる（testdata/flows/behavior_test.go。確かめることは、
-// そのファイルの頭）: すべてのケースと、すべての入れ物を満たす型を渡せば、通る。テストの名前（ラベル）は、フローの FQN と、要求の名前
-// （docs/ide-chain.md「テストの規約」）。
-func TestBehavior(t *testing.T) {
+// behavior は、生成した口を、一時のモジュールで、基底の出力に当てて走らせる（testdata/flows/behavior_test.go。確かめることは、
+// そのファイルの頭）: run に合うテストを走らせ、names のテスト（ラベルは、フローの FQN と、要求の名前。docs/ide-chain.md「テストの規約」）が、
+// どれも通ること。
+func behavior(t *testing.T, run string, names ...string) {
 	t.Parallel()
 	root := writeFlows(t, "behavior_test.go")
-	out, err := runGo(t, root, "test", "-count=1", "-v", ".")
+	out, err := runGo(t, root, "test", "-count=1", "-v", "-run", run, ".")
 	if err != nil {
 		t.Fatalf("口を満たす型のテストが落ちた: %v\n%s", err, out)
 	}
-	for _, name := range []string{
-		"TestFlows/flows.checkout", "TestFlows/flows.ping", "TestFlows/flows.rename", "TestFlows/flows.branch", "TestFlows/flows.lookup",
-		"TestRequirements/design.Req.R1", "TestRequirements/design.Req.R1/first", "TestRequirements/design.Req.R1/second",
-		"TestRequirements/design.Req.R2", "TestRequirements/design.Req.r3", "TestRequirements/design.Extra.X1",
-		"TestMixed/mixed.run", "TestMixed/design.Extra.X1", "TestK/k.go",
-		"TestReqOnly/design.Req.R1", "TestReqOnly/design.Req.R2", "TestReqOnly/design.Req.r3",
-	} {
+	for _, name := range names {
 		if !strings.Contains(out, "--- PASS: "+name+" ") {
 			t.Errorf("テスト %s が、通っていない:\n%s", name, out)
 		}
 	}
 }
 
-// TestMismatch は、走らせる側の確かめ（「E2E テストの口」の「口の形」）: Given が失敗を返せば、フローを呼ばずに落ちる。フローが失敗を
+// flowBehavior は、フローの口を満たす型を渡せば、フローごとのテストが、フローの FQN の名前で通ること。
+func flowBehavior(t *testing.T) {
+	behavior(t, "^(TestFlows|TestMixed|TestK)$",
+		"TestFlows/flows.checkout", "TestFlows/flows.ping", "TestFlows/flows.rename", "TestFlows/flows.branch", "TestFlows/flows.lookup",
+		"TestMixed/mixed.run", "TestMixed/design.Extra.X1", "TestK/k.go")
+}
+
+// requirementBehavior は、要求の入れ物を満たす型を渡せば、要求ごとのテストが、要求の名前で通ること（入れ物の中のサブテストも）。
+func requirementBehavior(t *testing.T) {
+	behavior(t, "^(TestRequirements|TestReqOnly)$",
+		"TestRequirements/design.Req.R1", "TestRequirements/design.Req.R1/first", "TestRequirements/design.Req.R1/second",
+		"TestRequirements/design.Req.R2", "TestRequirements/design.Req.r3", "TestRequirements/design.Extra.X1",
+		"TestReqOnly/design.Req.R1", "TestReqOnly/design.Req.R2", "TestReqOnly/design.Req.r3")
+}
+
+// flowMismatch は、走らせる側の確かめ（hozo.godesign.Requirement.FlowPort）: Given が失敗を返せば、フローを呼ばずに落ちる。フローが失敗を
 // 返せば、落ちる。どちらも、Then は呼ばれない（testdata/flows/mismatch_test.go）。差し替えていないケースは、通る。
-func TestMismatch(t *testing.T) {
+func flowMismatch(t *testing.T) {
 	t.Parallel()
 	root := writeFlows(t, "behavior_test.go", "mismatch_test.go")
 	out, err := runGo(t, root, "test", "-count=1", "-v", "-run", "^TestFlowMismatch$", ".")
@@ -127,7 +136,7 @@ func TestMismatch(t *testing.T) {
 	}
 }
 
-// implMethods は、口を満たす型のメソッド（<型>.<メソッド> → 宣言）。TestIncompleteDoNotCompile が、一つずつ欠く。
+// implMethods は、口を満たす型のメソッド（<型>.<メソッド> → 宣言）。incomplete が、一つずつ欠く。
 var implMethods = map[string]string{
 	// flowstest.FlowCases: フローごと
 	"flowCases.Checkout": "func (flowCases) Checkout() flowstest.CheckoutFlowCase { return flowstest.CheckoutFlowCase{} }",
@@ -185,10 +194,27 @@ func Run(t *testing.T) {
 	return b.String()
 }
 
-// TestIncompleteDoNotCompile は、ケースと入れ物の漏れが、コンパイルエラーになること（「E2E テストの口」「要求の、テストの入れ物の口」の
-// 「口の形」。CLAUDE.md「実装の漏れは、コンパイルエラーにする」）: フローのケースを一つ欠いた FlowCases と、要求の入れ物を一つ欠いた
-// Requirements は、走らせる関数に渡すところで、コンパイルできない。
-func TestIncompleteDoNotCompile(t *testing.T) {
+// omission は、口を満たす型から欠くメソッド（implMethods の鍵）と、その呼び名。
+type omission struct{ omit, what string }
+
+// flowOmissions は、フローのケースの漏れ。
+var flowOmissions = []omission{
+	{"flowCases.Checkout", "フロー flows.checkout のケース"},
+	{"flowCases.Ping", "値を返さないフロー flows.ping のケース"},
+	{"flowCases.Lookup", "最後のフロー flows.lookup のケース"},
+}
+
+// requirementOmissions は、要求の入れ物の漏れ。
+var requirementOmissions = []omission{
+	{"requirements.R1", "要求 design.Req.R1 の入れ物"},
+	{"requirements.R3", "どこからも指されていない要求 design.Req.r3 の入れ物"},
+	{"requirements.X1", "二つ目の分類の要求 design.Extra.X1 の入れ物"},
+	{"onlyRequirements.R2", "要求だけの単位の、要求 design.Req.R2 の入れ物"},
+}
+
+// incomplete は、ケースと入れ物の漏れが、コンパイルエラーになること（CLAUDE.md「実装の漏れは、コンパイルエラーにする」）: omissions の
+// メソッドを一つ欠いた型は、走らせる関数に渡すところで、コンパイルできない。
+func incomplete(t *testing.T, omissions []omission) {
 	t.Parallel()
 	root := writeFlows(t)
 	impl := filepath.Join(root, "impl", "impl.go")
@@ -198,15 +224,7 @@ func TestIncompleteDoNotCompile(t *testing.T) {
 	if out, err := runGo(t, root, "vet", "./impl"); err != nil {
 		t.Fatalf("すべてのケースを持つ実装が、コンパイルできない: %v\n%s", err, out)
 	}
-	for _, tt := range []struct{ omit, what string }{
-		{"flowCases.Checkout", "フロー flows.checkout のケース"},
-		{"flowCases.Ping", "値を返さないフロー flows.ping のケース"},
-		{"flowCases.Lookup", "最後のフロー flows.lookup のケース"},
-		{"requirements.R1", "要求 design.Req.R1 の入れ物"},
-		{"requirements.R3", "どこからも指されていない要求 design.Req.r3 の入れ物"},
-		{"requirements.X1", "二つ目の分類の要求 design.Extra.X1 の入れ物"},
-		{"onlyRequirements.R2", "要求だけの単位の、要求 design.Req.R2 の入れ物"},
-	} {
+	for _, tt := range omissions {
 		method := tt.omit[strings.IndexByte(tt.omit, '.')+1:]
 		writeFile(t, impl, implSource(tt.omit))
 		out, err := runGo(t, root, "vet", "./impl")
@@ -220,8 +238,20 @@ func TestIncompleteDoNotCompile(t *testing.T) {
 	}
 }
 
-// TestContents は、design.go の中身（「出力」「口の形」「指している設計」）のうち、行として確かめるもの。
-func TestContents(t *testing.T) {
+// wantLines は、入力 flows の gen/flows/flowstest/design.go に、lines のどれもがあること。
+func wantLines(t *testing.T, lines ...string) {
+	t.Helper()
+	_, files := emitFixture(t, "flows")
+	flows := files["gen/flows/flowstest/design.go"]
+	for _, line := range lines {
+		if !strings.Contains(flows, line) {
+			t.Errorf("gen/flows/flowstest/design.go に、%q がない", line)
+		}
+	}
+}
+
+// outputContents は、hozo.godesign.Requirement.Output: 出すファイルと、置き場、import の名前、公開の名前。
+func outputContents(t *testing.T) {
 	_, files := emitFixture(t, "flows")
 	// 出すファイルは、go-design を並べた単位ごとに、テストのパッケージの design.go と、その、テストの対応表（act の単位は、
 	// 並べていない）
@@ -230,35 +260,11 @@ func TestContents(t *testing.T) {
 		"gen/reqonly/reqonlytest/design.go gen/reqonly/reqonlytest/hozo-tests.go-design.json" {
 		t.Errorf("出したファイル = %s", got)
 	}
-	flows := files["gen/flows/flowstest/design.go"]
-	for _, line := range []string{
+	wantLines(t,
 		// N の入口のパッケージは、いつも、名前を書いて import する。別の名前空間の型は、その置き場の入口のパッケージから
 		"\tflows \"example.com/app/gen/flows\"\n", "\t\"example.com/app/gen/act\"\n",
-		// 引数のフィールド: Given、Then と当たれば、末尾に _
-		"\tGiven_ string\n", "\tThen_  string\n", "got, err := ops.Rename(ctx, k.Given_, k.Then_)\n",
-		// Then の形: 値を返すフローと、返さないフロー
-		"\tThen func(t *testing.T, got act.Receipt)\n", "\tThen func(t *testing.T)\n", "\tThen func(t *testing.T, got *string)\n",
-		// 走らせる側: フローの FQN の名前で、Given、フロー、正常に終わったことの確かめ、Then
-		"t.Run(\"flows.checkout\", func(t *testing.T) {\n", "if err := k.Given(ctx); err != nil {\n", "t.Fatalf(\"given: %v\", err)\n",
-		"err := ops.Ping(ctx)\n", "t.Fatalf(\"want no error, got %v\", err)\n", "k.Then(t, got)\n", "k.Then(t)\n",
-		"func RunFlows(t *testing.T, ops flows.Ops, c FlowCases) {\n",
-		// フローの説明: 二行以上なら、行ごとに続ける。説明がなければ、一行目だけ
-		"// フロー: 二行以上の説明を持つフロー。\n// 引数の名前が、Given、Then と当たる。\ntype RenameFlowCase struct {\n",
-		"足りない確かめ。\ntype PingFlowCase struct {\n",
-		// 要求: 分類の順、その中は、ケースの宣言順。メソッドの名前は、先頭を大文字に。テストの名前は、もとのケースの名前
-		"// Requirements は、要求ごとの、テストの入れ物。要求（design.Req、design.Extra のケース）ごとに、メソッド一つ（宣言順）。中身は、人か AI が書く。\n",
-		// 走らせる側は、入れ物を、その場の関数で包んで呼ぶ（「要求の、テストの入れ物の口」の「口の形」）
-		"\tt.Run(\"design.Req.r3\", func(t *testing.T) {\n\t\tc.R3(t)\n\t})\n", "func RunRequirements(t *testing.T, c Requirements) {\n",
-		// 指している設計: 名前空間の FQN の辞書順、その中は宣言順。同じ宣言は、一度だけ。op のほかの宣言（model、状態、read、効果）も
-		"\t// 指している設計: act.buy、act.count、flows.checkout\n", "\t// 指している設計: data.Row、data.rows、data.first、data.add\n",
-		"\t// 指している設計: なし\n", "\t// 指している設計: data.first、flows.checkout\n",
-		// 説明のない要求と、二行以上の説明
-		"\t// R2 は、要求 design.Req.R2。\n", "\t// X1 は、要求 design.Extra.X1: 二行以上の説明を持つ要求。\n\t// 二行目。\n\t//\n\t// 空行の後の行。\n",
-	} {
-		if !strings.Contains(flows, line) {
-			t.Errorf("gen/flows/flowstest/design.go に、%q がない", line)
-		}
-	}
+	)
+	flows := files["gen/flows/flowstest/design.go"]
 	// 公開の名前は、<Op>FlowCase、FlowCases、RunFlows、Requirements、RunRequirements だけ。非公開の名前は、ない
 	for _, line := range strings.Split(flows, "\n") {
 		for _, prefix := range []string{"func ", "type "} {
@@ -290,9 +296,46 @@ func TestContents(t *testing.T) {
 	}
 }
 
-// TestWarnings は、二つの warning（「対象」「指している設計」）: フローも、要求もない単位は、ファイルを出さず warning を一つ。
-// どこからも指されていない要求は、要求ごとに、それを並べた単位ごとに、warning を一つ（位置は、その分類）で、口は、出す。
-func TestWarnings(t *testing.T) {
+// flowContents は、hozo.godesign.Requirement.FlowPort の、行として確かめるもの。
+func flowContents(t *testing.T) {
+	wantLines(t,
+		// 引数のフィールド: Given、Then と当たれば、末尾に _
+		"\tGiven_ string\n", "\tThen_  string\n", "got, err := ops.Rename(ctx, k.Given_, k.Then_)\n",
+		// Then の形: 値を返すフローと、返さないフロー
+		"\tThen func(t *testing.T, got act.Receipt)\n", "\tThen func(t *testing.T)\n", "\tThen func(t *testing.T, got *string)\n",
+		// 走らせる側: フローの FQN の名前で、Given、フロー、正常に終わったことの確かめ、Then
+		"t.Run(\"flows.checkout\", func(t *testing.T) {\n", "if err := k.Given(ctx); err != nil {\n", "t.Fatalf(\"given: %v\", err)\n",
+		"err := ops.Ping(ctx)\n", "t.Fatalf(\"want no error, got %v\", err)\n", "k.Then(t, got)\n", "k.Then(t)\n",
+		"func RunFlows(t *testing.T, ops flows.Ops, c FlowCases) {\n",
+		// フローの説明: 二行以上なら、行ごとに続ける。説明がなければ、一行目だけ
+		"// フロー: 二行以上の説明を持つフロー。\n// 引数の名前が、Given、Then と当たる。\ntype RenameFlowCase struct {\n",
+		"足りない確かめ。\ntype PingFlowCase struct {\n",
+	)
+}
+
+// requirementContents は、hozo.godesign.Requirement.RequirementPort の、行として確かめるもの。
+func requirementContents(t *testing.T) {
+	wantLines(t,
+		// 要求: 分類の順、その中は、ケースの宣言順。メソッドの名前は、先頭を大文字に。テストの名前は、もとのケースの名前
+		"// Requirements は、要求ごとの、テストの入れ物。要求（design.Req、design.Extra のケース）ごとに、メソッド一つ（宣言順）。中身は、人か AI が書く。\n",
+		// 走らせる側は、入れ物を、その場の関数で包んで呼ぶ（hozo.godesign.Requirement.RequirementPort）
+		"\tt.Run(\"design.Req.r3\", func(t *testing.T) {\n\t\tc.R3(t)\n\t})\n", "func RunRequirements(t *testing.T, c Requirements) {\n",
+		// 説明のない要求と、二行以上の説明
+		"\t// R2 は、要求 design.Req.R2。\n", "\t// X1 は、要求 design.Extra.X1: 二行以上の説明を持つ要求。\n\t// 二行目。\n\t//\n\t// 空行の後の行。\n",
+	)
+}
+
+// designContents は、hozo.godesign.Requirement.Designs の、行として確かめるもの。
+func designContents(t *testing.T) {
+	wantLines(t,
+		// 指している設計: 名前空間の FQN の辞書順、その中は宣言順。同じ宣言は、一度だけ。op のほかの宣言（model、状態、read、効果）も
+		"\t// 指している設計: act.buy、act.count、flows.checkout\n", "\t// 指している設計: data.Row、data.rows、data.first、data.add\n",
+		"\t// 指している設計: なし\n", "\t// 指している設計: data.first、flows.checkout\n",
+	)
+}
+
+// warnNothing は、hozo.godesign.Requirement.Targets の warning: フローも、要求もない単位は、ファイルを出さず warning を一つ。
+func warnNothing(t *testing.T) {
 	root := newRoot(t)
 	files, diags, warnings := emitViews(t, root, loadViews(t, "empty"))
 	if len(files) != 0 || len(diags) != 0 || len(warnings) != 2 {
@@ -310,8 +353,12 @@ func TestWarnings(t *testing.T) {
 	if len(resp.Files) != 0 || len(resp.Warnings) != 1 || len(resp.Errors) != 0 {
 		t.Errorf("empty: 応答 = %+v, want warning が一つだけ", resp)
 	}
+}
 
-	files, diags, warnings = emitViews(t, newRoot(t), loadViews(t, "flows"))
+// warnUnreferenced は、hozo.godesign.Requirement.Designs の warning: どこからも指されていない要求は、要求ごとに、それを並べた単位ごとに、
+// warning を一つ（位置は、その分類）で、口は、出す。
+func warnUnreferenced(t *testing.T) {
+	files, diags, warnings := emitViews(t, newRoot(t), loadViews(t, "flows"))
 	if len(diags) != 0 || len(warnings) != 2 {
 		t.Fatalf("flows: 診断=%+v warnings=%+v, want warning が二つだけ（design.Req を並べた、flows と reqonly の単位）", diags, warnings)
 	}
@@ -451,9 +498,9 @@ func TestNoModule(t *testing.T) {
 	}
 }
 
-// TestUnitTargets は「対象」: フローは、単位の対象の op（View.files にあるファイルの op。docs/config.md「in」）だけ。
+// unitTargets は、hozo.godesign.Requirement.Targets: フローは、単位の対象の op（View.files にあるファイルの op。docs/config.md「in」）だけ。
 // 単位の対象でない op は、@prd.business.flow が付いていても、フローにならない。
-func TestUnitTargets(t *testing.T) {
+func unitTargets(t *testing.T) {
 	var flows *ir.View
 	for _, v := range loadViews(t, "flows") {
 		if v.Viewer == "k" {

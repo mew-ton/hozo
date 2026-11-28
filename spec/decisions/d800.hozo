@@ -260,5 +260,23 @@ namespace hozo.decisions {
     @adr.amends(Decision400.D469)
     @adr.proposed
     D812;
+
+    /**
+     * go-design の持ち主を、文書 docs/plugin-go-design.md から、プラグインのファイルに移した（D807、D810。形は、go-cli の D811 と同じ）。
+     * 出す口の形と振る舞いと、オプション requirements の意味は、go-design 自身の仕様 plugins/go-design/spec/go-design.hozo の要求
+     * hozo.godesign.Requirement のケース。マニフェストは plugins/go-design/hozo-plugin.toml。plugins/go-design を、一つの Hozo の
+     * プロジェクトにし、要求ごとの口（godesigntest.RunRequirements）を、go-design 自身が作り、go-design の単体テストが満たす。
+     * docs/plugin-go-design.md に残したのは、受け付けない書き方（フローの op の決まり）と、診断の補足だけ。
+     *
+     * @adr.context 文書の節が、出す口の形を言い、単体テストのコメントが、その見出しを名指ししていた。文書のコードの例は、
+     * サンプル tests/samples/shop-server/ の期待する出力と、同じものを、もう一度書いていた。
+     * @adr.consequence 文書にあった、仕様と Go のコードの例は、移さなかった: 期待する出力の実物は、サンプルの
+     * gen/flows/flowstest/design.go。プラグインのプロジェクトの仕様からは、ルートの仕様の印（adr.decided）が見えないので、要求を決めた
+     * 決定は、ケースの説明の文で言う。生成した口を動かすテスト（TestBehavior など）は、要求のケースごとの関数に分け、要求の側から呼ぶ。
+     * @adr.alternative コードの例を、要求の説明に写す: 説明のコメントの中の、行の頭の、デコレータの形（prd.business.flow など）が、タグとして
+     *   読まれる。サンプルの期待する出力と、同じものを、二か所に持つことにもなる
+     */
+    @adr.proposed
+    D813;
   }
 }

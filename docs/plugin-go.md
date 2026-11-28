@@ -154,7 +154,7 @@ N の op に内部の op が一つもない出力（op を持たない、型だ�
 | `go-http` | `http.go` | 入口 | `http` | `docs/plugin-go-http.md` |
 | `go-http` | `http.go` | テスト | `http` | `docs/plugin-go-http.md`「インテグレーションテストの口」 |
 | `go-cli` | `cli/cli.go`（パッケージ `cli`） | 自分のパッケージ | — | `docs/plugin-go-cli.md` |
-| `go-design` | `design.go` | テスト | `design` | `docs/plugin-go-design.md`「出力」 |
+| `go-design` | `design.go` | テスト | `design` | `plugins/go-design/spec/go-design.hozo` の `Requirement.Output` |
 
 - テストのコードを置く相乗り（表の、置くパッケージが「テスト」の行）は、同じディレクトリに、自分の、テストの対応表 `hozo-tests.<トランスパイラの名前>.json` も置く（`hozo-tests.go-http.json`、`hozo-tests.go-design.json`。「テストの対応表」）。
 - 相乗りは、置き場と名前を `plugin/golang`（`docs/packages.md`「`plugin/golang`（公開）」）で求める。この文書の規則を自分で書き写さない（`docs/plugin-protocol.md`「相乗りが基底の形を知る方法」）。

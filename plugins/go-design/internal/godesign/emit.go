@@ -27,14 +27,14 @@ const (
 // FileName は、このトランスパイラが、N のテストのパッケージに出すファイルの名前（docs/plugin-go.md「相乗りのファイル」）。
 const FileName = "design.go"
 
-// 読む語彙（標準の business、usecase、prd。docs/plugin-go-design.md「マニフェスト」）。actor の語彙は読まない（印）。
+// 読む語彙（標準の business、usecase、prd。plugins/go-design/hozo-plugin.toml）。actor の語彙は読まない（印）。
 const (
 	businessFlow = "prd.business.flow"
 	usecaseOf    = "prd.usecase.of"
 	prdRef       = "prd.ref"
 )
 
-// options は [emit.options.go-design]（docs/plugin-go-design.md「オプション」）。
+// options は [emit.options.go-design]（plugins/go-design/spec/go-design.hozo の Requirement.RequirementPort）。
 type options struct {
 	// Requirements は、要求の分類の FQN（書かれた順）。
 	Requirements []string `json:"requirements"`
@@ -47,7 +47,7 @@ type Output struct {
 	Errors   []plugin.Diagnostic
 }
 
-// Emit は、要求の View の出力 (U, N) の、テストのパッケージの design.go（docs/plugin-go-design.md「出力」）を作る。読むのは、要求だけ
+// Emit は、要求の View の出力 (U, N) の、テストのパッケージの design.go（plugins/go-design/spec/go-design.hozo の Requirement.Output）を作る。読むのは、要求だけ
 // （ファイルも、環境変数も、読まない）。診断があれば、ファイルも warning も返さない。フローも、要求もなければ、ファイルを
 // 出さず warning を一つ返す。どこからも指されていない要求ごとに、warning を一つ返す。
 // 戻り値の error は、利用者の仕様の誤りでないもの（View が欠けている、生成したコードを整形できない）。
@@ -105,7 +105,7 @@ func Emit(req *plugin.EmitRequest) (*Output, error) {
 		return nil, err
 	}
 	file := plugin.File{Path: path.Join(layout.TestDir, FileName), Content: content}
-	// テストの対応表（docs/plugin-go-design.md「出力」）: 出したテキストから作る
+	// テストの対応表（plugins/go-design/spec/go-design.hozo の Requirement.Output）: 出したテキストから作る
 	tests, err := golang.TestMap(file.Path, file.Content)
 	if err != nil {
 		return nil, fmt.Errorf("テストの対応表を作れない（生成器の不具合）: %w", err)
@@ -169,7 +169,7 @@ func (f *flow) method() string { return golang.MethodName(f.op.Name) }
 func (f *flow) hasValue() bool { return f.op.Returns != nil && !ir.IsNever(f.op.Returns) }
 
 // fields は、<Op>FlowCase の、フローの引数のフィールドの名前（Op.params の順）: 引数の名前を、フィールド名と同じ決まりで。
-// Given、Then と当たれば、末尾に _（docs/plugin-go-design.md「E2E テストの口」の「口の形」）。
+// Given、Then と当たれば、末尾に _（plugins/go-design/spec/go-design.hozo の Requirement.FlowPort）。
 func (f *flow) fields() []string {
 	names := make([]string, len(f.op.Params))
 	for i, p := range f.op.Params {
@@ -183,7 +183,7 @@ func (f *flow) fields() []string {
 }
 
 // flows は、N の単位の対象の op を宣言順に見て、フローを集め、診断（GODESIGN-1〜GODESIGN-4）を集める
-// （docs/plugin-go-design.md「対象」「フローの op の決まり」）。
+// （plugins/go-design/spec/go-design.hozo の Requirement.Targets、docs/plugin-go-design.md「フローの op の決まり」）。
 func (g *generator) flows() []flow {
 	var flows []flow
 	for _, d := range g.ns.Decls {
@@ -273,7 +273,7 @@ type requirement struct {
 }
 
 // requirementClasses は、オプション requirements を読み、要求の分類と、そのケースと、指している設計を返す
-// （docs/plugin-go-design.md「オプション」「要求の、テストの入れ物の口」）。GODESIGN-5 を集める。
+// （plugins/go-design/spec/go-design.hozo の Requirement.RequirementPort）。GODESIGN-5 を集める。
 func (g *generator) requirementClasses(req *plugin.EmitRequest) []class {
 	var opts options
 	index := g.view.Config.Index
@@ -321,7 +321,7 @@ func (g *generator) requirementClasses(req *plugin.EmitRequest) []class {
 
 // designs は、要求の名前（<分類の FQN>.<ケース>）→ それを指している設計（@prd.ref の引数に、その要求を持つ宣言の FQN）。
 // 仕様の全体から集める。並びは、名前空間の FQN の辞書順、その中は宣言順。同じ宣言は、一度だけ
-// （docs/plugin-go-design.md「要求の、テストの入れ物の口」の「指している設計」）。
+// （plugins/go-design/spec/go-design.hozo の Requirement.RequirementPort）。
 func (g *generator) designs() map[string][]string {
 	namespaces := make([]*ir.Namespace, 0, len(g.p.Namespaces))
 	for i := range g.p.Namespaces {
@@ -371,7 +371,7 @@ func caseValues(v ir.ArgValue) []ir.CaseValue {
 	return nil
 }
 
-// テストのパッケージに足す、決まった公開の名前（docs/plugin-go-design.md「出力」）。フローごとのケースは <Op>FlowCase。
+// テストのパッケージに足す、決まった公開の名前（plugins/go-design/spec/go-design.hozo の Requirement.Output）。フローごとのケースは <Op>FlowCase。
 const (
 	flowCaseSuffix   = "FlowCase"
 	flowCasesName    = "FlowCases"       // フローのケースのまとめ

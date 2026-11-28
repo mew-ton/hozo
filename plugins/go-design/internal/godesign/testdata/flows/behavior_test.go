@@ -1,12 +1,12 @@
 // 入力 flows の出力を動かす（plugins/go-design の TestBehavior が、基底 go と go-design の出力を書いたモジュールのルートに置いて
 // 走らせる）。確かめること（docs/plugin-go-design.md）:
 //
-//   - 「E2E テストの口」: すべてのフローのケースを持つ型を RunFlows に渡せば、通る。テストの名前は、フローの FQN。走らせる側は、
+//   - hozo.godesign.Requirement.FlowPort: すべてのフローのケースを持つ型を RunFlows に渡せば、通る。テストの名前は、フローの FQN。走らせる側は、
 //     Given、フロー、Then の順に呼ぶ。フローには、ケースの引数が、そのまま渡り、Then には、フローが返した値が渡る。Given と Then が
 //     nil のケースは、どちらも呼ばずに、通る。ops は、すべてのフローで、同じもの（状態は、引き継がれる）。
-//   - 「要求の、テストの入れ物の口」: すべての要求の入れ物を持つ型を RunRequirements に渡せば、通る。テストの名前は、要求の名前で、
+//   - hozo.godesign.Requirement.RequirementPort: すべての要求の入れ物を持つ型を RunRequirements に渡せば、通る。テストの名前は、要求の名前で、
 //     入れ物の中のサブテストは、その下に出る。
-//   - 「出力」: 基底が、テストのパッケージを作る出力（mixed）でも、作らない出力（flows、k、reqonly）でも、同じに使える。
+//   - hozo.godesign.Requirement.Output: 基底が、テストのパッケージを作る出力（mixed）でも、作らない出力（flows、k、reqonly）でも、同じに使える。
 package behavior
 
 import (

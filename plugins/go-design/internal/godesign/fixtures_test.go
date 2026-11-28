@@ -234,7 +234,7 @@ func firstDiff(want, got string) string {
 	return "  （違いなし）"
 }
 
-// isTestMap は、パス p が、このトランスパイラのテストの対応表（docs/plugin-go-design.md「出力」）か。
+// isTestMap は、パス p が、このトランスパイラのテストの対応表（plugins/go-design/spec/go-design.hozo の Requirement.Output）か。
 func isTestMap(p string) bool { return path.Base(p) == plugin.TestMapName(TranspilerName) }
 
 // scanTestRuns は、Go のソース src（置き場は file）の、いちばん内側の `t.Run(<名前>, func(t *testing.T) {` … `})` を、
@@ -323,7 +323,7 @@ func checkTestMaps(t *testing.T, files map[string]string) {
 	}
 }
 
-// checkFormatted は、生成した Go が go/format を通した形で、一行目がヘッダであること（docs/plugin-go-design.md「出力」）を確かめる。
+// checkFormatted は、生成した Go が go/format を通した形で、一行目がヘッダであること（plugins/go-design/spec/go-design.hozo の Requirement.Output）を確かめる。
 func checkFormatted(t *testing.T, files map[string]string) {
 	t.Helper()
 	checkTestMaps(t, files)

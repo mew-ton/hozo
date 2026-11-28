@@ -1,0 +1,9 @@
+{
+  "tests": [
+    {"name": "hozo.godesign.Requirement.Targets", "file": "internal/spec/godesigntest/design.go", "lines": [126, 126]},
+    {"name": "hozo.godesign.Requirement.Output", "file": "internal/spec/godesigntest/design.go", "lines": [129, 129]},
+    {"name": "hozo.godesign.Requirement.FlowPort", "file": "internal/spec/godesigntest/design.go", "lines": [132, 132]},
+    {"name": "hozo.godesign.Requirement.RequirementPort", "file": "internal/spec/godesigntest/design.go", "lines": [135, 135]},
+    {"name": "hozo.godesign.Requirement.Designs", "file": "internal/spec/godesigntest/design.go", "lines": [138, 138]}
+  ]
+}

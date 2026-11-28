@@ -214,11 +214,11 @@ R6 の、プラグインの部分の、段 4（`docs/requirements.md`「R6 の�
 | `client.hozo` | 名前空間 `client`: 操作の op（ユースケース）三つ（`signIn`、`order`、`viewOrders`。どれも `@prd.usecase.of(design.Actor.Customer)` と `export`）。どれも、機能入口の op（`server.login`、`server.placeOrder`、`server.getOrders`）を、一つ呼ぶ配線 | `docs/ide-chain.md`「ユースケース図」 |
 | `flows.hozo` | 名前空間 `flows`: フロー `signInAndOrder`（`@prd.business.flow` と `export`）と、その結果の model `Ordered`。三つの操作の op を、順に呼ぶ配線 | `docs/ide-chain.md`「業務フロー図」 |
 | `server.hozo` | `@prd.ref` を、三つの op に付けた: `authenticate`（`PRD_001`）、`getOrders`（`PRD_002`）、`placeOrder`（`PRD_001` と `PRD_002`）。op の宣言と配線は、変えていない | `docs/vocab.md`「設計の図の語彙」 |
-| `hozo.toml` | 単位を三つ足した（6: `http`、7: `client`、8: `flows`）。単位 8 に、`[emit.options.go-design]` の `requirements = ["design.Requirement"]` | `docs/plugin-go-design.md`「オプション」 |
+| `hozo.toml` | 単位を三つ足した（6: `http`、7: `client`、8: `flows`）。単位 8 に、`[emit.options.go-design]` の `requirements = ["design.Requirement"]` | `plugins/go-design/spec/go-design.hozo` の `Requirement.RequirementPort` |
 | `gen/http/doc.go`、`types.go` | 標準の語彙 `http` の型（例外三つと、model `Violation`） | `docs/plugin-go.md`「型」 |
 | `gen/client/doc.go`、`ops.go`、`wiring.go` | 操作の op の `Ops`、`server` の口 `ServerOps`、`New`、三つの配線の本体 | `docs/plugin-go.md`「実装を受け取る口」「配線の本体」 |
 | `gen/flows/doc.go`、`types.go`、`ops.go`、`wiring.go` | model `Ordered`、フローの `Ops`、`client` の口 `ClientOps`、`New`、フローの配線の本体 | 同上 |
-| `gen/flows/flowstest/design.go` | `go-design` の出力: `SignInAndOrderFlowCase`、`FlowCases`、`RunFlows`、`Requirements`（`PRD_001`、`PRD_002`）、`RunRequirements` | `docs/plugin-go-design.md`「E2E テストの口」「要求の、テストの入れ物の口」 |
+| `gen/flows/flowstest/design.go` | `go-design` の出力: `SignInAndOrderFlowCase`、`FlowCases`、`RunFlows`、`Requirements`（`PRD_001`、`PRD_002`）、`RunRequirements` | `plugins/go-design/spec/go-design.hozo` の `Requirement.FlowPort`、`Requirement.RequirementPort` |
 | `sample.json`、`gen/http/.hozoc-outputs.json`、`gen/client/.hozoc-outputs.json`、`gen/flows/.hozoc-outputs.json` | 上のファイルを、`go` と `go-design` のファイルと、出力先ごとの記録に足した | `../README.md`「sample.json」 |
 | `app/flowtest/flowtest.go` | 足した: 二つの口を満たす型 `FlowCases`、`Requirements` と、`RunFlows`、`RunRequirements`、`RunIncomplete`（「人が書いたもの」） | — |
 | `app/onmem/compose.go`、`app/onsqlite/compose.go` | 足した: `NewFlows`（同じ `store` と `server` の上に、`client` と `flows` を重ねる） | — |
@@ -242,8 +242,8 @@ R6 の、プラグインの部分の、段 4（`docs/requirements.md`「R6 の�
 |---|---|---|
 | `gen/server/servertest/hozo-tests.go.json` | 基底 `go` の、テストの対応表: `RunLeaves` の、11 のテスト（`server.checkPassword/OK` など）と、`leaves.go` の行 | `docs/plugin-go.md`「テストの対応表」 |
 | `gen/server/servertest/hozo-tests.go-http.json` | `go-http` の、テストの対応表: `RunHTTP` の、21 のテスト（`server.login/OK` など）と、テストのパッケージの `http.go` の行 | `docs/plugin-go-http.md`「インテグレーションテストの口」の「置き場と名前」 |
-| `gen/flows/flowstest/hozo-tests.go-design.json` | `go-design` の、テストの対応表: `RunFlows` の `flows.signInAndOrder` と、`RunRequirements` の `design.Requirement.PRD_001`、`PRD_002` と、`design.go` の行 | `docs/plugin-go-design.md`「出力」 |
-| `gen/flows/flowstest/design.go` | `RunRequirements` が、要求の入れ物を、その場の関数で包んで呼ぶ形にした（`t.Run("design.Requirement.PRD_001", func(t *testing.T) { c.PRD_001(t) })`。行は、三つに分かれる）。`RunRequirements` の中に、要求ごとの行を持つため | `docs/plugin-go-design.md`「要求の、テストの入れ物の口」の「口の形」 |
+| `gen/flows/flowstest/hozo-tests.go-design.json` | `go-design` の、テストの対応表: `RunFlows` の `flows.signInAndOrder` と、`RunRequirements` の `design.Requirement.PRD_001`、`PRD_002` と、`design.go` の行 | `plugins/go-design/spec/go-design.hozo` の `Requirement.Output` |
+| `gen/flows/flowstest/design.go` | `RunRequirements` が、要求の入れ物を、その場の関数で包んで呼ぶ形にした（`t.Run("design.Requirement.PRD_001", func(t *testing.T) { c.PRD_001(t) })`。行は、三つに分かれる）。`RunRequirements` の中に、要求ごとの行を持つため | `plugins/go-design/spec/go-design.hozo` の `Requirement.RequirementPort` |
 | `gen/server/.hozoc-outputs.json`、`gen/flows/.hozoc-outputs.json`、`sample.json` | 三つの対応表を、出力先ごとの記録と、トランスパイラの `files` に足した。`sample.json` に、`tests`（`skip` と `missing`）を足した | `../README.md`「sample.json」 |
 
 - **対応表は、手で書いた**（ほかの期待する出力と同じ）: 置いてある `leaves.go`、`http.go`、`design.go` の字面から、いちばん内側の `t.Run` の、`{` の次の行と、`})` の前の行を、数えた。`hozoc build` の出力と、バイト単位で同じことは、`transpilers/<名前>` が確かめる。
