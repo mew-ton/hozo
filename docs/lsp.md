@@ -48,9 +48,7 @@ capabilities: `textDocumentSync: { openClose: true, change: Full, save: { includ
 `hozoc build --no-emit` と同じ `internal/check` の呼び出しなので、同じ入力に同じ診断が出る（`docs/testing.md`「言語サーバーと check の一致」）。設定とマニフェストだけで決まる診断（CFG-6、CFG-26 など。`docs/config.md`「診断」）も、プラグインを起動せずに、解析のたびに出る。違いは、二つ。
 
 - プラグインの診断（`spec/cli.hozo` の `check` の手順の 4。HTTP-5 など、語彙のプラグインが返す誤りと、GOHTTP-16 など、トランスパイラが返す誤りと、warning）は、解析のたびには出さず、後から足す（「プラグインの診断」）。
-- 言語サーバーだけが出す診断が、二つある:
-
-この見出しの診断の、ID と条件と重さの持ち主は、`spec/diagnostics/hozoc.hozo` の分類 `hozo.diagnostics.Hozoc` のケース。
+- 言語サーバーだけが出す診断（LSP-*）の、ID と条件と重さの持ち主は、`spec/diagnostics/hozoc.hozo` の分類 `hozo.diagnostics.Hozoc` のケース。
 
 この節の細部は、決定 D680 が決めた。
 

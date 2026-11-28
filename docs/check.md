@@ -1128,7 +1128,3 @@ MATCH-8 は欠番。「アームの本体の `throw E` の `E` が、値を運�
 ### 語彙に固有の規則
 
 PAGE-1 / PAGE-2 は hozoc では検査しない。プラグインの `check`（`docs/plugin-protocol.md`「check」）が返す。
-
-## Data
-
-`Diagnostic.Data`（`docs/diagnostics.md`「構造」）の形の持ち主は、`spec/diagnostics.hozo` の model と、それを指す、ケースの `@carries`。

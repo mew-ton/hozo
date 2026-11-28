@@ -201,7 +201,7 @@ func TestCheckFailed(t *testing.T) {
 	if f.Error != "hozo.compiler.CheckFailed" || f.Value.Errors != 1 || f.Value.Warnings != 1 {
 		t.Fatalf("%+v", f)
 	}
-	// Diagnostic.Data（docs/check.md「Data」の RES-1 の candidates）は境界（spec/cli.hozo の Diagnostic.data）を越えて json に出る
+	// Diagnostic.Data（spec/diagnostics.hozo の、Data の modelの RES-1 の candidates）は境界（spec/cli.hozo の Diagnostic.data）を越えて json に出る
 	found := false
 	for _, d := range f.Value.Diagnostics {
 		if d.Code == "RES-1" {

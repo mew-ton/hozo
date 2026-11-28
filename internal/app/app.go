@@ -171,7 +171,7 @@ func positions(fs *source.FileSet, s source.Span) (compiler.Position, compiler.P
 	return compiler.Position{Line: int64(sp.Line), Col: int64(sp.Col)}, compiler.Position{Line: int64(ep.Line), Col: int64(ep.Col)}
 }
 
-// stringList は Diagnostic.Data の値（docs/check.md「Data」では FQN・ケース名・パスの列）を文字列の列にする。
+// stringList は Diagnostic.Data の値（spec/diagnostics.hozo の、Data の modelでは FQN・ケース名・パスの列）を文字列の列にする。
 func stringList(v any) []string {
 	switch x := v.(type) {
 	case []string:

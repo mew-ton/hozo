@@ -16,7 +16,7 @@ type Diagnostic struct {
     Span     *source.Span    // 位置（バイトのオフセット。docs/packages.md「internal/source」）。位置がなければ nil
     File     string          // Span が nil のときのファイル（hozo.toml など）。空なら全体
     Related  []Related       // 関連する位置（重複の相手、例外の出どころの行など）
-    Data     map[string]any  // 機械が読む補足。中身は docs/check.md「Data」。JSON に出し、コードアクション（docs/lsp.md「段階 4 の後」）が使う
+    Data     map[string]any  // 機械が読む補足。中身は spec/diagnostics.hozo の、Data の model。JSON に出し、コードアクション（docs/lsp.md「段階 4 の後」）が使う
 }
 
 type Related struct {
@@ -28,13 +28,11 @@ type Related struct {
 - `Code` は、仕様の名前空間 `hozo.diagnostics` の分類のケースの ID（`spec/diagnostics/`）。トランスパイラが `emit` の応答の `errors` で返したコード（`docs/plugin-protocol.md`「emit」）は、そのまま `Code` になる。規則の ID でないコードは下の「規則の ID でないコード」。コードが出しうる `Code` がどれかの表にあり、表の重さがコードと合っていることは `tests/codes_test.go` が確かめる。
 - `Message` は、`docs/` の文書の言葉で書く。例: BIND-4 → `openOrders の呼び出しで必須の入力 token が明示でも bind でも埋まっていない`。
 - `Message` は、設計書（`docs/README.md`「設計書という呼び名」）と、その節番号（「§n」）を引かない。設計書は仕様の持ち主ではなく、利用者が読んで確かめる先にならない。文書を引くなら、`docs/` の文書と見出しを引く（`docs/check.md`「残りのケース」）。
-- `Data` の中身は `docs/check.md`「Data」。
+- `Data` の中身は `spec/diagnostics.hozo` の、Data の model。
 
 ### 規則の ID でないコード
 
-この見出しの診断の、ID と条件と重さの持ち主は、`spec/diagnostics/hozoc.hozo` の分類 `hozo.diagnostics.Hozoc` のケース。
-
-ほかに、トランスパイラの warning の `PLUGIN`（`docs/plugin-protocol.md`「診断」）、Go の基底の不具合の `GO-INTERNAL`（`docs/plugin-go.md`「診断」）、言語サーバーだけが出す `LSP-1`（`docs/lsp.md`「診断」）がある。持ち主はそれぞれの文書。
+規則の ID の形（`<語>-<番号>`）でないコードが、四つある: 構文エラーの `SYNTAX`、ファイルを読めない `IO`、トランスパイラの warning の `PLUGIN`、Go の基底の不具合の `GO-INTERNAL`。条件と重さの持ち主は、ほかの診断と同じく、仕様の名前空間 `hozo.diagnostics` のケース（`spec/diagnostics/hozoc.hozo` と `spec/diagnostics/go.hozo`）。
 
 ## 位置
 

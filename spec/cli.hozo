@@ -57,7 +57,7 @@ namespace hozo.compiler {
   /** 位置（1 始まりの行と列） */
   model Position { line: int; col: int; }
 
-  /** 指摘の、機械が読む補足（docs/check.md「Data」）。項目の名前から、値の並びを引く */
+  /** 指摘の、機械が読む補足（spec/diagnostics.hozo の、Data の model）。項目の名前から、値の並びを引く */
   @adr.decided(hozo.decisions.Decision600.D603)
   model DiagnosticData { [key: string]: string[]; }
 
@@ -72,7 +72,7 @@ namespace hozo.compiler {
     start: Position?;
     end: Position?;
     related: RelatedInfo[];
-    /** 機械が読む補足（docs/check.md「Data」）。json にだけ出す */
+    /** 機械が読む補足（spec/diagnostics.hozo の、Data の model）。json にだけ出す */
     data: DiagnosticData?;
   }
 

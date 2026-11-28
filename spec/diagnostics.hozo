@@ -52,7 +52,7 @@ namespace hozo.diagnostics {
   decorator retired(...replacedBy: any case of never) for case of never;
 
   /**
-   * 文言に埋める値のうち、機械が読む形で持つもの（Diagnostic.data。docs/check.md「Data」）。
+   * 文言に埋める値のうち、機械が読む形で持つもの（Diagnostic.data）。
    *
    * @param data 値の形
    */
