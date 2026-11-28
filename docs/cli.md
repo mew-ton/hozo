@@ -6,13 +6,13 @@
 
 ## cli.hozo
 
-hozoc 自身の仕様の持ち主は、`spec/cli.hozo`（決定 D808）。宣言の意味は、その宣言の説明のコメントが持つ。形を決めた理由は、その宣言の `@adr.decided` が指す決定が持つ。この文書は、写しを置かない。
+hozoc 自身の仕様の持ち主は、`spec/cli.hozo`（決定 D807、D808）。宣言の意味と、決定に書いていない理由は、その宣言の説明のコメントが持つ。形を決めた決定は、その宣言の `@adr.decided` が名指しする。この文書は、写しを置かない。
 
 `spec/cli.hozo` から生成する単位（名前空間と、トランスパイラと、置き場）は、リポジトリ直下の `hozo.toml` が持つ。
 
 この文書と `docs/` のほかの文書が、修飾なしに `cli.hozo` と書けば、`spec/cli.hozo` を指す。go-cli プラグインの語彙のファイルは、`plugins/go-cli/cli.hozo` と書く（`docs/plugin-go-cli.md`「マニフェスト」）。
 
-`spec/` のほかのファイル（`flows.hozo`、`plugin.hozo`、`ir.hozo`、`lsp.hozo`、`ide.hozo`、`diagnostics.hozo`、`decisions/`）が何を書き、持ち主がどこで、コードになるかは、それぞれのファイルの頭のコメントが言う。
+`spec/` のほかのファイルが何を書き、持ち主がどこで、コードになるかは、それぞれのファイルの頭のコメントが言う。
 
 ## build
 

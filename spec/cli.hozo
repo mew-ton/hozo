@@ -1,7 +1,7 @@
 /**
  * hozo の仕様を検査し、各言語のコードに展開するコンパイラの、ユースケース。
- * コマンドの行（入口）は、名前空間 hozo.cli で、フラグを知っているのは、そちらだけ: ユースケースの入力（EmitInput、CoverageInput、
- * ServeInput）は、フラグに当たる項目を持たない（決定 D472、D473）。
+ * コマンドの行（入口）は、名前空間 hozo.cli で、フラグを知っているのは、そちらだけ: ユースケースの入力は、フラグに当たる項目を
+ * 持たない（決定 D472、D473）。
  * 例外は、投げるユースケースの側（この名前空間）に宣言し、終了コード（@cli.exitCode）も、その宣言に付ける。go-cli は、コマンドの op が
  * 投げうる例外を、どの名前空間のものでも見分ける（docs/plugin-go-cli.md「コマンドごとの関数」）。例外の名前の表示（--format json の
  * "error"）は、hozo.compiler.CheckFailed のように、名前空間から書く（決定 D742）。
@@ -180,8 +180,8 @@ namespace hozo.compiler {
 
   /**
    * 検査（check）の入力。ユースケースの入力（EmitInput、CoverageInput）から、配線が作る。
-   * 環境変数（HOZO_PLUGIN_PATH、HOZO_CACHE_DIR）も、コマンドの入力のフィールドとして受け取り、ここまで配線で渡す: 葉の op の実装が、
-   * プロセスの環境を自分で読まないので、同じ入力から同じ結果になり、テストが、実行する人の環境に左右されない
+   * 環境変数（HOZO_PLUGIN_PATH、HOZO_CACHE_DIR）も、コマンドの入力のフィールドとして受け取り、ここまで配線で渡す。葉の op の実装は、
+   * プロセスの環境を自分で読まない（docs/testing.md「環境からの独立」）
    */
   @adr.decided(hozo.decisions.Decision600.D694)
   model CheckInput {
@@ -294,7 +294,7 @@ namespace hozo.compiler {
    * 検査がプラグインから受け取った答えから、出力ごとのファイルを集めて、確かめる（パスと、ファイルの衝突）。集めたファイルは、返さない:
    * 返すのは、warning だけの結果（written も removed も空）。プラグインは、起動しない。ファイルには触れない。
    * hozo.toml がなければ、集めるものがなく、検査の warning だけを返す。
-   * 配線でなく葉なのは、配線が、並びのリテラルも、並びの写しも書けないため（docs/open.md「サンプルと、hozoc 自身の仕様」。plannedChanges も同じ）。
+   * 配線でなく葉なのは、配線が、並びのリテラルも、並びの写しも書けないため（docs/open.md「サンプルと、hozoc 自身の仕様」）。
    *
    * @param in ユースケースの入力
    * @param checked 検査の結果
@@ -323,6 +323,7 @@ namespace hozo.compiler {
   /**
    * 書き出す予定を、結果の形にする: written は、書く予定のファイルのパス（内容が同じで、書き直さないものも入る）。removed は、空
    * （消すファイルは、今の生成したファイルを読まないと決まらないので、決めない）。ファイルには触れない。
+   * 配線でなく葉なのは、配線が、並びのリテラルも、並びの写しも書けないため（docs/open.md「サンプルと、hozoc 自身の仕様」）。
    *
    * @param plan 書き出す予定
    */
@@ -405,7 +406,7 @@ namespace hozo.compiler {
    * @param in ユースケースの入力
    */
   @prd.usecase.of(Actor.Engineer)
-  @prd.ref(Requirement.SharedDiagnostics)
+  @prd.ref(Requirement.SharedDiagnostics, Requirement.SingleBinary)
   @adr.decided(hozo.decisions.Decision400.D472, hozo.decisions.Decision400.D473, hozo.decisions.Decision400.D474, hozo.decisions.Decision700.D751)
   export fn serve(in: ServeInput);
 
@@ -462,8 +463,7 @@ namespace hozo.compiler {
 /**
  * hozoc のコマンドの行（入口）。引数とフラグを読んで、名前空間 hozo.compiler のユースケースに入る。
  * フラグ（--no-emit、--dry-run、--format）を知っているのは、ここだけ: コマンドの op が、入力から、レコードリテラルで、ユースケースの
- * 入力を組んで渡す（決定 D472、D473）。コマンドは build、tests、lsp の三つ（決定 D417）。言語サーバーは、別のバイナリにせず、
- * サブコマンド lsp にする（hozo.compiler.Requirement.SingleBinary）。
+ * 入力を組んで渡す（決定 D472、D473）。
  * コマンドの op は export: go-cli の Main が、名前空間の外から、入口の Ops を通して呼ぶ（docs/plugin-go-cli.md「対象」の CLI-6）。
  */
 namespace hozo.cli {

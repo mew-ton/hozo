@@ -2,7 +2,6 @@
 
 // Package cli は hozoc のコマンドの行（入口）。引数とフラグを読んで、名前空間 hozo.compiler のユースケースに入る。
 // フラグ（--no-emit、--dry-run、--format）を知っているのは、ここだけ: コマンドの op が、入力から、レコードリテラルで、ユースケースの
-// 入力を組んで渡す（決定 D472、D473）。コマンドは build、tests、lsp の三つ（決定 D417）。言語サーバーは、別のバイナリにせず、
-// サブコマンド lsp にする（hozo.compiler.Requirement.SingleBinary）。
+// 入力を組んで渡す（決定 D472、D473）。
 // コマンドの op は export: go-cli の Main が、名前空間の外から、入口の Ops を通して呼ぶ（docs/plugin-go-cli.md「対象」の CLI-6）。
 package cli

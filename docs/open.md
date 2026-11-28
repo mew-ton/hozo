@@ -412,7 +412,7 @@ classify Gathered of Shipment { Complete; Awaiting: not Complete; }
 
 ### 設計書との違いの一覧の残り
 
-決定 D150 は、「設計書との違いを追う一覧は、持たない」と決めた。`tests/corpus/design/README.md`「設計書から変えた箇所」が、残っている（`cli.md`「cli.hozo」にあった一覧は、決定 D808 で、`spec/cli.hozo` の宣言の説明に移して、なくした）。
+決定 D150 は、「設計書との違いを追う一覧は、持たない」と決めた。`tests/corpus/design/README.md`「設計書から変えた箇所」が、残っている。
 
 コーパス `design` は、設計書の例を集めたものなので（`testing.md`「コーパス」）、写せなかった箇所の一覧は、コーパスの説明でもある。消すか、出どころの記録として残すかは、決めていない。
 

@@ -159,8 +159,8 @@ type TestsResult struct {
 }
 
 // CheckInput は検査（check）の入力。ユースケースの入力（EmitInput、CoverageInput）から、配線が作る。
-// 環境変数（HOZO_PLUGIN_PATH、HOZO_CACHE_DIR）も、コマンドの入力のフィールドとして受け取り、ここまで配線で渡す: 葉の op の実装が、
-// プロセスの環境を自分で読まないので、同じ入力から同じ結果になり、テストが、実行する人の環境に左右されない
+// 環境変数（HOZO_PLUGIN_PATH、HOZO_CACHE_DIR）も、コマンドの入力のフィールドとして受け取り、ここまで配線で渡す。葉の op の実装は、
+// プロセスの環境を自分で読まない（docs/testing.md「環境からの独立」）
 type CheckInput struct {
 	// 設定ファイルの場所
 	Config *Path `json:"config,omitempty"`
