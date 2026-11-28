@@ -82,7 +82,7 @@ hozo.toml: error[CFG-12]: 2 番目の [[emit]]（namespace = "server"）に out 
 
 ## 終了コード
 
-`spec/cli.hozo`（`docs/cli.md`）の例外の `@cli.exitCode` と、`cli` の語彙の既定（`docs/plugin-go-cli.md`「実行と表示」）で決まる。64 と 70 は `sysexits` の慣習（`EX_USAGE`、`EX_SOFTWARE`）。
+`spec/cli.hozo`（`docs/cli.md`）の例外の `@cli.exitCode` と、`cli` の語彙の既定（`plugins/go-cli/spec/go-cli.hozo` の `Requirement.Run`）で決まる。64 と 70 は `sysexits` の慣習（`EX_USAGE`、`EX_SOFTWARE`）。
 
 | コード | 例外 | 中身 |
 |---|---|---|

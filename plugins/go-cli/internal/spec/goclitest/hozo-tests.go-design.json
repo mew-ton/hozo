@@ -1,0 +1,9 @@
+{
+  "tests": [
+    {"name": "hozo.gocli.Requirement.Output", "file": "internal/spec/goclitest/design.go", "lines": [139, 139]},
+    {"name": "hozo.gocli.Requirement.Arguments", "file": "internal/spec/goclitest/design.go", "lines": [142, 142]},
+    {"name": "hozo.gocli.Requirement.CommandFunctions", "file": "internal/spec/goclitest/design.go", "lines": [145, 145]},
+    {"name": "hozo.gocli.Requirement.Run", "file": "internal/spec/goclitest/design.go", "lines": [148, 148]},
+    {"name": "hozo.gocli.Requirement.Usage", "file": "internal/spec/goclitest/design.go", "lines": [151, 151]}
+  ]
+}

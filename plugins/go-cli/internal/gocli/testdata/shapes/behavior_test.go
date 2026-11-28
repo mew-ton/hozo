@@ -1,4 +1,4 @@
-// 入力 shapes の出力を動かす（plugins/go-cli の TestBehavior が、基底 go・go-valid・go-cli の出力を書いたモジュールのルートに
+// 入力 shapes の出力を動かす（plugins/go-cli の TestRequirements が、基底 go・go-valid・go-cli の出力を書いたモジュールのルートに
 // 置いて走らせる）。shapea と shapeb の cli.go は、名前空間の名前のほかは同じテキスト（plugins/go-cli の TestSameShape）。
 // ここでは、型の違いが、実行時に出ることを確かめる（docs/testing.md「単体テスト」の「型に依らない形の確かめ」）:
 // 値を取らないフラグか（読む先が真偽値か）、残りの位置引数か（読む先がスライスか）、省略可能か（読む先がポインタか）、

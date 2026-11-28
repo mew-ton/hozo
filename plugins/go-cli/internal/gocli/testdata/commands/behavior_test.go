@@ -1,18 +1,18 @@
-// 入力 commands の出力を動かす（plugins/go-cli の TestBehavior が、基底 go・go-valid・go-cli の出力を書いたモジュールのルートに
+// 入力 commands の出力を動かす（plugins/go-cli の TestRequirements が、基底 go・go-valid・go-cli の出力を書いたモジュールのルートに
 // 置いて走らせる）。確かめること（docs/plugin-go-cli.md）:
 //
-//   - 「出力」: Main は、基底の New の戻り値（入口の Ops）をそのまま受け取り、ctx を op にそのまま渡す。
-//   - 「引数の解釈」の各規則: コマンドがない・知らない、help / --help / -h、--name value と --name=value、値を取らない boolean の
+//   - hozo.gocli.Requirement.Output: Main は、基底の New の戻り値（入口の Ops）をそのまま受け取り、ctx を op にそのまま渡す。
+//   - hozo.gocli.Requirement.Arguments の各規則: コマンドがない・知らない、help / --help / -h、--name value と --name=value、値を取らない boolean の
 //     フラグ（読む先の型で、実行時に決まる）、同じフラグが二度、-x は位置引数、-- 以降は位置引数、知らないフラグ・値のないフラグ・
 //     変換できない値・位置引数が多い（どれも 64）、@cli.env（フラグと位置引数が優先、空文字列は「ない」）、@cli.arg（位置は引数で
 //     決まり、宣言の順ではない。array は残りすべて）、名前を省いた @cli.flag / @cli.env（フィールドの名前）、値の変換
 //     （int / float / boolean / scalar）、Validate の違反（64）。
 //   - 値が与えられなかったときの三つの扱い: @cli.required（誤り。64）、@cli.default（その値）、どちらもない（零値のまま）。
 //     フラグ、位置引数、環境変数だけのフィールド、残りを受け取る array で。
-//   - 「実行と表示」: 成功は Present を呼んで 0。例外は Signature の順に値の型で見分けて Failure を作り、@cli.exitCode か 70。
+//   - hozo.gocli.Requirement.Run: 成功は Present を呼んで 0。例外は Signature の順に値の型で見分けて Failure を作り、@cli.exitCode か 70。
 //     見分けられなければ 70。Present / PresentError の失敗は 70。JSONPresenter の形。Failure の Value は、引数を持つ例外の
 //     値そのもの（表示の value は、引数の名前をキーにしたオブジェクト）で、引数を持たない例外は nil（value を出さない）。
-//   - 「使い方の表示」: 全体とコマンドごと。プログラム名は filepath.Base(os.Args[0])。
+//   - hozo.gocli.Requirement.Usage: 全体とコマンドごと。プログラム名は filepath.Base(os.Args[0])。
 package behavior
 
 import (
@@ -482,7 +482,7 @@ func (r *recorder) PresentError(w io.Writer, command string, input any, f toolcl
 	return r.err
 }
 
-// TestPresenter は「実行と表示」: Present は標準出力と、コマンドの名前、入力、結果を受け取る。PresentError は標準エラーと Failure
+// TestPresenter は hozo.gocli.Requirement.Run: Present は標準出力と、コマンドの名前、入力、結果を受け取る。PresentError は標準エラーと Failure
 // （例外の FQN、運ぶ値、op が返した error そのもの）を受け取る。Present / PresentError 自体の失敗は、標準エラーに出して 70。
 // ctx は op にそのまま渡る。env が nil なら、環境変数を見ない。
 func TestPresenter(t *testing.T) {
@@ -554,7 +554,7 @@ func TestPresenter(t *testing.T) {
 	}
 }
 
-// TestJSONPresenter は「実行と表示」の JSONPresenter の形。
+// TestJSONPresenter は hozo.gocli.Requirement.Run の JSONPresenter の形。
 func TestJSONPresenter(t *testing.T) {
 	p := toolcli.JSONPresenter{}
 	var b bytes.Buffer

@@ -7,7 +7,7 @@ import compiler "github.com/mew-ton/hozo/internal/gen/hozo/compiler/types"
 // OutputFormat は表示の形式。text か json。json は、診断を機械が読むためのもの（docs/diagnostics.md「json」）
 type OutputFormat string
 
-// BuildInput は build の入力。フラグ（noEmit、dryRun）は、省略可能でない boolean で、付いていなければ偽（docs/plugin-go-cli.md「語彙」）
+// BuildInput は build の入力。フラグ（noEmit、dryRun）は、省略可能でない boolean で、付いていなければ偽（plugins/go-cli/cli.hozo）
 type BuildInput struct {
 	// 設定ファイルの場所
 	Config *compiler.Path `json:"config,omitempty"`

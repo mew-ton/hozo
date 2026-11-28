@@ -11,7 +11,7 @@ import (
 	"github.com/mew-ton/hozo/internal/gen/hozo/compiler"
 )
 
-// Presenter は結果と例外の表示（docs/plugin-go-cli.md「実行と表示」）。
+// Presenter は結果と例外の表示（plugins/go-cli/spec/go-cli.hozo の Requirement.Run）。
 // go-cli が生成した cli.Presenter の実装で、cli.Main が結果を標準出力に、例外を標準エラーに出すときに呼ぶ。
 //
 // 形式は input（コマンドの入力 hozo.cli の BuildInput / TestsInput）の format で選ぶ（docs/diagnostics.md「表示」）。なければ text。
@@ -98,7 +98,7 @@ func (Presenter) Present(w io.Writer, command string, input any, result any) err
 
 // PresentError は例外を w に出す。
 func (Presenter) PresentError(w io.Writer, command string, input any, f cli.Failure) error {
-	// f.Value は、引数を持つ例外の、値そのもの（docs/plugin-go-cli.md「コマンドごとの関数」）。診断を運ぶ例外かどうかは carriedBy が見る
+	// f.Value は、引数を持つ例外の、値そのもの（plugins/go-cli/spec/go-cli.hozo の Requirement.CommandFunctions）。診断を運ぶ例外かどうかは carriedBy が見る
 	diags, carries := carriedBy(f.Value)
 	if isJSON(input) {
 		if !carries {

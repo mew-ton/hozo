@@ -39,7 +39,7 @@ formats = []
 enabled = true
 `
 
-// docs/plugin-go-cli.md「マニフェスト」。
+// plugins/go-cli/hozo-plugin.toml。
 const goCLIManifest = `
 name     = "go-cli"
 wasm     = "plugin.wasm"
@@ -117,7 +117,7 @@ func TestLoadManifestGoCLI(t *testing.T) {
 	}
 }
 
-// リポジトリの plugins/go-cli のマニフェストが読めて、docs/plugin-go-cli.md「マニフェスト」のとおりであること。
+// リポジトリの plugins/go-cli のマニフェストが読めて、plugins/go-cli/hozo-plugin.tomlのとおりであること。
 func TestLoadManifestRepoGoCLI(t *testing.T) {
 	m, diags := LoadManifest(filepath.Join("..", "..", "plugins", "go-cli", ManifestFileName))
 	if len(diags) != 0 || m == nil {

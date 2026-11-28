@@ -2,7 +2,7 @@
 //
 // 骨組みは spec/cli.hozo から生成したもの（docs/requirements.md「自己展開」の 3）: ユースケースの名前空間 hozo.compiler と、コマンドの行の
 // 名前空間 hozo.cli の、型と op の形と配線 internal/gen/hozo/compiler、internal/gen/hozo/cli（基底 go と go-valid。docs/plugin-go.md、
-// docs/plugin-go-valid.md）と、go-cli が出した internal/gen/hozo/cli/cli（docs/plugin-go-cli.md「出力」）。ここは、internal/app の Main を呼ぶだけ: internal/app の葉の op と
+// docs/plugin-go-valid.md）と、go-cli が出した internal/gen/hozo/cli/cli（plugins/go-cli/spec/go-cli.hozo の Requirement.Output）。ここは、internal/app の Main を呼ぶだけ: internal/app の葉の op と
 // 状態の単位の実装を compiler.New に渡したもの（app.App の Ops）を、表示（cli.Presenter）と一緒に cli.Main に渡す
 // （internal/app（パッケージ app の説明））。古い名前のコマンド（check、emit）には、新しい書き方を示す。
 // 骨組みを変えるときは spec/cli.hozo を変えて `make generate`。

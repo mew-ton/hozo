@@ -232,7 +232,7 @@ func firstDiff(want, got string) string {
 	return "  （違いなし）"
 }
 
-// checkFormatted は、生成した Go が go/format を通した形で、一行目がヘッダであること（docs/plugin-go-cli.md「出力」）を確かめる。
+// checkFormatted は、生成した Go が go/format を通した形で、一行目がヘッダであること（plugins/go-cli/spec/go-cli.hozo の Requirement.Output）を確かめる。
 func checkFormatted(t *testing.T, files map[string]string) {
 	t.Helper()
 	for _, p := range sortedPaths(files) {

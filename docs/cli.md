@@ -14,7 +14,7 @@ hozoc 自身の仕様の持ち主は、`spec/cli.hozo`（決定 D807、D808）�
 
 `spec/cli.hozo` から生成する単位（名前空間と、トランスパイラと、置き場）は、リポジトリ直下の `hozo.toml` が持つ。
 
-この文書と `docs/` のほかの文書が、修飾なしに `cli.hozo` と書けば、`spec/cli.hozo` を指す。go-cli プラグインの語彙のファイルは、`plugins/go-cli/cli.hozo` と書く（`docs/plugin-go-cli.md`「マニフェスト」）。
+この文書と `docs/` のほかの文書が、修飾なしに `cli.hozo` と書けば、`spec/cli.hozo` を指す。go-cli プラグインの語彙のファイルは、`plugins/go-cli/cli.hozo` と書く（`plugins/go-cli/hozo-plugin.toml`）。
 
 `spec/` のほかのファイルが何を書き、持ち主がどこで、コードになるかは、それぞれのファイルの頭のコメントが言う。
 

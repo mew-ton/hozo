@@ -1,4 +1,4 @@
-// 入力 locals の出力を動かす（plugins/go-cli の TestBehavior が、基底 go・go-valid・go-cli の出力を書いたモジュールのルートに
+// 入力 locals の出力を動かす（plugins/go-cli の TestRequirements が、基底 go・go-valid・go-cli の出力を書いたモジュールのルートに
 // 置いて走らせる）。名前空間のパッケージの名前が、cli.go の局所の名前（env、in）や、標準ライブラリのパッケージの名前（errors、fmt）と
 // 当たっても、コンパイルでき、同じに動くこと。
 package behavior

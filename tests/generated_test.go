@@ -90,8 +90,8 @@ func TestGeneratedUpToDate(t *testing.T) {
 }
 
 // pluginProjects は、プラグインのプロジェクト（plugins/<名前>/hozo.toml。internal/tools/selfgen の pluginProjects と同じ）。
-// 置き場は plugins/<名前>/internal/spec（docs/plugin-go-http.md「go-http 自身の要求」、docs/plugin-go-sqlite.md「go-sqlite 自身の要求」）。
-var pluginProjects = []string{"go-http", "go-sqlite"}
+// 置き場は plugins/<名前>/internal/spec（docs/plugin-go-http.md「go-http 自身の要求」、docs/plugin-go-sqlite.md「go-sqlite 自身の要求」、plugins/go-cli/spec/go-cli.hozo）。
+var pluginProjects = []string{"go-cli", "go-http", "go-sqlite"}
 
 // TestGeneratedPluginSpecsUpToDate は、プラグインのプロジェクトごとに、コミットされた plugins/<名前>/internal/spec/** が、
 // そのプラグイン自身の要求の仕様 plugins/<名前>/spec/<名前>.hozo から遅れていないこと（docs/testing.md「生成物の一致」）。

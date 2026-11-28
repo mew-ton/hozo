@@ -78,8 +78,6 @@ func docBlock(t *testing.T, doc, marker string) string {
 //   - vocab/http.hozo は、docs/vocab.md「`http` の語彙」のブロック（「この部分」）を、そのまま含む。
 //   - vocab/prd.hozo（prd と、その下の actor、usecase、business）は、docs/vocab.md「設計の図の語彙」の全文と、
 //     バイト単位で同じ。
-//   - plugins/go-cli/cli.hozo は、docs/plugin-go-cli.md「語彙」のブロックの宣言（説明のコメントは略してある）を、
-//     同じ順に、過不足なく持つ。
 func TestDocsEmbedVocabulary(t *testing.T) {
 	read := func(path string) string {
 		t.Helper()
@@ -109,21 +107,4 @@ func TestDocsEmbedVocabulary(t *testing.T) {
 			}
 		})
 	}
-	t.Run("plugins/go-cli/cli.hozo", func(t *testing.T) {
-		decls := func(s string) []string {
-			var out []string
-			for _, line := range strings.Split(s, "\n") {
-				if l := strings.TrimSpace(line); strings.HasPrefix(l, "decorator ") || strings.HasPrefix(l, "@external") || strings.HasPrefix(l, "namespace ") {
-					out = append(out, l)
-				}
-			}
-			return out
-		}
-		want := decls(docBlock(t, "../docs/plugin-go-cli.md", "`plugins/go-cli/cli.hozo` の宣言は次のとおり"))
-		got := decls(read("../plugins/go-cli/cli.hozo"))
-		if strings.Join(got, "\n") != strings.Join(want, "\n") {
-			t.Errorf("plugins/go-cli/cli.hozo の宣言が、docs/plugin-go-cli.md「語彙」と違う（文書に合わせる）:\n文書:\n  %s\nファイル:\n  %s",
-				strings.Join(want, "\n  "), strings.Join(got, "\n  "))
-		}
-	})
 }
