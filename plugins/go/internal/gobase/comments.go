@@ -7,7 +7,7 @@ import (
 	"github.com/mew-ton/hozo/plugin/golang"
 )
 
-// このファイルは、コメントのテキスト（docs/plugin-go.md「コメント」）。
+// このファイルは、コメントのテキスト（plugins/go/spec/go.hozo の Requirement.Comments）。
 
 // comment は text の行ごとに `// ` を付ける（空の行は `//`）。末尾に改行を一つ付ける。text が空なら ""。
 func comment(text string) string {
@@ -59,7 +59,7 @@ func describe(name string, d *ir.Doc, fallback string) string {
 	return wa(name, fallback)
 }
 
-// opFacts は、op のコメントの、説明の後ろの段（docs/plugin-go.md「コメント」の「op のコメント」）: `引数:` の段と、
+// opFacts は、op のコメントの、説明の後ろの段（plugins/go/spec/go.hozo の Requirement.Comments の「op のコメント」）: `引数:` の段と、
 // Throws / Reads / Effects の行。純粋かどうか（Signature.pure）は、書かない。sig は、その op の計算した結果（Op.signature か、
 // 見る側から見た View.ops の値）。
 func opFacts(o *ir.Op, sig *ir.Signature) []string {
@@ -124,7 +124,7 @@ func caseSet(s ir.CaseSet) string {
 
 // effectTarget は、効果の宛先の書き方（状態の単位の命令のコメント、effect の定数のコメント）: 組み込みの効果なら
 // `<状態の FQN>.<post / put / delete>`（行の遷移を持つなら、その後ろに空白一つと、行の遷移の表示）、遷移なら
-// `<宛先の FQN> as <前> -> <後>`（仕様の宣言の綴りと同じ。docs/plugin-go.md「コメント」）。
+// `<宛先の FQN> as <前> -> <後>`（仕様の宣言の綴りと同じ。plugins/go/spec/go.hozo の Requirement.Comments）。
 func effectTarget(e *ir.Effect) string {
 	switch t := e.Target.(type) {
 	case ir.BuiltinTarget:

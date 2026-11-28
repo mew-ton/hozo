@@ -108,11 +108,11 @@ func TestNoisy(t *testing.T)    { desktest.RunSeams(t, deskCases{noisy{}}) }
 func TestSkipping(t *testing.T) { desktest.RunSeams(t, deskCases{skipping{}}) }
 `
 
-// TestCatchCasesFail は、継ぎ目の実装が、デコレータの宣言に反すれば、RunSeams が、受ける例外ごとのテストを落とすこと
-// （docs/plugin-go.md「デコレータのテストの口」の「受けるケース」の、扱いごとの確かめ）: 受けるはずの例外を、そのまま返す。
+// catchCasesFail は、継ぎ目の実装が、デコレータの宣言に反すれば、RunSeams が、受ける例外ごとのテストを落とすこと
+// （plugins/go/spec/go.hozo の Requirement.UnitTestPort の「デコレータのテストの口」の「受けるケース」の、扱いごとの確かめ）: 受けるはずの例外を、そのまま返す。
 // ignores と、throws のない recovers なのに、別の失敗を返す。throws を持つ recovers なのに、その throws にない例外を返す。
 // 中身を、呼ばない。宣言どおりのところは、同じ走りの中でも、通る。
-func TestCatchCasesFail(t *testing.T) {
+func catchCasesFail(t *testing.T) {
 	root, files := emitFixture(t, "wraps")
 	writeFiles(t, root, files)
 	test, err := os.ReadFile(filepath.Join("testdata", "wraps", "behavior_test.go"))

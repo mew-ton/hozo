@@ -21,10 +21,10 @@ func methodBody(t *testing.T, src, name string) string {
 	return src[i+open+2 : i+end]
 }
 
-// TestElseArmSameCode は docs/plugin-go.md「match」の「else のアームは、受けるケース（MatchArm.cases）を名前で並べたアームと、
+// elseArmSameCode は plugins/go/spec/go.hozo の Requirement.Wiring の「match」の「else のアームは、受けるケース（MatchArm.cases）を名前で並べたアームと、
 // 同じコードになる」: testdata/matchswitch の describe（すべてのケースを名前で書く）と describeElse（最後のアームを else と
 // 書く）は、仕様に書いたままのコメント以外、本体が同じ。基底は MatchArm.else を読まない。
-func TestElseArmSameCode(t *testing.T) {
+func elseArmSameCode(t *testing.T) {
 	_, files := emitFixture(t, "matchswitch")
 	wiring, ok := files["gen/app/wiring.go"]
 	if !ok {

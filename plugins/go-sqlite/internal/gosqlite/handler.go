@@ -18,7 +18,7 @@ import (
 // TranspilerName は、このプラグインが提供するただ一つのトランスパイラの名前（docs/plugin-go-sqlite.md「マニフェスト」）。
 const TranspilerName = "go-sqlite"
 
-// FileName は、このトランスパイラが、入口のパッケージに置くファイルの名前（docs/plugin-go.md「相乗りのファイル」）。
+// FileName は、このトランスパイラが、入口のパッケージに置くファイルの名前（plugins/go/spec/go.hozo の Requirement.Layout の「相乗りのファイル」）。
 const FileName = "db.go"
 
 // Handler は go-sqlite の plugin.Handler。emit と、emit と同じ検査で答える check を実装する。

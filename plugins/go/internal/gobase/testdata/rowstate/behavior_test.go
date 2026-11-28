@@ -1,6 +1,6 @@
 // 生成したコードの振る舞いのテスト（docs/testing.md「単体テスト」の `plugins/go`）: 行の遷移を持つ効果は、宛先の状態の単位の
 // メソッドのままで、配線は、仕様の呼び出しを、そのまま写す（基底は、効果の後で、行が、言ったケースにあるかを確かめるコードを
-// 足さない。docs/plugin-go.md「状態の単位」）。効果の前の、行のケース（絞り込んだ引数）は、効果の入口で確かめる（同「効果の入口の
+// 足さない。plugins/go/spec/go.hozo の Requirement.Ports の「状態の単位」）。効果の前の、行のケース（絞り込んだ引数）は、効果の入口で確かめる（同「効果の入口の
 // 確かめ」）。ない側のケースを持つ、述語で決まる分類は、述語を持たないケースを、判定関数が、値がないことで決める（同「分類」）。
 // plugins/go の TestBehavior が、生成したコードのモジュールのルートに置いて走らせる。
 package behavior
@@ -96,7 +96,7 @@ func setup(rows ...app.Order) (*orders, *life, app.Ops) {
 	return s, l, app.New(s, l, stage{})
 }
 
-// LifeCases は、ない側のケースの述語を持たない（docs/plugin-go.md「分類」）
+// LifeCases は、ない側のケースの述語を持たない（plugins/go/spec/go.hozo の Requirement.Wiring の「分類」）
 func TestAbsentCaseHasNoPredicate(t *testing.T) {
 	typ := reflect.TypeOf((*app.LifeCases)(nil)).Elem()
 	var names []string

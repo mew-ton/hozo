@@ -1,5 +1,5 @@
 // 入力 typespkg の出力を動かす（plugins/go の TestBehavior が、出力を書いたモジュールのルートに置いて走らせる）。確かめること
-// （docs/plugin-go.md「型のパッケージ」）:
+// （plugins/go/spec/go.hozo の Requirement.Layout の「型のパッケージ」）:
 //
 //   - 互いの型を使う二つの名前空間（ship の型が carry の型を使い、carry の関数が ship の型を使う）の出力が、コンパイルできて、動く。
 //   - 人が書くコードから見た名前は、変わらない: 入口のパッケージの名前（ship.Parcel、carry.Code）で、型を書ける。

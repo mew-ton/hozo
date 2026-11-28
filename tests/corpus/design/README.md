@@ -66,15 +66,15 @@
 
 ## 出力
 
-`testdata/expected/emit/` は、基底 `go` が出したもの（`docs/plugin-go.md`）。実装が書いたものを `-update` で置いた、後戻りの検出のためのゴールデン（`docs/testing.md`「コーパス」）。
+`testdata/expected/emit/` は、基底 `go` が出したもの（`plugins/go/spec/go.hozo`）。実装が書いたものを `-update` で置いた、後戻りの検出のためのゴールデン（`docs/testing.md`「コーパス」）。
 
 | 出力 | 中身 |
 |---|---|
-| `gen/server/` | `server` は内部の op を持つので、定義は内側のフォルダ `inner/`、入口は `export` の op だけの `Ops` と、型・状態の単位の再公開（`docs/plugin-go.md`「内側のフォルダと入口」）。すべての op が出る: 配線（効果を呼ぶ op を含む）は `inner/wiring.go`、本体のない op は、どれも `Leaves`（同「op の置き場」）。効果は、宛先の状態の単位のメソッド（`inner/states.go` の `SessionsState.CreateSession`、`CartsState.AddCartLine` など。同「状態の単位」）で、配線が `o.sessions.CreateSession(ctx, …)` の形で呼ぶ。引数を持つ例外は、引数ごとにフィールド一つの構造体（`ClientError{Value Violations}`。同「exception」） |
+| `gen/server/` | `server` は内部の op を持つので、定義は内側のフォルダ `inner/`、入口は `export` の op だけの `Ops` と、型・状態の単位の再公開（`plugins/go/spec/go.hozo` の `Requirement.Layout` の「内側のフォルダと入口」）。すべての op が出る: 配線（効果を呼ぶ op を含む）は `inner/wiring.go`、本体のない op は、どれも `Leaves`（同「op の置き場」）。効果は、宛先の状態の単位のメソッド（`inner/states.go` の `SessionsState.CreateSession`、`CartsState.AddCartLine` など。同「状態の単位」）で、配線が `o.sessions.CreateSession(ctx, …)` の形で呼ぶ。引数を持つ例外は、引数ごとにフィールド一つの構造体（`ClientError{Value Violations}`。同「exception」） |
 | `gen/client/` | 同じく `inner/` と入口。述語で決まる分類（`WarrantyKind`、`WarrantyAvailable`）の `classify.go`、`server` の op の口 `ServerOps`、`server` の入口のパッケージの型の import |
 | `gen/http/`、`gen/page/` | 語彙の型（`http` の例外、`browser.page.Route` など）だけ。op を持たないので、`inner/` はない。`http.BadRequest` は、二つの引数（`message`、`violations`）が、そのまま二つのフィールド |
 
-相乗りを並べていないので、語彙のデコレータ（`@http.get`、`@browser.page.route`、`@db.table` など）と、利用者が `valid` に足した制約（§6.5）は印のままで、出力に現れない（`docs/plugin-go.md`「デコレータ」）。印のままのデコレータは、どのトランスパイラも解釈しないので、付けた所ごとに、CFG-26 の warning が出る（64 個。`docs/config.md`「解釈するトランスパイラ」。一覧は、ゴールデン `testdata/expected/check.txt`）。`http`、`valid`、`db` の語彙の検査は、相乗りを並べていなくても、掛かる（語彙のプラグイン `http`、`valid`、`db`。`docs/plugin-http.md`、`docs/plugin-valid.md`、`docs/plugin-db.md`）。`db` の、しまい方のデコレータは、表を出すトランスパイラが求めるもので、ここでは、書いていない（`docs/plugin-db.md`「しまい方」）。利用者が `valid` に足した制約は、語彙のプラグイン `valid` も、読まない（`docs/plugin-valid.md`「対象」）。
+相乗りを並べていないので、語彙のデコレータ（`@http.get`、`@browser.page.route`、`@db.table` など）と、利用者が `valid` に足した制約（§6.5）は印のままで、出力に現れない（`plugins/go/spec/go.hozo` の `Requirement.Decorators`）。印のままのデコレータは、どのトランスパイラも解釈しないので、付けた所ごとに、CFG-26 の warning が出る（64 個。`docs/config.md`「解釈するトランスパイラ」。一覧は、ゴールデン `testdata/expected/check.txt`）。`http`、`valid`、`db` の語彙の検査は、相乗りを並べていなくても、掛かる（語彙のプラグイン `http`、`valid`、`db`。`docs/plugin-http.md`、`docs/plugin-valid.md`、`docs/plugin-db.md`）。`db` の、しまい方のデコレータは、表を出すトランスパイラが求めるもので、ここでは、書いていない（`docs/plugin-db.md`「しまい方」）。利用者が `valid` に足した制約は、語彙のプラグイン `valid` も、読まない（`docs/plugin-valid.md`「対象」）。
 
 ## 設計書の例が規則に触れるところ
 

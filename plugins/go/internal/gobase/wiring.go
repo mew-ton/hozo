@@ -10,12 +10,12 @@ import (
 	"github.com/mew-ton/hozo/plugin/golang"
 )
 
-// このファイルは wiring.go（docs/plugin-go.md「配線の本体」）: 単位の対象の配線ごとに、ops のメソッドを一つ。
+// このファイルは wiring.go（plugins/go/spec/go.hozo の Requirement.Wiring）: 単位の対象の配線ごとに、ops のメソッドを一つ。
 // 実行の順序は行の順で、並列にはしない。継ぎ目を持つ配線は、メソッドの名前が中身の名前（`loginBody`）になる。
 // 配線も、配線が呼ぶもの（op、read、効果、分類の判定関数）も、最初の引数に ctx を取り、最後の戻り値に error を返す
 // （同「op の形」）: 呼び出しには、いつも ctx を渡し、失敗は、いつも error で返す。panic は出さない。
 
-// ptrHelper は、値をポインタにする補助（docs/plugin-go.md「値」）。wiring.go が使っていれば、その末尾に一つだけ出す。
+// ptrHelper は、値をポインタにする補助（plugins/go/spec/go.hozo の Requirement.Wiring の「値」）。wiring.go が使っていれば、その末尾に一つだけ出す。
 const ptrHelper = "func ptr[T any](v T) *T { return &v }\n"
 
 // genWiring は定義のパッケージの wiring.go。単位の対象の配線がなければ nil。
@@ -33,7 +33,7 @@ func (e *emitter) genWiring() *fileGen {
 			b := newBody(e, f, os)
 			b.gen()
 		}
-		// 本体のあるデコレータの外側（docs/plugin-go.md「本体のあるデコレータ」）: 適用ごとに、メソッド一つ。書かれた順
+		// 本体のあるデコレータの外側（plugins/go/spec/go.hozo の Requirement.Wraps）: 適用ごとに、メソッド一つ。書かれた順
 		for i, l := range os.Layers {
 			if l.Bodied {
 				e.genWrap(f, os, i)
@@ -64,7 +64,7 @@ func hasBodied(os golang.OpShape) bool {
 	return false
 }
 
-// wrapResult は、本体のあるデコレータの外側で、包んだ関数の呼び出しの結果を受ける val の名前（docs/plugin-go.md「本体のあるデコレータ」）。
+// wrapResult は、本体のあるデコレータの外側で、包んだ関数の呼び出しの結果を受ける val の名前（plugins/go/spec/go.hozo の Requirement.Wraps）。
 const wrapResult = "result"
 
 // wrapStatements は、デコレータの本体の文を、値を返す op の配線として書ける形に、直す: 包んだ関数の呼び出し（か、包んだ関数の呼び出しのアームを
@@ -104,7 +104,7 @@ func wrapStatements(stmts []ir.Statement, o *ir.Op) []ir.Statement {
 				expr, span = ir.MatchExpr{Match: x.Match}, x.Span
 			}
 		case ir.TryStmt:
-			// try { next(); … }: 結果の val を、try の前に、空で宣言し、try のブロックの中で入れる（docs/plugin-go.md「例外を受ける文」）
+			// try { next(); … }: 結果の val を、try の前に、空で宣言し、try のブロックの中で入れる（plugins/go/spec/go.hozo の Requirement.Wiring の「例外を受ける文」）
 			if len(x.Body) > 0 {
 				if cs, isCall := x.Body[0].(ir.CallStmt); isCall && cs.Call.IsProceed() {
 					body := append([]ir.Statement{ir.AssignStmt{Name: name, Expr: ir.CallExpr{Call: cs.Call}, Span: cs.Span}}, x.Body[1:]...)
@@ -131,7 +131,7 @@ func wrapStatements(stmts []ir.Statement, o *ir.Op) []ir.Statement {
 	return out
 }
 
-// genWrap は、op os に付いた、本体のあるデコレータ（os.Layers[i]）の外側のメソッド（docs/plugin-go.md「本体のあるデコレータ」）。
+// genWrap は、op os に付いた、本体のあるデコレータ（os.Layers[i]）の外側のメソッド（plugins/go/spec/go.hozo の Requirement.Wraps）。
 // 本体を、op の配線として書く。包んだ関数の呼び出し は、内側の層を、op の引数のまま呼ぶ。
 func (e *emitter) genWrap(f *fileGen, os golang.OpShape, i int) {
 	o := e.op(os.FQN)
@@ -194,7 +194,7 @@ type scope struct {
 	err    bool              // このブロックで、err を作る文（…, err := …）を、もう書いたか
 }
 
-// override は、match のアームの中の、絞り込まれた対象（docs/plugin-go.md「match」の「絞り込んだ値」）。
+// override は、match のアームの中の、絞り込まれた対象（plugins/go/spec/go.hozo の Requirement.Wiring の「match」の「絞り込んだ値」）。
 type override struct {
 	name  string   // 対象が束縛か引数なら、その名前
 	state string   // 対象が状態なら、その FQN
@@ -241,7 +241,7 @@ type bodyGen struct {
 	catches []catchVar
 }
 
-// catchVar は、catch のブロック一つ（docs/plugin-go.md「例外を受ける文」）: 仕様の、受けた例外の名前（name）と、
+// catchVar は、catch のブロック一つ（plugins/go/spec/go.hozo の Requirement.Wiring の「例外を受ける文」）: 仕様の、受けた例外の名前（name）と、
 // 受けた失敗の変数（err。error）、仕様の例外として取り出した変数（exc。runtime.Exception）。
 type catchVar struct {
 	name, err, exc string
@@ -302,7 +302,7 @@ func (b *bodyGen) line(s string) {
 }
 
 // needErr は、`x, err = <呼び出し>` の前に呼ぶ: err が、まだ、見えていなければ、`var err error` を置く
-// （docs/plugin-go.md「文」）。
+// （plugins/go/spec/go.hozo の Requirement.Wiring の「文」）。
 func (b *bodyGen) needErr() {
 	for _, sc := range b.scopes {
 		if sc.err {
@@ -379,7 +379,7 @@ func (b *bodyGen) returnErr(errExpr string) {
 	b.terminated = true
 }
 
-// fail は失敗の扱い: `if err != nil { return <零値>, err }`（docs/plugin-go.md「呼び出し」）。
+// fail は失敗の扱い: `if err != nil { return <零値>, err }`（plugins/go/spec/go.hozo の Requirement.Wiring の「呼び出し」）。
 func (b *bodyGen) fail() {
 	b.line("if err != nil {")
 	b.depth++
@@ -560,14 +560,14 @@ func (b *bodyGen) narrowedFor(name, state string, path []string) *override {
 }
 
 // ref は、名前の Atom（束縛・引数か、状態）とパスを、Go の式とその型にする。途中に省略可能な model があれば、文の前に途中の値を作る
-// （docs/plugin-go.md「値」の「省略可能を通るパス」）。emit が false なら、型だけを求める（コードを書かない）。
+// （plugins/go/spec/go.hozo の Requirement.Wiring の「値」の「省略可能を通るパス」）。emit が false なら、型だけを求める（コードを書かない）。
 func (b *bodyGen) ref(name, state string, path []string, emit bool) (string, ir.Type) {
 	expr, typ, _ := b.refLiteral(name, state, path, emit)
 	return expr, typ
 }
 
 // refLiteral は ref と同じ。加えて、式が、リテラルの型で値が決まるもの（リテラルの型のフィールドを読む式と、リテラルの型の
-// アームに絞られた対象。docs/plugin-go.md「値」の「リテラルの型のフィールド」、「match」の variant）なら、そのリテラルを返す。
+// アームに絞られた対象。plugins/go/spec/go.hozo の Requirement.Wiring の「値」の「リテラルの型のフィールド」、「match」の variant）なら、そのリテラルを返す。
 // そのとき、式は、当てはめる型のない形のリテラルの式（当てはめる型に合わせるのは、atom）。
 func (b *bodyGen) refLiteral(name, state string, path []string, emit bool) (string, ir.Type, ir.Literal) {
 	var expr string
@@ -667,7 +667,7 @@ func (b *bodyGen) optionalPath(x string, inner ir.Type, rest []string, emit bool
 	return v, result
 }
 
-// literal は、リテラル lit を、型 target の位置に書く Go の式（docs/plugin-go.md「値」の literal の行と「型をそろえる」）。
+// literal は、リテラル lit を、型 target の位置に書く Go の式（plugins/go/spec/go.hozo の Requirement.Wiring の「値」の literal の行と「型をそろえる」）。
 // target が省略可能で、Go の型がポインタなら `ptr(<型>(<リテラル>))`。target が nil（位置の型が決まらない）なら、リテラルの型の値。
 func (f *fileGen) literal(lit ir.Literal, target ir.Type) string {
 	if opt, ok := target.(ir.OptionalType); ok {
@@ -746,7 +746,7 @@ func (b *bodyGen) atomType(a ir.Atom) ir.Type {
 	return nil
 }
 
-// atom は Atom を Go の式にする（docs/plugin-go.md「値」）。target は、その値を渡す位置の型（当てはめる型。決まらなければ nil）。
+// atom は Atom を Go の式にする（plugins/go/spec/go.hozo の Requirement.Wiring の「値」）。target は、その値を渡す位置の型（当てはめる型。決まらなければ nil）。
 // 戻り値は、式と、値の型（当てはめる前の型。none とレコードリテラルは target）。
 func (b *bodyGen) atom(a ir.Atom, target ir.Type) (string, ir.Type) {
 	switch x := a.(type) {
@@ -788,7 +788,7 @@ func (b *bodyGen) armOf(ref *ir.ArmRef) (*ir.Union, armType, bool) {
 	return nil, armType{}, false
 }
 
-// enter は、アーム a（union u のもの）の型の式 expr を、u の位置に入れる式（docs/plugin-go.md「値」の「union に入れる」）:
+// enter は、アーム a（union u のもの）の型の式 expr を、u の位置に入れる式（plugins/go/spec/go.hozo の Requirement.Wiring の「値」の「union に入れる」）:
 // マーカーを生やした構造体のアームは、式のまま。包む型のアームは、`<Union><アーム名>{Value: <式>}`。リテラルの型のアームは、
 // `<Union><アーム名>{}`（式は、使わない: 値は、型で決まっている）。
 func (b *bodyGen) enter(u *ir.Union, a armType, expr string) string {
@@ -861,7 +861,7 @@ func (b *bodyGen) entered(ex ir.Expr, arm *ir.ArmRef) string {
 	return "nil"
 }
 
-// convert は、型 from の式 expr を、型 to の位置に渡す式にする（docs/plugin-go.md「値」の「型をそろえる」）。
+// convert は、型 from の式 expr を、型 to の位置に渡す式にする（plugins/go/spec/go.hozo の Requirement.Wiring の「値」の「型をそろえる」）。
 // Go の型が同じなら、そのまま。array の要素をそろえる必要があれば、文の前にループを置く。
 func (b *bodyGen) convert(expr string, from, to ir.Type) string {
 	if from == nil || to == nil || b.sameGo(from, to) {
@@ -956,7 +956,7 @@ func hasPrefix(path, prefix []string) bool {
 }
 
 // record は、レコードリテラル rec（書かれていない引数なら nil）を、当てはめる model の構造体リテラルにする
-// （docs/plugin-go.md「値」の record の行、「bind で埋まる位置」の 3 と 4）。並びは model のフィールドの順。書かれていない
+// （plugins/go/spec/go.hozo の Requirement.Wiring の「値」の record の行、「bind で埋まる位置」の 3 と 4）。並びは model のフィールドの順。書かれていない
 // フィールド（省略可能なフィールドだけ）は書かず、零値のまま。当てはめる型が省略可能なら `&<型>{…}`。
 // path は、引数名からこの値までのパス、bounds は bind で埋まる位置。
 func (b *bodyGen) record(rec *ir.RecordAtom, target ir.Type, path []string, bounds []boundValue) string {
@@ -1047,7 +1047,7 @@ func addUnique(out *[]string, s string) {
 	*out = append(*out, s)
 }
 
-// read は、状態を、状態の単位の Get で読む（docs/plugin-go.md「状態の参照」）。読むのは、その状態を使う文の直前。
+// read は、状態を、状態の単位の Get で読む（plugins/go/spec/go.hozo の Requirement.Wiring の「状態の参照」）。読むのは、その状態を使う文の直前。
 // 変数の名前は、状態の名前（先頭を小文字に。当たれば末尾に _）。同じ状態をもう一度読むときは、同じ変数に = で代入する。
 // skip は、読まない状態（match が読んだ値を使うもの）。
 func (b *bodyGen) read(states []string, skip map[string]bool) {
@@ -1082,7 +1082,7 @@ type callInfo struct {
 	never bool    // 「返らない」呼び出し（never を返す op）
 }
 
-// target は、呼び出しの先（docs/plugin-go.md「呼び出し」の表の行）を、同じ形のメソッドの呼び出しとして見たもの:
+// target は、呼び出しの先（plugins/go/spec/go.hozo の Requirement.Wiring の「呼び出し」の表の行）を、同じ形のメソッドの呼び出しとして見たもの:
 // op か、read か、効果（宣言したものと、直に呼ぶ組み込みの効果）。どれも、最初の引数に ctx を取り、最後の戻り値に error を返す。
 type target struct {
 	recv   string       // メソッドの前: `o.`（同じ名前空間の op）、`o.<名前空間の引数名>.`、`o.<状態の単位の引数名>.`
@@ -1164,7 +1164,7 @@ func (b *bodyGen) targetOf(c *ir.Call) (target, bool) {
 	return target{}, false
 }
 
-// call は、呼び出しの式を作る（docs/plugin-go.md「呼び出し」「bind で埋まる位置」）。呼ぶ先が op でも、read でも、効果でも、
+// call は、呼び出しの式を作る（plugins/go/spec/go.hozo の Requirement.Wiring の「呼び出し」、Requirement.Wiring の「bind で埋まる位置」）。呼ぶ先が op でも、read でも、効果でも、
 // 同じ形のメソッドの呼び出しになる。bind で埋まる位置の状態は、先に read で読んであること。
 func (b *bodyGen) call(c *ir.Call) callInfo {
 	e := b.e
@@ -1223,7 +1223,7 @@ func (b *bodyGen) call(c *ir.Call) callInfo {
 	return callInfo{expr: t.recv + t.method + "(" + strings.Join(args, ", ") + ")", ret: t.ret, never: t.never}
 }
 
-// throwValue は、アームの本体の `throw E`、`throw E(<値>, …)` が作る例外の値（docs/plugin-go.md「match」の「アームの本体」）:
+// throwValue は、アームの本体の `throw E`、`throw E(<値>, …)` が作る例外の値（plugins/go/spec/go.hozo の Requirement.Wiring の「match」の「アームの本体」）:
 // 例外の構造体のリテラル。フィールドは例外の引数（Exception.params の順）で、いつもすべて書く。値は、引数の型を当てはめる型にして
 // 「値」の規則で書く。渡されていない省略可能な引数は nil。
 func (b *bodyGen) throwValue(t *ir.ThrowBody) string {
@@ -1565,12 +1565,12 @@ func (b *bodyGen) stmt(s ir.Statement, rest []ir.Statement) {
 	}
 }
 
-// tryStmt は、例外を受ける文（docs/plugin-go.md「例外を受ける文」）: try のブロックを、その場で呼ぶ関数にして、その失敗を、
+// tryStmt は、例外を受ける文（plugins/go/spec/go.hozo の Requirement.Wiring の「例外を受ける文」）: try のブロックを、その場で呼ぶ関数にして、その失敗を、
 // catch のブロックで受ける。受けるのは、仕様の例外（runtime.Exception）だけで、そうでない失敗は、そのまま返す。
 func (b *bodyGen) tryStmt(x ir.TryStmt) {
 	caught := b.fresh("caught")
 	b.line("// try")
-	// 関数は、基底が出すほかの関数と同じに、ctx を取り、error を返す（docs/plugin-go.md「op の形」）
+	// 関数は、基底が出すほかの関数と同じに、ctx を取り、error を返す（plugins/go/spec/go.hozo の Requirement.OpShape）
 	b.line("if " + caught + " := func(ctx " + b.f.im.Add("context", "context") + ".Context) error {")
 	b.depth++
 	b.push()
@@ -1603,7 +1603,7 @@ func (b *bodyGen) tryStmt(x ir.TryStmt) {
 	b.line("}")
 }
 
-// caughtSwitch は、受けた例外の match（docs/plugin-go.md「例外を受ける文」）: 型の switch。アームごとに case 一つで、そのアームが
+// caughtSwitch は、受けた例外の match（plugins/go/spec/go.hozo の Requirement.Wiring の「例外を受ける文」）: 型の switch。アームごとに case 一つで、そのアームが
 // 受けるケースの例外の型を、分類の宣言の順に並べる。残りのケースを受けるアームは default。残りのケースがない分類では、
 // default は、受けた失敗を、そのまま返す。mode、x、t は、アームの本体の使われ方（matchSwitch と同じ）。
 func (b *bodyGen) caughtSwitch(m *ir.Match, cs ir.CaughtSubject, mode matchMode, x string, t ir.Type) {
@@ -1678,7 +1678,7 @@ func (b *bodyGen) returnNever(ci callInfo) {
 	b.returnErr(ci.expr)
 }
 
-// returnCall は `return 呼び出し`（docs/plugin-go.md「文」）: 型をそろえる必要がなければ `return <呼び出し>`（戻り値の並びは、
+// returnCall は `return 呼び出し`（plugins/go/spec/go.hozo の Requirement.Wiring の「文」）: 型をそろえる必要がなければ `return <呼び出し>`（戻り値の並びは、
 // 呼ぶ先も、この配線も `(T, error)`）。型をそろえる必要があれば、v<n> に束縛して失敗の扱いを置いてから
 // `return <そろえた値>, nil`。
 func (b *bodyGen) returnCall(ci callInfo) {
@@ -1745,7 +1745,7 @@ func subjectText(a ir.Atom) string {
 	return "{…}"
 }
 
-// matchPlan は、match 一つの分け方（docs/plugin-go.md「match」の「分け方」の表）。
+// matchPlan は、match 一つの分け方（plugins/go/spec/go.hozo の Requirement.Wiring の「match」の「分け方」の表）。
 type matchPlan struct {
 	m        *ir.Match
 	classify *ir.Classify // 標準の分類なら nil
@@ -1765,7 +1765,7 @@ type matchPlan struct {
 }
 
 // armCasesText は、アームが受けるケースの名前（`, ` でつなぐ）。else のアームも、受けるケースの名前
-// （docs/plugin-go.md「match」: else のアームは、受けるケースを名前で並べたアームと、同じコードになる）。
+// （plugins/go/spec/go.hozo の Requirement.Wiring の「match」: else のアームは、受けるケースを名前で並べたアームと、同じコードになる）。
 func armCasesText(a *ir.MatchArm) string {
 	return strings.Join(a.Cases, ", ")
 }
@@ -1882,7 +1882,7 @@ func (p *matchPlan) narrowBy(a *ir.MatchArm, state string) ir.NarrowBy {
 	return ""
 }
 
-// narrow は、アーム a の中での絞り込みを b.overrides に足す（docs/plugin-go.md「match」の「絞り込んだ値」）。
+// narrow は、アーム a の中での絞り込みを b.overrides に足す（plugins/go/spec/go.hozo の Requirement.Wiring の「match」の「絞り込んだ値」）。
 // 戻り値は、枝の頭のコメントの「<対象> は <型>」の部分（絞り込まれなければ ""）。
 func (b *bodyGen) narrow(p *matchPlan, a *ir.MatchArm) string {
 	var texts []string
@@ -2070,7 +2070,7 @@ func (b *bodyGen) matchType(p *matchPlan) ir.Type {
 	return t
 }
 
-// armBody は、アームの本体を書く（docs/plugin-go.md「match」の「アームの本体」の表）。x は、`const x = match` の変数（その型は t）。
+// armBody は、アームの本体を書く（plugins/go/spec/go.hozo の Requirement.Wiring の「match」の「アームの本体」の表）。x は、`const x = match` の変数（その型は t）。
 func (b *bodyGen) armBody(p *matchPlan, a *ir.MatchArm, mode matchMode, x string, t ir.Type) {
 	switch body := a.Body.(type) {
 	case ir.CallExpr:
@@ -2150,12 +2150,12 @@ func armFor(m *ir.Match, name string) *ir.MatchArm {
 	return nil
 }
 
-// classificationError は、分類の誤りの値（docs/plugin-go.md「match」の「分類の誤りの枝」「switch の形」）。
+// classificationError は、分類の誤りの値（plugins/go/spec/go.hozo の Requirement.Wiring の「match」の「分類の誤りの枝」「switch の形」）。
 func (b *bodyGen) classificationError(classify string) string {
 	return "&" + b.f.im.Add(runtimePath, "runtime") + ".ClassificationError{Classify: " + strconv.Quote(classify) + "}"
 }
 
-// errorBranch は、分類の誤りの枝（docs/plugin-go.md「match」の「分類の誤りの枝」）の中身のテキスト:
+// errorBranch は、分類の誤りの枝（plugins/go/spec/go.hozo の Requirement.Wiring の「match」の「分類の誤りの枝」）の中身のテキスト:
 // `return <零値>, &runtime.ClassificationError{Classify: "<分類の FQN>"}` の一行。枝の頭のコメントは書かない。
 func (b *bodyGen) errorBranch(classify string) string {
 	saved, terminated := b.buf, b.terminated
@@ -2166,13 +2166,13 @@ func (b *bodyGen) errorBranch(classify string) string {
 	return text
 }
 
-// match は match を書く（docs/plugin-go.md「match」）: 分類の種類ごとの分け方と、使われ方ごとのアームの本体の組み合わせ。
+// match は match を書く（plugins/go/spec/go.hozo の Requirement.Wiring の「match」）: 分類の種類ごとの分け方と、使われ方ごとのアームの本体の組み合わせ。
 //
 // mode が modeConst（val x = match）なら、分ける前に `var x <型>` を置く。modeAssign（x = match）なら、置かない
 // （空の宣言の所に、もう、ある）。typ は、val の型（書いた型か、解決した型）。nil なら、match の型。
 func (b *bodyGen) match(m *ir.Match, mode matchMode, bindName string, typ ir.Type, rest []ir.Statement) {
 	if cs, caught := m.Subject.(ir.CaughtSubject); caught {
-		// 受けた例外の match（docs/plugin-go.md「例外を受ける文」）
+		// 受けた例外の match（plugins/go/spec/go.hozo の Requirement.Wiring の「例外を受ける文」）
 		x := ""
 		if mode == modeConst || mode == modeAssign {
 			if typ == nil {
@@ -2415,7 +2415,7 @@ func (b *bodyGen) matchIf(p *matchPlan, mode matchMode, x string, t ir.Type) {
 	}
 }
 
-// matchThree は、三つに分ける形（docs/plugin-go.md「match」の「三つに分ける形」。literal の分類で、対象の型が boolean?）:
+// matchThree は、三つに分ける形（plugins/go/spec/go.hozo の Requirement.Wiring の「match」の「三つに分ける形」。literal の分類で、対象の型が boolean?）:
 // 式のない switch。三つの側（真、偽、値がない）を、この順に見て、同じアームが受ける側（ケースのない側どうしは、分類の誤りの枝）を、
 // 一つの節にまとめる。最後の節は default:。
 func (b *bodyGen) matchThree(p *matchPlan, mode matchMode, x string, t ir.Type) {

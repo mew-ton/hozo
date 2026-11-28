@@ -13,7 +13,7 @@ import (
 // （docs/plugin-go.md「診断」）。
 var ErrNoModule = errors.New("no Go module name in the options")
 
-// ModuleOf は、出力の設定 cfg の、Go のモジュールの名前（docs/plugin-go.md「マニフェスト」のオプション module:
+// ModuleOf は、出力の設定 cfg の、Go のモジュールの名前（plugins/go/hozo-plugin.tomlのオプション module:
 // cfg.Options[cfg.Base]["module"]）。書かれていない、文字列でない、空なら ErrNoModule を包んだ誤り（GO-8）。
 // ファイル（go.mod）は、読まない（決定 D425）。
 func ModuleOf(cfg ir.NamespaceConfig) (string, error) {
@@ -29,7 +29,7 @@ func ModuleOf(cfg ir.NamespaceConfig) (string, error) {
 }
 
 // ImportPath は、モジュール module の、ディレクトリ dir（プロジェクトのルートからの相対パス。出力先 Dir(U, N) か、その下）に置く
-// パッケージの import パス（docs/plugin-go.md「パッケージと import パス」）: module に、dir を `/` でつないだもの。dir がルート
+// パッケージの import パス（plugins/go/spec/go.hozo の Requirement.Layout の「パッケージと import パス」）: module に、dir を `/` でつないだもの。dir がルート
 // そのもの（"."、""）なら module。モジュールのルートは、プロジェクトのルート。
 func ImportPath(module, dir string) string {
 	dir = path.Clean(filepath.ToSlash(dir))

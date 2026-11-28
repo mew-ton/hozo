@@ -7,7 +7,7 @@ import (
 	"github.com/mew-ton/hozo/ir"
 )
 
-// Place は op の置き場（docs/plugin-go.md「op の置き場」の表の 1〜3）: N の op の実装が、どこにあるか。
+// Place は op の置き場（plugins/go/spec/go.hozo の Requirement.Ports の「op の置き場」の表の 1〜3）: N の op の実装が、どこにあるか。
 // op は、関数の枠だけを作る。状態に触れるのは read と効果（どちらも状態の単位のメソッド）で、op ではないので、置き場は三つだけ。
 type Place int
 
@@ -21,7 +21,7 @@ const (
 	Leaf
 )
 
-// Shape は、一つの出力 (U, N) の、op と、実装を受け取る口のすべて（docs/plugin-go.md「出力の対象」「実装を受け取る口」「継ぎ目」）。
+// Shape は、一つの出力 (U, N) の、op と、実装を受け取る口のすべて（plugins/go/spec/go.hozo の Requirement.Targets、Requirement.Ports、Requirement.Seams）。
 // 基底も相乗りも、ShapeOf の同じ値から名前と並びを求める。
 type Shape struct {
 	// Ops は N の op: 単位の対象の op と、単位の対象の配線が呼ぶ、単位の対象でない N の op（本体のない op として出すもの）。宣言順。
@@ -43,7 +43,7 @@ type Shape struct {
 	New []Param
 }
 
-// OpShape は N の op 一つの形（docs/plugin-go.md「op の形」「op の置き場」「継ぎ目」）。メソッドは、どの op も、最初の引数に
+// OpShape は N の op 一つの形（plugins/go/spec/go.hozo の Requirement.OpShape、Requirement.Ports の「op の置き場」、Requirement.Seams）。メソッドは、どの op も、最初の引数に
 // ctx context.Context を取り、最後の戻り値に error を返す（同「op の形」）ので、それを言うフィールドは持たない。
 type OpShape struct {
 	// FQN は op の FQN。Method はメソッドの名前（op 名を先頭大文字にしたもの）。
@@ -55,13 +55,13 @@ type OpShape struct {
 	// Seams は、この op の継ぎ目のデコレータの FQN（書かれた順。先頭が最も外側）。空なら継ぎ目を持たない。
 	Seams []string
 	// Layers は、この op の中身を包むデコレータ（書かれた順。先頭が最も外側）: 継ぎ目のデコレータ（Seams と同じもの）と、
-	// 本体のあるデコレータ（docs/plugin-go.md「本体のあるデコレータ」）。空なら、op は一層。
+	// 本体のあるデコレータ（plugins/go/spec/go.hozo の Requirement.Wraps）。空なら、op は一層。
 	Layers []Layer
 	// Body は、包むデコレータを持ち、基底が中身を出す op（Wiring と Never）の、中身のメソッドの名前（`loginBody`）。それ以外は ""。
 	Body string
 }
 
-// Layer は、op の中身を包むデコレータ一つ（docs/plugin-go.md「継ぎ目」「本体のあるデコレータ」）。
+// Layer は、op の中身を包むデコレータ一つ（plugins/go/spec/go.hozo の Requirement.Seams、Requirement.Wraps）。
 type Layer struct {
 	// Decorator はデコレータの FQN（名前付きのデコレータは、汎用の側）。
 	Decorator string
@@ -73,7 +73,7 @@ type Layer struct {
 	Args []ir.Arg
 }
 
-// StateUnit は状態の単位一つ（docs/plugin-go.md「状態の単位」）: インターフェース `<状態>State`。その状態に触れるもののすべて。
+// StateUnit は状態の単位一つ（plugins/go/spec/go.hozo の Requirement.Ports の「状態の単位」）: インターフェース `<状態>State`。その状態に触れるもののすべて。
 // メソッドの並びは、形で決まる問い合わせ（基底の状態。Shape から決まる IsEmpty / Get）か、ケースごとの述語（状態の分類。Predicates）、
 // 形で決まる命令（Builtins）、read（Reads）、効果（Effects）。どれも ctx を取り、error を返す。
 type StateUnit struct {
@@ -94,7 +94,7 @@ type StateUnit struct {
 	Predicates []string
 }
 
-// Dep は別の名前空間の口一つ（docs/plugin-go.md「別の名前空間の op」）: インターフェース `<M>Ops`。
+// Dep は別の名前空間の口一つ（plugins/go/spec/go.hozo の Requirement.Ports の「別の名前空間の op」）: インターフェース `<M>Ops`。
 type Dep struct {
 	// Namespace は名前空間 M の FQN。TypeName はインターフェースの名前、Param は New の引数の名前。
 	Namespace, TypeName, Param string
@@ -102,7 +102,7 @@ type Dep struct {
 	Ops []string
 }
 
-// Seam は継ぎ目一つ（docs/plugin-go.md「Seams」）: op の FQN、デコレータの FQN、それを宣言したトランスパイラ
+// Seam は継ぎ目一つ（plugins/go/spec/go.hozo の Requirement.Seams の「Seams」）: op の FQN、デコレータの FQN、それを宣言したトランスパイラ
 // （View.config.seams の値）、Seams のメソッドの名前。
 type Seam struct {
 	Op, Decorator, Transpiler, Method string
@@ -339,7 +339,7 @@ func shapeOf(p *ir.Program, viewer string, inUnit func(*ir.Op) bool, seams map[s
 		s.Deps = append(s.Deps, dep)
 	}
 
-	// New の引数（docs/plugin-go.md「New」の表）。名前は、先に並んだ引数と当たらなくなるまで末尾に _ を足す
+	// New の引数（plugins/go/spec/go.hozo の Requirement.Ports の「New」の表）。名前は、先に並んだ引数と当たらなくなるまで末尾に _ を足す
 	// New の本体は、構造体 ops のリテラルを書く（`&ops{…}`）ので、引数に ops という名前を使わない
 	taken := map[string]bool{"ops": true}
 	hasInner := false
@@ -377,7 +377,7 @@ func shapeOf(p *ir.Program, viewer string, inUnit func(*ir.Op) bool, seams map[s
 	return s
 }
 
-// CheckedParam は、効果の入口の確かめ一つ（docs/plugin-go.md「効果の入口の確かめ」）: 引数 Param の値が、分類 Classify の
+// CheckedParam は、効果の入口の確かめ一つ（plugins/go/spec/go.hozo の Requirement.Ports の「効果の入口の確かめ」）: 引数 Param の値が、分類 Classify の
 // ケース Cases（引数の型に書かれた順）の、どれかにあること。
 type CheckedParam struct {
 	// Param は引数の名前。Classify は分類の FQN。Cases は、引数の型が言うケース。
@@ -402,7 +402,7 @@ func CheckedParams(p *ir.Program, e *ir.Effect) []CheckedParam {
 
 // PredicateNarrowing は、型 t が、そのまま、述語で決まる値の分類か op の分類で絞り込んだ型（`T on C.K`）なら、その分類の FQN と、
 // 型が言うケース。そうでなければ ok は false。基底が、判定関数 Classify<C> を呼んで確かめる所（効果の入口の確かめと、
-// 葉の op の戻り値の確かめ: docs/plugin-go.md「効果の入口の確かめ」「単体テストの口」）が使う。
+// 葉の op の戻り値の確かめ: plugins/go/spec/go.hozo の Requirement.Ports の「効果の入口の確かめ」、Requirement.UnitTestPort）が使う。
 func PredicateNarrowing(p *ir.Program, t ir.Type) (classify string, cases []string, ok bool) {
 	c, isCase := t.(ir.CaseType)
 	if !isCase || p == nil {
@@ -418,16 +418,16 @@ func PredicateNarrowing(p *ir.Program, t ir.Type) (classify string, cases []stri
 	return cl.Name, c.Cases, true
 }
 
-// CheckedUnitName は、入口の確かめを持つ状態の単位を包む、非公開の型の名前（docs/plugin-go.md「効果の入口の確かめ」）:
+// CheckedUnitName は、入口の確かめを持つ状態の単位を包む、非公開の型の名前（plugins/go/spec/go.hozo の Requirement.Ports の「効果の入口の確かめ」）:
 // `checked<状態>State`。
 func CheckedUnitName(stateOrClassify string) string {
 	return "checked" + StateUnitName(stateOrClassify)
 }
 
-// builtinOrder は、形で決まる命令の並び（docs/plugin-go.md「状態の単位」: Post、Put、Delete の順）。
+// builtinOrder は、形で決まる命令の並び（plugins/go/spec/go.hozo の Requirement.Ports の「状態の単位」: Post、Put、Delete の順）。
 var builtinOrder = []ir.Operation{ir.OpPost, ir.OpPut, ir.OpDelete}
 
-// place は op o の置き場（docs/plugin-go.md「op の置き場」: 上から順に、最初に当たる行）。target は o が単位の対象か。
+// place は op o の置き場（plugins/go/spec/go.hozo の Requirement.Ports の「op の置き場」: 上から順に、最初に当たる行）。target は o が単位の対象か。
 // 読む状態と効果（デコレータが運ぶ Op.carried を含む）は、置き場を変えない: 状態に触れるのは read と効果で、op ではない。
 func place(o *ir.Op, target bool) Place {
 	switch {
@@ -439,7 +439,7 @@ func place(o *ir.Op, target bool) Place {
 	return Leaf // 3: 葉と、単位の対象でない配線（本体を出さず、人が実装する葉として扱う）
 }
 
-// effectUnit は、効果 e の宛先の単位（docs/plugin-go.md「状態の単位」の「効果の宛先の単位」）: 組み込みの効果か、基底の状態の
+// effectUnit は、効果 e の宛先の単位（plugins/go/spec/go.hozo の Requirement.Ports の「状態の単位」の「効果の宛先の単位」）: 組み込みの効果か、基底の状態の
 // 遷移なら、その基底の状態。状態の分類の遷移なら、その分類が述語で決まるならその分類、型で決まるなら、その分類のただ一つの
 // 対象の状態。分からなければ ""。
 func effectUnit(p *ir.Program, e *ir.Effect) string {
@@ -462,7 +462,7 @@ func effectUnit(p *ir.Program, e *ir.Effect) string {
 	return ""
 }
 
-// Signature は、op のメソッドの引数と戻り値のテキスト（docs/plugin-go.md「op の形」）。形は op の宣言だけで決まり、
+// Signature は、op のメソッドの引数と戻り値のテキスト（plugins/go/spec/go.hozo の Requirement.OpShape）。形は op の宣言だけで決まり、
 // どのインターフェースに現れても、どの名前空間から見ても同じ。純粋かどうか（Op.signature.pure）と、throws の有無は、見ない。
 //
 //   - 引数: いつも、最初に `ctx context.Context`。続けて Op.params の並びのまま `<局所の名前> <型>`。
@@ -478,21 +478,21 @@ func Signature(op *ir.Op, imports *Imports, reserved map[string]bool) (params, r
 	return unitParams(op.Params, imports, reserved), results
 }
 
-// ReadSignature は、read のメソッド（状態の単位の問い合わせ）の引数と戻り値のテキスト（docs/plugin-go.md「状態の単位」）:
+// ReadSignature は、read のメソッド（状態の単位の問い合わせ）の引数と戻り値のテキスト（plugins/go/spec/go.hozo の Requirement.Ports の「状態の単位」）:
 // `ctx context.Context` と、Read.params の並びのまま `<局所の名前> <型>`、戻り値は `(<結果の型>, error)`。op と同じに、
 // いつも ctx を取り、error を返す。reserved は、局所の名前が避ける名前（LocalName）。
 func ReadSignature(r *ir.Read, imports *Imports, reserved map[string]bool) (params, results string) {
 	return unitParams(r.Params, imports, reserved), "(" + GoType(r.Returns, imports) + ", error)"
 }
 
-// EffectSignature は、効果のメソッド（状態の単位の命令）の引数と戻り値のテキスト（docs/plugin-go.md「状態の単位」）:
+// EffectSignature は、効果のメソッド（状態の単位の命令）の引数と戻り値のテキスト（plugins/go/spec/go.hozo の Requirement.Ports の「状態の単位」）:
 // `ctx context.Context` と、Effect.params の並びのまま `<局所の名前> <型>`、戻り値は `error`。
 func EffectSignature(e *ir.Effect, imports *Imports, reserved map[string]bool) (params, results string) {
 	return unitParams(e.Params, imports, reserved), "error"
 }
 
 // BuiltinSignature は、形で決まる命令（直に呼ぶ組み込みの効果。状態 s の単位の Post / Put / Delete）の引数と戻り値のテキスト
-// （docs/plugin-go.md「状態の単位」）: `ctx context.Context[, value <状態の要素の型>]` と `error`。値を取るかどうかは、
+// （plugins/go/spec/go.hozo の Requirement.Ports の「状態の単位」）: `ctx context.Context[, value <状態の要素の型>]` と `error`。値を取るかどうかは、
 // docs/check.md「直に呼ぶ組み込みの効果」の表のとおり: 取らないのは delete だけ。引数の名前は、いつも value（ir.DirectEffectParam）。
 func BuiltinSignature(s *ir.State, operation string, imports *Imports) (params, results string) {
 	params = "ctx " + qualify(imports, "context", "context") + ".Context"
@@ -515,7 +515,7 @@ func unitParams(ps []ir.OpParam, imports *Imports, reserved map[string]bool) str
 	return strings.Join(out, ", ")
 }
 
-// SeamSignature は、継ぎ目のメソッド（インターフェース Seams のメソッド）の引数と戻り値のテキスト（docs/plugin-go.md「Seams」）:
+// SeamSignature は、継ぎ目のメソッド（インターフェース Seams のメソッド）の引数と戻り値のテキスト（plugins/go/spec/go.hozo の Requirement.Seams の「Seams」）:
 // 引数は、op の形の引数の後ろに `body func(<op の形の引数>) <op の形の戻り値>`、戻り値は op の形の戻り値。
 // body の関数の型には、引数の名前も書く。body という名前が op の引数の局所の名前と当たれば、当たらなくなるまで、
 // body の方の末尾に _ を足す。
@@ -529,7 +529,7 @@ func SeamSignature(op *ir.Op, imports *Imports, reserved map[string]bool) (param
 }
 
 // SeamBodyParam は、継ぎ目のメソッドの最後の引数（op の中身）の名前: `body`。op の引数の局所の名前と当たれば、当たらなくなるまで
-// 末尾に _ を足す（docs/plugin-go.md「Seams」）。
+// 末尾に _ を足す（plugins/go/spec/go.hozo の Requirement.Seams の「Seams」）。
 func SeamBodyParam(op *ir.Op, reserved map[string]bool) string {
 	used := map[string]bool{"ctx": true}
 	for _, p := range op.Params {
@@ -574,7 +574,7 @@ func eachMatch(w *ir.Wiring, fn func(m *ir.Match)) {
 	})
 }
 
-// SeamDecorators は、デコレータのテストの口の対象（docs/plugin-go.md「デコレータのテストの口」）: s.Seams にメソッドを持つ
+// SeamDecorators は、デコレータのテストの口の対象（plugins/go/spec/go.hozo の Requirement.UnitTestPort の「デコレータのテストの口」）: s.Seams にメソッドを持つ
 // デコレータの FQN。並びは、s.Seams の中で、最初に出てくる順。
 func SeamDecorators(s *Shape) []string {
 	var out []string

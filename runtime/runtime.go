@@ -1,9 +1,3 @@
-// Package runtime は、hozoc が生成した Go のコードが import する型と関数を持つ。
-//
-// 形は docs/plugin-go.md「runtime パッケージ」（Violation、ValidationError、CheckFormat は docs/plugin-go-valid.md「runtime」、
-// DBTxKey は docs/plugin-go-sqlite.md「トランザクション」）。
-// 生成したコードのヘッダに書く版（docs/plugin-go.md「ファイル」）と合わせて互換を保つので、API を変えるときはそちらも見る。
-// 標準ライブラリにだけ依存する（docs/packages.md「依存の向き」）。
 package runtime
 
 import (
@@ -13,10 +7,10 @@ import (
 
 // Effect は効果の名前（FQN）。生成したコードは効果ごとに
 // `const EffectCreateSession runtime.Effect = "server.createSession"` を出す
-// （docs/plugin-go.md「effect」）。
+// （plugins/go/spec/go.hozo の Requirement.Types の「effect」）。
 type Effect string
 
-// Exception は、生成した例外の型が満たすインターフェース（docs/plugin-go.md「exception」）。
+// Exception は、生成した例外の型が満たすインターフェース（plugins/go/spec/go.hozo の Requirement.Types の「exception」）。
 // HozoException は例外の FQN を返す。
 type Exception interface {
 	error
@@ -53,7 +47,7 @@ func (e *ValidationError) Error() string {
 	return "validation failed: " + strings.Join(parts, "; ")
 }
 
-// ClassificationError は分類の誤り（docs/plugin-go.md「分類」「match」の「分類の誤りの枝」）: 値が、分類が宣言したケースの
+// ClassificationError は分類の誤り（plugins/go/spec/go.hozo の Requirement.Wiring の「分類」、Requirement.Wiring の「match」の「分類の誤りの枝」）: 値が、分類が宣言したケースの
 // どれにも当たらないか、二つ以上の述語が真になった。判定関数と、型で決まる分類の match が返す。
 // Classify は分類の FQN、Hits は真になったケースの名前（書かれた順）。どのケースにも当たらなければ空、
 // 真が二つ以上ならそのすべて。
@@ -71,7 +65,7 @@ func (e *ClassificationError) Error() string {
 	return fmt.Sprintf("classification %s: %d cases matched (%s)", e.Classify, len(e.Hits), strings.Join(e.Hits, ", "))
 }
 
-// CaseError は、効果の入口の確かめの失敗（docs/plugin-go.md「効果の入口の確かめ」）: 絞り込んだ引数が、言ったとおりのケースに
+// CaseError は、効果の入口の確かめの失敗（plugins/go/spec/go.hozo の Requirement.Ports の「効果の入口の確かめ」）: 絞り込んだ引数が、言ったとおりのケースに
 // ない。仕様の例外ではない（Exception を満たさない）。効果は、起きていない。
 // Effect は効果の FQN、Param は引数の名前、Classify は分類の FQN、Want は、引数の型が言うケース（型に書かれた順）、
 // Got は、判定関数が返したケース。

@@ -521,7 +521,7 @@ CoreType    = "string" | "boolean" | "int" | "float" | "datetime" | "date" | "ti
   | `time` | 一日の中の時刻（時刻帯を持たない） |
   | `duration` | 時間の長さ。リテラル `5m`、`30s` の型（「字句」の `Duration`） |
 
-  その言語の型、通信の上の形、保存の形に写すのは、基底とプラグイン（Go は `docs/plugin-go.md`「型」、`docs/plugin-go-http.md`、`docs/plugin-go-sqlite.md`「しまい方」）。
+  その言語の型、通信の上の形、保存の形に写すのは、基底とプラグイン（Go は `plugins/go/spec/go.hozo` の `Requirement.Types`、`docs/plugin-go-http.md`、`docs/plugin-go-sqlite.md`「しまい方」）。
 - `Time` と `Duration` は、核の型の名前ではなくなった。ふつうの名前として読み、宣言がなければ、RES-1 が、今の語を示す（`docs/resolve.md`「手続き」の 1.7）。
 - **リテラルの型**（`LiteralType`）は、値が、そのリテラル一つだけの型（`severity: "error";`、`fn retry(times: 3): void;`）。書けるのは、文字列、整数、小数、真偽のリテラル（「リテラル」）で、`Type` を書けるどの位置にも書ける。`Duration` のリテラルは、型にならない（SYNTAX。理由は「決めたこと」）。意味と、渡し方は `docs/types.md`「リテラルの型」「互換」。値の集まり（`"error"` か `"warning"`）は、リテラルの型をアームに持つ `union` で書く（「union」）。
 - 形の語で書いた `single<T>`、`nullable<T>`、`list<T>` が、もとの形で、`T`、`T?`、`T[]` は、その省略形（決定 D355、D361）。`Type` を書けるどの位置にも、どちらでも書け、IR では同じ型になる（`docs/types.md`「形の書き方」）。

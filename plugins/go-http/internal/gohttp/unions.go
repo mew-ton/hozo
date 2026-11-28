@@ -23,7 +23,7 @@ type wireUnion struct {
 type wireArm struct {
 	name string
 	// goName は、アームの値の Go の型の名前（修飾なし。union を宣言した名前空間の、定義のパッケージの名前）: その名前空間の model なら、
-	// その構造体。それ以外は、包む型 <Union><アーム名>（docs/plugin-go.md「union」）。
+	// その構造体。それ以外は、包む型 <Union><アーム名>（plugins/go/spec/go.hozo の Requirement.Types の「union」）。
 	goName  string
 	wrapped bool
 	// keys は、決め手（httpvocab.Arm.Keys）。
@@ -55,7 +55,7 @@ func (g *generator) wireUnions(unions []*httpvocab.Union) {
 			arm := wireArm{name: a.Name, keys: a.Keys}
 			switch {
 			case a.Literal != nil:
-				// リテラルの型のアーム: 値を持たない、包む型（docs/plugin-go.md「union」）
+				// リテラルの型のアーム: 値を持たない、包む型（plugins/go/spec/go.hozo の Requirement.Types の「union」）
 				arm.goName, arm.literal, arm.value = golang.TypeName(u.Decl.Name, ns)+golang.Capitalize(a.Name), true, httpvocab.LiteralJSON(a.Literal)
 			case g.declNS[a.Model.Name] == ns:
 				arm.goName = golang.TypeName(a.Model.Name, ns)

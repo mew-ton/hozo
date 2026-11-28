@@ -5,7 +5,7 @@ import (
 	"time"
 )
 
-// Date は、暦の一日（仕様の核の型 date。docs/plugin-go.md「runtime パッケージ」）。時刻帯を持たない。
+// Date は、暦の一日（仕様の核の型 date。パッケージ runtime の説明（runtime/doc.go））。時刻帯を持たない。
 // 零値は 0001-01-01。== で比べられ、map のキーにできる。文字列の形は "2006-01-02"。
 type Date struct {
 	// 零値を、正しい日付（0001-01-01）にするために、年・月・日から 1 を引いて持つ。
@@ -79,7 +79,7 @@ func (d *Date) UnmarshalText(text []byte) error {
 	return nil
 }
 
-// TimeOfDay は、一日の中の時刻（仕様の核の型 time。docs/plugin-go.md「runtime パッケージ」）。時刻帯を持たない。
+// TimeOfDay は、一日の中の時刻（仕様の核の型 time。パッケージ runtime の説明（runtime/doc.go））。時刻帯を持たない。
 // 零値は 00:00:00。== で比べられ、map のキーにできる。文字列の形は "15:04:05" で、秒より細かい部分は、小数部。
 type TimeOfDay struct {
 	ns int64 // 0 時からのナノ秒。0 以上、一日より小さい

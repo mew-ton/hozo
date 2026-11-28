@@ -1,4 +1,4 @@
-// GO-4（docs/plugin-go.md「内側のフォルダと入口」）: n は内部の op を持つので、定義を gen/n/inner に置く。
+// GO-4（plugins/go/spec/go.hozo の Requirement.Layout の「内側のフォルダと入口」）: n は内部の op を持つので、定義を gen/n/inner に置く。
 // 同じ単位が出力する子の名前空間 n.inner の出力先も gen/n/inner。位置は、名前空間の最初の内部の op。
 
 namespace n {

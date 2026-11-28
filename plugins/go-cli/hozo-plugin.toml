@@ -1,6 +1,6 @@
 # go-cli のマニフェスト（決定 D719、D811。持ち主は、このファイル。形は docs/plugin-protocol.md「マニフェスト `hozo-plugin.toml`」）
 name     = "go-cli"
-# 作り方は、ほかの Go のプラグインと同じ（docs/plugin-go.md「マニフェスト」）
+# 作り方は、ほかの Go のプラグインと同じ（plugins/go/hozo-plugin.toml）
 wasm     = "plugin.wasm"
 protocol = "0.27"
 

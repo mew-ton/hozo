@@ -17,7 +17,7 @@ import (
 // runtimePath は、生成したコードが import する runtime パッケージ（docs/plugin-go-valid.md「runtime」）。
 const runtimePath = "github.com/mew-ton/hozo/runtime"
 
-// 生成したコードの、パッケージに足す非公開の名前（前置きは valid。docs/plugin-go.md「相乗りのファイル」）。
+// 生成したコードの、パッケージに足す非公開の名前（前置きは valid。plugins/go/spec/go.hozo の Requirement.Layout の「相乗りのファイル」）。
 const (
 	helperAppend  = "validAppend"
 	helperKeys    = "validKeys"
@@ -49,7 +49,7 @@ func (f *file) local(name string) string {
 }
 
 // render は validate.go の全体を作り、go/format で整形する。import の名前を文書の決まりの順で決めるために、二度描く
-// （docs/plugin-go.md「パッケージと import パス」の「import の名前」。基底と同じ手順）。
+// （plugins/go/spec/go.hozo の Requirement.Layout の「パッケージと import パス」の「import の名前」。基底と同じ手順）。
 func (g *generator) render(targets []target) (string, error) {
 	first := &file{g: g, im: golang.NewTypesImports(g.view, g.layout)}
 	first.draw(targets)

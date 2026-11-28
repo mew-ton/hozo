@@ -49,7 +49,7 @@ func TestNoStorageImport(t *testing.T) {
 }
 
 // TestLeaves は、葉の op の本体。どれも引数だけで決まる（保存先に触れず、受け取った ctx も見ない）。
-// どのメソッドも ctx を取り、error を返す（docs/plugin-go.md「op の形」）。throws のない五つが error を返すのは、
+// どのメソッドも ctx を取り、error を返す（plugins/go/spec/go.hozo の Requirement.OpShape）。throws のない五つが error を返すのは、
 // トークンと識別子を作れなかったとき（newSession、newOrder）だけ。
 func TestLeaves(t *testing.T) {
 	now := time.Date(2026, 1, 2, 12, 4, 5, 0, time.FixedZone("JST", 9*60*60))

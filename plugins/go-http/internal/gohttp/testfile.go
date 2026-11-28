@@ -19,7 +19,7 @@ import (
 // 入口ごと、結果ごと、フィールドごとに出す行は、デコレータの引数（と、フィールドの名前）と、op が投げうる例外の集まりだけから作る
 // （docs/requirements.md「出力を推論しない」）。型を書くのは、口の宣言（入力の model と、結果の型）と、例外の見分けの型引数だけ。
 
-// TestFileName は、このトランスパイラが、N のテストのパッケージに出すファイルの名前（docs/plugin-go.md「相乗りのファイル」）。
+// TestFileName は、このトランスパイラが、N のテストのパッケージに出すファイルの名前（plugins/go/spec/go.hozo の Requirement.Layout の「相乗りのファイル」）。
 const TestFileName = "http.go"
 
 // テストのパッケージに足す、決まった公開の名前（docs/plugin-go-http.md「インテグレーションテストの口」の「置き場と名前」）。

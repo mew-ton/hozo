@@ -1,6 +1,6 @@
 // 生成したコードの振る舞いのテスト（docs/testing.md「単体テスト」の `plugins/go`）: 状態を通る配線と、read と効果と、直に呼ぶ
 // 組み込みの効果を呼ぶ配線（呼ぶ先が、宛先の状態の単位のメソッドであること）、葉の op の置き場
-// （docs/plugin-go.md「op の置き場」「状態の単位」「呼び出し」「状態の参照」）。plugins/go の TestBehavior が、生成したコードの
+// （plugins/go/spec/go.hozo の Requirement.Ports の「op の置き場」、Requirement.Ports の「状態の単位」、Requirement.Wiring の「呼び出し」、Requirement.Wiring の「状態の参照」）。plugins/go の TestBehavior が、生成したコードの
 // モジュールのルートに置いて走らせる。
 package behavior
 
@@ -178,7 +178,7 @@ func (l leaves) Audit(_ context.Context, note string) error {
 	return nil
 }
 
-// デコレータも throws もない葉（仕様の上で純粋）も、同じ形: ctx を取り、error を返す（docs/plugin-go.md「op の形」）
+// デコレータも throws もない葉（仕様の上で純粋）も、同じ形: ctx を取り、error を返す（plugins/go/spec/go.hozo の Requirement.OpShape）
 func (l leaves) Show(_ context.Context, title string) error {
 	l.w.note("show " + title)
 	return nil
@@ -374,7 +374,7 @@ func TestStateReadFails(t *testing.T) {
 	expectLog(t, w, "token.Get")
 }
 
-// 葉の op の置き場（docs/plugin-go.md「op の置き場」の 3）: 葉は、いつも Leaves。デコレータが reads / effects を運んでいても
+// 葉の op の置き場（plugins/go/spec/go.hozo の Requirement.Ports の「op の置き場」の 3）: 葉は、いつも Leaves。デコレータが reads / effects を運んでいても
 // （一つの状態でも、二つの状態でも）、状態の単位のメソッドにはならない
 func TestLeafPlaces(t *testing.T) {
 	ctx := context.Background()

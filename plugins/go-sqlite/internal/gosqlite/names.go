@@ -3,7 +3,7 @@ package gosqlite
 import "github.com/mew-ton/hozo/plugin/golang"
 
 // このファイルは GOSQL-4（docs/plugin-go-sqlite.md「診断」）: このトランスパイラの公開の名前（Schema、CreateTables、Querier、Conn、
-// <状態>Table、New<状態>Table、出すなら DbSeams、NewDbSeams）が、N の定義のパッケージの名前（docs/plugin-go.md「名前」）と、
+// <状態>Table、New<状態>Table、出すなら DbSeams、NewDbSeams）が、N の定義のパッケージの名前（plugins/go/spec/go.hozo の Requirement.Names）と、
 // または互いに当たる。db.go は入口のパッケージに置くが、入口は定義のすべての名前を再公開するので、当たる相手は定義のパッケージの名前。
 
 // owned は、パッケージの名前一つと、それを生んだもの。
@@ -13,7 +13,7 @@ type owned struct {
 	ours bool   // このトランスパイラの名前か（そうでなければ、基底の名前）
 }
 
-// baseNames は、基底 go が N の定義のパッケージに出す公開の名前（docs/plugin-go.md「名前」の「名前が当たれば GO-2」が並べるもの。
+// baseNames は、基底 go が N の定義のパッケージに出す公開の名前（plugins/go/spec/go.hozo の Requirement.Names の「名前が当たれば GO-2」が並べるもの。
 // 一覧は、基底と共有する golang.PublicNames）。同じ名前が二つあれば、先のもの。
 func (e *emitter) baseNames() map[string]owned {
 	names := map[string]owned{}

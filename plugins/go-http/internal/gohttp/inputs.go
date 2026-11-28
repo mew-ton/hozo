@@ -45,7 +45,7 @@ func inputsOf(read []httpvocab.Input) []input {
 // location は、通信の上の場所（httpPlace の二つ目と、違反の path の先頭）: 項目の形は `<場所>.<名前>`、全体の形は `<場所>`。
 func (in *input) location() string { return in.where }
 
-// literalBody は、リテラルの、Go での書き方のうち、型を書かない部分（docs/plugin-go.md「値」の表の literal の行）:
+// literalBody は、リテラルの、Go での書き方のうち、型を書かない部分（plugins/go/spec/go.hozo の Requirement.Wiring の「値」の表の literal の行）:
 // 文字列は strconv.Quote、整数は 10 進、小数は 'g'（. も e も含まなければ .0 を足す）、真偽値は true / false、期間はナノ秒。
 func literalBody(lit ir.Literal) string {
 	switch x := lit.(type) {

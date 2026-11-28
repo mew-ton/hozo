@@ -23,7 +23,7 @@ Hozo の言語と、その実装（このリポジトリ）の設計。言語の
 | [`config.md`](config.md) | `hozo.toml`: 単位、基底と相乗り、オプション、継ぎ目、型の置き場 | `internal/config`、`internal/project`、`internal/check` |
 | [`vocab.md`](vocab.md) | 標準の語彙 | `vocab/`、`internal/vocab` |
 | [`plugin-protocol.md`](plugin-protocol.md) | マニフェスト（基底と相乗りの `requires`、継ぎ目の `seams`）、探索、JSON のやり取り、相乗りが基底の形を知る方法 | `internal/plugin`、`plugin` |
-| [`plugin-go.md`](plugin-go.md) | Go の基底のトランスパイラ `go`: 語彙によらずに決まる Go の出力のすべて（置き場、名前、型、op の形、実装を受け取る口、配線の本体、継ぎ目） | `plugins/go`、`plugin/golang`、`runtime` |
+| [`plugin-go.md`](plugin-go.md) | Go の基底のトランスパイラ `go` の、持ち主の一覧と、診断の補足。語彙によらずに決まる Go の出力（置き場、名前、型、op の形、実装を受け取る口、配線の本体、継ぎ目）の持ち主は、`plugins/go/spec/go.hozo` | `plugins/go`、`plugin/golang`、`runtime` |
 | [`plugin-valid.md`](plugin-valid.md) | 語彙のプラグイン `valid`: `valid` の語彙の、言語に依らない決まり（制約が、何に付けられ、どの値を通すか、使い方の検査 VALID-*） | `plugins/valid`、`plugin/validvocab` |
 | [`plugin-go-valid.md`](plugin-go-valid.md) | `valid` の制約を確かめる関数を出す相乗り `go-valid` | `plugins/go-valid`、`plugin/govalid`、`runtime` |
 | [`plugin-db.md`](plugin-db.md) | 語彙のプラグイン `db`: `db` の語彙の、言語にも保存先にも依らない決まり（どの状態が表か、`read` と効果のデコレータが、宣言の何と合うか、使い方の検査 DB-*） | `plugins/db`、`plugin/dbvocab` |
@@ -65,15 +65,15 @@ Hozo の言語と、その実装（このリポジトリ）の設計。言語の
 | 入っているプラグイン、使うプラグイン | `plugin-protocol.md`「探索」 |
 | 単位 | `config.md`「単位」 |
 | 基底、相乗り、単位の基底、単位の言語 | `config.md`「基底と相乗り」 |
-| 継ぎ目、単位の継ぎ目（op の「中身」と「外側」） | `config.md`「継ぎ目」。Go での形（`Seams`、中身の名前）は `plugin-go.md`「継ぎ目」 |
+| 継ぎ目、単位の継ぎ目（op の「中身」と「外側」） | `config.md`「継ぎ目」。Go での形（`Seams`、中身の名前）は `plugins/go/spec/go.hozo` の `Requirement.Seams` |
 | 解釈する（トランスパイラが、デコレータを）、設定が解釈するデコレータ | `config.md`「解釈するトランスパイラ」 |
 | 型の置き場、「名前空間が基底の出力を持つ」 | `config.md`「型の置き場」 |
 | 単位の対象（単位が対象にする名前空間）、Dir(U, N) | `config.md`「単位の対象」 |
 | 単位の対象の宣言、出力（単位と、その単位が出力する名前空間の組） | `config.md`「in」 |
-| 出力の対象（基底が一つの出力に出す宣言） | `plugin-go.md`「出力の対象」 |
-| 定義のパッケージ、入口のパッケージ、内側のフォルダ | `plugin-go.md`「内側のフォルダと入口」 |
-| op の置き場、形で決まる問い合わせ、問い合わせ、命令 | `plugin-go.md`「op の置き場」「状態の単位」 |
-| テストのパッケージ、単体テストの口（人か AI が中身を書く関数の、結果ごとのケースを受け取る口）、効果の入口の確かめ | `plugin-go.md`「単体テストの口」「効果の入口の確かめ」。言語によらない決まりは `ide-chain.md`「テストの規約」「ステートマシン図」 |
+| 出力の対象（基底が一つの出力に出す宣言） | `plugins/go/spec/go.hozo` の `Requirement.Targets` |
+| 定義のパッケージ、入口のパッケージ、内側のフォルダ | `plugins/go/spec/go.hozo` の `Requirement.Layout` の「内側のフォルダと入口」 |
+| op の置き場、形で決まる問い合わせ、問い合わせ、命令 | `plugins/go/spec/go.hozo` の `Requirement.Ports` の「op の置き場」、`Requirement.Ports` の「状態の単位」 |
+| テストのパッケージ、単体テストの口（人か AI が中身を書く関数の、結果ごとのケースを受け取る口）、効果の入口の確かめ | `plugins/go/spec/go.hozo` の `Requirement.UnitTestPort`、`Requirement.Ports` の「効果の入口の確かめ」。言語によらない決まりは `ide-chain.md`「テストの規約」「ステートマシン図」 |
 | 通信の形（HTTP の要求と応答の JSON） | `plugin-http.md`「通信の形」 |
 | インテグレーションテストの口（入口のデコレータを持つ op の、結果ごとのケースを受け取る口。HTTP の入口のもの） | `plugin-go-http.md`「インテグレーションテストの口」。言語によらない決まりは `ide-chain.md`「テストの規約」の「インテグレーションテスト」 |
 | E2E テストの口（フローの op の、ケースを受け取る口）、要求の、テストの入れ物の口、要求の分類、指している設計 | `plugins/go-design/spec/go-design.hozo` の `Requirement.FlowPort`、`Requirement.RequirementPort`、`Requirement.Designs`。言語によらない決まりは `ide-chain.md`「テストの規約」の「E2E テスト」「要求のテスト」 |
@@ -101,7 +101,7 @@ Hozo の言語と、その実装（このリポジトリ）の設計。言語の
 | インデックスの model（本体にインデックス `[名前: K]: V;` を書いた model。キーが決まっていない構造） | `types.md`「インデックスの model」 |
 | 絞り込み、型で決まる絞り込み、述語の要る絞り込み | `types.md`「絞り込み」 |
 | 「値がない」「返らない」（式の型） | `types.md`「型の種類」 |
-| 状態の単位（生成した Go の中の、状態ごとのインターフェース。設定の単位とは別） | `plugin-go.md`「状態の単位」 |
+| 状態の単位（生成した Go の中の、状態ごとのインターフェース。設定の単位とは別） | `plugins/go/spec/go.hozo` の `Requirement.Ports` の「状態の単位」 |
 | 語彙の名前空間 | `vocab.md`「語彙の名前空間」 |
 | `spec/cli.hozo`（hozoc 自身の仕様）と `plugins/go-cli/cli.hozo`（go-cli の語彙） | `cli.md`「cli.hozo」 |
 | hozoc の担い手（`Actor`）と、hozoc の要求（`Requirement`） | `spec/cli.hozo` の、その名前の分類 |

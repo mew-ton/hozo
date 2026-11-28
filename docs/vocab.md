@@ -328,7 +328,7 @@ namespace flows {
 | `valid`（言語に依らない決まり: 制約の意味、使い方の検査） | 語彙のプラグイン `valid`（`docs/plugin-valid.md`） |
 | `valid` の標準の制約（確かめる関数） | `go-valid`（`docs/plugin-go-valid.md`） |
 | `cli`（go-cli の語彙） | `plugins/go-cli/`（`docs/plugin-go-cli.md`） |
-| `fs` | 語彙を実装するプラグインはない。`@fs.files` は読むトランスパイラがなく、印のまま（`docs/plugin-go.md`「デコレータ」）。解釈するトランスパイラがないので、単位の対象に書けば、CFG-26 の warning が出る（hozoc 自身の仕様で、二か所。「解釈されなくてよいデコレータ」） |
+| `fs` | 語彙を実装するプラグインはない。`@fs.files` は読むトランスパイラがなく、印のまま（`plugins/go/spec/go.hozo` の `Requirement.Decorators`）。解釈するトランスパイラがないので、単位の対象に書けば、CFG-26 の warning が出る（hozoc 自身の仕様で、二か所。「解釈されなくてよいデコレータ」） |
 | `http`（言語に依らない決まり: 経路、通信の上の形、使い方の検査） | 語彙のプラグイン `http`（`docs/plugin-http.md`） |
 | `http`（サーバー） | `go-http`（`docs/plugin-go-http.md`） |
 | `db` | `go-sqlite`（`docs/plugin-go-sqlite.md`） |

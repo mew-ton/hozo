@@ -13,7 +13,7 @@ import (
 	pkgtype "example.com/shop-server/gen/type"
 )
 
-// このファイルは、基底が出した、にせものと、テストの中の組み立て（docs/plugin-go.md「テストのにせもの」）を使うテスト。
+// このファイルは、基底が出した、にせものと、テストの中の組み立て（plugins/go/spec/go.hozo の Requirement.Fakes）を使うテスト。
 // servertest.NewOps が、server と store の配線（本物）を、流れの端（store の read と効果、mailer.send）と、継ぎ目の、にせものの
 // 上に組み立てる。DB は、要らない。葉は、人が書いた本物（Leaves）を渡す。
 
@@ -130,7 +130,7 @@ func TestFakesThrow(t *testing.T) {
 }
 
 // TestFakesFlow は、にせものの上の、フロー: flowstest.NewOps が、flows と client の配線（本物）を、重ねる。client が呼ぶ server の op は、
-// 相手の入口で、流れの端（docs/plugin-go.md「テストのにせもの」の「別の名前空間」）: にせものが、言った値を返し、server の中は、
+// 相手の入口で、流れの端（plugins/go/spec/go.hozo の Requirement.Fakes の「別の名前空間」）: にせものが、言った値を返し、server の中は、
 // 通らない。ログインして、注文し、一覧を見るまでが、サーバーなしで通る。
 func TestFakesFlow(t *testing.T) {
 	f := new(flowstest.Fakes)

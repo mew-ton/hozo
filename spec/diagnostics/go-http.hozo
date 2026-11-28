@@ -13,7 +13,7 @@ namespace hozo.diagnostics {
     GOHTTP_9;
 
     /**
-     * GOHTTP-10: 入口のパッケージに足す公開の名前（`HandlerOption`、`WithInternalError`、`NewHandler`）が、N の定義のパッケージの名前（model `NewHandler` など。`docs/plugin-go.md`「名前」）と当たる。位置は当たった宣言
+     * GOHTTP-10: 入口のパッケージに足す公開の名前（`HandlerOption`、`WithInternalError`、`NewHandler`）が、N の定義のパッケージの名前（model `NewHandler` など。plugins/go/spec/go.hozo の Requirement.Names）と当たる。位置は当たった宣言
      */
     @severity(Severity.Error)
     GOHTTP_10;

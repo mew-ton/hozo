@@ -217,7 +217,7 @@ func firstDiff(want, got string) string {
 	return "  （違いなし）"
 }
 
-// isTestMap は、パス p が、基底のテストの対応表（docs/plugin-go.md「テストの対応表」）か。
+// isTestMap は、パス p が、基底のテストの対応表（plugins/go/spec/go.hozo の Requirement.UnitTestPort の「テストの対応表」）か。
 func isTestMap(p string) bool { return path.Base(p) == plugin.TestMapName(TranspilerName) }
 
 // goFiles は、files のうち、Go のファイル（テストの対応表を除いたもの）。
@@ -233,7 +233,7 @@ func goFiles(files map[string]string) map[string]string {
 
 // scanTestRuns は、Go のソース src（置き場は file）の、いちばん内側の `t.Run(<名前>, func(t *testing.T) {` … `})` を、
 // 字下げだけを頼りに探す（go/parser を使う golang.TestMap とは、別の読み方）: 名前は、外の段から / でつなぎ、行は、
-// 開く行の次の行から、閉じる行の前の行まで（docs/plugin-go.md「テストの対応表」）。
+// 開く行の次の行から、閉じる行の前の行まで（plugins/go/spec/go.hozo の Requirement.UnitTestPort の「テストの対応表」）。
 func scanTestRuns(t *testing.T, file, src string) []plugin.TestEntry {
 	t.Helper()
 	type run struct {
@@ -280,7 +280,7 @@ func scanTestRuns(t *testing.T, file, src string) []plugin.TestEntry {
 	return out
 }
 
-// checkTestMaps は、出力のテストの対応表（docs/plugin-go.md「テストの対応表」）を、出力の Go のテキストに当てて確かめる:
+// checkTestMaps は、出力のテストの対応表（plugins/go/spec/go.hozo の Requirement.UnitTestPort の「テストの対応表」）を、出力の Go のテキストに当てて確かめる:
 // t.Run を持つ Go のファイルがあるディレクトリにだけ、一つあり、中身は、そのディレクトリの Go のファイル（パスの順は、
 // doc.go、leaves.go、classify.go、seams.go: 基底が出す順）の、いちばん内側の t.Run を、行の順に、テスト一つを一行で並べたもの。
 func checkTestMaps(t *testing.T, files map[string]string) {
@@ -318,7 +318,7 @@ func checkTestMaps(t *testing.T, files map[string]string) {
 	}
 }
 
-// checkFormatted は、生成した Go が go/format を通した形であること（docs/plugin-go.md「ファイル」）を確かめる。Go でない
+// checkFormatted は、生成した Go が go/format を通した形であること（plugins/go/spec/go.hozo の Requirement.Layout の「ファイル」）を確かめる。Go でない
 // ファイルは、テストの対応表だけ（中身は checkTestMaps）。
 func checkFormatted(t *testing.T, files map[string]string) {
 	t.Helper()

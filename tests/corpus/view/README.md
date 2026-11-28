@@ -84,5 +84,5 @@
 
 | 文書 | 書きたかった構文 | 今の実装 |
 |---|---|---|
-| `docs/ir.md`「その名前空間から見た IR」の `params`（入れ子の位置） | `model Auth { token: Token?; locale: string; }`、`model GetUserInput { auth: Auth; id: UserId; }`（位置 `in.auth.token`） | 外した理由（本体に組み込んでいた Go の出力が、合成した `web.getUser$in$auth` の名前を作れなかった）は、なくなった: このコーパスは Go を出さず、基底 `go` は合成した model を出さない（`docs/plugin-go.md`「出力の対象」）。足すと `view.web.json` と `TestViewFromEntry` の期待値を書き直すことになるので、まだ足していない |
+| `docs/ir.md`「その名前空間から見た IR」の `params`（入れ子の位置） | `model Auth { token: Token?; locale: string; }`、`model GetUserInput { auth: Auth; id: UserId; }`（位置 `in.auth.token`） | 外した理由（本体に組み込んでいた Go の出力が、合成した `web.getUser$in$auth` の名前を作れなかった）は、なくなった: このコーパスは Go を出さず、基底 `go` は合成した model を出さない（`plugins/go/spec/go.hozo` の `Requirement.Targets`）。足すと `view.web.json` と `TestViewFromEntry` の期待値を書き直すことになるので、まだ足していない |
 | `docs/plugin-protocol.md`「起動」の終了コード 2 | マニフェストのとおりに起動して、`protocol` の不一致を MAN-2 にする | 外した理由（マニフェストの `go run` が、プログラムの終了コードを伝えず、`Crashed` になった）は、なくなった: マニフェストの `wasm` を動かせば、終了コード 2 が、そのまま届く。`TestViewDeliveredToPlugin` の protocol のサブテストは、マニフェストの WASM を、`internal/plugin` の `Runner` で、じかに動かす |

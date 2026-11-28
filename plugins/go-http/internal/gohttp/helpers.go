@@ -6,7 +6,7 @@ package gohttp
 // 読み方、値がなければ 204）は、この補助が、実行時に決める（docs/requirements.md「出力を推論しない」）。
 //
 // 補助の中のパッケージの名前（http、json、io、errors、reflect、strconv、strings、runtime）は、そのまま書く: 標準ライブラリと
-// runtime の import の名前は変わらない（docs/plugin-go.md「パッケージと import パス」の「import の名前」）。import に足すのは、
+// runtime の import の名前は変わらない（plugins/go/spec/go.hozo の Requirement.Layout の「パッケージと import パス」の「import の名前」）。import に足すのは、
 // 補助を出す側（helpers）。
 
 // helper は、補助一つ（か、いつも一緒に出す一組）: テキストと、それが使うパッケージの import パス。
@@ -357,8 +357,8 @@ func httpInternal(w http.ResponseWriter, r *http.Request, err error, o httpOptio
 	helperWriteErrorComment = `// httpWriteError は op が返したエラーを応答にする。@http.status を持つ例外は、そのステータスと例外の FQN（と運ぶ値）。
 // それ以外（ステータスを持たない例外、ctx のエラー、ほかのエラー）は 500 で、中身を出さない。
 `
-	// 例外の値を応答にする。例外の構造体は、引数ごとにフィールド一つで、json タグは引数の名前（基底が付ける。docs/plugin-go.md
-	// 「exception」）なので、運ぶ値は、例外の値そのものの JSON（引数の名前をキーにしたオブジェクト。「通信の形」の「失敗の応答」）。
+	// 例外の値を応答にする。例外の構造体は、引数ごとにフィールド一つで、json タグは引数の名前（基底が付ける。plugins/go/spec/go.hozo の Requirement.Types の「exception」
+	// ）なので、運ぶ値は、例外の値そのものの JSON（引数の名前をキーにしたオブジェクト。「通信の形」の「失敗の応答」）。
 	// 引数の数も、名前も、型も、ここには書かない: 引数を持つかどうかは、実行時に、構造体のフィールドの数で見る
 	helperThrown = helper{imports: []string{"errors", "net/http", "reflect", runtimePath}, text: `// httpThrown は、err が例外 E（値）なら、status と、例外の FQN（と運ぶ値）を返して true。
 // 値を運ぶ例外かどうかは、実行時に見る（引数ごとのフィールドを、一つでも持つ）。運ぶ値は、引数の名前をキーにしたオブジェクト。

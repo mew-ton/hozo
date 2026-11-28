@@ -1,5 +1,5 @@
 // テストの中の組み立てを、作れない出力: app が呼ぶ other を、同じ基底の単位が、二つ出力する（通す出力を、選ばない。
-// docs/plugin-go.md「テストのにせもの」の「別の名前空間」）。go-http は、ハンドラだけを出し、口を出さずに、warning を返す。
+// plugins/go/spec/go.hozo の Requirement.Fakes の「別の名前空間」）。go-http は、ハンドラだけを出し、口を出さずに、warning を返す。
 namespace other {
   export fn value(): int;
 }

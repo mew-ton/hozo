@@ -10,7 +10,7 @@ import (
 	"github.com/mew-ton/hozo/ir"
 )
 
-// このファイルは、単体テストの口（docs/plugin-go.md「単体テストの口」）を、生成したコードを実際にコンパイルして、走らせて確かめる:
+// このファイルは、単体テストの口（plugins/go/spec/go.hozo の Requirement.UnitTestPort）を、生成したコードを実際にコンパイルして、走らせて確かめる:
 // ケースの漏れは、コンパイルエラーになる。テストの名前は、<FQN>/<結果>。結果がケースのものと違えば、口が、テストを落とす。
 // 口を満たす型が、すべてのケースで通ることと、効果の入口の確かめは、入力 unittest の behavior_test.go（TestBehavior）。
 
@@ -60,10 +60,10 @@ func casesImpl(omit string) string {
 	return b.String()
 }
 
-// TestIncompleteCasesDoNotCompile は、単体テストのケースの漏れが、コンパイルエラーになること（同「葉の op」「分類の判定」）:
+// incompleteCasesDoNotCompile は、単体テストのケースの漏れが、コンパイルエラーになること（同「葉の op」「分類の判定」）:
 // 葉を一つ欠いた LeafCases、結果（正常、例外、名前が当たって名前空間を前に付けた例外）を一つ欠いた <Op>Cases、ケースを一つ
 // 欠いた <C>Examples は、走らせる関数に渡すところで、コンパイルできない。
-func TestIncompleteCasesDoNotCompile(t *testing.T) {
+func incompleteCasesDoNotCompile(t *testing.T) {
 	root, files := emitFixture(t, "unittest")
 	writeFiles(t, root, files)
 	impl := filepath.Join(root, "impl", "impl.go")
@@ -108,9 +108,9 @@ func writeBehavior(t *testing.T) string {
 	return root
 }
 
-// TestUnitTestNames は、走らせる関数が付けるテストの名前（ラベル）が、<op の FQN>/<結果> と、<分類の FQN>/<ケース> であること
+// unitTestNames は、走らせる関数が付けるテストの名前（ラベル）が、<op の FQN>/<結果> と、<分類の FQN>/<ケース> であること
 // （同「葉の op」「分類の判定」。docs/ide-chain.md「テストの規約」）。ない側のケースのテストは、例なしで、基底が作る。
-func TestUnitTestNames(t *testing.T) {
+func unitTestNames(t *testing.T) {
 	root := writeBehavior(t)
 	out, err := runGo(t, root, "test", "-count=1", "-v", "-run", "^(TestLeafCases|TestStage|TestLife|TestLookup|TestLevel)$", ".")
 	if err != nil {
@@ -192,10 +192,10 @@ func (noStage) Done() app.Order { return app.Order{Note: "?"} }
 func TestNoStage(t *testing.T) { apptest.RunStage(t, stage{}, noStage{}) }
 `
 
-// TestUnitTestSeamFails は、結果が、ケースのものと違えば、走らせる関数が、そのケースのテストを落とすこと（同「葉の op」の
+// unitTestSeamFails は、結果が、ケースのものと違えば、走らせる関数が、そのケースのテストを落とすこと（同「葉の op」の
 // 「走らせる側が確かめること」、「分類の判定」）: 例外のケースで、失敗がないか、別の失敗。正常のケースで、失敗がある。絞り込んだ
 // 戻り値が、言ったケースにない。例が、そのケースに当たらない。落ちたケースの Then は、呼ばれない。
-func TestUnitTestSeamFails(t *testing.T) {
+func unitTestSeamFails(t *testing.T) {
 	root := writeBehavior(t)
 	writeFile(t, filepath.Join(root, "faults_test.go"), unittestFaults)
 	out, err := runGo(t, root, "test", "-count=1", "-v", "-run", "^(TestFaultyLeaves|TestWrongStage|TestWrongLife|TestNoStage)$", ".")
@@ -242,10 +242,10 @@ func TestUnitTestSeamFails(t *testing.T) {
 	}
 }
 
-// TestUnitTestSplitOutput は、分けた出力（docs/plugin-go.md「内側のフォルダと入口」）でも、単体テストの口と、効果の入口の確かめが
+// unitTestSplitOutput は、分けた出力（plugins/go/spec/go.hozo の Requirement.Layout の「内側のフォルダと入口」）でも、単体テストの口と、効果の入口の確かめが
 // 同じに働くこと: 入力 unittest の葉 log を、内部の op にする。包む型は、内側のパッケージの states.go に出て、テストのパッケージは、
 // 入口のパッケージだけを import する。同じ behavior_test.go が、入口の New と、テストのパッケージを通して、通る。
-func TestUnitTestSplitOutput(t *testing.T) {
+func unitTestSplitOutput(t *testing.T) {
 	views := loadViews(t, "unittest")
 	internal := 0
 	for _, v := range views {

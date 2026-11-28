@@ -1,4 +1,4 @@
-// docs/plugin-go.md「継ぎ目」の各行を、一か所ずつ使う。各 op の上のコメントが、その op が確かめる行。
+// plugins/go/spec/go.hozo の Requirement.Seams の各行を、一か所ずつ使う。各 op の上のコメントが、その op が確かめる行。
 
 // 葉の op は reads / effects の節を書けない（docs/check.md「葉の op」）ので、葉が状態に触れることは、運ぶ節を持つデコレータで言う
 // （docs/check.md「デコレータが運ぶ reads と effects」）

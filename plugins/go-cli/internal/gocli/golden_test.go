@@ -24,7 +24,7 @@ var goldenFixtures = []struct {
 }{
 	{name: "commands", covers: "hozo.gocli.Requirement.Output、Requirement.Arguments、Requirement.CommandFunctions、Requirement.Run、Requirement.Usage の各行", behavior: true},
 	{name: "shapes", covers: "hozo.gocli.Requirement.CommandFunctions: フィールドの型と、例外が引数を持つかどうかによらず、同じ形（docs/testing.md「単体テスト」の「型に依らない形の確かめ」）", behavior: true},
-	{name: "locals", covers: "名前空間のパッケージの名前が、生成したコードの局所の名前や、標準ライブラリのパッケージの名前と当たるとき（docs/plugin-go.md「パッケージと import パス」の import の名前）", behavior: true},
+	{name: "locals", covers: "名前空間のパッケージの名前が、生成したコードの局所の名前や、標準ライブラリのパッケージの名前と当たるとき（plugins/go/spec/go.hozo の Requirement.Layout の「パッケージと import パス」の import の名前）", behavior: true},
 }
 
 // TestGolden は、入力ごとに、出力がゴールデン testdata/<名前>/expected/ とバイト単位で同じこと、go/format を通した形で

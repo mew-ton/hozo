@@ -1,4 +1,4 @@
-// docs/plugin-go.md「match」の、絞り込みが literal の型で決まる分類（対象が boolean。docs/check.md「ケースの型」）: 二つに分ける形で、
+// plugins/go/spec/go.hozo の Requirement.Wiring の「match」の、絞り込みが literal の型で決まる分類（対象が boolean。docs/check.md「ケースの型」）: 二つに分ける形で、
 // 真の側が if の枝。使われ方（return / val / 文）と、ケースの持ち方（真と偽、真と残り、片方だけ）の組を、一か所ずつ使う。
 // op はどれも export（出力は一つのパッケージ）。
 

@@ -1,6 +1,6 @@
 // 生成したコードの振る舞いのテスト（docs/testing.md「単体テスト」の `plugins/go`）: 残りのケースを書かない、型で決まる分類
 // （presence）の match は、値がないとき、return / const / 文のどの形でも、分類の誤り（*runtime.ClassificationError）を返す
-// （docs/plugin-go.md「match」の「分類の誤りの枝」）。else のアームは、受けるケースを名前で並べたアームと同じに動く。
+// （plugins/go/spec/go.hozo の Requirement.Wiring の「match」の「分類の誤りの枝」）。else のアームは、受けるケースを名前で並べたアームと同じに動く。
 // plugins/go の TestBehavior が、生成したコードのモジュールのルートに置いて走らせる。
 package behavior
 

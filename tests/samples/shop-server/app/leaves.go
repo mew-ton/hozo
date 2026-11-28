@@ -19,7 +19,7 @@ import (
 // *Leaves を server.New の引数 leaves にそのまま渡す。テストが差し替えられるように、時計と識別子の作り方を持つ。
 //
 // メソッドは、十とも、最初の引数に ctx を取り、最後の戻り値に error を返す（生成された server.Leaves のメソッドの形。
-// docs/plugin-go.md「op の形」: 基底は、どの op にそれが要るかを判定しない）。ここの本体は、どれも待たないので ctx を見ない。
+// plugins/go/spec/go.hozo の Requirement.OpShape: 基底は、どの op にそれが要るかを判定しない）。ここの本体は、どれも待たないので ctx を見ない。
 // error を返すのは、仕様の例外（checkPassword、requireFresh）と、トークンと識別子を作れなかったとき（newSession、newOrder）。
 type Leaves struct {
 	// Now は今の時刻。

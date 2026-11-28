@@ -24,7 +24,7 @@ import (
 //
 // 継承した model は、展開済みのフィールド（受け継いだデコレータを含む）で判定する。union と exception は持たない（例外の引数の型が
 // Validate を持つ型でも、例外の構造体には出さない）。
-// View が見る側のために合成した model（synthesizedFrom が op の FQN。Go の型にならない。docs/plugin-go.md「出力の対象」）も持たない。
+// View が見る側のために合成した model（synthesizedFrom が op の FQN。Go の型にならない。plugins/go/spec/go.hozo の Requirement.Targets）も持たない。
 // scalar でも model でもない宣言、Program にない FQN は false。
 func HasValidate(p *ir.Program, typeFQN string) bool {
 	if p == nil {

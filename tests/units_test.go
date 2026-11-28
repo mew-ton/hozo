@@ -50,7 +50,7 @@ func TestUnitsCorpus(t *testing.T) {
 
 	t.Run("config.md 単位/同じ名前空間の二つの単位は、別の out に独立に出力する", func(t *testing.T) {
 		// 単位 2（gen/api）と単位 3（gen/batch）は、どちらも shop。shop は関数を持つので、型は、型のパッケージ types
-		// （docs/plugin-go.md「型のパッケージ」）。内部の op も持つので、定義は内側のフォルダ inner（同「内側のフォルダと入口」）で、
+		// （plugins/go/spec/go.hozo の Requirement.Layout の「型のパッケージ」）。内部の op も持つので、定義は内側のフォルダ inner（同「内側のフォルダと入口」）で、
 		// 内側は、型のパッケージを、入口は、内側を、再公開する。それぞれが自分の型をすべて持ち、同じ名前空間を出力する別の単位の
 		// パッケージは import しない
 		for _, dir := range []string{"gen/api", "gen/batch"} {
@@ -65,14 +65,14 @@ func TestUnitsCorpus(t *testing.T) {
 			}
 		}
 	})
-	t.Run("config.md in と plugin-go.md 出力の対象/in が絞るのは op だけ", func(t *testing.T) {
+	t.Run("config.md in と go の Requirement.Targets/in が絞るのは op だけ", func(t *testing.T) {
 		// 単位 2 の in は shop/api.hozo だけ。型（Report は batch.hozo の宣言）と状態は、in によらずすべて出る（上のサブテスト）。
 		// op は、単位の対象のもの（open、save、issue）と、単位の対象の配線 open が呼んでいる nightly（batch.hozo の配線）。
 		// nightly は、本体を出さず、人が実装する葉（Leaves の口）として出す。nightly が呼ぶ sweep と、呼ばれていない report は出ない
 		want(t, "gen/api/inner/ops.go", []string{"\tNightly(ctx context.Context, item Item) error", "return o.leaves.Nightly(ctx, item)"}, []string{"Sweep", "Report"})
 		want(t, "gen/api/inner/wiring.go", []string{"func (o *ops) Open(ctx context.Context, item Item) (Receipt, error) {", "o.Nightly(ctx, item)"}, []string{"func (o *ops) Nightly("})
 		// 単位 3 は in を省いているので、同じ nightly の本体を出し、sweep（純粋で throws のない葉。それでも、ctx を取り、error を返す:
-		// docs/plugin-go.md「op の形」）と report も出す
+		// plugins/go/spec/go.hozo の Requirement.OpShape）と report も出す
 		want(t, "gen/batch/inner/wiring.go", []string{"func (o *ops) Nightly(ctx context.Context, item Item) error {", "o.Sweep(ctx, item)"}, nil)
 		want(t, "gen/batch/inner/ops.go", []string{"\tSweep(ctx context.Context, item Item) error\n", "\tReport(ctx context.Context) (Report, error)"}, nil)
 	})
@@ -100,7 +100,7 @@ func TestUnitsCorpus(t *testing.T) {
 			}
 		}
 	})
-	t.Run("plugin-go.md 内側のフォルダと入口/内部の op を持たない出力は分けない", func(t *testing.T) {
+	t.Run("go の Requirement.Layout 内側のフォルダと入口/内部の op を持たない出力は分けない", func(t *testing.T) {
 		// stock の op は reserve だけで、export。一つのパッケージがすべての定義を持つ
 		want(t, "gen/stock/ops.go", []string{"package stock", "\tReserve(ctx context.Context, id ItemId) error"}, nil)
 		for p := range got {

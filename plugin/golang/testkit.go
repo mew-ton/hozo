@@ -6,10 +6,10 @@ import (
 	"github.com/mew-ton/hozo/ir"
 )
 
-// このファイルは、テストのにせものと、テストの中の組み立て（docs/plugin-go.md「テストのにせもの」）の形。基底は、ここから fakes.go を
+// このファイルは、テストのにせものと、テストの中の組み立て（plugins/go/spec/go.hozo の Requirement.Fakes）の形。基底は、ここから fakes.go を
 // 作り、その組み立てを使う相乗り（docs/plugin-go-http.md「インテグレーションテストの口」）は、同じ値から、名前と並びを求める。
 
-// KitKind は、New の引数の種類（docs/plugin-go.md「New」の表）。
+// KitKind は、New の引数の種類（plugins/go/spec/go.hozo の Requirement.Ports の「New」の表）。
 type KitKind int
 
 const (
@@ -27,7 +27,7 @@ const (
 	KitSeams
 )
 
-// TestKit は、一つの出力 (U, N) の、テストのにせものと、テストの中の組み立て（docs/plugin-go.md「テストのにせもの」）。
+// TestKit は、一つの出力 (U, N) の、テストのにせものと、テストの中の組み立て（plugins/go/spec/go.hozo の Requirement.Fakes）。
 type TestKit struct {
 	// Namespace は、出力する名前空間 N の FQN。Dir は Dir(U, N)。
 	Namespace, Dir string
@@ -190,7 +190,7 @@ func (b *kitBuilder) kit(ns string, cfg ir.NamespaceConfig, inUnit func(*ir.Op) 
 		name := next()
 		unit, n := b.throughUnit(cfg, d.Namespace)
 		// 呼ぶ op が、どれも、入口（@entry のデコレータを持つ op）の名前空間は、相手の入口の並びで、流れの端: 通す出力があっても、
-		// にせものにする（docs/plugin-go.md「テストのにせもの」の「流れの端」）
+		// にせものにする（plugins/go/spec/go.hozo の Requirement.Fakes の「流れの端」）
 		entry := n == 1 && allEntries(p, d.Ops)
 		switch {
 		case n == 0 || entry:
@@ -255,7 +255,7 @@ func allEntries(p *ir.Program, ops []string) bool {
 	return len(ops) > 0
 }
 
-// TestFakeNames は、view の出力 (U, N) の fakes.go の、公開の名前（docs/plugin-go.md「テストのにせもの」）: にせものの型（New の引数の順）、
+// TestFakeNames は、view の出力 (U, N) の fakes.go の、公開の名前（plugins/go/spec/go.hozo の Requirement.Fakes）: にせものの型（New の引数の順）、
 // `Fakes`、`NewOps`。fakes.go を持たない出力では、空。
 func TestFakeNames(view *ir.View) []TestName {
 	k, _ := TestKitOf(view)

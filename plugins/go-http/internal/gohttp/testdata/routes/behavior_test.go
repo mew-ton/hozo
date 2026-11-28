@@ -521,7 +521,7 @@ func TestErrors(t *testing.T) {
 	}
 }
 
-// 例外の構造体は、引数ごとにフィールド一つ（docs/plugin-go.md「exception」）。値を一つに包むフィールドは、ない。
+// 例外の構造体は、引数ごとにフィールド一つ（plugins/go/spec/go.hozo の Requirement.Types の「exception」）。値を一つに包むフィールドは、ない。
 var (
 	_ = pkgtype.Conflict{Existing: "", Count: int64(0)}
 	_ = pkgtype.Limited{RetryAfter: pkgtype.Wait(0), Hint: (*string)(nil), Until: (*time.Time)(nil)}

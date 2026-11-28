@@ -53,7 +53,7 @@ func (l leaves) Clash(_ context.Context, s, ctx, body, context_ string, id pkgty
 }
 
 // items は状態 shop.items の単位の実装: 形で決まる問い合わせ（IsEmpty、Get）と、read shop.itemById と、効果 shop.addItem
-// （docs/plugin-go.md「状態の単位」）。単位のメソッドは、すべてここに書く（インターフェースを埋め込まない: 一つでも足りないか、
+// （plugins/go/spec/go.hozo の Requirement.Ports の「状態の単位」）。単位のメソッドは、すべてここに書く（インターフェースを埋め込まない: 一つでも足りないか、
 // 名前が違えば、New に渡すところでコンパイルできない）。
 type items struct {
 	log *[]string
@@ -153,7 +153,7 @@ func TestDenied(t *testing.T) {
 }
 
 // 以下は、継ぎ目を宣言したトランスパイラが二つある単位（mixed）: RateSeams だけでは Seams を満たさないので、人が、もう一方の
-// 実装と一つの構造体に埋め込む（docs/plugin-go.md「継ぎ目の実装」）。
+// 実装と一つの構造体に埋め込む（plugins/go/spec/go.hozo の Requirement.Seams の「継ぎ目の実装」）。
 
 // traceSeams は、もう一方のトランスパイラ（go-trace）の継ぎ目の、人が書いた代わり。
 type traceSeams struct{ log *[]string }

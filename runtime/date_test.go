@@ -6,7 +6,7 @@ import (
 	"time"
 )
 
-// TestDate は、Date の、文字列の形、零値、繰り上げ、比較、JSON（docs/plugin-go.md「runtime パッケージ」）。
+// TestDate は、Date の、文字列の形、零値、繰り上げ、比較、JSON（パッケージ runtime の説明（runtime/doc.go））。
 func TestDate(t *testing.T) {
 	if got := (Date{}).String(); got != "0001-01-01" {
 		t.Errorf("零値 = %q, want 0001-01-01", got)

@@ -5,10 +5,10 @@ import (
 	"testing"
 )
 
-// TestLiteralTypeDecls は docs/plugin-go.md「model」のリテラルの型のフィールド（構造体に項目を持たず、コメントの行を置く）と、
+// literalTypeDecls は plugins/go/spec/go.hozo の Requirement.Types の「model」のリテラルの型のフィールド（構造体に項目を持たず、コメントの行を置く）と、
 // 「union」のリテラルの型のアーム（値を持たない、包む型）、印で見分ける union（ふつうの、model のアームの union）:
 // testdata/literals の型の宣言が、文書から、手で書いた、下のコードを含むこと。
-func TestLiteralTypeDecls(t *testing.T) {
+func literalTypeDecls(t *testing.T) {
 	_, files := emitFixture(t, "literals")
 	src, ok := files["gen/app/types/types.go"]
 	if !ok {
@@ -98,10 +98,10 @@ type ShapeYes struct{}
 	}
 }
 
-// TestLiteralTypeBodies は docs/plugin-go.md「値」の、リテラルの型のアームに入れる式（<Union><アーム名>{}）、リテラルの型の
+// literalTypeBodies は plugins/go/spec/go.hozo の Requirement.Wiring の「値」の、リテラルの型のアームに入れる式（<Union><アーム名>{}）、リテラルの型の
 // フィールドを読む式（リテラルの式）と、レコードリテラル（そのフィールドを書かない）、「match」の variant（リテラルの型の
 // アーム）と、三つに分ける形（対象の型が boolean?）: testdata/literals の op の本体が、文書から、手で書いた、下のコードと同じこと。
-func TestLiteralTypeBodies(t *testing.T) {
+func literalTypeBodies(t *testing.T) {
 	_, files := emitFixture(t, "literals")
 	wiring, ok := files["gen/app/wiring.go"]
 	if !ok {
@@ -207,10 +207,10 @@ func TestLiteralTypeBodies(t *testing.T) {
 	}
 }
 
-// TestOptionalLiteralPredicateGuard は docs/plugin-go.md「分類」の、literal の確かめの、対象の型が boolean?（v は *bool）のもの:
+// optionalLiteralPredicateGuard は plugins/go/spec/go.hozo の Requirement.Wiring の「分類」の、literal の確かめの、対象の型が boolean?（v は *bool）のもの:
 // 判定関数の中で、as true のケースの述語は `if v != nil && *v`、as false のケースの述語は `if v != nil && !*v` で包む。
 // 期待は、文書から、手で書いた。
-func TestOptionalLiteralPredicateGuard(t *testing.T) {
+func optionalLiteralPredicateGuard(t *testing.T) {
 	_, files := emitFixture(t, "literals")
 	src, ok := files["gen/app/types/classify.go"]
 	if !ok {

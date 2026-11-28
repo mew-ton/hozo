@@ -15,7 +15,7 @@ import (
 // このファイルは cli.go のテキスト（plugins/go-cli/spec/go-cli.hozo の Requirement.Output、Requirement.Arguments、Requirement.CommandFunctions、Requirement.Run、Requirement.Usage）。検査（emit.go）を
 // 通った入力だけを描く。
 //
-// cli.go は自分のパッケージ（cli）なので、非公開の名前に前置きの決まりはない（docs/plugin-go.md「相乗りのファイル」）。ただし、
+// cli.go は自分のパッケージ（cli）なので、非公開の名前に前置きの決まりはない（plugins/go/spec/go.hozo の Requirement.Layout の「相乗りのファイル」）。ただし、
 // import する名前空間のパッケージの名前（小文字と数字だけ）と当たらないように、パッケージの非公開の名前は、どれも大文字を含む形に
 // する: コマンドごとの run<Op> / fail<Op> / usage<Op> と、補助の cli<名前>（コマンドごとの名前と当たらないように、前置きを分ける）。
 //
@@ -48,7 +48,7 @@ func (g *generator) newFile() *file {
 }
 
 // local は、関数の中の局所の名前。このファイルが import するパッケージの名前と当たれば、当たらなくなるまで末尾に _ を足す
-// （docs/plugin-go.md「名前」の「局所の名前」と同じ扱い）。
+// （plugins/go/spec/go.hozo の Requirement.Names の「局所の名前」と同じ扱い）。
 func (f *file) local(name string) string {
 	for f.reserved[name] {
 		name += "_"
@@ -57,7 +57,7 @@ func (f *file) local(name string) string {
 }
 
 // pkg は、標準ライブラリか runtime のパッケージを import に足して、その名前を返す（名前は変わらない。
-// docs/plugin-go.md「パッケージと import パス」）。
+// plugins/go/spec/go.hozo の Requirement.Layout の「パッケージと import パス」）。
 func (f *file) pkg(importPath string) string {
 	f.std[importPath] = true
 	return f.im.Add(importPath, path.Base(importPath))
@@ -84,7 +84,7 @@ func (f *file) decl(fqn string) string {
 }
 
 // render は cli.go の全体を作り、go/format で整形する。import の名前を文書の決まりの順で決めるために、二度描く
-// （docs/plugin-go.md「パッケージと import パス」の「import の名前」）: 一度目で、使う import の集まりを知り、二度目は、標準ライブラリと
+// （plugins/go/spec/go.hozo の Requirement.Layout の「パッケージと import パス」の「import の名前」）: 一度目で、使う import の集まりを知り、二度目は、標準ライブラリと
 // runtime を先に、その後に名前空間のパッケージ（N の入口を含む）を FQN の辞書順に足した名前で描く。
 func (g *generator) render(commands []command) (string, error) {
 	first := g.newFile()
@@ -387,7 +387,7 @@ func (l *cliLine) orDefault(dst any, value any) { l.field(dst).fallback = value 
 // 入力が Validate を持つか、例外が引数を持つか）は、どれもここにあり、実行時に決める（plugins/go-cli/spec/go-cli.hozo の Requirement.CommandFunctions）。
 func (f *file) helpers() string {
 	// 補助のテキストは、標準ライブラリと runtime のパッケージを、その名前のまま書く: 最後に描くとき（render の二度目）は、それらを
-	// 先に import に足すので、名前は変わらない（docs/plugin-go.md「パッケージと import パス」の「import の名前」）。
+	// 先に import に足すので、名前は変わらない（plugins/go/spec/go.hozo の Requirement.Layout の「パッケージと import パス」の「import の名前」）。
 	for _, p := range []string{"os", "path/filepath", "strings", "fmt", "io", "reflect", "strconv", "sort"} {
 		f.pkg(p)
 	}

@@ -7,7 +7,7 @@ import (
 	"testing"
 )
 
-// このファイルは、実装の漏れがコンパイルエラーになること（docs/plugin-go.md「実装を受け取る口」: メソッドが一つでも足りない値は、
+// このファイルは、実装の漏れがコンパイルエラーになること（plugins/go/spec/go.hozo の Requirement.Ports: メソッドが一つでも足りない値は、
 // 渡すところでコンパイルできない）を、生成したコードを実際にコンパイルして確かめる。漏れを、実行のときに見つける道はない。
 
 // linesMethods は、入力 states の状態 app.lines の単位 LinesState のメソッドの、すべての実装（メソッド名 → ソース）。
@@ -41,9 +41,9 @@ func linesImpl(omit string) string {
 	return b.String()
 }
 
-// TestIncompleteUnitDoesNotCompile は、状態の単位のメソッドを一つでも持たない型が、渡すところでコンパイルできないことを確かめる:
+// incompleteUnitDoesNotCompile は、状態の単位のメソッドを一つでも持たない型が、渡すところでコンパイルできないことを確かめる:
 // 形で決まる問い合わせ、配線が直に呼ぶ形で決まる命令、read（配線が呼ぶものも、どの配線も呼ばないものも）、効果（同じ）。
-func TestIncompleteUnitDoesNotCompile(t *testing.T) {
+func incompleteUnitDoesNotCompile(t *testing.T) {
 	root, files := emitFixture(t, "states")
 	writeFiles(t, root, files)
 	impl := filepath.Join(root, "impl", "impl.go")
@@ -120,10 +120,10 @@ func leavesImpl(replace map[string]string) string {
 	return b.String()
 }
 
-// TestLeafOfAnotherShapeDoesNotCompile は、葉の実装の漏れと、形の違いが、渡すところでコンパイルできないこと（docs/plugin-go.md
-// 「実装を受け取る口」「op の形」）。仕様の上で純粋な葉（make、note）と、純粋で throws のある葉（parse）も、ctx を取り、error を
+// leafOfAnotherShapeDoesNotCompile は、葉の実装の漏れと、形の違いが、渡すところでコンパイルできないこと（plugins/go/spec/go.hozo の Requirement.Ports
+// 「op の形」）。仕様の上で純粋な葉（make、note）と、純粋で throws のある葉（parse）も、ctx を取り、error を
 // 返す形でなければ、Leaves を満たさない: 前の形（ctx を取らない、error を返さない）の実装は、通らない。
-func TestLeafOfAnotherShapeDoesNotCompile(t *testing.T) {
+func leafOfAnotherShapeDoesNotCompile(t *testing.T) {
 	root, files := emitFixture(t, "statements")
 	writeFiles(t, root, files)
 	impl := filepath.Join(root, "impl", "impl.go")

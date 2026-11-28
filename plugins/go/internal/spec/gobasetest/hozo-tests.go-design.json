@@ -1,0 +1,18 @@
+{
+  "tests": [
+    {"name": "hozo.gobase.Requirement.Targets", "file": "internal/spec/gobasetest/design.go", "lines": [1719, 1719]},
+    {"name": "hozo.gobase.Requirement.Layout", "file": "internal/spec/gobasetest/design.go", "lines": [1722, 1722]},
+    {"name": "hozo.gobase.Requirement.Names", "file": "internal/spec/gobasetest/design.go", "lines": [1725, 1725]},
+    {"name": "hozo.gobase.Requirement.Types", "file": "internal/spec/gobasetest/design.go", "lines": [1728, 1728]},
+    {"name": "hozo.gobase.Requirement.OpShape", "file": "internal/spec/gobasetest/design.go", "lines": [1731, 1731]},
+    {"name": "hozo.gobase.Requirement.Ports", "file": "internal/spec/gobasetest/design.go", "lines": [1734, 1734]},
+    {"name": "hozo.gobase.Requirement.Wiring", "file": "internal/spec/gobasetest/design.go", "lines": [1737, 1737]},
+    {"name": "hozo.gobase.Requirement.Decorators", "file": "internal/spec/gobasetest/design.go", "lines": [1740, 1740]},
+    {"name": "hozo.gobase.Requirement.Seams", "file": "internal/spec/gobasetest/design.go", "lines": [1743, 1743]},
+    {"name": "hozo.gobase.Requirement.Wraps", "file": "internal/spec/gobasetest/design.go", "lines": [1746, 1746]},
+    {"name": "hozo.gobase.Requirement.UnitTestPort", "file": "internal/spec/gobasetest/design.go", "lines": [1749, 1749]},
+    {"name": "hozo.gobase.Requirement.Fakes", "file": "internal/spec/gobasetest/design.go", "lines": [1752, 1752]},
+    {"name": "hozo.gobase.Requirement.Comments", "file": "internal/spec/gobasetest/design.go", "lines": [1755, 1755]},
+    {"name": "hozo.gobase.Requirement.Determinism", "file": "internal/spec/gobasetest/design.go", "lines": [1758, 1758]}
+  ]
+}

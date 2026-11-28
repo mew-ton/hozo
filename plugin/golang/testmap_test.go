@@ -8,7 +8,7 @@ import (
 	"github.com/mew-ton/hozo/plugin"
 )
 
-// テストの対応表（docs/plugin-go.md「テストの対応表」）: テスト一つは、いちばん内側の t.Run。名前は、段を / でつなぐ。
+// テストの対応表（plugins/go/spec/go.hozo の Requirement.UnitTestPort の「テストの対応表」）: テスト一つは、いちばん内側の t.Run。名前は、段を / でつなぐ。
 // 行は、その場の関数の本体の、{ の次の行から、} の前の行まで。
 func TestTestMap(t *testing.T) {
 	src := `package xtest
@@ -95,7 +95,7 @@ func TestTestMapRejects(t *testing.T) {
 	}
 }
 
-// カバレッジを読む（docs/plugin-go.md「カバレッジを読む」）。
+// カバレッジを読む（plugins/go/spec/go.hozo の Requirement.UnitTestPort の「カバレッジを読む」）。
 func TestReadCoverProfile(t *testing.T) {
 	for _, mode := range []string{"set", "count", "atomic"} {
 		p, recognized, err := ReadCoverProfile("mode: " + mode + "\n" +

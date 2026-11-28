@@ -7,7 +7,7 @@
 plugin_dirs = ["plugins"]       # サンプルの中のプラグイン go-ratelimit（語彙 rate と、その継ぎ目の中身。P38）
 max_bindings = 6                # 既定は 5。server.getMyPage が、val を六つ持つ（disjoint の外に出す三つを含む。README.md「R6 で変えたこと」）
 
-# Go のモジュールの名前（go.mod の module と同じもの。docs/plugin-go.md「マニフェスト」）。プロジェクト全体のオプション
+# Go のモジュールの名前（go.mod の module と同じもの。plugins/go/hozo-plugin.toml）。プロジェクト全体のオプション
 [options.go]
 module = "example.com/shop-server"
 

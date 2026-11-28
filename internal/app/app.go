@@ -1,12 +1,12 @@
 // Package app は hozoc の葉の op の実装と表示（パッケージの説明）。
 //
 // 骨組み（型、op の形、実装を受け取る口、配線、引数の解釈、例外の見分けと終了コード、使い方の表示）は spec/cli.hozo から生成した
-// internal/gen/hozo/compiler と internal/gen/hozo/cli（基底 go と go-valid。docs/plugin-go.md、docs/plugin-go-valid.md）と
+// internal/gen/hozo/compiler と internal/gen/hozo/cli（基底 go と go-valid。plugins/go/spec/go.hozo、docs/plugin-go-valid.md）と
 // internal/gen/hozo/cli/cli（go-cli。docs/plugin-go-cli.md）が持ち、ここは、生成した口を満たす [App] と、cli.Presenter の実装 [Presenter] を持つ:
 //
 //   - 葉の op（状態に触れない）check、collectOutputs、verifyOutputs、plannedChanges、matchTests、serve、runEmit は compiler.Leaves の
 //     メソッドで、*App がそれを満たす。
-//   - 状態に触れるのは、状態の単位のメソッドだけ（docs/plugin-go.md「状態の単位」）。read outputChanges は、その状態 outputs の単位
+//   - 状態に触れるのは、状態の単位のメソッドだけ（plugins/go/spec/go.hozo の Requirement.Ports の「状態の単位」）。read outputChanges は、その状態 outputs の単位
 //     （compiler.OutputsState）の問い合わせで、形で決まる問い合わせ（IsEmpty と Get）と一緒に、[App.Outputs] が返す値が持つ。
 //     効果 syncOutputs は、その宛先の状態の分類 OutputsSync の単位（compiler.OutputsSyncState）の命令で、同じ単位の問い合わせ
 //     （述語 UpToDate と OutOfDate）と一緒に、[App.OutputsSync] が返す値が持つ。

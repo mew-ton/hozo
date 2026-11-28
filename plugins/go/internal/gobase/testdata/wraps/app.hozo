@@ -1,4 +1,4 @@
-// docs/plugin-go.md「本体のあるデコレータ」の各行を、一か所ずつ使う。各 op の上のコメントが、その op が確かめる行。
+// plugins/go/spec/go.hozo の Requirement.Wraps の各行を、一か所ずつ使う。各 op の上のコメントが、その op が確かめる行。
 
 /** テストの語彙 */
 namespace trace {
@@ -8,7 +8,7 @@ namespace trace {
   exception Late;
   /** 変だ */
   exception Odd;
-  // 継ぎ目を要る（go-trace）。本体のあるデコレータと、重ねる。デコレータのテストの口（docs/plugin-go.md「デコレータのテストの口」）の、
+  // 継ぎ目を要る（go-trace）。本体のあるデコレータと、重ねる。デコレータのテストの口（plugins/go/spec/go.hozo の Requirement.UnitTestPort の「デコレータのテストの口」）の、
   // 結果ごとの確かめ: prevents effects（中身を呼ばない）、keeps effects（中身を呼んでいる）、関係なし（例外だけ）
   /** 中身の前後に、印を残す */
   decorator fn traced(): throws Busy prevents effects throws Late keeps effects throws Odd;
@@ -19,7 +19,7 @@ namespace trace {
   exception Cut;
   /** 落ちたか、切れた */
   union Outage { Down; Cut; }
-  // 例外を受ける、継ぎ目のデコレータ（go-trace）。デコレータのテストの口の「受けるケース」（docs/plugin-go.md）の、扱いごとの確かめ
+  // 例外を受ける、継ぎ目のデコレータ（go-trace）。デコレータのテストの口の「受けるケース」（plugins/go/spec/go.hozo）の、扱いごとの確かめ
   /** 落ちても、何もなかったことにする */
   decorator fn quiet(): catches Down ignores;
   /** 落ちても、切れても、続ける */
@@ -148,7 +148,7 @@ namespace shop {
   export fn refuse(): never throws Denied;
 }
 
-/** 例外を受けるデコレータを付ける名前空間（docs/plugin-go.md「デコレータのテストの口」の「受けるケース」） */
+/** 例外を受けるデコレータを付ける名前空間（plugins/go/spec/go.hozo の Requirement.UnitTestPort の「デコレータのテストの口」の「受けるケース」） */
 namespace desk {
   /** 灯り */
   state lamp: single<string>;

@@ -8,7 +8,7 @@ import (
 	"github.com/mew-ton/hozo/ir"
 )
 
-// このファイルは、ThrowSources と CaughtSources（docs/plugin-go.md「テストのにせもの」の「求めるケースを、にせものに当てる」）:
+// このファイルは、ThrowSources と CaughtSources（plugins/go/spec/go.hozo の Requirement.Fakes の「求めるケースを、にせものに当てる」）:
 // 本体が求めたケース（View.entries）を、Go のにせものに当てる。出どころを求めること（docs/check.md「入口ごとの、求めるケース」）は、
 // 本体のテスト（internal/check/entries_test.go）が確かめるので、ここでは、IR も、View.entries も、手で組む。
 
@@ -102,7 +102,7 @@ func throwsStep(kind ir.EntryTargetKind, name, exception string, via ...string) 
 	return ir.EntryStep{Via: via, Verb: ir.StepThrows, Kind: kind, Name: name, Exception: exception}
 }
 
-// 差し替えに言うこと（ir.EntryStep）の、相手の種類ごとに、Fakes の、どのフィールドに、何を言うか（docs/plugin-go.md「テストのにせもの」の
+// 差し替えに言うこと（ir.EntryStep）の、相手の種類ごとに、Fakes の、どのフィールドに、何を言うか（plugins/go/spec/go.hozo の Requirement.Fakes の
 // 「求めるケースを、にせものに当てる」の表）。
 func TestThrowSourcesSteps(t *testing.T) {
 	v := mapView()

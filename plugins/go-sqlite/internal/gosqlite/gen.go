@@ -43,7 +43,7 @@ const (
 )
 
 // generate は db.go の内容を作る。import の名前と、局所の名前が避ける名前を決めるために、二度作る（基底と同じ。
-// docs/plugin-go.md「パッケージと import パス」の「import の名前」）: 一度目で import の集まりを知り、名前を文書の順で決め直してから、
+// plugins/go/spec/go.hozo の Requirement.Layout の「パッケージと import パス」の「import の名前」）: 一度目で import の集まりを知り、名前を文書の順で決め直してから、
 // その名前でもう一度作る。go/format で整形する。
 func (e *emitter) generate() (string, error) {
 	im := golang.NewImports(e.view, e.layout, false)
@@ -78,7 +78,7 @@ type fileGen struct {
 }
 
 // build は、db.go の本体（import より後ろ）を一通り作る。標準ライブラリと runtime の名前は、そのまま書く（import の名前を決め直した
-// 二度目でも、その名前は変わらない。docs/plugin-go.md「パッケージと import パス」の「import の名前」）。
+// 二度目でも、その名前は変わらない。plugins/go/spec/go.hozo の Requirement.Layout の「パッケージと import パス」の「import の名前」）。
 func (e *emitter) build(im *golang.Imports) string {
 	f := &fileGen{e: e, im: im, imports: map[string]bool{}, private: map[string]bool{}, used: map[string]bool{}}
 	im.Add("context", "context")
@@ -392,7 +392,7 @@ func (f *fileGen) effect(u *unit, x *effect) {
 
 // locals は、補助と継ぎ目のメソッドの中の局所の名前 names を、このファイルが import するパッケージの名前と当たれば、当たらなくなるまで
 // 末尾に _ を足したもの（その名前のパッケージの型を、本体が書けなくなるのを防ぐ。相乗りのファイルは、自分の局所の名前の方を変える。
-// docs/plugin-go.md「パッケージと import パス」の「import の名前」）。
+// plugins/go/spec/go.hozo の Requirement.Layout の「パッケージと import パス」の「import の名前」）。
 func (f *fileGen) locals(names ...string) []string {
 	out := make([]string, len(names))
 	for i, n := range names {

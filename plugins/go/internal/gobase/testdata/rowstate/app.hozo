@@ -1,6 +1,6 @@
 // plugins/go の単体テストの入力: 行の遷移（docs/check.md「行の遷移」）と、ない側のケース（同「ない側のケース」）。
 // 効果は、行の遷移を持っても、宛先の状態の単位のメソッドで、形は変わらない。変わるのは、コメントだけ。
-// 行の引数を絞り込んだ効果（start、cancel、revise、discard）は、入口で、行のケースを確かめる（docs/plugin-go.md「効果の入口の確かめ」）。
+// 行の引数を絞り込んだ効果（start、cancel、revise、discard）は、入口で、行のケースを確かめる（plugins/go/spec/go.hozo の Requirement.Ports の「効果の入口の確かめ」）。
 // ない側のケースは、述語を持たない: 型で決まる分類（Known）は何も出さず、述語で決まる分類（Life）は、判定関数が、値がないことで決める。
 namespace app {
   model Order { id: string; note: string; }

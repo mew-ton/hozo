@@ -7,17 +7,17 @@ import (
 	"github.com/mew-ton/hozo/ir"
 )
 
-// innerDir は内側のフォルダの名前で、内側のパッケージの名前でもある（docs/plugin-go.md「内側のフォルダと入口」）。
+// innerDir は内側のフォルダの名前で、内側のパッケージの名前でもある（plugins/go/spec/go.hozo の Requirement.Layout の「内側のフォルダと入口」）。
 // 相乗りは、このディレクトリ名を使わない（同「相乗りのファイル」）。
 const innerDir = "inner"
 
-// typesDir は、型のパッケージのフォルダの名前で、そのパッケージの名前でもある（docs/plugin-go.md「型のパッケージ」）。
+// typesDir は、型のパッケージのフォルダの名前で、そのパッケージの名前でもある（plugins/go/spec/go.hozo の Requirement.Layout の「型のパッケージ」）。
 const typesDir = "types"
 
-// testSuffix は、テストのパッケージの名前の後ろに付ける語（docs/plugin-go.md「単体テストの口」の「テストのパッケージ」）。
+// testSuffix は、テストのパッケージの名前の後ろに付ける語（plugins/go/spec/go.hozo の Requirement.UnitTestPort の「テストのパッケージ」）。
 const testSuffix = "test"
 
-// Layout は一つの出力 (U, N) の置き場（docs/plugin-go.md「配置」）。
+// Layout は一つの出力 (U, N) の置き場（plugins/go/spec/go.hozo の Requirement.Layout）。
 //
 // 入口のパッケージは `<Dir(U, N)>/` で、人が書くコード、別の名前空間の出力、相乗りのファイルが使う。定義のパッケージは、
 // 型と口と配線を定義するパッケージ: 分けた出力（HasInner）では内側 `<Dir(U, N)>/inner/`、分けない出力では入口と同じ。
@@ -33,19 +33,19 @@ type Layout struct {
 	// DefDir、DefPath、DefName は、定義のパッケージのディレクトリ、import パス、名前。HasInner なら `<Dir>/inner`、
 	// `<EntryPath>/inner`、"inner"。そうでなければ入口と同じ。
 	DefDir, DefPath, DefName string
-	// HasTypes は、型のパッケージを、分けて持つか（docs/plugin-go.md「型のパッケージ」: N が、op、read、効果、状態の宣言を、
+	// HasTypes は、型のパッケージを、分けて持つか（plugins/go/spec/go.hozo の Requirement.Layout の「型のパッケージ」: N が、op、read、効果、状態の宣言を、
 	// 一つでも持つ。単位の in は、見ない）。
 	HasTypes bool
 	// TypesDir、TypesPath、TypesName は、型のパッケージのディレクトリ、import パス、名前。HasTypes なら `<Dir>/types`、
 	// `<EntryPath>/types`、"types"。そうでなければ入口と同じ。別の名前空間の出力と、相乗りのファイルは、ここを import する。
 	TypesDir, TypesPath, TypesName string
-	// TestDir、TestPath、TestName は、テストのパッケージ（docs/plugin-go.md「単体テストの口」の「テストのパッケージ」）の
+	// TestDir、TestPath、TestName は、テストのパッケージ（plugins/go/spec/go.hozo の Requirement.UnitTestPort の「テストのパッケージ」）の
 	// ディレクトリ、import パス、名前: `<Dir>/<EntryName>test`、`<EntryPath>/<EntryName>test`、`<EntryName>test`。
 	// 口が一つもない出力では、基底は、このパッケージを作らない。
 	TestDir, TestPath, TestName string
 }
 
-// LayoutOf は、この View の出力 (U, N) の置き場（docs/plugin-go.md「パッケージと import パス」「内側のフォルダと入口」）。
+// LayoutOf は、この View の出力 (U, N) の置き場（plugins/go/spec/go.hozo の Requirement.Layout の「パッケージと import パス」、Requirement.Layout の「内側のフォルダと入口」）。
 // import パスは、設定のオプション module から作る（ModuleOf）。module がなければ ErrNoModule を包んだ誤り（GO-8）。
 func LayoutOf(view *ir.View) (*Layout, error) {
 	hasInner := false
@@ -55,7 +55,7 @@ func LayoutOf(view *ir.View) (*Layout, error) {
 	return layout(view.Viewer, view.Config, hasInner, HasFuncs(view.Program, view.Viewer))
 }
 
-// HasFuncs は、名前空間 namespace が、関数を持つか（docs/plugin-go.md「型のパッケージ」）: op、read、効果、状態の宣言を、一つでも
+// HasFuncs は、名前空間 namespace が、関数を持つか（plugins/go/spec/go.hozo の Requirement.Layout の「型のパッケージ」）: op、read、効果、状態の宣言を、一つでも
 // 持つ。単位の in は、見ない（名前空間の宣言だけから決まる）。
 func HasFuncs(p *ir.Program, namespace string) bool {
 	if p == nil {

@@ -1,7 +1,7 @@
 [options.go]
 module = "example.com/app"
 
-# plugins/go の単体テストの入力（docs/testing.md「単体テスト」）: docs/plugin-go.md「match」の、絞り込みが literal の分け方（if <対象>）。
+# plugins/go の単体テストの入力（docs/testing.md「単体テスト」）: plugins/go/spec/go.hozo の Requirement.Wiring の「match」の、絞り込みが literal の分け方（if <対象>）。
 [[emit]]
 namespace   = "app"
 transpilers = ["go"]

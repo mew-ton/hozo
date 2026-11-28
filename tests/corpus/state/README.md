@@ -1,6 +1,6 @@
 # コーパス `state`
 
-状態を分類で表す決定（決定 S1〜S6、S8）の構文を、一つの名前空間で一か所ずつ使うプロジェクト（`docs/testing.md`「コーパス」）。`hozoc build --no-emit` が error なしで通ること、IR（`docs/ir.md`）に載る形、Go の基底 `go` の出力（`docs/plugin-go.md`）の形を確かめる。
+状態を分類で表す決定（決定 S1〜S6、S8）の構文を、一つの名前空間で一か所ずつ使うプロジェクト（`docs/testing.md`「コーパス」）。`hozoc build --no-emit` が error なしで通ること、IR（`docs/ir.md`）に載る形、Go の基底 `go` の出力（`plugins/go/spec/go.hozo`）の形を確かめる。
 
 | ファイル | 中身 |
 |---|---|
@@ -42,9 +42,9 @@
 
 ## 出力
 
-`testdata/expected/emit/gen/shop/` の、`docs/plugin-go.md` の見出しごとの対応。`shop` は `export` の op を持たない（すべて内部の op）ので、定義は内側のフォルダ `inner/` にあり、入口の `Ops` はメソッドを持たない（「内側のフォルダと入口」）。
+`testdata/expected/emit/gen/shop/` の、`plugins/go/spec/go.hozo` の見出しごとの対応。`shop` は `export` の op を持たない（すべて内部の op）ので、定義は内側のフォルダ `inner/` にあり、入口の `Ops` はメソッドを持たない（「内側のフォルダと入口」）。
 
-| `docs/plugin-go.md` の見出し | 構文 | 出力（`inner/`） |
+| `plugins/go/spec/go.hozo` の見出し | 構文 | 出力（`inner/`） |
 |---|---|---|
 | 「状態の単位」の問い合わせ | `state carts: list<Line>;`、`state token: nullable<Token>;`、`state title: single<string>;` | `states.go` の `CartsState`（`IsEmpty`、`Get`）、`TokenState`（`IsEmpty`、`Get`）、`TitleState`（`Get`） |
 | 「状態の単位」の命令 | `effect fn addLine(line: Line): effects carts.post;`、`effect fn placeOrder(): effects Checkout as Shopping -> Ordered;`、`effect fn signIn(): effects LoggedIn as any -> LoggedIn;`、`effect fn rename(): effects title.put;` など | 効果は、どれも、宛先の単位のメソッド（宣言順。どの配線も呼ばない `rename`、`touchCheckout` も出る）: 基底の状態の組み込みの効果と遷移は、その状態の単位（`CartsState.AddLine`、`CartsState.ClearCart`、`TokenState.RemoveToken`、`TokenState.SaveToken`、`TitleState.Rename`）、状態の分類の遷移は、その分類の単位（`CheckoutState.PlaceOrder`、`LoggedInState.SignIn`）。コメントは `// AddLine は命令（効果 shop.addLine、effects shop.carts.post）: カートに行を足す`。`read` の宣言と、直に呼ぶ組み込みの効果は、このコーパスにない（`plugins/go` の単体テストの入力 `states` が確かめる） |

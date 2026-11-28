@@ -1,4 +1,4 @@
-// docs/plugin-go.md「型」の各節と「コメント」を、サンプルが使わない形も含めて、一か所ずつ使う。op はない（型だけの出力）。
+// plugins/go/spec/go.hozo の Requirement.Types の各節と「コメント」を、サンプルが使わない形も含めて、一か所ずつ使う。op はない（型だけの出力）。
 
 /** Types of the app. 説明が ASCII の文字で始まる（「は」の後ろに空白を置く） */
 namespace app {

@@ -21,7 +21,7 @@ const (
 	codeValidOption = "GOVALID-7" // [emit.options.go-valid] に、知らないキーがある
 )
 
-// FileName は、このトランスパイラが出すただ一つのファイルの名前（docs/plugin-go.md「相乗りのファイル」）。定義のパッケージに置く。
+// FileName は、このトランスパイラが出すただ一つのファイルの名前（plugins/go/spec/go.hozo の Requirement.Layout の「相乗りのファイル」）。定義のパッケージに置く。
 const FileName = "validate.go"
 
 // vocabulary は、制約のデコレータを持つ語彙の名前空間。
@@ -182,7 +182,7 @@ func (g *generator) check() []target {
 		case *ir.Model:
 			if x.SynthesizedFrom != "" {
 				if _, isOp := g.p.Lookup(x.SynthesizedFrom).(*ir.Op); isOp {
-					continue // View が見る側のために合成した model は、Go の型にならない（docs/plugin-go.md「出力の対象」）
+					continue // View が見る側のために合成した model は、Go の型にならない（plugins/go/spec/go.hozo の Requirement.Targets）
 				}
 			}
 			g.checkModel(x)
@@ -319,7 +319,7 @@ func (g *generator) validatedIn(t ir.Type, visited map[string]bool) (string, boo
 }
 
 // wrappedArms は、N の union u の、包む型のアームのうち、Validate を出すもの（docs/plugin-go-valid.md「出力」）: アームの型が、
-// Validate を持つ型への ref で、アームの値が、包む型（u と同じ名前空間の model でない。docs/plugin-go.md「union」）。
+// Validate を持つ型への ref で、アームの値が、包む型（u と同じ名前空間の model でない。plugins/go/spec/go.hozo の Requirement.Types の「union」）。
 func (g *generator) wrappedArms(u *ir.Union) []*ir.UnionArm {
 	var out []*ir.UnionArm
 	ns := g.declNS[u.Name]

@@ -1,4 +1,4 @@
-# plugins/go の単体テストの入力（docs/testing.md「単体テスト」）: GO-2（生成する名前が当たる。docs/plugin-go.md「名前」）の各条件。
+# plugins/go の単体テストの入力（docs/testing.md「単体テスト」）: GO-2（生成する名前が当たる。plugins/go/spec/go.hozo の Requirement.Names）の各条件。
 # 条件ごとに名前空間を分け、一つの単位（namespace = "c"）が、子孫の c.* をすべて出力する。
 [hozo]
 plugin_dirs = ["plugins"]

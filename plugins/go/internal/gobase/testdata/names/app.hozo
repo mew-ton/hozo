@@ -1,4 +1,4 @@
-// docs/plugin-go.md「名前」の「局所の名前」、「パッケージと import パス」の「import の名前」、「New」の引数の名前を、
+// plugins/go/spec/go.hozo の Requirement.Names の「局所の名前」、「パッケージと import パス」の「import の名前」、「New」の引数の名前を、
 // 当たる名前で確かめる。op はどれも export（出力は、名前空間ごとに一つのパッケージ）。
 
 // 葉の op は reads / effects の節を書けない（docs/check.md「葉の op」）ので、葉が状態に触れることは、運ぶ節を持つデコレータで言う

@@ -1,4 +1,4 @@
-// 生成したコードの振る舞いのテスト（docs/testing.md「単体テスト」の `plugins/go`）: リテラルの型（docs/plugin-go.md「型」の、
+// 生成したコードの振る舞いのテスト（docs/testing.md「単体テスト」の `plugins/go`）: リテラルの型（plugins/go/spec/go.hozo の Requirement.Types の、
 // リテラルの型の行）。配線が union に入れた値が、そのアームの、値を持たない包む型で、葉に届くこと。リテラルの型の
 // フィールドを読んだ値が、そのリテラルであること。variant の match が、アームごとに分かれること。三つに分ける形
 // （対象の型が boolean?）が、真、偽、値がない、を、それぞれのケースのアームに届け、ケースのない側を、分類の誤り

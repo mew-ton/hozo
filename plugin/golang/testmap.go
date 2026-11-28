@@ -13,7 +13,7 @@ import (
 )
 
 // TestMap は、整形した後の Go のソース src（置き場は path。プロジェクトのルートからの相対パス）の、走らせる関数の中の
-// テストを、行の順で返す（docs/plugin-go.md「テストの対応表」）。
+// テストを、行の順で返す（plugins/go/spec/go.hozo の Requirement.UnitTestPort の「テストの対応表」）。
 //
 // テスト一つは、いちばん内側の `t.Run(<名前>, func(t *testing.T) { … })`。Name は、外の段からその t.Run までの名前を
 // `/` でつないだもの。Lines は、その場の関数の本体の、`{` の次の行から `}` の前の行まで。
@@ -119,7 +119,7 @@ func collectTests(fset *token.FileSet, path string, outer []string, runs []testR
 	return nil
 }
 
-// CoverProfile は、go test -coverprofile が書いたファイルの中身（docs/plugin-go.md「カバレッジを読む」）: ファイルの名前
+// CoverProfile は、go test -coverprofile が書いたファイルの中身（plugins/go/spec/go.hozo の Requirement.UnitTestPort の「カバレッジを読む」）: ファイルの名前
 // （<import パス>/<ファイル名>）ごとの、区切りと、実行されたか。
 type CoverProfile struct {
 	files map[string]map[[2]int]bool // 名前 → [始まりの行, 終わりの行] → 回数が 1 以上の行が、一つでもあったか

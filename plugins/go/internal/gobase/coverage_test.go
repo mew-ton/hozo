@@ -23,10 +23,10 @@ func coverOutput(index int, dir, module string) ir.NamespaceConfig {
 	return c
 }
 
-// direction "coverage"（docs/plugin-go.md「カバレッジを読む」）: 要求のファイルごとに、<そのディレクトリの import パス>/<ファイル名>
+// direction "coverage"（plugins/go/spec/go.hozo の Requirement.UnitTestPort の「カバレッジを読む」）: 要求のファイルごとに、<そのディレクトリの import パス>/<ファイル名>
 // の行を探し、回数が 1 以上の区切りの行の範囲を返す。測られていないファイルは、出さない。モジュールの名前は、要求の outputs
 // （ファイルを出した出力の設定）から取る: ファイルは、読まない。
-func TestCoverage(t *testing.T) {
+func coverageLines(t *testing.T) {
 	profile := "mode: set\n" +
 		"example.com/shop/gen/server/servertest/leaves.go:156.65,157.51 1 1\n" +
 		"example.com/shop/gen/server/servertest/leaves.go:157.51,159.34 2 1\n" +
@@ -115,7 +115,7 @@ func TestCoverageHandler(t *testing.T) {
 	}
 }
 
-// リポジトリのマニフェストが、[coverage] enabled を言っている（docs/plugin-go.md「マニフェスト」）。
+// リポジトリのマニフェストが、[coverage] enabled を言っている（plugins/go/hozo-plugin.toml）。
 func TestManifestDeclaresCoverage(t *testing.T) {
 	data, err := os.ReadFile(filepath.Join("..", "..", "hozo-plugin.toml"))
 	if err != nil {

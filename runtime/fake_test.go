@@ -6,7 +6,7 @@ import (
 	"testing"
 )
 
-// TestFake は、値を返すメソッドのにせもの（docs/plugin-go.md「runtime パッケージ」）: 呼ばれた引数を覚える。言われていなければ、本物を
+// TestFake は、値を返すメソッドのにせもの（パッケージ runtime の説明（runtime/doc.go））: 呼ばれた引数を覚える。言われていなければ、本物を
 // 呼ぶか（本物があるとき）、零値を返す。Returns と Throws は、後に言った方が効き、本物を呼ばせない。
 func TestFake(t *testing.T) {
 	type args struct{ ID int }
@@ -63,7 +63,7 @@ func TestFakeVoid(t *testing.T) {
 	}
 }
 
-// TestFakeAt は、呼び出しごとの結果（docs/plugin-go.md「runtime パッケージ」の ReturnsAt と ThrowsAt）: 言われた回だけが、その結果を
+// TestFakeAt は、呼び出しごとの結果（パッケージ runtime の説明（runtime/doc.go）の ReturnsAt と ThrowsAt）: 言われた回だけが、その結果を
 // 返し、本物は、呼ばない。ほかの回は、Returns か Throws、どちらも言われていなければ、本物か、零値。同じ回に二度言えば、後が効く。
 func TestFakeAt(t *testing.T) {
 	type args struct{ ID int }

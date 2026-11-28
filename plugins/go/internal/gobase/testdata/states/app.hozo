@@ -1,4 +1,4 @@
-// docs/plugin-go.md「op の置き場」「状態の単位」「状態の参照」と、「呼び出し」「文」の read・効果・直に呼ぶ組み込みの効果の行を、
+// plugins/go/spec/go.hozo の Requirement.Ports の「op の置き場」、Requirement.Ports の「状態の単位」、Requirement.Wiring の「状態の参照」と、「呼び出し」「文」の read・効果・直に呼ぶ組み込みの効果の行を、
 // 一か所ずつ使う。各宣言の上のコメントが、それが確かめる行。op はどれも export（出力は一つのパッケージ）。
 
 // 葉の op は reads / effects の節を書けない（docs/check.md「葉の op」）ので、葉が状態に触れることは、運ぶ節を持つデコレータで言う

@@ -7,7 +7,7 @@ import (
 	"github.com/mew-ton/hozo/ir"
 )
 
-// docs/plugin-go.md「パッケージと import パス」の「import の名前」: import のブロックは、標準ライブラリ、空行、それ以外の順で、
+// plugins/go/spec/go.hozo の Requirement.Layout の「パッケージと import パス」の「import の名前」: import のブロックは、標準ライブラリ、空行、それ以外の順で、
 // それぞれパスの辞書順。一つなら一行。名前がパスの最後の要素と違えば、名前を書く。
 func TestImportsRender(t *testing.T) {
 	im := &Imports{}
@@ -216,7 +216,7 @@ func TestImportsQualifier(t *testing.T) {
 	}
 }
 
-// docs/plugin-go.md「単体テストの口」の「テストのパッケージ」: テストのパッケージのファイルは、N の宣言も、入口のパッケージの名前で
+// plugins/go/spec/go.hozo の Requirement.UnitTestPort の「テストのパッケージ」: テストのパッケージのファイルは、N の宣言も、入口のパッケージの名前で
 // 修飾する。入口の import は、名前がパスの最後の要素と同じでも、名前を書く（Canonical で足し直しても）。別の名前空間の import は、
 // ほかのファイルと同じ。
 func TestTestImports(t *testing.T) {

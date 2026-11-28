@@ -7,10 +7,10 @@ import (
 	"github.com/mew-ton/hozo/ir"
 )
 
-// docs/plugin-go.md「名前」の「名前が当たれば GO-2」が並べる、定義のパッケージの公開の名前を、種類ごとに一つずつ。
+// plugins/go/spec/go.hozo の Requirement.Names の「名前が当たれば GO-2」が並べる、定義のパッケージの公開の名前を、種類ごとに一つずつ。
 // 並びは、宣言順（宣言ごとの名前）、状態の単位、Ops、New、Leaves、Seams、別の名前空間の口。
 func TestPublicNames(t *testing.T) {
-	// model から出す名前は、構造体の型だけ（値を作る関数 New<Model> は出さない。docs/plugin-go.md「model」）
+	// model から出す名前は、構造体の型だけ（値を作る関数 New<Model> は出さない。plugins/go/spec/go.hozo の Requirement.Types の「model」）
 	page := model("shop.Page", field("size", ir.Int()))
 	synthesized := model("shop.leaf$in")
 	synthesized.SynthesizedFrom = "shop.leaf"
@@ -18,7 +18,7 @@ func TestPublicNames(t *testing.T) {
 	arm.SynthesizedFrom = "shop.Shape"
 	set := union("shop.Errors")
 	set.Variant = ir.UnionSet
-	// 分類の定数は、宣言したケースの数だけ（docs/plugin-go.md「分類」。<C>Default はない）
+	// 分類の定数は、宣言したケースの数だけ（plugins/go/spec/go.hozo の Requirement.Wiring の「分類」。<C>Default はない）
 	kind := classify("shop.Kind", ir.TypeSubject{Type: ir.String()}, ir.DecidedByPredicate, "Big", "Small")
 	sync := classify("shop.Sync", ir.StatesSubject{States: []string{"shop.items"}}, ir.DecidedByPredicate, "UpToDate", "OutOfDate")
 	v := viewOf("shop",
@@ -96,7 +96,7 @@ func TestPublicNames(t *testing.T) {
 	}
 }
 
-// docs/plugin-go.md「単体テストの口」の「テストのパッケージ」と「テストのにせもの」: 基底が、テストのパッケージに出す公開の名前。
+// plugins/go/spec/go.hozo の Requirement.UnitTestPort の「テストのパッケージ」と「テストのにせもの」: 基底が、テストのパッケージに出す公開の名前。
 // 並びは、まとめの LeafCases と RunLeaves、葉ごとの <Op>Cases と <Op>Case、判定の口を出す分類ごとの <C>Examples と Run<C>、
 // fakes.go の名前（にせものの型を New の引数の順に、Fakes、NewOps）。
 func TestPublicTestNames(t *testing.T) {

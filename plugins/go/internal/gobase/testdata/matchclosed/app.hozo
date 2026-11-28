@@ -1,4 +1,4 @@
-// docs/plugin-go.md「match」の、二つに分ける形（if）での、閉じた分類（docs/check.md「閉じた分類」）を、一か所ずつ使う:
+// plugins/go/spec/go.hozo の Requirement.Wiring の「match」の、二つに分ける形（if）での、閉じた分類（docs/check.md「閉じた分類」）を、一か所ずつ使う:
 // 残りのケースを書かない presence の分類の「分類の誤りの枝」（return / const / 文）と、else のアーム（受けるケースを名前で
 // 並べたアームと、同じコードになる）。各 op の上のコメントが、その op が確かめる行。
 // op はどれも export（出力は一つのパッケージ）。

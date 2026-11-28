@@ -160,7 +160,7 @@ type OutputResult struct {
 	Results []EmitResponse `json:"results"`
 }
 
-// Version は、このリポジトリのプラグインの版。生成したファイルのヘッダに書く（docs/plugin-go.md「ファイル」）。
+// Version は、このリポジトリのプラグインの版。生成したファイルのヘッダに書く（plugins/go/spec/go.hozo の Requirement.Layout の「ファイル」）。
 const Version = "0.0.0-dev"
 
 // Options は、起動されたトランスパイラへのオプション req.View.Config.Options[req.Transpiler]（docs/config.md「オプション」、

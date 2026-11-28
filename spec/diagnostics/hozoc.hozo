@@ -74,7 +74,7 @@ namespace hozo.diagnostics {
     // docs/cli.md「診断」が説明する規則
 
     /**
-     * TESTS-1: 求めるテストが、走ったと確かめられない。二つの場合がある。（1）カバレッジが、そのテストの行を、実行済みと言っていない: テストを受け取る口を呼ぶテストを、書いていない。絞って走らせた。カバレッジを取るときに、測る範囲に、口のパッケージを入れていない（Go なら `-coverpkg`。`docs/plugin-go.md`「カバレッジを読む」）。（2）カバレッジが、そのファイルを測っていない。位置は、対応表の `file` と、`lines` の始まりの行
+     * TESTS-1: 求めるテストが、走ったと確かめられない。二つの場合がある。（1）カバレッジが、そのテストの行を、実行済みと言っていない: テストを受け取る口を呼ぶテストを、書いていない。絞って走らせた。カバレッジを取るときに、測る範囲に、口のパッケージを入れていない（Go なら `-coverpkg`。plugins/go/spec/go.hozo の Requirement.UnitTestPort の「カバレッジを読む」）。（2）カバレッジが、そのファイルを測っていない。位置は、対応表の `file` と、`lines` の始まりの行
      */
     @severity(Severity.Error)
     @adr.decided(hozo.decisions.Decision300.D380)
@@ -151,7 +151,7 @@ namespace hozo.diagnostics {
     /**
      * GOEMIT-1: 欠番（GOEMIT-1〜GOEMIT-6、GOEMIT-INTERNAL を、まとめて、なくした）。本体に組み込んだ Go の出力の規則。出力を基底のプラグインに移した（決定 D80）ときになくなった。行き先（GO-*、GOVALID-*）は持ち主の文書
      *
-     * 経緯のある所: `docs/plugin-go.md`「診断」
+     * 経緯のある所: docs/plugin-go.md「診断」
      */
     @retired
     @adr.decided(hozo.decisions.Decision000.D80)
@@ -160,7 +160,7 @@ namespace hozo.diagnostics {
     /**
      * GOEMIT-2: 欠番（GOEMIT-1〜GOEMIT-6、GOEMIT-INTERNAL を、まとめて、なくした）。本体に組み込んだ Go の出力の規則。出力を基底のプラグインに移した（決定 D80）ときになくなった。行き先（GO-*、GOVALID-*）は持ち主の文書
      *
-     * 経緯のある所: `docs/plugin-go.md`「診断」
+     * 経緯のある所: docs/plugin-go.md「診断」
      */
     @retired
     @adr.decided(hozo.decisions.Decision000.D80)
@@ -169,7 +169,7 @@ namespace hozo.diagnostics {
     /**
      * GOEMIT-3: 欠番（GOEMIT-1〜GOEMIT-6、GOEMIT-INTERNAL を、まとめて、なくした）。本体に組み込んだ Go の出力の規則。出力を基底のプラグインに移した（決定 D80）ときになくなった。行き先（GO-*、GOVALID-*）は持ち主の文書
      *
-     * 経緯のある所: `docs/plugin-go.md`「診断」
+     * 経緯のある所: docs/plugin-go.md「診断」
      */
     @retired
     @adr.decided(hozo.decisions.Decision000.D80)
@@ -178,7 +178,7 @@ namespace hozo.diagnostics {
     /**
      * GOEMIT-4: 欠番（GOEMIT-1〜GOEMIT-6、GOEMIT-INTERNAL を、まとめて、なくした）。本体に組み込んだ Go の出力の規則。出力を基底のプラグインに移した（決定 D80）ときになくなった。行き先（GO-*、GOVALID-*）は持ち主の文書
      *
-     * 経緯のある所: `docs/plugin-go.md`「診断」
+     * 経緯のある所: docs/plugin-go.md「診断」
      */
     @retired
     @adr.decided(hozo.decisions.Decision000.D80)
@@ -187,7 +187,7 @@ namespace hozo.diagnostics {
     /**
      * GOEMIT-5: 欠番（GOEMIT-1〜GOEMIT-6、GOEMIT-INTERNAL を、まとめて、なくした）。本体に組み込んだ Go の出力の規則。出力を基底のプラグインに移した（決定 D80）ときになくなった。行き先（GO-*、GOVALID-*）は持ち主の文書
      *
-     * 経緯のある所: `docs/plugin-go.md`「診断」
+     * 経緯のある所: docs/plugin-go.md「診断」
      */
     @retired
     @adr.decided(hozo.decisions.Decision000.D80)
@@ -196,7 +196,7 @@ namespace hozo.diagnostics {
     /**
      * GOEMIT-6: 欠番（GOEMIT-1〜GOEMIT-6、GOEMIT-INTERNAL を、まとめて、なくした）。本体に組み込んだ Go の出力の規則。出力を基底のプラグインに移した（決定 D80）ときになくなった。行き先（GO-*、GOVALID-*）は持ち主の文書
      *
-     * 経緯のある所: `docs/plugin-go.md`「診断」
+     * 経緯のある所: docs/plugin-go.md「診断」
      */
     @retired
     @adr.decided(hozo.decisions.Decision000.D80)
@@ -205,7 +205,7 @@ namespace hozo.diagnostics {
     /**
      * GOEMIT-INTERNAL: 欠番（GOEMIT-1〜GOEMIT-6、GOEMIT-INTERNAL を、まとめて、なくした）。本体に組み込んだ Go の出力の規則。出力を基底のプラグインに移した（決定 D80）ときになくなった。行き先（GO-*、GOVALID-*）は持ち主の文書
      *
-     * 経緯のある所: `docs/plugin-go.md`「診断」
+     * 経緯のある所: docs/plugin-go.md「診断」
      */
     @retired
     @adr.decided(hozo.decisions.Decision000.D80)

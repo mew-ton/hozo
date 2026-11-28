@@ -2,7 +2,7 @@
 sources     = ["spec/**/*.hozo"]   # 仕様は spec/ の下だけ（vocab/ と tests/ の .hozo を読まないため）
 plugin_dirs = ["plugins"]
 
-# Go のモジュールの名前（go.mod の module と同じもの。docs/plugin-go.md「マニフェスト」）。プロジェクト全体のオプション
+# Go のモジュールの名前（go.mod の module と同じもの。plugins/go/hozo-plugin.toml）。プロジェクト全体のオプション
 [options.go]
 module = "github.com/mew-ton/hozo"
 

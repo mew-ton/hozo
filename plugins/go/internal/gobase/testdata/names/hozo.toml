@@ -1,7 +1,7 @@
 [options.go]
 module = "example.com/app"
 
-# plugins/go の単体テストの入力（docs/testing.md「単体テスト」）: docs/plugin-go.md「名前」（局所の名前）、「パッケージと import パス」（import の名前）、
+# plugins/go の単体テストの入力（docs/testing.md「単体テスト」）: plugins/go/spec/go.hozo の Requirement.Names（局所の名前）、「パッケージと import パス」（import の名前）、
 # 「New」（引数の名前）、「別の名前空間の op」。
 [[emit]]
 namespace   = "app"
