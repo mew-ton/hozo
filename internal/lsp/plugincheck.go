@@ -15,7 +15,7 @@ import (
 	"github.com/mew-ton/hozo/internal/source"
 )
 
-// docs/lsp.md「プラグインの診断」: プラグインの check（docs/cli.md「検査」の 4）は、解析とは分けて、裏で走らせる。
+// docs/lsp.md「プラグインの診断」: プラグインの check（spec/cli.hozo の check の手順の 4）は、解析とは分けて、裏で走らせる。
 // 状態（pluginChecks）に触るのは、run の goroutine だけ。裏の goroutine は、project.LoadWith を一度呼び、答えを results に
 // 置いて終わる。
 

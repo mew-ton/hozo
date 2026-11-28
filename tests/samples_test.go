@@ -663,7 +663,7 @@ func (s *sampleProject) testCheck(t *testing.T) {
 //   - 単位の out の下のファイルは、記録を除いて、どれも sample.json のどれかのトランスパイラのファイル
 //     （hozoc 本体はコードを出力しない。出どころのないファイルを置かせない）。
 //   - 記録は、そのディレクトリの下のファイル（もっと深い記録のあるディレクトリの下のものを除く）のパスを、
-//     辞書順に並べた JSON の配列（docs/cli.md「書き出し」の 6）。記録の下にないファイルはない。
+//     辞書順に並べた JSON の配列（spec/cli.hozo の write の手順の 6）。記録の下にないファイルはない。
 //
 // 単位（out と transpilers）は、今の hozoc が読んだ hozo.toml から取る。読めなければ、単位が欠けるので、理由を示して飛ばす。
 func (s *sampleProject) testFiles(t *testing.T) {
@@ -777,7 +777,7 @@ func (s *sampleProject) testMaps() []string {
 	return out
 }
 
-// testTests は、求めるテストが走ったかを、カバレッジと突き合わせられること（docs/cli.md「tests」、tests/samples/README.md
+// testTests は、求めるテストが走ったかを、カバレッジと突き合わせられること（spec/cli.hozo の confirmTests、tests/samples/README.md
 // 「テスト」）。サンプルのモジュールで、カバレッジを取りながらテストを走らせ、サンプルのディレクトリ（期待する出力が、置き場に
 // ある）で hozoc tests を走らせる。hozoc は、何も書き出さない。
 //

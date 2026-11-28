@@ -10,6 +10,27 @@ type Ops interface {
 	// コマンドでも、ユースケースでもない、内部の葉の op で、ユースケースの配線が、はじめに呼ぶ。プラグインを一つずつ起動する繰り返しは、
 	// この op の中に置く（配線は、繰り返しを持たない）。
 	//
+	// 手順:
+	//
+	// 1. hozo.toml を読み、入っているプラグインのマニフェストを探して読み、各単位の transpilers の名前をトランスパイラに解決する
+	//    （docs/config.md「置き場と探し方」「単位」、docs/plugin-protocol.md「探索」）。探索が見るプロジェクトの外の場所は、入力の
+	//    pluginPath（HOZO_PLUGIN_PATH）と、cmd/hozoc が渡すホームディレクトリ。hozo.toml がなければ、設定なしで進む（作業ディレクトリを
+	//    ルートにし、sources は既定。プラグインは探さない）。設定とマニフェストの error は、CFG-16 なら LanguageMismatch、それ以外は
+	//    ConfigInvalid（docs/config.md「診断」、docs/plugin-protocol.md「診断」）。
+	// 2. 標準の語彙、使うプラグイン（docs/plugin-protocol.md「探索」）の語彙、sources のファイルの順に読み、解析する（docs/grammar.md）。
+	//    in は、読むファイルを変えない（docs/config.md「in」）。
+	// 3. 解決（docs/resolve.md）、正規化（docs/ir.md）、計算と検査（docs/check.md）を行う。
+	// 4. 1〜3 に error が一つもなければ、プラグインに頼む。はじめに、語彙のプラグインごとに一回、direction "read" を送る（相手は
+	//    docs/plugin-protocol.md「語彙のプラグイン」: 仕様が使っている語彙のもの。単位がなくても、頼む）。その応答に error がなければ、
+	//    使うプラグインごとに一回、direction "emit" を送る（相手と、受け持つ出力は、同「起動」）。どちらの応答も、返った errors を error の
+	//    診断として、warnings を warning の診断（PLUGIN）として、足す（同じ診断は、一度だけ。同「emit」）。語彙の使い方の誤り（HTTP-5 など）と、
+	//    トランスパイラが返す誤り（GOHTTP-16 など）は、ここで出る（決定 D404、D410、D416）。返ったファイルは、書かない: 同じ実行の、
+	//    後の段（collectOutputs、matchTests）が使う。プラグインの異常終了は Crashed、形の違う応答は MalformedOutput。
+	// 5. error が一つでもあれば、例外（値は error と warning のすべて）。設定かマニフェストの error（CFG-*、MAN-*）が一つでもあれば
+	//    ConfigInvalid、ただし、それがすべて CFG-16 なら LanguageMismatch。それ以外は CheckFailed。error がなければ CheckResult（warning）。
+	//
+	// 構文エラーのあるファイルも、読めた宣言は、解決と検査に進める。診断の順序は docs/diagnostics.md。
+	//
 	// 引数:
 	//   - in: 検査の入力
 	//
@@ -64,7 +85,52 @@ type Ops interface {
 	// Write は仕様を検査し、プラグインから受け取ったファイルを書き出す。例外は、どれも書き出しを始める前に起きる（集めるのが先）。
 	// 配線にしたのは、検査を通った結果だけを書き出しに渡すことと、check の例外が、ユースケースとコマンド build に伝わることを、検査器に
 	// 確かめさせるため。MalformedOutput も prevents effects なのは、ファイルをすべて集めて、パスと衝突を確かめてから書き始めるため
-	// （docs/cli.md「書き出し」）。それは、例外を投げる collectOutputs が、効果 syncOutputs より上の行にあることから、検査器が確かめる（REL-4）。
+	// （下の手順の 3 が、5 より先）。それは、例外を投げる collectOutputs が、効果 syncOutputs より上の行にあることから、検査器が確かめる（REL-4）。
+	//
+	// 書き出しの手順（check の後）。1〜3 が collectOutputs（ファイルを集める）、5〜7 の、書くファイルと消すファイルを決めるところが
+	// outputChanges、書き出すところが syncOutputs。verify（検査だけ）は、1〜3 を、確かめるためだけに行い（verifyOutputs）、preview（書き出す
+	// 予定を見る）は、1〜3 の後、4 で終わる（plannedChanges）。出力（単位 U と、U が出力する名前空間 N の組）と、その置き場 Dir(U, N) は
+	// docs/config.md「単位の対象」「in」。一度の build が書き出す出力の集まりを、**書き出しの対象**と呼ぶ。書き出すファイルは、どれも
+	// トランスパイラが返したもので、hozoc が自分で作るファイルは、出力先ごとの記録だけ。プラグインは、check の 4 で、一度、起動してあり、
+	// collectOutputs は、起動しない（docs/plugin-protocol.md「起動」: 一度の実行で、同じプラグインに、同じことを、二度、頼まない）。
+	//
+	// 0. hozo.toml がなければ（設定なし）、verify は、集めるものがないので、検査の warning だけを返す（verifyOutputs）。preview と write は、
+	//    CFG-7 で ConfigInvalid（collectOutputs）。
+	// 1. namespaces が空なら、すべての出力が、書き出しの対象。空でなければ、引数 n ごとに、名前空間が n と同じか n の子孫である出力が、
+	//    書き出しの対象（その名前空間を出力する、すべての単位の分。引数は、単位ではなく、名前空間を選ぶ）。n は、単位の namespace に書いた
+	//    名前である必要はない: n 自身がどの単位の対象でなくても、n の子孫を対象にする単位があれば、その出力が選ばれ、単位が名指しする
+	//    名前空間の子孫を n に書けば、その子孫の出力だけが選ばれる。引数 n について、仕様にある名前空間のうち、n と n の子孫のどれも、
+	//    どの単位の対象（docs/config.md「単位の対象」）でもなければ、UnknownNamespace（仕様にない名前を書いたときも、これに当たる）。
+	//    単位の対象ではあるが、in のせいで出力でない名前空間だけを選ぶ引数は、UnknownNamespace ではなく、何も書かずに、5 の後始末だけを行う。
+	// 2. 書き出しの対象の各出力 (U, N) について、U の transpilers の各トランスパイラの答え（check の 4 で受け取ったもの）から、files を集める
+	//    （順序は、単位の設定の順、名前空間の IR の順、transpilers に書いた順）。files の path の誤り（PLG-1 / PLG-2）と、テストの対応表の
+	//    誤り（PLG-4）は、MalformedOutput（docs/plugin-protocol.md「応答の形」「診断」）。errors は、ここには、ない（一つでもあれば、check が
+	//    CheckFailed で終わっている）。
+	// 3. すべての出力のファイルを集めてから、パスの重複を確かめる（CFG-5 → OutputConflict）。
+	// 4. verify は、ここで終わり: written も removed も空で返す（置き場は、読まない）。preview も、ここで終わり: 書く予定のパスを written に
+	//    入れて返す（書かない。置き場は、読まないので、removed は、空）。
+	// 5. 書き出しの対象の各出力の <Dir(U, N)>/.hozoc-outputs.json（前回書いたパスの一覧。ルートからの相対パスの JSON の配列、辞書順）を読み、
+	//    今回書かないパスのファイルを消す。ファイルがなければ、何もしない。U の対象の名前空間が、in のせいで出力でなくなったとき
+	//    （docs/config.md「in」）も、その Dir(U, N) は、同じに扱う（前回のファイルを消す）。hozo.toml から単位を消した、または、namespace か
+	//    out を変えた場合、前の出力先は、もう分からないので、消さない（手で消す）。
+	//    - 記録のパスに従って消すのは、その記録の持ち主の Dir(U, N) の下のファイルだけ。記録に、Dir(U, N) の下でないパス（.. で外へ出るもの、
+	//      絶対パス、ルートの中の別のディレクトリ、別の出力の Dir）が書かれていても、そのファイルは消さず、removed にも warning にも出さない。
+	//      hozoc がこの記録に書くのは、Dir(U, N) の下のパスだけ（PLG-1 を通ったトランスパイラのファイル）なので、それ以外は、hozoc の
+	//      書いたものではなく、記録が壊れているか、手で直されている。壊れた記録で、出力先の外や、プロジェクトの外のファイルを消さないための
+	//      規則。黙って無視するのは、単位を消したときの、前の出力先と同じ扱い（hozoc が持ち主だと言えないファイルには触れず、何も言わない）。
+	//    - 消したファイルのディレクトリが空になれば、Dir(U, N) の下の範囲で、そのディレクトリも消す（Go の基底の内側のフォルダ inner が
+	//      要らなくなったとき。docs/plugin-go.md「内側のフォルダと入口」）。
+	// 6. ファイルを書く。内容が同じなら、書き直さない（written には入れる）。ディレクトリは作る。
+	// 7. .hozoc-outputs.json を書く。書くものが一つもない出力（どのトランスパイラも、ファイルを返さなかった）には作らず、前回のものが
+	//    あれば消す。
+	//
+	// - 書き出しの対象を絞っても、書き出す出力の内容は、すべてを対象にしたときと同じになる。どのトランスパイラも、一つの出力の答えを、
+	//   その出力の View だけから作り（docs/plugin-protocol.md「起動」）、ほかの出力の答えを要らないため。
+	// - 書き出しの対象を絞っても、プラグインには、すべての出力を頼む（check の 4 が、すべての出力の診断を要る）。絞るのは、集めて、書き出す
+	//   ファイルだけ。対象でない出力の、path の誤り（PLG-1 / PLG-2 / PLG-4）と、衝突（CFG-5）は、見ない。
+	// - BuildResult.warnings は、check の warning（トランスパイラの warning を含む）。
+	// - 書く順序は、パスの辞書順。途中で失敗したら、そこまでに書いたものは残る（原子性は持たない。Crashed は check で起きるので、書き出しには
+	//   入っていない）。
 	//
 	// 引数:
 	//   - in: ユースケースの入力
@@ -87,6 +153,34 @@ type Ops interface {
 
 	// ConfirmTests は仕様を検査し、求めるテストが走ったかを、カバレッジと突き合わせて確かめる。テストは走らせない。
 	//
+	// 求めるテストは、テストを受け取る口が、ケースを受け取って走らせるテスト（docs/plugin-protocol.md「テストの対応表」）。hozoc は、
+	// テストを走らせない: 利用者（か CI）が、プロジェクトのやり方で、カバレッジを取りながらテストを走らせ、そのファイルの場所を渡す。
+	// 分かるのは「走ったか」までで、「通ったか」は、テストの実行の終了コードが言う（docs/ide-chain.md「テストの規約」の「担保すること」）。
+	//
+	// 手順（check の後の、matchTests）:
+	//
+	// 1. すべての出力について、トランスパイラの答えから、ファイルを集める（write の手順の 2 と 3 と同じ。OutputConflict、MalformedOutput も
+	//    同じ）。ファイルは、書き出さない。hozo.toml がなければ、CFG-7 で ConfigInvalid。
+	// 2. 集めたファイルから、テストの対応表を取り出す。その並び（出力の順、トランスパイラの順、対応表の中の順）が、**求めるテスト**。
+	//    一つもなければ、ここで終わり（ran は空）。
+	// 3. 対応表と、対応表が指すファイルが、置き場にあり、集めたものと同じ内容であることを確かめる。ないか、違えば、ファイルごとに TESTS-2
+	//    （置き場の出力が、今の仕様からのものでない。行が、合わない）。一つでもあれば、CoverageUnusable。
+	// 4. coverage のファイルを読み（相対パスの基準は、作業ディレクトリ）、対応表を持つ単位の基底のプラグインごとに、direction "coverage" を
+	//    送る（相手と、渡すものは、docs/plugin-protocol.md「coverage」）。次のどれかなら、TESTS-3 で、一つでもあれば、CoverageUnusable:
+	//    ファイルを読めない（一つ）。単位の基底のプラグインが [coverage] enabled でない（プラグインごとに一つ）。プラグインの応答が
+	//    recognized: false（プラグインごとに一つ）。
+	// 5. 求めるテストごとに、応答の、そのファイルの lines のどれかが、テストの lines の範囲と、一行でも重なれば、**走った**。重ならなければ、
+	//    走っていない。応答に、そのファイルがなければ、カバレッジが、そのファイルを測っていない。どちらも、テストごとに TESTS-1 で、一つでも
+	//    あれば、TestsNotRun。
+	// 6. すべて走っていれば、TestsResult（warnings は、check の warning（トランスパイラの warning を含む）。ran は、求めるテストの
+	//    <トランスパイラの名前>: <テストの名前>）。
+	//
+	// - 確かめられないこと: カバレッジを取った後に、hozoc build をやり直して、同じ内容でない出力を書いた場合、3 は、今の置き場を見るので、
+	//   通る。カバレッジは、前の出力の行を言っているので、突き合わせは、当てにならない。カバレッジと出力の、新しさは、比べない（ファイルの
+	//   時刻は、チェックアウトで変わる）。CI では、書き出しの後の一致（docs/testing.md「生成物の一致」）、テスト、hozoc tests を、この順に、
+	//   同じ作業ツリーで走らせる。
+	// - 一度に渡せるカバレッジのファイルは、一つ（言語の違う単位を持つプロジェクトの扱いは、決めていない: docs/open.md「語彙とプラグイン」）。
+	//
 	// 引数:
 	//   - in: ユースケースの入力
 	//
@@ -94,6 +188,7 @@ type Ops interface {
 	ConfirmTests(ctx context.Context, in CoverageInput) (TestsResult, error)
 
 	// Serve は言語サーバーとして標準入出力で動く（docs/lsp.md）。クライアントが exit を送るまで戻らない。
+	// config が与えられなければ、クライアントの rootUri から、hozo.toml を探す。
 	//
 	// 引数:
 	//   - in: ユースケースの入力
@@ -101,7 +196,7 @@ type Ops interface {
 
 	// RunEmit はプラグインを一つ、hozoc の中の WASM の実行環境で動かして、受け持つ出力のすべてを、まとめて展開させる
 	// （docs/plugin-protocol.md「起動」）。入力は、標準入力に JSON で渡し、標準出力の JSON を、出力として受け取る。
-	// どの配線からも呼ばれないが、プラグインとの境界の記述として残す（docs/cli.md「手で書くもの」）。動かすプラグインは、引数 plugin で
+	// どの配線からも呼ばれないが、プラグインとの境界の記述として残す（実装は internal/app の RunEmit）。動かすプラグインは、引数 plugin で
 	// 渡す: デコレータの引数に、実行時の値は書けない。
 	//
 	// 引数:
@@ -118,6 +213,27 @@ type Leaves interface {
 	// Check は仕様を検査する。使うプラグインに、展開を頼み、その診断も集める。ファイルは書き出さない。
 	// コマンドでも、ユースケースでもない、内部の葉の op で、ユースケースの配線が、はじめに呼ぶ。プラグインを一つずつ起動する繰り返しは、
 	// この op の中に置く（配線は、繰り返しを持たない）。
+	//
+	// 手順:
+	//
+	// 1. hozo.toml を読み、入っているプラグインのマニフェストを探して読み、各単位の transpilers の名前をトランスパイラに解決する
+	//    （docs/config.md「置き場と探し方」「単位」、docs/plugin-protocol.md「探索」）。探索が見るプロジェクトの外の場所は、入力の
+	//    pluginPath（HOZO_PLUGIN_PATH）と、cmd/hozoc が渡すホームディレクトリ。hozo.toml がなければ、設定なしで進む（作業ディレクトリを
+	//    ルートにし、sources は既定。プラグインは探さない）。設定とマニフェストの error は、CFG-16 なら LanguageMismatch、それ以外は
+	//    ConfigInvalid（docs/config.md「診断」、docs/plugin-protocol.md「診断」）。
+	// 2. 標準の語彙、使うプラグイン（docs/plugin-protocol.md「探索」）の語彙、sources のファイルの順に読み、解析する（docs/grammar.md）。
+	//    in は、読むファイルを変えない（docs/config.md「in」）。
+	// 3. 解決（docs/resolve.md）、正規化（docs/ir.md）、計算と検査（docs/check.md）を行う。
+	// 4. 1〜3 に error が一つもなければ、プラグインに頼む。はじめに、語彙のプラグインごとに一回、direction "read" を送る（相手は
+	//    docs/plugin-protocol.md「語彙のプラグイン」: 仕様が使っている語彙のもの。単位がなくても、頼む）。その応答に error がなければ、
+	//    使うプラグインごとに一回、direction "emit" を送る（相手と、受け持つ出力は、同「起動」）。どちらの応答も、返った errors を error の
+	//    診断として、warnings を warning の診断（PLUGIN）として、足す（同じ診断は、一度だけ。同「emit」）。語彙の使い方の誤り（HTTP-5 など）と、
+	//    トランスパイラが返す誤り（GOHTTP-16 など）は、ここで出る（決定 D404、D410、D416）。返ったファイルは、書かない: 同じ実行の、
+	//    後の段（collectOutputs、matchTests）が使う。プラグインの異常終了は Crashed、形の違う応答は MalformedOutput。
+	// 5. error が一つでもあれば、例外（値は error と warning のすべて）。設定かマニフェストの error（CFG-*、MAN-*）が一つでもあれば
+	//    ConfigInvalid、ただし、それがすべて CFG-16 なら LanguageMismatch。それ以外は CheckFailed。error がなければ CheckResult（warning）。
+	//
+	// 構文エラーのあるファイルも、読めた宣言は、解決と検査に進める。診断の順序は docs/diagnostics.md。
 	//
 	// 引数:
 	//   - in: 検査の入力
@@ -166,6 +282,7 @@ type Leaves interface {
 	MatchTests(ctx context.Context, in CoverageInput, checked CheckResult) (TestsResult, error)
 
 	// Serve は言語サーバーとして標準入出力で動く（docs/lsp.md）。クライアントが exit を送るまで戻らない。
+	// config が与えられなければ、クライアントの rootUri から、hozo.toml を探す。
 	//
 	// 引数:
 	//   - in: ユースケースの入力
@@ -173,7 +290,7 @@ type Leaves interface {
 
 	// RunEmit はプラグインを一つ、hozoc の中の WASM の実行環境で動かして、受け持つ出力のすべてを、まとめて展開させる
 	// （docs/plugin-protocol.md「起動」）。入力は、標準入力に JSON で渡し、標準出力の JSON を、出力として受け取る。
-	// どの配線からも呼ばれないが、プラグインとの境界の記述として残す（docs/cli.md「手で書くもの」）。動かすプラグインは、引数 plugin で
+	// どの配線からも呼ばれないが、プラグインとの境界の記述として残す（実装は internal/app の RunEmit）。動かすプラグインは、引数 plugin で
 	// 渡す: デコレータの引数に、実行時の値は書けない。
 	//
 	// 引数:

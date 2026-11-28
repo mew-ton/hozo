@@ -10,7 +10,7 @@ import (
 	"testing"
 )
 
-// このファイルは、プラグインの診断が、hozoc build --no-emit で出ることを、本物のプラグインで確かめる（docs/cli.md「検査」の 4、
+// このファイルは、プラグインの診断が、hozoc build --no-emit で出ることを、本物のプラグインで確かめる（spec/cli.hozo の check の手順の 4、
 // docs/plugin-protocol.md「語彙のプラグイン」「起動」「read」「emit」、決定 D404、D410、D416）。
 //
 // 検査は、プラグインに emit を頼み、その答えの診断を使う。SDK が、要求の並びを回すことは、plugin の TestRunEmitBatch、hozoc が、

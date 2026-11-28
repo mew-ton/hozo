@@ -130,7 +130,7 @@ func runHome(t *testing.T, dir, home string, env map[string]string, args ...stri
 }
 
 // innerOps は、a の実装で、ユースケース（名前空間 hozo.compiler）の、内側のパッケージの Ops（内部の op check、collectOutputs、runEmit
-// なども持つ）を組み立てる。内部の op のテストは、ここから呼ぶ（docs/cli.md「手で書くもの」、docs/plugin-go.md「内側のフォルダと入口」）。
+// なども持つ）を組み立てる。内部の op のテストは、ここから呼ぶ（パッケージの説明、docs/plugin-go.md「内側のフォルダと入口」）。
 // 引数は App.Usecases と同じ。
 func innerOps(a *App) inner.Ops {
 	return inner.New(a, a.Sources(), a.Config(), a.Outputs(), a.OutputsSync())
@@ -563,7 +563,7 @@ func TestEmitStaleAndConflict(t *testing.T) {
 	}
 }
 
-// TestEmitErrors は docs/cli.md「書き出し」の 2: どれかのトランスパイラが errors を返せば、残りのトランスパイラも起動して errors を
+// TestEmitErrors は spec/cli.hozo の write の手順の 2: どれかのトランスパイラが errors を返せば、残りのトランスパイラも起動して errors を
 // すべて集めたうえで CheckFailed（1）。emit の全体が、何も書き出さない（errors を返していない出力のファイルも）。
 func TestEmitErrors(t *testing.T) {
 	dir := copyCorpus(t)
@@ -593,7 +593,7 @@ func TestEmitErrors(t *testing.T) {
 
 // TestEmitNestedOutput は PLG-1 の「別の出力の Dir」: 単位が子孫の名前空間も出力するとき、Dir(U, N.child) は Dir(U, N) の下にある。
 // N の出力のトランスパイラは、そこには書けない。記録は出力ごとで、消したファイルのディレクトリが空になれば、それも消す
-// （docs/cli.md「書き出し」の 5）。
+// （spec/cli.hozo の write の手順の 5）。
 func TestEmitNestedOutput(t *testing.T) {
 	dir := t.TempDir()
 	write(t, filepath.Join(dir, "a.hozo"), "namespace a {\n  fn f();\n}\nnamespace a.child {\n  fn g();\n}\n")
@@ -660,7 +660,7 @@ func TestEmitNestedOutput(t *testing.T) {
 	}
 }
 
-// TestEmitStaleRecordStaysInDir は docs/cli.md「書き出し」の 5: .hozoc-outputs.json のパスに従って消すのは、その記録の持ち主の
+// TestEmitStaleRecordStaysInDir は spec/cli.hozo の write の手順の 5: .hozoc-outputs.json のパスに従って消すのは、その記録の持ち主の
 // Dir(U, N) の下のファイルだけ。記録に `..` や絶対パス、ルートの中の別のディレクトリ、別の出力の Dir のパスが
 // 書かれていても（壊れた記録、手で直した記録）、そのファイルは消さず、removed にも出さない。Dir の下の古いファイルは消す。
 func TestEmitStaleRecordStaysInDir(t *testing.T) {
@@ -748,7 +748,7 @@ func TestEmitStaleRecordStaysInDir(t *testing.T) {
 	}
 }
 
-// TestEmitNothing は docs/cli.md「書き出し」の 5 と 7: 単位のどのトランスパイラもファイルを返さなければ、その出力には何も書かない。
+// TestEmitNothing は spec/cli.hozo の write の手順の 5 と 7: 単位のどのトランスパイラもファイルを返さなければ、その出力には何も書かない。
 // 前回の出力は古いファイルとして消え、.hozoc-outputs.json も残らない。エラーでも warning でもない。
 // 単位そのものを消したときは、前の出力先が分からないので何も消さない。
 func TestEmitNothing(t *testing.T) {
@@ -782,7 +782,7 @@ func TestEmitNothing(t *testing.T) {
 	fakePlugin(t, dir, "base", "go", "", baseResponse, 0)
 
 	// server の単位を hozo.toml から消す: server はどの単位の対象でもなくなり、前の出力先は分からないので何も消さない
-	// （docs/cli.md「書き出し」の 5）。エラーにもならない
+	// （spec/cli.hozo の write の手順の 5）。エラーにもならない
 	if code, _, stderr := run(t, dir, nil, "build"); code != 0 {
 		t.Fatalf("emit: code=%d stderr=%q", code, stderr)
 	}
@@ -801,7 +801,7 @@ func TestEmitNothing(t *testing.T) {
 	}
 }
 
-// TestUpToDate は spec/cli.hozo の分類 OutputsSync の述語 UpToDate と OutOfDate（docs/cli.md「手で書くもの」）: 生成し直した
+// TestUpToDate は spec/cli.hozo の分類 OutputsSync の述語 UpToDate と OutOfDate（パッケージの説明）: 生成し直した
 // 内容とディスクの内容を比べる。生成したコードの判定関数 compiler.ClassifyOutputsSync が、状態の分類の単位（App.OutputsSync）の
 // 二つの述語を呼び、真がちょうど一つのケースを返す（OutOfDate は UpToDate の否定なので、いつも、どちらか一つ）。
 func TestUpToDate(t *testing.T) {
@@ -902,7 +902,7 @@ func TestUpToDate(t *testing.T) {
 	}
 }
 
-// TestWriteOutputsSteps は、ユースケース write の配線が呼ぶ三つ（docs/cli.md「書き出し」「手で書くもの」）を、一つずつ動かす: 葉の op
+// TestWriteOutputsSteps は、ユースケース write の配線が呼ぶ三つ（spec/cli.hozo の write の手順と、パッケージの説明）を、一つずつ動かす: 葉の op
 // collectOutputs は、ファイルに触れずに、書き出す予定を集める。read outputChanges（状態 outputs の単位の問い合わせ）は、予定を今の
 // ファイルと比べて、書くファイルと消すファイルを決めるだけで、何も変えない。効果 syncOutputs（状態の分類 OutputsSync の単位の命令）が、
 // 書き出す。ユースケース preview（葉の op plannedChanges）は、消すファイルを決めず、書き出さない。予定は、直前の collectOutputs が
@@ -1484,7 +1484,7 @@ func TestEmitUnits(t *testing.T) {
 	})
 }
 
-// TestEmitUnitsTargets は docs/cli.md「書き出し」の 1: 引数は名前空間で、その名前空間と子孫を出力するすべての単位の分を
+// TestEmitUnitsTargets は spec/cli.hozo の write の手順の 1: 引数は名前空間で、その名前空間と子孫を出力するすべての単位の分を
 // 書き出す。対象を絞っても、書き出す出力の内容は、すべてを対象にしたときと同じ。プラグインには、対象を絞っても、すべての
 // 出力を頼む（check が、すべての出力の診断を要る）: 絞るのは、書き出すファイルだけ。
 func TestEmitUnitsTargets(t *testing.T) {
@@ -1568,7 +1568,7 @@ func TestEmitUnitsTargets(t *testing.T) {
 	}
 }
 
-// TestEmitArgumentDescendantOnly は docs/cli.md「書き出し」の 1（決定 D50）: 引数の名前空間そのものがどの単位の
+// TestEmitArgumentDescendantOnly は spec/cli.hozo の write の手順の 1（決定 D50）: 引数の名前空間そのものがどの単位の
 // 対象でなくても、その子孫を対象にする単位があれば、その出力が対象になる（UnknownNamespace ではない）。
 // 引数もその子孫もどの単位の対象でもなければ UnknownNamespace。
 func TestEmitArgumentDescendantOnly(t *testing.T) {
@@ -1618,7 +1618,7 @@ func TestEmitIn(t *testing.T) {
 	if got := emitAll(t, dir); got["x/extra/e.txt"] != "e" {
 		t.Fatalf("gen/x/extra/e.txt がない: %v", got)
 	}
-	// in に合うファイルに宣言を持たなくなった名前空間は、その単位では出力しない。前回の出力は消える（docs/cli.md「書き出し」の 5）
+	// in に合うファイルに宣言を持たなくなった名前空間は、その単位では出力しない。前回の出力は消える（spec/cli.hozo の write の手順の 5）
 	write(t, filepath.Join(dir, "hozo.toml"), pluginDirs+
 		"[[emit]]\nin = [\"shop/api.hozo\"]\nnamespace = \"shop.extra\"\ntranspilers = [\"extra\"]\nout = \"gen/x/extra\"\n")
 	code, stdout, stderr := run(t, dir, nil, "build")
@@ -1633,7 +1633,7 @@ func TestEmitIn(t *testing.T) {
 	}
 }
 
-// TestRunEmit は spec/cli.hozo の op runEmit（compiler.Leaves のメソッド。docs/cli.md「手で書くもの」）: plugin を起動し、req を JSON に
+// TestRunEmit は spec/cli.hozo の op runEmit（compiler.Leaves のメソッド。パッケージの説明）: plugin を起動し、req を JSON に
 // して送り、応答を compiler.EmitResponse に読んで返す。内部の op なので、内側のパッケージの Ops から呼ぶ。動かすのは、
 // plugin.wasm の WASM。compiler.Spec と compiler.OutputView は中身のない model なので、要求の spec と、
 // 出力の view は空のオブジェクト。異常終了は compiler.Crashed、形の違う応答は compiler.MalformedOutput（どちらも、生成した hozoc の型）。
@@ -1713,8 +1713,8 @@ func TestRunEmit(t *testing.T) {
 	}
 }
 
-// TestStateUnits は、spec/cli.hozo の状態 sources、config、outputs の単位の、形で決まる問い合わせ（IsEmpty と Get。docs/cli.md
-// 「手で書くもの」の表）: 作業ディレクトリから探した設定で、ディスクから読む。outputs は、出力先ごとの記録に載っているファイルで、
+// TestStateUnits は、spec/cli.hozo の状態 sources、config、outputs の単位の、形で決まる問い合わせ（IsEmpty と Get。パッケージの
+// 説明）: 作業ディレクトリから探した設定で、ディスクから読む。outputs は、出力先ごとの記録に載っているファイルで、
 // 効果 syncOutputs（emit）の結果を判定できる。
 func TestStateUnits(t *testing.T) {
 	dir := copyCorpus(t)
@@ -1857,7 +1857,7 @@ func TestEmitAsksEachPluginOnce(t *testing.T) {
 	}
 }
 
-// TestRenamedCommands は docs/cli.md「build」の「古い名前」: hozoc check と hozoc emit は、なくした。その名前で呼ばれたら、何もせずに、
+// TestRenamedCommands は spec/cli.hozo の build の説明の「古い名前」: hozoc check と hozoc emit は、なくした。その名前で呼ばれたら、何もせずに、
 // 新しい書き方（残りの引数を付けたもの）を、標準エラーに示して、使い方の誤りの終了コード（64）で終わる。
 func TestRenamedCommands(t *testing.T) {
 	dir := unitsProject(t)
@@ -1893,8 +1893,8 @@ func TestRenamedCommands(t *testing.T) {
 	}
 }
 
-// TestBuildNoEmit は docs/cli.md「build」: hozoc build --no-emit は、検査だけ。ファイルには、触れない（書かず、消さず、置き場も
-// 読まない）が、ファイルを集めて、path と衝突を確かめるところ（「書き出し」の 1〜3）までは、行う。表示は、検査の結果だけ。
+// TestBuildNoEmit は spec/cli.hozo の build: hozoc build --no-emit は、検査だけ。ファイルには、触れない（書かず、消さず、置き場も
+// 読まない）が、ファイルを集めて、path と衝突を確かめるところ（spec/cli.hozo の write の手順の 1〜3）までは、行う。表示は、検査の結果だけ。
 func TestBuildNoEmit(t *testing.T) {
 	dir := unitsProject(t)
 	// 先に、ふつうに書き出して、置き場を作る
@@ -1946,7 +1946,7 @@ func TestBuildNoEmit(t *testing.T) {
 	}
 }
 
-// TestBuildNoEmitWithoutConfig は docs/cli.md「build」の「hozo.toml がないとき」: build --no-emit は、設定なしで検査する。build は、
+// TestBuildNoEmitWithoutConfig は spec/cli.hozo の build の説明の「hozo.toml がないとき」: build --no-emit は、設定なしで検査する。build は、
 // 書き出す単位がないので、CFG-7。
 func TestBuildNoEmitWithoutConfig(t *testing.T) {
 	dir := t.TempDir()

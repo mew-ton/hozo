@@ -1,5 +1,5 @@
 // Package testmap は、テストの対応表（docs/plugin-protocol.md「テストの対応表」）の形の確かめと、カバレッジの
-// 「実行された行」との突き合わせ（docs/cli.md「tests」の 2 と 5）。
+// 「実行された行」との突き合わせ（spec/cli.hozo の confirmTests の手順の 2 と 5）。
 //
 // 言語も、カバレッジの形も、知らない: 対応表は、トランスパイラが emit の応答に足したファイルで、実行された行は、基底の
 // プラグインが direction "coverage" で返したもの。診断は作らない（internal/app が、結果から作る）。
@@ -109,7 +109,7 @@ type Test struct {
 	sdk.TestEntry
 }
 
-// Label は、テストを名指す文字列 `<トランスパイラの名前>: <テストの名前>`（docs/cli.md「tests」）。
+// Label は、テストを名指す文字列 `<トランスパイラの名前>: <テストの名前>`（spec/cli.hozo の confirmTests）。
 func (t Test) Label() string { return t.Transpiler + ": " + t.Name }
 
 // Status は、求めるテスト一つの、突き合わせの結果。
@@ -124,7 +124,7 @@ const (
 	Unmeasured
 )
 
-// Match は、求めるテスト tests を、実行された行 covered と突き合わせる（docs/cli.md「tests」の 5）。戻り値は tests と
+// Match は、求めるテスト tests を、実行された行 covered と突き合わせる（spec/cli.hozo の confirmTests の手順の 5）。戻り値は tests と
 // 同じ長さ、同じ順。covered に、どのテストのものでもないファイルがあっても、何も言わない。同じ path が二度あれば、
 // 行の範囲を合わせて見る。
 func Match(tests []Test, covered []sdk.CoveredFile) []Status {

@@ -36,7 +36,7 @@ func (s *usecaseSpy) Serve(context.Context, compiler.ServeInput) error {
 	return nil
 }
 
-// TestBuildFlags は、コマンドの行の build が、フラグから、入るユースケースを分けること（docs/cli.md「build」の表）: フラグの組の
+// TestBuildFlags は、コマンドの行の build が、フラグから、入るユースケースを分けること（spec/cli.hozo の build）: フラグの組の
 // すべてで、ちょうど一つのユースケースが呼ばれ、--no-emit と --dry-run の両方なら、検査だけ（verify）。分け方は、spec/cli.hozo の
 // 配線（分類 hozo.cli.Flag の match。build と、内部の op writeOrPreview）が言い、生成した本体が、そのまま行う: 人が書く述語は、ない
 // （前は、述語で決まる分類 Request と、その述語 requestCases を、ここで確かめていた）。

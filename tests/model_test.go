@@ -205,7 +205,7 @@ func TestModelCorpus(t *testing.T) {
 		// shop は単位の対象（出力する名前空間）だが、その単位のトランスパイラ none はファイルを返さない。hozoc 本体は
 		// コードを出力しない（docs/plugin-protocol.md「この文書が決めること」）ので、emit は何も書かない。印のデコレータ
 		// （@marks.*）も何も生成しない。前回の出力（.hozoc-outputs.json にあるもの）は古いファイルとして消え、記録も残らない
-		// （docs/cli.md「書き出し」の 5 と 7）。
+		// （spec/cli.hozo の write の手順の 5 と 7）。
 		dir := t.TempDir()
 		fakeplugin.Place(t, filepath.Join(dir, "plugins", "none", fakeplugin.WasmFile))
 		copyHozo(t, modelCorpus, dir)

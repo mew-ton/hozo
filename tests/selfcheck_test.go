@@ -15,7 +15,7 @@ import (
 	"github.com/mew-ton/hozo/internal/gen/hozo/cli/cli"
 )
 
-// hozocMain は cmd/hozoc/main.go と同じ組み立て（docs/cli.md「手で書くもの」）: 生成した cli.Main に
+// hozocMain は cmd/hozoc/main.go と同じ組み立て（internal/app（パッケージ app の説明））: 生成した cli.Main に
 // internal/app の App の Ops（コマンドの行の Ops。葉の op と状態の単位の実装を compiler.New に渡したものを、呼ぶ）と Presenter を渡す。作業ディレクトリは tests/ で、
 // hozo.toml は親（リポジトリ直下）に見つかる。
 func hozocMain(args []string, stdout, stderr io.Writer) int {

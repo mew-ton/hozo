@@ -10,7 +10,7 @@ import (
 	"github.com/mew-ton/hozo/internal/source"
 )
 
-// Check は spec/cli.hozo の op check（docs/cli.md「検査」）。compiler.Leaves のメソッド。internal/project.LoadWith が 1〜4 を行い、ここは 5:
+// Check は spec/cli.hozo の op check（手順は、その説明）。compiler.Leaves のメソッド。internal/project.LoadWith が 1〜4 を行い、ここは 5:
 // error が一つでもあれば例外（値は error と warning のすべて）、なければ CheckResult（warning）。
 // 解析した Project は CollectOutputs のために a.checked に置く。
 //
@@ -21,10 +21,13 @@ import (
 // プラグインを探す場所のうちプロジェクトの外のもの（docs/plugin-protocol.md「探索」の 2 と 3）は、入力の pluginPath
 // （HOZO_PLUGIN_PATH）と a.Home。プロセスの環境は読まない。
 //
-// 例外の選び方（docs/cli.md「検査」の 5、docs/config.md「診断」の最後の段落、docs/diagnostics.md「終了コード」）:
+// 例外の選び方（spec/cli.hozo の check の手順の 5、docs/config.md「診断」の最後の段落、docs/diagnostics.md「終了コード」）:
 // error の中に CFG-*（CFG-5 以外）か MAN-* があれば設定の誤りで、それらがすべて CFG-16 なら LanguageMismatch、
 // そうでなければ ConfigInvalid。設定の誤りがなければ CheckFailed。
 // プラグインの check が異常終了すれば compiler.Crashed / compiler.MalformedOutput（asProc）。
+//
+// プラグインは、受け取った ctx で起動する: ctx が中断されていれば、次のプラグインを起動せずに、その error を返す。
+// cmd/hozoc が渡す ctx は context.Background() で、中断されることはない。
 func (a *App) Check(ctx context.Context, in compiler.CheckInput) (compiler.CheckResult, error) {
 	if err := ctx.Err(); err != nil {
 		return compiler.CheckResult{}, err

@@ -11,7 +11,7 @@ import (
 	"github.com/mew-ton/hozo/internal/gen/hozo/compiler"
 )
 
-// Presenter は結果と例外の表示（docs/cli.md「手で書くもの」の Presenter、docs/plugin-go-cli.md「実行と表示」）。
+// Presenter は結果と例外の表示（docs/plugin-go-cli.md「実行と表示」）。
 // go-cli が生成した cli.Presenter の実装で、cli.Main が結果を標準出力に、例外を標準エラーに出すときに呼ぶ。
 //
 // 形式は input（コマンドの入力 hozo.cli の BuildInput / TestsInput）の format で選ぶ（docs/diagnostics.md「表示」）。なければ text。
@@ -21,7 +21,8 @@ import (
 //     `written: <path>` と `removed: <path>` を一行ずつ。TestsResult は warning があればその一覧と件数、続けて
 //     `ran: <トランスパイラの名前>: <テストの名前>` を一行ずつと、最後に件数（`3 tests ran`）。診断を運ぶ例外はその一覧と件数。それ以外の例外は
 //     `hozoc: <メッセージ>`（Failure.Err のメッセージ。なければ例外の FQN）。
-//   - json: CheckResult は {"warnings": [...]}、EmitResult は {"warnings": [...], "written": [...], "removed": [...]}。
+//   - json: CheckResult は {"warnings": [...]}、EmitResult は {"warnings": [...], "written": [...], "removed": [...]}、
+//     TestsResult は {"warnings": [...], "ran": [...]}。
 //     例外は {"error": "<FQN>", "value": {...}} で、診断を運ぶ例外の value は docs/diagnostics.md「表示」の json
 //     （{"diagnostics", "errors", "warnings"}）。例外の引数の名前は、表示に出さない。それ以外は cli.JSONPresenter と同じ。
 //
@@ -36,7 +37,7 @@ var _ cli.Presenter = Presenter{}
 func (Presenter) Present(w io.Writer, command string, input any, result any) error {
 	switch r := result.(type) {
 	case compiler.BuildResult:
-		// 検査だけ（hozoc build --no-emit）: 検査の結果だけを出す（docs/cli.md「build」の「--no-emit の表示」）
+		// 検査だけ（hozoc build --no-emit）: 検査の結果だけを出す（spec/cli.hozo の build の説明の「--no-emit の表示」）
 		if in, ok := input.(hozocli.BuildInput); ok && in.NoEmit {
 			if isJSON(input) {
 				return writeJSON(w, struct {

@@ -101,7 +101,7 @@ namespace hozo.diagnostics {
   /**
    * hozoc 自身が出す診断: 言語の規則、設定、マニフェスト、hozoc tests、プラグインの応答の誤り。
    * どのユースケースが出すかは、@checkedBy が言う（検査するものは verify。同じ検査は、preview、write、confirmTests も通る:
-   * docs/cli.md「検査」）。
+   * spec/cli.hozo の check）。
    */
   classify Rule of never {
     /** RES-1: 名前が見つからない。候補を、Data と、メッセージに示す */

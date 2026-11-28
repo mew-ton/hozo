@@ -91,7 +91,7 @@ func (OutputConflict) HozoException() string { return "hozo.compiler.OutputConfl
 
 var _ runtime.Exception = OutputConflict{}
 
-// TestsNotRun: 求めるテストのうち、走ったと確かめられないものがある（docs/cli.md「tests」の TESTS-1）
+// TestsNotRun: 求めるテストのうち、走ったと確かめられないものがある（docs/cli.md「診断」の TESTS-1）
 type TestsNotRun struct {
 	Diagnostics []Diagnostic `json:"diagnostics"`
 }
@@ -101,7 +101,7 @@ func (TestsNotRun) HozoException() string { return "hozo.compiler.TestsNotRun" }
 
 var _ runtime.Exception = TestsNotRun{}
 
-// CoverageUnusable: カバレッジを、求めるテストと突き合わせられない（docs/cli.md「tests」の TESTS-2、TESTS-3）
+// CoverageUnusable: カバレッジを、求めるテストと突き合わせられない（docs/cli.md「診断」の TESTS-2、TESTS-3）
 type CoverageUnusable struct {
 	Diagnostics []Diagnostic `json:"diagnostics"`
 }

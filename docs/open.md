@@ -183,9 +183,9 @@
 | 出力先の言語の中だけの型の表し方（Go の中で `time.Time` そのものを使う、など）を書く、言語ごとの語彙のデコレータ（`docs/requirements.md`「型の仕組みは、出力先の語彙を持たない」）。要る例が出たら、語彙と、そのデコレータを決める | 設計（要る例を待つ） | `requirements.md`「型の仕組みは、出力先の語彙を持たない」 |
 | **イベントストーミングの語彙 `prd.eventstorming.event` が、まだ、ない**（同 500。決めただけ）。README の折りたたみは、この綴りで書いてあり、語彙に入るまで、`hozoc` に、通らない | 実装（#134 と一緒） | `vocab.md`「設計の図の語彙」 |
 | **`prd.actor`（担い手の種類）が、手法を、またいでいる。** ユースケース図の語彙だが、業務フロー図のレーンと、イベントストーミングの担い手も、これを読む（`ide-chain.md`「対応」）。決定 D500（手法ごとに、名前空間を、一つ。同居させない）に、合っていない。分けるか、担い手を、手法をまたぐものとして、決まりの外に置くか | 判断 | `vocab.md`「設計の図の語彙」 |
-| `hozoc tests` に、カバレッジのファイルを、二つ以上渡すこと（言語の違う単位を持つプロジェクト。Go の、パッケージごとに分けたカバレッジ）。今は、一つだけ。基底のプラグインが、読める形と認めなければ、その単位の分は、TESTS-3 | 判断と設計 | `cli.md`「tests」 |
+| `hozoc tests` に、カバレッジのファイルを、二つ以上渡すこと（言語の違う単位を持つプロジェクト。Go の、パッケージごとに分けたカバレッジ）。今は、一つだけ。基底のプラグインが、読める形と認めなければ、その単位の分は、TESTS-3 | 判断と設計 | `spec/cli.hozo` の `confirmTests` |
 | 走ったテストが、通ったかを、Hozo が知る道（走らせる関数が、環境変数の指す先に、結果を書く）。今は、テストの実行の終了コードに任せている（決定 D380 の、採らなかった案: 要るようになったら、足す） | 判断 | `ide-chain.md`「テストの規約」の「担保すること」 |
-| カバレッジを取った後に、`hozoc build` をやり直したことを、`hozoc tests` が、見つける道。今は、見つけられない（CI では、同じ作業ツリーで、順に走らせる） | 判断と設計 | `cli.md`「tests」の「確かめられないこと」 |
+| カバレッジを取った後に、`hozoc build` をやり直したことを、`hozoc tests` が、見つける道。今は、見つけられない（CI では、同じ作業ツリーで、順に走らせる） | 判断と設計 | `spec/cli.hozo` の `confirmTests` の説明の「確かめられないこと」 |
 | TS の基底が、テストの対応表を出し、`coverage` を読むこと（vitest などの、カバレッジの形）。TS の基底そのものが、まだない（`requirements.md`「段階」の 5）。SDK（`sdk/ts`）は、型と、direction を持っている | 設計 | `plugin-protocol.md`「coverage」 |
 | 基底が、`disjoint` を、並列に出す形を足すとき: 既定を直列にし、並列は、オプションで選ぶ形にするか。選んだとき、検査が確かめない二点が、人の責任になることを、オプションの説明に書くか（今の基底 `go` は、直列にだけ出し、オプションを持たない） | 判断 | `plugin-go.md`「文」 |
 | 行のケースを変える効果の中身を、`db` の語彙で言えるようにするか（今は DB-17 で、人が書く） | 判断 | この文書「段階を変える書き換え」 |
@@ -240,8 +240,8 @@
 | サンプル `shop-server` に、引数を持つ例外を足すか | 判断 | この文書「`shop-server` の、引数を持つ例外」 |
 | 同じ名前空間を、二つの単位に出した出力が、コンパイルできて、一つの `server` の下で動くことを、確かめるサンプルが、なくなった（`shop-server` の、メモリ版の `store` を、なくしたため: 決定 D388）。設定と、出力の形は、`tests/corpus/units`、`internal/app` の `TestEmitUnits`、`plugins/go/internal/gobase/testdata/seams` が、今も確かめる。二つとも、テストの対象にする決まり（同 387）の当てはめを作るときに、動く例が、また要る | 判断 | `tests/samples/shop-server/README.md`「メモリ版の `store` をなくしたこと」 |
 | サンプル `order-app` の `@pact.promise`（op に付けた、約束の文。264 より前の形）を、要求のケース（`classify … of never`）と `@prd.ref` に、書き直すか。書き直すと、要求のテストの入れ物（決定 D377）が、要求の数だけ、要るようになる | 判断 | `ide-chain.md`「要求トレーサビリティマトリクス」 |
-| `hozoc` 自身の、七つの葉の op（`check`、`collectOutputs`、`verifyOutputs`、`plannedChanges`、`matchTests`、`serve`、`runEmit`）の、単体テストの口（`internal/gen/hozo/compiler/compilertest`）を満たすテストを、書くこと。今は、口が出ているだけで、渡すテストがない（口は、渡したところで、ケースの漏れが、コンパイルエラーになる）。このリポジトリ自身に、`hozoc tests` を掛けると、`internal/gen/hozoc/hozoctest/hozo-tests.go.json` の 22 のテストが、すべて、走っていないと出る: CI に入れるのは、このテストを書いてから | 作業 | `cli.md`「手で書くもの」 |
-| 葉の op `collectOutputs` と `matchTests` は、`hozo.toml` がないときに `ConfigInvalid`（CFG-7）を返す。`matchTests` は、`throws` に `ConfigInvalid` を書いているが、`collectOutputs` は、書いていない（`emit` の `throws` には、`check` の分として、ある）。葉の op が返す例外が、宣言にあることを、確かめるものは、ない | 判断（`collectOutputs` の `throws` に足すか、CFG-7 を `check` に移すか） | `cli.md`「手で書くもの」の最後の項目 |
+| `hozoc` 自身の、七つの葉の op（`check`、`collectOutputs`、`verifyOutputs`、`plannedChanges`、`matchTests`、`serve`、`runEmit`）の、単体テストの口（`internal/gen/hozo/compiler/compilertest`）を満たすテストを、書くこと。今は、口が出ているだけで、渡すテストがない（口は、渡したところで、ケースの漏れが、コンパイルエラーになる）。このリポジトリ自身に、`hozoc tests` を掛けると、`internal/gen/hozoc/hozoctest/hozo-tests.go.json` の 22 のテストが、すべて、走っていないと出る: CI に入れるのは、このテストを書いてから | 作業 | `internal/app`（パッケージ `app` の説明） |
+| 葉の op `collectOutputs` と `matchTests` は、`hozo.toml` がないときに `ConfigInvalid`（CFG-7）を返す。`matchTests` は、`throws` に `ConfigInvalid` を書いているが、`collectOutputs` は、書いていない（`emit` の `throws` には、`check` の分として、ある）。葉の op が返す例外が、宣言にあることを、確かめるものは、ない | 判断（`collectOutputs` の `throws` に足すか、CFG-7 を `check` に移すか） | `internal/app` の `noConfig` |
 | `tests/samples/shop-server/README.md` が引く、`server.hozo:<行>` の行番号が、今のファイルと、ずれている（R6 の、プラグインの部分の段 4 で、`@prd.ref` の三行を足す前から、ずれていた: `server.hozo:43-45` は `login` のはずが、model `MyPage`。`server.hozo:126` は、`Found` のアームのはずが、`getMe` の宣言。配線の op の `throws` の行を消した（決定 D379）ので、60 行目から後ろは、さらに前に詰まった）。行番号で引くのをやめて、op の名前で引くか、直すか | 作業 | `tests/samples/shop-server/README.md`「入力」「下書きから変えたこと」「分かったこと」 |
 | hozoc 自身の仕様（`spec/cli.hozo`、`spec/flows.hozo`。決定 D468）で、書けなかった所 1: 業務の流れ。**書けた**（同 475）: 置き場は、名前空間 `hozo.flows`。hozoc の外の手順（利用者か CI が、テストを走らせる）は、外の道具の名前空間 `hozo.toolchain` の、中身のない op として宣言し、流れの中で呼ぶ（サンプル `order-app` の、外の仕組みと、同じ形）。残り: 流れのうち、ユースケースが、まだない段（設計する人の、IDE の中の段。「生成物が、仕様から遅れていないことを確かめる」「プルリクエストに、設計として何が変わったかを出す」。AI か、エンジニアが、テストと中身を書く段）は、コメントのまま | 実装（IDE を、Hozo に書くとき、ほか） | `spec/flows.hozo`、`tools.md`「仕事の流れ」 |
 | **決定の記録（ADR）を、Hozo で書くこと**を、考えていなかった（利用者の指摘）。書いたときの決定は、`decisions.md` の表が持っていた（今は `spec/decisions/`。決定 D541）。今の言語で、書ける所（hozoc に通して確かめた）: 決定の一つ一つは、対象のない分類のケース（`classify Decision of never { D447; }`）。「置き換える」は、ケースに付ける印が、別のケースを指す形（`@supersedes(Decision.D392)`）。「この宣言の形を、この決定が決めた」は、自前の印（`@decided(Decision.D447)`）を、op、model、状態、効果、`read`、例外、scalar、フィールドに付ける。`union`、`classify`（分類そのもの）、`decorator` の宣言にも、付けられるようになった（決定 D476。付ける先に、その種類を書いたデコレータ: `for union, classify, decorator`）。**書けない所**: (1) `namespace` には、印を付けられない（`grammar.md`「decorator の宣言」の `Target`。文法で閉じる）。決定は、構造そのもの（なぜ、この名前空間の分け方か）についてのものがあり、そこは、結べない。名前空間に結べないことは、「書けなかった所 2」（決定 D470）と、同じ根。(2) 決めたこと、理由、採らなかった案、利用者の言葉を、項目に分けて持てない（説明のコメントの、文章になる）。項目に分けることは、コメントの中のタグで、できるようになった（決定 D477〜D480）。**最初の一切れを、書いた**（`spec/decisions/`: 語彙 `adr` と、分類 `hozo.decisions.Decision`。468〜480 と、417、確かめていない決定の三つ。形を決めた宣言に、`@adr.decided` を結んだ: `spec/cli.hozo` の入口とユースケースと分類、`spec/flows.hozo` の流れ、`spec/diagnostics.hozo` と `spec/decisions/` の、自前の印の宣言）。書けなかった所は、下の「同 36」〜「同 39」。持ち主は、すべての決定を、`spec/decisions/` に移した（決定 D533、D541）。残り: ほかの決定（決定 D1〜D467）を写すか（#174）。語彙 `adr` を、同梱の語彙に移すか | 判断、設計 | `spec/decisions/`、`grammar.md`「decorator の宣言」、`vocab.md`「設計の図の語彙」 |
@@ -397,10 +397,10 @@ classify Gathered of Shipment { Complete; Awaiting: not Complete; }
 済んだもの:
 
 - `cli.md`「cli.hozo」（決定 D808）。
+- `cli.md` の、ほかの節（決定 D809）。残したのは「診断」の表（下の、検査の規則と診断と一緒に移す）。
 
 残り（持ち主が、まだ文書のもの）:
 
-- `cli.md`「build」「検査」「書き出し」「tests」「手で書くもの」の、葉の op の中身。
 - 検査の規則と診断: `requirements.md`「検査の規則の一覧」、`check.md`、`diagnostics.md`、各文書の「診断」の表。`spec/diagnostics.hozo` は、まだ写し（代表の 24 個）。
 - `plugin-protocol.md`（`spec/plugin.hozo` は写し）、`ir.md`（`spec/ir.hozo` は写し）、`lsp.md` と `editors.md`（`spec/lsp.hozo` は写し）、`tools.md` と `ide-screens.md`（`spec/ide.hozo` は写し）。
 - プラグインの文書（`plugin-*.md`）。
@@ -426,4 +426,4 @@ classify Gathered of Shipment { Complete; Awaiting: not Complete; }
 
 ### `OutputsSync` の判定
 
-状態の分類 `OutputsSync` の述語は、`UpToDate` と `OutOfDate` の二つで、どちらも、生成し直した内容とディスクを比べる（`cli.md`「手で書くもの」）。判定関数 `ClassifyOutputsSync` は、二つの述語を呼ぶので、生成し直し（トランスパイラの起動）が、二度走る。今、呼ぶのはテストだけ。
+状態の分類 `OutputsSync` の述語は、`UpToDate` と `OutOfDate` の二つで、どちらも、生成し直した内容とディスクを比べる（`internal/app`（パッケージ `app` の説明））。判定関数 `ClassifyOutputsSync` は、二つの述語を呼ぶので、生成し直し（トランスパイラの起動）が、二度走る。今、呼ぶのはテストだけ。
