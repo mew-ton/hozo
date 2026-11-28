@@ -67,7 +67,7 @@ interprets = [
 - 違反は `*runtime.ValidationError`（「runtime」）で返す。違反がなければ `nil`。違反は、確かめた順にすべて集める（最初の一つで止めない）。
 - **別の名前空間の型**の `Validate` は、その型のメソッドを呼ぶ。メソッドは型の定義のパッケージにしか書けないので、その名前空間の型の置き場（`docs/config.md`「型の置き場」）の単位も、`transpilers` に `go-valid` を並べていなければならない。並べていなければ GOVALID-3（黙って確かめずに済ませない）。scalar の元の型（「scalar」）が、別の名前空間の scalar のときも同じ。
 - 非公開の名前は `valid` で始める。補助の関数は、`validAppend`（「runtime」）と `validKeys`（インデックスの model のキーを辞書順に並べる。「model」）の二つで、使うときだけ、パッケージごとに一つずつ、この順でファイルの末尾に出す（`validAppend` は、元の scalar が `Validate` を持つ scalar も使う）。`pattern` の正規表現は、パッケージの変数 `validPattern<型名>`（フィールドの制約なら `validPattern<Model><フィールド名を先頭大文字に>`）に `regexp.MustCompile(…)` で一度だけ作り、ファイルの先頭（import の後）に宣言順で並べる。変数の名前が当たれば（model `Item` のフィールド `color` と、scalar `ItemColor`）、後ろの方に `2`、`3`、… を付ける。
-- メソッドの中の局所の名前（レシーバ `v` / `m`、違反を集める `violations`）が、このファイルが import するパッケージの名前（元の scalar の名前空間のパッケージ）と当たれば、局所の名前の方の末尾に `_` を足す（`plugins/go/spec/go.hozo` の `Requirement.Names`の「局所の名前」と同じ扱い）。
+- メソッドの中の局所の名前（レシーバ `v` / `m`、違反を集める `violations`）が、このファイルが import するパッケージの名前（元の scalar の名前空間のパッケージ）と当たれば、局所の名前の方の末尾に `_` を足す（`plugins/go/spec/go.hozo` の `Requirement.Names` の「局所の名前」と同じ扱い）。
 
 ### scalar
 

@@ -386,9 +386,9 @@ type KitParam struct {
     FQN   string                                  // 状態、分類、別の名前空間の FQN
     Fake  string                                  // にせものの型の名前（KitUnit なら ""）
     Unit  *TestKit                                // KitUnit のとき、本物を通す出力
-    Entry bool                                    // KitExternal が、通す出力のある名前空間の、入口の op の並びか（`plugins/go/spec/go.hozo` の `Requirement.Fakes`の「別の名前空間」）
+    Entry bool                                    // KitExternal が、通す出力のある名前空間の、入口の op の並びか（`plugins/go/spec/go.hozo` の `Requirement.Fakes` の「別の名前空間」）
 }
-func ThrowSources(view *ir.View, kit *TestKit, entry string) []ThrowSource   // view の出力の入口 entry の、例外の出どころ（View.entries の、その入口の sources の順）を、kit のにせものに当てたもの（`plugins/go/spec/go.hozo` の `Requirement.Fakes`の「求めるケースを、にせものに当てる」）。入口が View.entries になければ nil
+func ThrowSources(view *ir.View, kit *TestKit, entry string) []ThrowSource   // view の出力の入口 entry の、例外の出どころ（View.entries の、その入口の sources の順）を、kit のにせものに当てたもの（`plugins/go/spec/go.hozo` の `Requirement.Fakes` の「求めるケースを、にせものに当てる」）。入口が View.entries になければ nil
 func CaughtSources(view *ir.View, kit *TestKit, entry string) []ThrowSource  // 同じ入口の、受ける道（View.entries の caught の順）
 type ThrowSource struct {
     Exception string                              // 例外の FQN（受ける道なら、受けられる例外）
@@ -422,7 +422,7 @@ func (p *CoverProfile) Lines(name string) (lines [][2]int, measured bool)   // <
 - 例外の値を作るか読む相乗り（`go-http`、`go-cli`、サンプルの `go-ratelimit`）は、例外の構造体のフィールドを、`Exception.params` の順に、`FieldName(<引数名>)` で求める（型は `GoType(<引数の型>)`、タグは `json:"<引数名>"`、省略可能なら `,omitempty`）。引数のない例外は `struct{}`。値を一つに包むフィールド `Value` は、もうない。
 - これまでの `Resolver`（複製した型をローカルにする判断）はなくした。別の名前空間の型は、いつも置き場の入口のパッケージ。
 - 当たる名前（GO-2）と import の循環（GO-3）を見つけるのは基底のプラグイン（`plugins/go/internal/gobase`）で、このパッケージは、当たらない前提で名前を返す。
-- `PublicNames` は、`plugins/go/spec/go.hozo` の `Requirement.Names`の「名前が当たれば GO-2」が並べる、定義のパッケージの公開の名前の、ただ一つの写し。並びは、N の宣言順（宣言ごとに、型、アームを包む型。分類は、列挙の型、ケースの定数、判定関数、述語のインターフェース）、状態の単位（宣言順）、`Ops`、`New`、`Leaves`、`Seams`、別の名前空間の口（FQN の辞書順）。基底は、この一覧の中で名前が当たれば GO-2 を返す。入口か定義のパッケージに公開の名前を足す相乗り（`go-sqlite` の GOSQL-4、`go-http` の GOHTTP-10、サンプルの `go-ratelimit` の GORATE-2）は、自分の名前がこの一覧の名前と当たるかを確かめる（入口のパッケージは、定義のすべての名前を再公開するので、どちらに足す名前も、当たる相手はこの一覧）。一覧を自分で書き写さない。
+- `PublicNames` は、`plugins/go/spec/go.hozo` の `Requirement.Names` の「名前が当たれば GO-2」が並べる、定義のパッケージの公開の名前の、ただ一つの写し。並びは、N の宣言順（宣言ごとに、型、アームを包む型。分類は、列挙の型、ケースの定数、判定関数、述語のインターフェース）、状態の単位（宣言順）、`Ops`、`New`、`Leaves`、`Seams`、別の名前空間の口（FQN の辞書順）。基底は、この一覧の中で名前が当たれば GO-2 を返す。入口か定義のパッケージに公開の名前を足す相乗り（`go-sqlite` の GOSQL-4、`go-http` の GOHTTP-10、サンプルの `go-ratelimit` の GORATE-2）は、自分の名前がこの一覧の名前と当たるかを確かめる（入口のパッケージは、定義のすべての名前を再公開するので、どちらに足す名前も、当たる相手はこの一覧）。一覧を自分で書き写さない。
 - `PublicTestNames` は、テストのパッケージの、基底の公開の名前（`plugins/go/spec/go.hozo` の `Requirement.UnitTestPort`: `LeafCases`、`RunLeaves`、葉ごとの `<Op>Cases` と `<Op>Case`、分類ごとの `<C>Examples` と `Run<C>`。同「テストのにせもの」: にせものの型、`Fakes`、`NewOps`）の、ただ一つの写し。基底は、この一覧の中で名前が当たれば GO-2 を返す。テストのパッケージにファイルを足す相乗り（`go-http` の GOHTTP-20）は、自分の名前が、この一覧の名前と当たるかを確かめる。空かどうかは、基底が、テストのパッケージを作るかどうか。
 - `TestKitOf` は、テストのにせものと、テストの中の組み立て（`plugins/go/spec/go.hozo` の `Requirement.Fakes`）の、ただ一つの写し。基底は、ここから `fakes.go` を作り、組み立てを使う相乗り（`go-http` の `RunHTTP`）は、同じ値から、`Fakes` のフィールドの名前と、`NewOps` の引数を求める。別の単位の出力の形は、`HomeOf` と同じに、その単位の `in` を省いたものとして求める。
 

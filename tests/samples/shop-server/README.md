@@ -136,7 +136,7 @@ R6 の、言語の部分（`docs/requirements.md`「R6 の、言語の部分」�
 | `type.hozo` | 例外 `EmailTaken`。`@http.status` は、付けない（投げる `store.addUser` は、HTTP の入口から呼ばれない） | `docs/grammar.md`「exception / effect / read」 |
 | `store.hozo` | 効果 `createUser` に、`@db.conflict(type.EmailTaken)` と、`throws type.EmailTaken`。それを呼ぶ配線 `addUser` の `throws` に、同じ例外 | `docs/check.md`「read と効果」、`docs/vocab.md`「`db` の read と効果」 |
 | `gen/type/types.go` | 例外の型 `EmailTaken` | `plugins/go/spec/go.hozo` の `Requirement.Types` の「exception」 |
-| `gen/store/states.go`、`gen/storemem/states.go` | `CreateUser` のコメントに、`throws type.EmailTaken`。メソッドの形は、同じ | `plugins/go/spec/go.hozo` の `Requirement.Comments`の「状態の単位のメソッド」 |
+| `gen/store/states.go`、`gen/storemem/states.go` | `CreateUser` のコメントに、`throws type.EmailTaken`。メソッドの形は、同じ | `plugins/go/spec/go.hozo` の `Requirement.Comments` の「状態の単位のメソッド」 |
 | `gen/store/ops.go`、`gen/store/wiring.go`、`gen/storemem/ops.go`、`gen/storemem/wiring.go` | `AddUser` のコメントに、`Throws: type.EmailTaken`。本体は、同じ（効果の失敗を、そのまま返す） | `plugins/go/spec/go.hozo` の `Requirement.Comments` |
 | `gen/store/types.go`、`gen/storemem/types.go` | 効果の定数のコメント（説明を変えた分） | — |
 | `gen/store/db.go` | `CreateUser` が、`dbExec` を `dbConflict(…, pkgtype.EmailTaken{})` で包む。補助 `dbConflict` と、`strings` の import | `docs/plugin-go-sqlite.md`「効果の中身」「補助」「メソッドの形とコメント」 |
@@ -313,7 +313,7 @@ HOZO_PLUGIN_PATH="$PWD/../../../plugins" /tmp/hozoc tests --coverage /tmp/cover.
 |---|---|
 | `gen/store/storetest/doc.go`、`fakes.go` | 足した: 四つの状態の単位のにせもの（`UsersStateFake` など）、継ぎ目のにせもの（`SeamsFake`: `placeOrder` の `@db.transaction`）、`Fakes`、`NewOps` |
 | `gen/server/servertest/fakes.go` | 足した: 葉のにせもの（`LeavesFake`。本物を包む）、`mailer` の op のにせもの（`MailerOpsFake`。`mailer` には、単位がない）、継ぎ目のにせもの（`SeamsFake`: `login` の `@rate.limited`）、`Fakes`（`Store` は `storetest.Fakes`）、`NewOps` |
-| `gen/client/clienttest/doc.go`、`fakes.go` | 足した: `Fakes` と `NewOps`。`New` の引数は、`server` の op だけ。その op は、どれも、相手の入口（`@http.*`）なので、流れの端で、`Server` は、にせもの `ServerOpsFake`（`plugins/go/spec/go.hozo` の `Requirement.Fakes`の「別の名前空間」。作り直しの段 2 で、`servertest.Fakes` を通す形から、変えた） |
+| `gen/client/clienttest/doc.go`、`fakes.go` | 足した: `Fakes` と `NewOps`。`New` の引数は、`server` の op だけ。その op は、どれも、相手の入口（`@http.*`）なので、流れの端で、`Server` は、にせもの `ServerOpsFake`（`plugins/go/spec/go.hozo` の `Requirement.Fakes` の「別の名前空間」。作り直しの段 2 で、`servertest.Fakes` を通す形から、変えた） |
 | `gen/flows/flowstest/doc.go`、`fakes.go` | 足した: `Fakes`（`Client` は `clienttest.Fakes`）と `NewOps` |
 | `gen/server/servertest/doc.go` | パッケージのコメント（単体テストの口と、にせもの、の両方を言う） |
 | `sample.json`、四つの `.hozoc-outputs.json` | 足したファイルの分 |
@@ -630,7 +630,7 @@ GOTOOLCHAIN=local go run ./app/cmd/shop-sqlite   # http://localhost:8080。ユ�
 
 `store` の十の op は、どれも `export` を付けた配線で、`read` か効果を呼ぶ（九つは一つだけ、`placeOrder` は効果を二つ）。本体は `gen/store/wiring.go` の、`ops` のメソッド（`return o.users.UserByEmail(ctx, email)`）。どれも、`ctx` を取り、`error` を返す（`throws` を書いている op は、ない。`addUser` だけが、呼ぶ効果 `createUser` から、例外 `type.EmailTaken` を、計算で持つ）。**五つの `read` と五つの効果は、op ではなく、読む状態・宛先の状態の単位（`<状態>State`）のメソッド**（`plugins/go/spec/go.hozo` の `Requirement.Ports` の「状態の単位」。`gen/store/states.go`）: `users` に `UserByEmail`、`UserById`、`CreateUser`、`sessions` に `SessionByToken`、`CreateSession`、`DeleteSession`、`orders` に `OrdersOfUser`、`LatestOrderOf`、`CreateOrder`、`notifications` に `NotifyUser`。`placeOrder` の二つの効果は、宛先が `orders` と `notifications` に分かれるが、それぞれの状態の単位のメソッドで、二つをまたぐ口は要らない。`placeOrder` は、継ぎ目を持つので二層（外側は `gen/store/ops.go` の `ops.PlaceOrder`、中身は `gen/store/wiring.go` の `placeOrderBody`）。`mailer.send` は、デコレータ `@smtp.sendMail` を持つ葉なので純粋でない（`mailer.hozo`）。`server.MailerOps` と `server.StoreOps` のメソッド（`mailer.send` と、`store` の九つ）は、相手がどれも純粋でないので、`ctx` を取り、`error` を返す。`mailer` に Go の単位を置けば、そこに出る `Ops` の `Send` も同じ判定で同じ形になり、その `Ops` は `server.MailerOps` をそのまま満たす。
 
-**デコレータごとの、出力への効き方**（`plugins/go/spec/go.hozo` の `Requirement.Decorators`の四つの形）:
+**デコレータごとの、出力への効き方**（`plugins/go/spec/go.hozo` の `Requirement.Decorators` の四つの形）:
 
 | デコレータ | 読むトランスパイラ | 形 | 基底の出力への効き方 |
 |---|---|---|---|
@@ -1025,7 +1025,7 @@ N1〜N96 のうち、解決は 16: N3（仕様の直し）、N11（直した P30
 
 #### 例外、効果、`read` を同じ書き方に（決定 124〜131、S25。125〜131 は、次の節の決定が置き換えた）
 
-- **N114 期待する出力は、コメントの四行しか変わらなかった**。`read` に名前を付けても、基底の出力は変わらない: op が読む状態（`Signature.reads`。`Reads: store.users`）も、op の置き場も、状態の単位のメソッドのコメント（`// FindUser は問い合わせ: store.users を読む（reads）葉の op store.findUser。`）も、`read` の名前を持たない。`read` の名前が出るのは、`go-sqlite` の四つのメソッドのコメントだけ。基底のコメントに `read` の名前を書くかどうかは、決めていない（`plugins/go/spec/go.hozo` の `Requirement.Comments`の未決）。
+- **N114 期待する出力は、コメントの四行しか変わらなかった**。`read` に名前を付けても、基底の出力は変わらない: op が読む状態（`Signature.reads`。`Reads: store.users`）も、op の置き場も、状態の単位のメソッドのコメント（`// FindUser は問い合わせ: store.users を読む（reads）葉の op store.findUser。`）も、`read` の名前を持たない。`read` の名前が出るのは、`go-sqlite` の四つのメソッドのコメントだけ。基底のコメントに `read` の名前を書くかどうかは、決めていない（`plugins/go/spec/go.hozo` の `Requirement.Comments` の未決）。
 - **N115 表を、二度書く**。`@db.find(users, "email") read userByEmail on users;` は、表 `users` を、デコレータの引数と、`on` の後ろの両方に書く。効果（`@db.insert(users) effect createUser on users.post;`）と同じ形で、食い違いは GOSQL-21。出力を決めるのがデコレータの引数だけ、という原則の帰結。
 - **N116 読む op の説明と、`read` の説明が、ほとんど同じ文になる**。`read userByEmail`（「email が同じユーザー」）と `op findUser`（「email からユーザーを引く」）。`read` を一つだけ行い、引いたものをそのまま返す op では、二つの宣言が同じことを言う。書く側の `effect createUser` と `op addUser` も同じ。`read` を二つ以上並べる op が書けるようになれば、分かれる（`docs/plugin-go-sqlite.md`「未決: 複数の `read` と、戻り値の型」）。
 - **N117 この段階の期待する出力は、道具で確かめていない**。書いたときの hozoc は、この仕様を読めない（節の `,` と、`read` の宣言）。確かめたのは、このモジュールの `go vet` と `go test` が通ることまで（変えたのは、コメントだけ）。
