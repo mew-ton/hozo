@@ -162,13 +162,7 @@ func CheckFormat(name, v string) bool                   // valid.format の四�
 
 `emit` の応答の `errors` で返す。検査だけの実行（`hozoc build --no-emit`）も、同じ応答の診断を使う（`docs/plugin-protocol.md`「起動」「emit」）。
 
-| ID | 重さ | 意味 |
-|---|---|---|
-| GOVALID-3 | error | `Validate` を持つ別の名前空間の型を、フィールドに持つか、scalar の元の型にするが、その名前空間の型の置き場の単位が `go-valid` を並べていない。メッセージに、その単位（何番目の `[[emit]]` か）を示す。位置は model（元の型なら、その scalar） |
-| GOVALID-4 | error | フィールドの型が union で、そのアームの型が、`ref` でないか、インデックスの model か、別の union への `ref` で、その中に `Validate` を持つ型がある（「Validate を持つ型」。確かめる形が、まだない）。位置は model |
-| GOVALID-5 | error | 標準でない `valid` の制約（ほかのプラグインの語彙のファイルが `valid` に足したデコレータ）が付いている。位置は、付いた scalar か model |
-| GOVALID-6 | error | `Validate` を持つ model が、`validate` という名前のフィールドを持つ（Go で、フィールド `Validate` とメソッド `Validate` が当たる）。位置は model |
-| GOVALID-7 | error | `[emit.options.go-valid]` に、知らないキーがある。位置なし |
+この見出しの診断の、ID と条件と重さの持ち主は、`spec/diagnostics/go-valid.hozo` の分類 `hozo.diagnostics.GoValid` のケース。
 
 - **`go-valid` は、VALID-* の検査を通っていない仕様を受け取ったら、診断にせず、異常終了する**（`Crashed`。`docs/plugin-protocol.md`「起動」）。hozoc からは、起きない: 語彙のプラグイン `valid` が error を返せば、`emit` は頼まれず、入っていなければ CFG-25（「マニフェスト」）。
 - 基底のオプション `module` がないとき（同じ単位の基底が GO-8 を返し、何も書き出されない。`docs/plugin-go.md`「診断」）は、ファイルを返さず、GO-8 も重ねて返さない。置き場を求められないので、GOVALID-3 は確かめない。ほかの診断は、そのときも返す。
@@ -187,4 +181,4 @@ func CheckFormat(name, v string) bool                   // valid.format の四�
   | `pattern` が RE2 でない | VALID-3 |
   | `format` の名前を知らない | VALID-4 |
 
-- GOVALID-2 は欠番。「フィールドの既定値が、その型かフィールドの制約に合わない」という規則だったが、フィールドの既定値を言語からなくしたので、確かめるものがない（決定 S24）。値を入れるデコレータ（`@http.default`、`@cli.default`）の値は、それを読む相乗りが、生成するときに制約で確かめる（`docs/plugin-http.md`「補う値と制約」）。番号は別の意味に使い回さない（欠番の一覧は `docs/requirements.md`「検査の規則の一覧」）。
+- GOVALID-2 は欠番。「フィールドの既定値が、その型かフィールドの制約に合わない」という規則だったが、フィールドの既定値を言語からなくしたので、確かめるものがない（決定 S24）。値を入れるデコレータ（`@http.default`、`@cli.default`）の値は、それを読む相乗りが、生成するときに制約で確かめる（`docs/plugin-http.md`「補う値と制約」）。番号は別の意味に使い回さない（欠番は、`spec/diagnostics/` のケースの `@retired`）。

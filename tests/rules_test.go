@@ -225,7 +225,7 @@ var grammarClosed = map[string]bool{
 	"WIRE-1": true, "WIRE-5": true, "MATCH-1": true, "MATCH-3": true,
 }
 
-// reportedAs は、規則の診断が別の ID で出るもの（docs/check.md「診断」の表の「診断は RES-1 として出る」など）。
+// reportedAs は、規則の診断が別の ID で出るもの（spec/diagnostics/rule.hozo の NS-1 の「診断は RES-1 として出る」など）。
 var reportedAs = map[string]string{
 	"NS-1": "RES-1", // 解決の手続きそのもの
 }
@@ -345,16 +345,12 @@ func TestRules(t *testing.T) {
 	}
 }
 
-// ruleDocs は規則の ID を持つ設計文書（docs/testing.md「規則ごとのテスト」の対象）。
-var ruleDocs = []string{"check.md", "resolve.md", "types.md", "config.md"}
-
-// idRowRE は「診断」の表の行の先頭の列（`| REL-4 | error | ... |`）。
-var idRowRE = regexp.MustCompile(`^\|\s*([A-Z]+-\d+)\s*\|`)
-
 // notTestable は .hozo と hozo.toml だけでは起こせない、または診断を持たない規則と、その理由。
 // docs/testing.md「規則ごとのテスト」の「文法で閉じている規則（— のもの）は … SYNTAX で確かめる」に従い、
 // 文法で閉じる規則はここに入れず、SYNTAX の例を置く。
 var notTestable = map[string]string{
+	"PAGE-1":   "hozoc は検査しない。語彙 browser.page のプラグインの受け持ち（docs/check.md「語彙に固有の規則」）。診断なし",
+	"PAGE-2":   "同じく、hozoc は検査しない（docs/check.md「語彙に固有の規則」）。診断なし",
 	"NS-2":     "正規化で行う。診断なし（docs/check.md「名前空間」）",
 	"EFF-1":    "計算（Sig の F）で行う。診断なし（docs/check.md「状態と効果」）",
 	"THROWS-4": "計算（Sig の E）で行う。診断なし（docs/check.md「throws」）。節に書いていない例外も、多めに書いた例外も、通ることは、REL-4 の ok の例（ok_4）で確かめる",
@@ -367,42 +363,31 @@ var notTestable = map[string]string{
 	"CFG-5":    "書き出すファイルの衝突は emit でしか起きない（.hozo と hozo.toml だけでは出ない。internal/app のテスト）",
 }
 
-// tableIDs は文書 path の表の先頭の列にある規則の ID を集める。
-func tableIDs(t *testing.T, path string) map[string]bool {
+// ruleClass は、言語と設定の規則の分類（spec/diagnostics/rule.hozo の hozo.diagnostics.Rule）。docs/testing.md「規則ごとのテスト」の対象。
+const ruleClass = "Rule"
+
+// specRuleIDs は、仕様の分類 Rule のケースの ID を集める: live は、欠番でないもの、all は、欠番を含むすべて。
+func specRuleIDs(t *testing.T) (live, all map[string]bool) {
 	t.Helper()
-	content, err := os.ReadFile(path)
-	if err != nil {
-		t.Fatal(err)
-	}
-	ids := map[string]bool{}
-	for _, line := range strings.Split(string(content), "\n") {
-		if m := idRowRE.FindStringSubmatch(line); m != nil {
-			ids[m[1]] = true
+	live, all = map[string]bool{}, map[string]bool{}
+	for _, d := range specDiagnostics(t) {
+		if d.class != ruleClass {
+			continue
+		}
+		all[d.id] = true
+		if !d.retired {
+			live[d.id] = true
 		}
 	}
-	return ids
+	return live, all
 }
 
-// docRuleIDs は設計文書の「診断」の表から規則の ID を集める（ID → 文書の名前）。
-func docRuleIDs(t *testing.T) map[string]string {
-	t.Helper()
-	ids := map[string]string{}
-	for _, name := range ruleDocs {
-		for id := range tableIDs(t, filepath.Join("..", "docs", name)) {
-			if _, dup := ids[id]; !dup {
-				ids[id] = name
-			}
-		}
-	}
-	return ids
-}
-
-// TestRulesCoverDocs は、設計文書の「診断」の表のすべての ID に tests/rules/<ID>/ があることを確かめる。
-// notTestable の ID は除く（理由を持つ）。逆に、tests/rules のディレクトリの ID は表のどれかにあること。
+// TestRulesCoverDocs は、仕様の分類 Rule の、欠番でないすべてのケースに tests/rules/<ID>/ があることを確かめる。
+// notTestable の ID は除く（理由を持つ）。逆に、tests/rules のディレクトリの ID は、その分類のケースにあること。
 func TestRulesCoverDocs(t *testing.T) {
-	ids := docRuleIDs(t)
+	ids, all := specRuleIDs(t)
 	if len(ids) == 0 {
-		t.Fatal("設計文書から規則の ID を一つも拾えなかった")
+		t.Fatal("仕様から規則の ID を一つも拾えなかった")
 	}
 	entries, err := os.ReadDir(rulesDir)
 	if err != nil {
@@ -418,7 +403,7 @@ func TestRulesCoverDocs(t *testing.T) {
 		}
 	}
 	var missing []string
-	for id, doc := range ids {
+	for id := range ids {
 		if _, excluded := notTestable[id]; excluded {
 			if dirs[id] {
 				t.Errorf("%s は notTestable にあるのに tests/rules/%s がある。どちらかを直す", id, id)
@@ -426,29 +411,26 @@ func TestRulesCoverDocs(t *testing.T) {
 			continue
 		}
 		if !dirs[id] {
-			missing = append(missing, id+"（"+doc+"）")
+			missing = append(missing, id)
 		}
 	}
 	sort.Strings(missing)
 	for _, m := range missing {
-		t.Errorf("設計文書の規則 %s に tests/rules のディレクトリがない", m)
+		t.Errorf("仕様の規則 %s に tests/rules のディレクトリがない", m)
 	}
 	for id := range notTestable {
-		if _, ok := ids[id]; !ok {
-			t.Errorf("notTestable の %s は設計文書の表にない", id)
+		if !ids[id] {
+			t.Errorf("notTestable の %s は、仕様の分類 %s の、欠番でないケースにない", id, ruleClass)
 		}
 	}
-	// 逆向き: ディレクトリの ID は四つの文書か、docs/requirements.md「検査の規則の一覧」（SYN-1 / SYN-2 はそこにだけある）の表にあること
+	// 逆向き: ディレクトリの ID は、分類 Rule のケース（欠番を含む）にあること
 	known := map[string]bool{"SYNTAX": true} // 構文エラーと、誤りのあるファイルでも残りを検査すること（docs/check.md「この文書が決めること」）
-	for id := range ids {
-		known[id] = true
-	}
-	for id := range tableIDs(t, filepath.Join("..", "docs", "requirements.md")) {
+	for id := range all {
 		known[id] = true
 	}
 	for id := range dirs {
 		if !known[id] {
-			t.Errorf("tests/rules/%s は設計文書の表にない規則", id)
+			t.Errorf("tests/rules/%s は、仕様の分類 %s にない規則", id, ruleClass)
 		}
 	}
 }

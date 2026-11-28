@@ -61,7 +61,7 @@ var diagnosticFixtures = []struct{ name, code string }{
 	{"http19", CodeTemplate},   // @http.badRequest の文言の中の {<名前>} が、例外の、型が string の引数を指していない
 }
 
-// TestDiagnosticCodes は、「診断」の表の ID（HTTP-1〜HTTP-19。欠番はない）のどれもが、入力を一つ持つこと。
+// TestDiagnosticCodes は、spec/diagnostics/http.hozo の ID（HTTP-1〜HTTP-19。欠番はない）のどれもが、入力を一つ持つこと。
 func TestDiagnosticCodes(t *testing.T) {
 	seen := map[string]bool{}
 	for _, fx := range diagnosticFixtures {
@@ -121,7 +121,7 @@ func sameDiagnostics(a, b []plugin.Diagnostic) bool {
 	return true
 }
 
-// TestDiagnosticPositions は、診断の位置（docs/plugin-http.md「診断」の表）: 表に書いた宣言の FQN。
+// TestDiagnosticPositions は、診断の位置（spec/diagnostics/http.hozo のケースの説明）: 説明に書いた宣言の FQN。
 func TestDiagnosticPositions(t *testing.T) {
 	for name, want := range map[string][]string{
 		"http1": {"app.hidden", "app.also"},

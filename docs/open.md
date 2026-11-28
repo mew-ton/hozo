@@ -302,7 +302,7 @@
 | 行の遷移の表示の組み立てが、二か所にある | 作業 | この文書「行の遷移の表示の二つの実装」 |
 | 状態の分類 `OutputsSync` の判定が、生成し直しを二度走らせる | 作業 | この文書「`OutputsSync` の判定」 |
 | 言語サーバーの、プラグインの診断（決定 D405。開いたときと、保存したときに、裏で走らせる）の、残り: 打つのを止めてから、少し後にも、走らせるか。プラグインを、起動したままにする形（常駐。同 411 が、エディタで要ると分かったときに、足すと決めた。速さの実測は `plugin-protocol.md`「起動」） | 判断 | `lsp.md`「プラグインの診断」 |
-| **処理系の第一言語を、英語にする**（決定 D442、D488。決めたのは、方針と、英語が要る範囲と、文言の持ち主まで。直すのは、後: #132）。やること: (1) コンパイルエラーと warning になりうる状況の、一つ一つに、番号を振り、hozoc 自身の仕様（`.hozo`）の上で、要求（PRD）として、管理する形にする（今は、`requirements.md`「検査の規則の一覧」と、各文書の「診断」の表が、持つ）。(2) 文言を、診断の宣言の前の、`@hint` でないデコレータで、仕様に書き、それを解釈して、番号から英語の文言を引く表を作る、Hozo 自身のためのプラグインを、用意する（同 488。決めていない点は、その行が、並べる）。(3) 番号のない、人に見せる文言に、番号を振る（求めるケースの、作れない理由 `EntrySource.why` は、今、日本語の句: IR の項目の意味が変わる）。(4) 生成するコードのコメント、CLI の表示を、英語にする。(5) README を、英語にして、日本語を、併記する。(6) 文書（`docs/`）も、将来、英語にする（`CLAUDE.md` の「文書は、日本語」を、そのときに変える）。今は、すべてが日本語。量が多く、機械的な作業が大半（テストの期待も、ほぼすべて、置き直しになる） | 設計と実装（後） | `requirements.md`「検査の規則の一覧」、`diagnostics.md` |
+| **処理系の第一言語を、英語にする**（決定 D442、D488。決めたのは、方針と、英語が要る範囲と、文言の持ち主まで。直すのは、後: #132）。やること: (1) コンパイルエラーと warning になりうる状況の、一つ一つに、番号を振り、hozoc 自身の仕様（`.hozo`）の上で、要求（PRD）として、管理する形にする（済んだ: 決定 D812。持ち主は、`spec/diagnostics/` のケース）。(2) 文言を、診断の宣言の前の、`@hint` でないデコレータで、仕様に書き、それを解釈して、番号から英語の文言を引く表を作る、Hozo 自身のためのプラグインを、用意する（同 488。決めていない点は、その行が、並べる）。(3) 番号のない、人に見せる文言に、番号を振る（求めるケースの、作れない理由 `EntrySource.why` は、今、日本語の句: IR の項目の意味が変わる）。(4) 生成するコードのコメント、CLI の表示を、英語にする。(5) README を、英語にして、日本語を、併記する。(6) 文書（`docs/`）も、将来、英語にする（`CLAUDE.md` の「文書は、日本語」を、そのときに変える）。今は、すべてが日本語。量が多く、機械的な作業が大半（テストの期待も、ほぼすべて、置き直しになる） | 設計と実装（後） | `requirements.md`「検査の規則の一覧」、`diagnostics.md` |
 
 ## 持ち主のない点
 
@@ -397,12 +397,12 @@ classify Gathered of Shipment { Complete; Awaiting: not Complete; }
 済んだもの:
 
 - `cli.md`「cli.hozo」（決定 D808）。
-- `cli.md` の、ほかの節（決定 D809）。残したのは「診断」の表（この見出しの「残り」の、検査の規則と診断と一緒に移す）。
-- go-cli（決定 D811）: 振る舞いは `plugins/go-cli/spec/go-cli.hozo`、語彙は `plugins/go-cli/cli.hozo`、マニフェストは `plugins/go-cli/hozo-plugin.toml`。`plugin-go-cli.md` に残したのは、受け付けない書き方と診断（同じく、検査の規則と診断と一緒に移す）。
+- `cli.md` の、ほかの節（決定 D809）。
+- go-cli（決定 D811）: 振る舞いは `plugins/go-cli/spec/go-cli.hozo`、語彙は `plugins/go-cli/cli.hozo`、マニフェストは `plugins/go-cli/hozo-plugin.toml`。`plugin-go-cli.md` に残したのは、受け付けない書き方。
+- 検査の規則と診断（決定 D812）: ID、条件、重さ、欠番は、`spec/diagnostics.hozo` と `spec/diagnostics/` の、名前空間 `hozo.diagnostics` の分類のケース。文書に残したのは、規則の背景と、手続きの全体と、なくした規則の経緯。
 
 残り（持ち主が、まだ文書のもの）:
 
-- 検査の規則と診断: `requirements.md`「検査の規則の一覧」、`check.md`、`diagnostics.md`、各文書の「診断」の表。`spec/diagnostics.hozo` は、まだ写し（代表の 24 個）。
 - `plugin-protocol.md`（`spec/plugin.hozo` は写し）、`ir.md`（`spec/ir.hozo` は写し）、`lsp.md` と `editors.md`（`spec/lsp.hozo` は写し）、`tools.md` と `ide-screens.md`（`spec/ide.hozo` は写し）。
 - go-cli のほかのプラグインの文書（`plugin-*.md`）。go-http と go-sqlite の要求（`plugins/go-http/spec/go-http.hozo`、`plugins/go-sqlite/spec/go-sqlite.hozo`）は、まだ写し。
 - 標準の語彙のファイル（`vocab/`）。今は、`vocab.md` が持ち主で、ファイルは写し（`testing.md`「コーパス」の `TestDocsEmbedVocabulary`）。

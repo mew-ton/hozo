@@ -37,7 +37,7 @@ func loadSpec(t *testing.T, name string) *ir.Spec {
 	return &spec
 }
 
-// codes は、「診断」の表の ID（DB-1〜DB-19。欠番はない）。入力は testdata/db<n>/ で、DB-<n> の診断だけを返す。
+// codes は、spec/diagnostics/db.hozo の ID（DB-1〜DB-19。欠番はない）。入力は testdata/db<n>/ で、DB-<n> の診断だけを返す。
 const codes = 19
 
 // TestDiagnostics は docs/plugin-db.md「診断」の DB-1〜DB-19: どの ID も入力を一つ持ち、診断のコード・位置・メッセージが

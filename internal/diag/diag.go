@@ -44,7 +44,7 @@ type Diagnostic struct {
 	File string
 	// Related は関連する位置（重複の相手、例外の出どころの行など）。
 	Related []Related
-	// Data は機械が読む補足（docs/check.md「Data」）。JSON にだけ出す。
+	// Data は機械が読む補足（spec/diagnostics.hozo の、Data の model）。JSON にだけ出す。
 	Data map[string]any
 }
 

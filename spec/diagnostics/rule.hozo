@@ -1,0 +1,1489 @@
+// Hozo 自身の仕様: 診断の分類 hozo.diagnostics.Rule（決定 D812。持ち主は、このファイル）。印の意味は spec/diagnostics.hozo。
+// ケースの名前は、ID の - を _ に替えたもの。もとの綴りは、説明の頭に書く。どの単位の対象でもない: コードには、ならない。
+
+namespace hozo.diagnostics {
+  /** 言語と設定の規則（docs/check.md、docs/resolve.md、docs/types.md、docs/config.md が説明する）。どのケースも、tests/rules/<ID>/ に、通る例と落ちる例を持つ（持たないものと、その理由は tests/rules_test.go） */
+  classify Rule of never {
+    // docs/check.md「名前空間」が説明する規則
+
+    /**
+     * NS-1: 別の名前空間の宣言は常に修飾して参照。外側を自動で探さない
+     *
+     * 解決の手続きそのもの（`docs/resolve.md`「手続き」）。診断は RES-1 として出る
+     */
+    @severity(Severity.Error)
+    @checkedBy(hozo.compiler.verify)
+    NS_1;
+
+    /**
+     * NS-2: 同じ名前の `namespace` は一つに併合
+     *
+     * 正規化で行う。診断なし
+     */
+    @severity(Severity.Silent)
+    @checkedBy(hozo.compiler.verify)
+    NS_2;
+
+    /**
+     * NS-3: 複数の語彙（標準の語彙、プラグインの語彙）が同じ名前をグローバルに宣言したらエラー
+     *
+     * RES-6 のうち、両方の出どころが語彙（`Span.file` が `hozo:` で始まる。`docs/ir.md`「Program」）のもの。メッセージに語彙の出どころ（標準か、どのプラグインか）を出す
+     */
+    @severity(Severity.Error)
+    @checkedBy(hozo.compiler.verify)
+    NS_3;
+
+    /**
+     * NS-5: 別の名前空間の、`export` のない op を呼んだ（`docs/check.md`「op の宣言と本体」の「export」の表の二つ: 配線の呼び出し、デコレータの引数に渡した op）。位置は呼び出しの op の名前（デコレータの引数ならその引数の値）。`Related` にその op の宣言
+     */
+    @severity(Severity.Error)
+    @checkedBy(hozo.compiler.verify)
+    NS_5;
+
+    /**
+     * NS-6: 配線が、別の名前空間の `read` か効果（`effect` の宣言）を呼んだ（`docs/check.md`「状態に触れるもの」の「配線からの呼び出し」）。位置は呼び出しの名前。`Related` にその宣言。メッセージに、その名前空間の op を通すことを示す。`Signature` を要しないので `internal/sema` が出す
+     */
+    @severity(Severity.Error)
+    @checkedBy(hozo.compiler.verify)
+    NS_6;
+
+    /**
+     * NAME-1: 型の位置は UpperCamelCase、実行・適用されるものは lowerCamelCase
+     *
+     * `model` / `scalar` / `exception` / `union` / `classify` とそのケースの名前の先頭が大文字でない。`state` / `op` / `effect` / `read` / `decorator` の名前の先頭が小文字でない。`_` で始まる名前も警告。語彙は対象外。強さは、ここで warning と決めた
+     */
+    @severity(Severity.Warning)
+    @checkedBy(hozo.compiler.verify)
+    NAME_1;
+
+    /**
+     * DOC-1: `@param` / `@throws` / `@see` が存在しない名前を指したらエラー。説明の有無は警告しない
+     *
+     * `@param` が引数名にない（op、デコレータ、`exception`、`effect`、`read` の引数。引数を持たない種類の宣言に書いた `@param` も）、`@see` が解決できない（`internal/sema`）。`@throws` の例外が `Signature.exceptions` にも、O に付いたデコレータの `outer throws` にもない（`internal/check`。外から見たときだけ起きる例外も書けるようにするため）。効果の `@throws` の例外が、その効果の `throws`（`Effect.throws`）にない（`internal/sema`）。デコレータの宣言の `@param` は `Param` の名前
+     */
+    @severity(Severity.Error)
+    @checkedBy(hozo.compiler.verify)
+    DOC_1;
+
+    /**
+     * DOC-2: 同じ `@param` 名、同じ `@throws` 例外が二度ある
+     */
+    @severity(Severity.Error)
+    @checkedBy(hozo.compiler.verify)
+    DOC_2;
+
+    /**
+     * UNION-1: `union` の要素にアーム（`A: T`）と参照（`X;`）が混ざる。または参照の要素に例外と効果が混ざる。または `arms` でアーム名が重複
+     */
+    @severity(Severity.Error)
+    @checkedBy(hozo.compiler.verify)
+    UNION_1;
+
+    /**
+     * UNION-2: `union`（`arms`）の二つのアームが、等しいリテラルの型を持つ（`docs/types.md`「リテラルの型」）。位置は、後ろのアームの型
+     */
+    @severity(Severity.Error)
+    @checkedBy(hozo.compiler.verify)
+    UNION_2;
+
+    // docs/check.md「状態と効果」が説明する規則
+
+    /**
+     * STATE-1: 状態への操作は形で決まる（形と操作の表は `docs/check.md`「状態の形」）
+     *
+     * 組み込みの効果の `operation` が、その状態の形にない（`docs/check.md`「状態の形」の表。`single` に `post` / `delete`）。`effect` の宣言の宛先にも、`effects` に直に書いた `状態.操作`（`docs/check.md`「状態に触れるもの」の「節に書く要素」）にも、配線で直に呼んだ `状態.操作(…)`（同「直に呼ぶ組み込みの効果」）にも掛かる。位置は操作の語
+     *
+     * 決めた所と、説明のある所: S1: `docs/check.md`「状態の形」。`effects` に直に書いた `状態.操作` と、配線で直に呼んだ `状態.操作(…)` にも掛かる: 同「状態に触れるもの」
+     */
+    @severity(Severity.Error)
+    @adr.decided(hozo.decisions.DecisionS.S1)
+    @checkedBy(hozo.compiler.verify)
+    STATE_1;
+
+    /**
+     * STATE-3: 状態の要素の型（`State.element`）が `optional`。形が型から決まるようになった（`docs/check.md`「状態の形」）ので、当たるのは `list` の状態だけ（`list<T?>`、`T?[]`）: 列は値を持つ。`single<T?>` と `nullable<T?>` は `T?`（`nullable<T>`）と同じ型なので当たらない（`docs/types.md`「形の書き方」）。当たった状態は、`list<T>` として残りの検査を続ける
+     */
+    @severity(Severity.Error)
+    @checkedBy(hozo.compiler.verify)
+    STATE_3;
+
+    /**
+     * STATE-4: 遷移の前か後のケースが、宛先の分類のケースでない（宛先が基底の状態なら、その形の、組み込みの分類のケース: `docs/check.md`「状態の形」の表）。宛先が `single` の状態（組み込みの分類がない）。前と後のどちらかのケースの並びに重複がある
+     */
+    @severity(Severity.Error)
+    @checkedBy(hozo.compiler.verify)
+    STATE_4;
+
+    /**
+     * STATE-2: 持ち主でない名前空間の op（葉でも配線でも）に、その状態への効果をデコレータが運んだらエラー（葉の op は、自分では `effects` を書けない: STATE-5）
+     *
+     * op O（葉でも配線でも）にデコレータが運ぶ効果 e（`Op.carried.effects`）について、e の名前空間（直に書いた効果なら、その状態の名前空間）が ns(O) と違う。デコレータの `halts` の効果（宣言に書いたもの、`any effect` の引数で渡したもの）についても、デコレータを付けた op の名前空間と違えば同じ（§6.2「持ち主ではない名前空間の葉の op がその効果を `effects` に宣言すればエラー」を、葉が節を書けなくなり、デコレータが配線にも運ぶ形に当てたもの）。位置はそのデコレータの適用
+     *
+     * 決めた所と、説明のある所: `docs/check.md`「状態と効果」「葉の op」「デコレータが運ぶ reads と effects」
+     */
+    @severity(Severity.Error)
+    @checkedBy(hozo.compiler.verify)
+    STATE_2;
+
+    /**
+     * EFF-1: 効果は呼び出し元に自動で伝播する
+     *
+     * 計算（Sig の F）で行う。診断なし
+     */
+    @severity(Severity.Silent)
+    @checkedBy(hozo.compiler.verify)
+    EFF_1;
+
+    /**
+     * READS-1: op O（葉でも配線でも）にデコレータが運ぶ `reads`（`Op.carried.reads` の要素の状態。`read` の宣言なら、その宛先）の名前空間が ns(O) と違う（計算`docs/check.md`「デコレータが運ぶ reads と effects」。`Signature` を要しないので `internal/sema` が出す）。位置はそのデコレータの適用
+     */
+    @severity(Severity.Error)
+    @checkedBy(hozo.compiler.verify)
+    READS_1;
+
+    /**
+     * EFF-4: 配線の op が、`effects` の節に、計算した分にない効果を書けば warning
+     *
+     * 配線の op O が、`effects` の節に書いた効果 e（`Op.effects` の要素。ユニオンは、展開した効果ごと）が、計算した分にない（`docs/check.md`「状態に触れるもの」の「節に書く要素」と、`docs/check.md`「状態と効果」）。効果ごとに一つ。位置は op。メッセージに、本体が、それを行わないことと、呼び出しを書くか、節から外すことを示す
+     *
+     * 決めた所と、説明のある所: 決定 D451: `docs/check.md`「状態に触れるもの」の「節に書く要素」
+     */
+    @severity(Severity.Warning)
+    @adr.decided(hozo.decisions.Decision400.D451)
+    @checkedBy(hozo.compiler.verify)
+    EFF_4;
+
+    /**
+     * READS-3: 配線の op が、`reads` の節に、計算した分にない状態を書けば warning
+     *
+     * 配線の op O が、`reads` の節に書いた要素の状態（`read` の宣言なら、その宛先）が、計算した分にない（`docs/check.md`「状態に触れるもの」の「節に書く要素」と、`docs/check.md`「状態と効果」）。状態ごとに一つ。位置は op。メッセージは EFF-4 と同じ形
+     *
+     * 決めた所と、説明のある所: 決定 D451: `docs/check.md`「状態に触れるもの」の「節に書く要素」
+     */
+    @severity(Severity.Warning)
+    @adr.decided(hozo.decisions.Decision400.D451)
+    @checkedBy(hozo.compiler.verify)
+    READS_3;
+
+    /**
+     * STATE-5: 葉の op（本体を持たない op）が `reads` か `effects` の節を書いた（`docs/check.md`「状態に触れるもの」の「葉の op」。`Signature` を要しないので `internal/sema` が出す）。節ごとに一つ。位置はその節。メッセージに、`read` か効果を宣言して配線で呼ぶことを示す
+     */
+    @severity(Severity.Error)
+    @checkedBy(hozo.compiler.verify)
+    STATE_5;
+
+    /**
+     * STATE-6: 配線が、`list` の状態の `put` か `delete` を直に呼んだ（`docs/check.md`「状態に触れるもの」の「直に呼ぶ組み込みの効果」: どの列かを引数から決める規則がない）。位置は操作の語。メッセージに、名前を付けた `effect` を宣言して呼ぶことを示す。`internal/sema` が出す
+     */
+    @severity(Severity.Error)
+    @checkedBy(hozo.compiler.verify)
+    STATE_6;
+
+    /**
+     * STATE-7: 行の遷移（`as` の節）が、書き込む状態と効果の引数に結びつかない（`docs/check.md`「行の遷移」の「結びつき」）: ケース `C.K` の C が、値の分類でない（op の分類、状態の分類）か、対象の型が、状態の要素の型 T でも `T?` でもない。K が C のケースでない。効果の引数に、型が T か、T を絞り込んだ型のものが、ちょうど一つでない（メッセージに、行の引数を持たない効果は `as` を書けないことを示す）。位置は、当たったケースの名前（引数の数なら `as`）。`internal/sema` が出す
+     */
+    @severity(Severity.Error)
+    @checkedBy(hozo.compiler.verify)
+    STATE_7;
+
+    /**
+     * STATE-8: 行の遷移の形が、操作に合わない（`docs/check.md`「行の遷移」の「操作ごとに書ける形」の表の「書けない形」）。`put` と `delete` の行の引数を、ない側のケースに絞り込んだ型も、これ。位置は、合わないところ（ケースなら、そのケースの名前、`else` なら `else`、引数の型なら、その型）。メッセージに、その操作で書ける形を示す。`internal/sema` が出す
+     */
+    @severity(Severity.Error)
+    @checkedBy(hozo.compiler.verify)
+    STATE_8;
+
+    // docs/check.md「throws」が説明する規則
+
+    /**
+     * THROWS-3: `never` を返す op が、`docs/check.md`「op の宣言と本体」の「never を返す op」の条件 1〜6 のどれかを満たさない（`Signature` を要しないので `internal/sema` が出す）。満たさない条件ごとに一つ。位置は、1 は op の名前、2 と 3 は `throws`（なければ op の名前）、4 は最初の引数、5 と 6 はそのデコレータ
+     */
+    @severity(Severity.Error)
+    @checkedBy(hozo.compiler.verify)
+    THROWS_3;
+
+    /**
+     * THROWS-4: 配線の op が `throws` の節に書いた例外は、計算した例外に、足す。節に書いていない例外も、多めに書いた例外も、エラーにしない。診断は、ない
+     *
+     * 計算（Sig の E）で行う。診断なし。配線の op が `throws` の節に書いた例外は、計算した例外に、足す。節に書いていない例外も、多めに書いた例外も、エラーにしない（`docs/check.md`「状態に触れるもの」の「節に書く要素」）
+     *
+     * 決めた所と、説明のある所: 決定 D381: `docs/check.md`「状態に触れるもの」の「節に書く要素」
+     */
+    @severity(Severity.Silent)
+    @adr.decided(hozo.decisions.Decision300.D381, hozo.decisions.Decision400.D466)
+    @checkedBy(hozo.compiler.verify)
+    THROWS_4;
+
+    /**
+     * REL-1: `throws` の中で各例外は一度だけ現れる
+     *
+     * `Op.throws`（またはデコレータの `throws`、効果の `throws`）の全節を通して同じ例外が二度ある（`Signature` を要しないので `internal/sema` が出す。REL-5 も同じ）
+     */
+    @severity(Severity.Error)
+    @checkedBy(hozo.compiler.verify)
+    REL_1;
+
+    /**
+     * REL-2: 効果を持たない op の `throws` に `prevents` / `keeps` があれば警告
+     *
+     * Sig(O, ns(O)).effects が空の op の `Op.throws` に `relations` がある。デコレータの `throws` の `relations` は対象外（§7.3）
+     */
+    @severity(Severity.Warning)
+    @checkedBy(hozo.compiler.verify)
+    REL_2;
+
+    /**
+     * REL-4: 配線の op の例外ごとの効果の状態は検査器が計算する。書かれた `prevents` / `keeps`（目的語は `effects` だけ）が計算と食い違えばエラー
+     *
+     * 計算の手順 0 の「配線の `Op.throws` に `relations` が書かれていれば」の比較。`prevents` なのに `prevented` でない、`keeps` なのに `kept` でない組を示す。目的語の `effects` は、その op の効果のすべて（F）なので、呼ぶ先が言った関係を、呼び元が、向きを変えて書いたとき（呼ぶ先の効果は、呼ぶ先の言ったとおりに計算される）にも、呼び元が、同じ向きで書いて、例外の前に起きる効果を持つときにも、当たる（`docs/check.md`「状態に触れるもの」の「節に書く要素」の、上書き）
+     *
+     * 決めた所と、説明のある所: S9: `docs/check.md`「計算」「throws」
+     */
+    @severity(Severity.Error)
+    @adr.decided(hozo.decisions.DecisionS.S9)
+    @checkedBy(hozo.compiler.verify)
+    REL_4;
+
+    /**
+     * REL-5: 一つの `ThrowsClause` に `prevents` と `keeps` の両方がある
+     */
+    @severity(Severity.Error)
+    @checkedBy(hozo.compiler.verify)
+    REL_5;
+
+    // docs/check.md「デコレータ」が説明する規則
+
+    /**
+     * DEC-1: 付けられる対象は、関数に付けるデコレータ（`decorator fn`）なら `op`、そのほかは `for` で決まる。宣言にない対象に付けたらエラー
+     *
+     * `Application` が付いた先の種類が、D の `targets` にない。分類のケースに付けたときは、D の `targets` に、そのケースを含む、分類のケース（`docs/grammar.md`「decorator の宣言」の `CaseKind`: 分類の名前か、対象の型で、絞る）がなければ DEC-1。`union` / `classify`（分類そのもの）/ `decorator` の宣言に付けたときも、同じ: D の `targets` に、その種類がなければ DEC-1（付けられるようにしたのは 決定 D476。関数に付けるデコレータ `decorator fn` の `targets` は `op` だけなので、この三つには、付かない）。`namespace` と `bind` は文法で閉じる（`docs/grammar.md`「ファイルと宣言」）
+     *
+     * 決めた所と、説明のある所: 対象 `effect` と `read`: `docs/grammar.md`「decorator の宣言」（理由は同「決めたこと」）
+     */
+    @severity(Severity.Error)
+    @adr.decided(hozo.decisions.Decision400.D476)
+    @checkedBy(hozo.compiler.verify)
+    DEC_1;
+
+    /**
+     * DEC-2: `throws` / `catches`（と、`reads` / `effects`）の節を宣言できるのは、関数に付けるデコレータ（`decorator fn`）だけ（文法で閉じる）
+     *
+     * 文法で閉じる（節を持てるのは、`decorator fn` だけ。`docs/grammar.md`「decorator の宣言」）
+     *
+     * 決めた所と、説明のある所: `reads` / `effects` の節は 決定 D98。`decorator fn`: 同 394、`docs/grammar.md`「decorator の宣言」
+     */
+    @severity(Severity.Silent)
+    @adr.decided(hozo.decisions.Decision000.D98, hozo.decisions.Decision300.D394)
+    @checkedBy(hozo.compiler.verify)
+    DEC_2;
+
+    /**
+     * DEC-3: `catches X` の後に `recovers` / `halts e` / `ignores` を必ず書く
+     *
+     * 文法で閉じる
+     */
+    @severity(Severity.Silent)
+    @checkedBy(hozo.compiler.verify)
+    DEC_3;
+
+    /**
+     * DEC-4: `ignores` は値を返さない op にだけ付けられる
+     *
+     * `catches ... ignores` を持つデコレータが、`returns` が `null` でない op に付いている
+     */
+    @severity(Severity.Error)
+    @checkedBy(hozo.compiler.verify)
+    DEC_4;
+
+    /**
+     * DEC-5: 効果が不明な例外を `recovers` で吸収するデコレータを、効果を持つ op に付けたら警告
+     *
+     * 計算の手順 i で `recovers` が succ(e) を `unknown` にした（F が空なら起きない）
+     */
+    @severity(Severity.Warning)
+    @checkedBy(hozo.compiler.verify)
+    DEC_5;
+
+    /**
+     * DEC-6: `throws` と `catches` の差し引きがゼロになる宣言は警告
+     *
+     * 一つのデコレータの宣言で、`catches` の例外と `throws` の例外に同じものがある
+     */
+    @severity(Severity.Warning)
+    @checkedBy(hozo.compiler.verify)
+    DEC_6;
+
+    /**
+     * DEC-7: 引数の中身を確認する（`any effect on s.put` の性質、ユニオンのメンバー、持ち主でない状態への効果など）
+     *
+     * `docs/types.md`「デコレータの引数」の、`any effect on` と、ユニオンのメンバーと、分類のケース（`any case of never`、`any case of Order`、`any case of Actor` の、絞りに合わないケース）の照合
+     */
+    @severity(Severity.Error)
+    @checkedBy(hozo.compiler.verify)
+    DEC_7;
+
+    /**
+     * DEC-8: 名前付きのデコレータは、汎用のデコレータに引数を固定した別名としてだけ定義できる
+     *
+     * 文法で閉じる
+     */
+    @severity(Severity.Silent)
+    @checkedBy(hozo.compiler.verify)
+    DEC_8;
+
+    /**
+     * DEC-9: 適用順は op に近いものから。IR では入れ子にせず、順序付きの列に正規化する
+     *
+     * 正規化（`docs/ir.md`「デコレータの適用」）
+     *
+     * 決めた所と、説明のある所: `docs/ir.md`「デコレータの適用」（決定 D16）
+     */
+    @severity(Severity.Silent)
+    @adr.decided(hozo.decisions.Decision000.D16)
+    @checkedBy(hozo.compiler.verify)
+    DEC_9;
+
+    /**
+     * DEC-10: `outer throws` の例外は境界の外から見たときだけ加わる（前は `@external` の `throws`。決定 D407）
+     *
+     * 計算（手順 i の `outer throws`）
+     */
+    @severity(Severity.Silent)
+    @adr.decided(hozo.decisions.Decision400.D407)
+    @checkedBy(hozo.compiler.verify)
+    DEC_10;
+
+    /**
+     * DEC-11: `docs/types.md`「デコレータの引数」の数と名前
+     */
+    @severity(Severity.Error)
+    @checkedBy(hozo.compiler.verify)
+    DEC_11;
+
+    /**
+     * DEC-12: 別名の `target` が別名。または別名の `args` が `target` の `Param` に合わない（DEC-11 と同じ手続き）
+     */
+    @severity(Severity.Error)
+    @checkedBy(hozo.compiler.verify)
+    DEC_12;
+
+    /**
+     * DEC-13: `@repeatable` の印のないデコレータ（`Decorator.repeatable` が偽）が、同じ宣言に二度付いている（引数が違っても。名前付きデコレータは展開した汎用デコレータで比べ、印も汎用デコレータのものを見る）
+     */
+    @severity(Severity.Error)
+    @checkedBy(hozo.compiler.verify)
+    DEC_13;
+
+    /**
+     * DEC-16: 計算の手順 i で、`catches` の例外がそこまでの E にない
+     */
+    @severity(Severity.Warning)
+    @checkedBy(hozo.compiler.verify)
+    DEC_16;
+
+    /**
+     * DEC-19: 包んだ関数の引数は、デコレータの本体の、文か、`match` のアームの本体に、呼び出しとしてだけ書け、引数を取らない。`try` のブロックに書くなら、最初の文
+     *
+     * 包んだ関数の引数（`docs/grammar.md`「デコレータの本体」の `next`）を、書けない所に書いた: 呼び出しでない位置（`val x = next;`、呼び出しの引数）。引数を書いた。`for` か `disjoint` の中。`try` のブロックの、最初の文でない位置（アームの本体も）。`catch` のブロックの中。値の位置（`val` に入れる、`return` する）は、値がないので WIRE-2
+     *
+     * 決めた所と、説明のある所: 決定 D392、D447: `docs/grammar.md`「デコレータの本体」、`docs/check.md`「デコレータ」
+     */
+    @severity(Severity.Error)
+    @adr.decided(hozo.decisions.Decision300.D392, hozo.decisions.Decision400.D447)
+    @checkedBy(hozo.compiler.verify)
+    DEC_19;
+
+    /**
+     * DEC-20: デコレータの本体は、どの道も、包んだ関数を、ちょうど一度呼ぶか、例外を投げる
+     *
+     * デコレータの本体に、包んだ関数の呼び出し を、ちょうど一度呼ばずに終わる道がある: 一度も呼ばない道、二度以上呼ぶ道。`throw` のアームで終わる道は、数えない。`try` の文は、`try` のブロックの中の回数で数える（`docs/check.md`「デコレータの本体」）。位置は、宣言の名前
+     *
+     * 決めた所と、説明のある所: 決定 D392、D447: `docs/grammar.md`「デコレータの本体」、`docs/check.md`「デコレータ」
+     */
+    @severity(Severity.Error)
+    @adr.decided(hozo.decisions.Decision300.D392, hozo.decisions.Decision400.D447)
+    @checkedBy(hozo.compiler.verify)
+    DEC_20;
+
+    /**
+     * DEC-21: デコレータの本体に、`return` は書けない
+     *
+     * デコレータの本体に `return` がある
+     *
+     * 決めた所と、説明のある所: 決定 D392、D447: `docs/grammar.md`「デコレータの本体」、`docs/check.md`「デコレータ」
+     */
+    @severity(Severity.Error)
+    @adr.decided(hozo.decisions.Decision300.D392, hozo.decisions.Decision400.D447)
+    @checkedBy(hozo.compiler.verify)
+    DEC_21;
+
+    /**
+     * DEC-22: 本体のあるデコレータは、`catches` の節を持てない
+     *
+     * 本体のあるデコレータが、`catches` の節を持つ（例外を受ける処理は、本体の `try` で書く。`docs/check.md`「デコレータの本体」）
+     *
+     * 決めた所と、説明のある所: 決定 D392、D447: `docs/grammar.md`「デコレータの本体」、`docs/check.md`「デコレータ」。`docs/check.md`「デコレータの本体」
+     */
+    @severity(Severity.Error)
+    @adr.decided(hozo.decisions.Decision300.D392, hozo.decisions.Decision400.D447)
+    @checkedBy(hozo.compiler.verify)
+    DEC_22;
+
+    /**
+     * DEC-23: デコレータの本体で読める引数は、型を一つ書いた、値の引数だけ
+     *
+     * デコレータの本体が、値として読めない引数を使った: `any <種類>` の引数、型を二つ以上書いた引数、残りの引数
+     *
+     * 決めた所と、説明のある所: 決定 D392、D447: `docs/grammar.md`「デコレータの本体」、`docs/check.md`「デコレータ」。`docs/check.md`「デコレータの本体」
+     */
+    @severity(Severity.Error)
+    @adr.decided(hozo.decisions.Decision300.D392, hozo.decisions.Decision400.D447)
+    @checkedBy(hozo.compiler.verify)
+    DEC_23;
+
+    /**
+     * DEC-25: 包んだ関数の呼び出しの後ろに文を持つデコレータは、`never` を返す op には、付けられない
+     *
+     * 本体のあるデコレータを、`never` を返す op に付けていて、本体の 包んだ関数の呼び出し（か、包んだ関数の呼び出し のアームを持つ `match`）の後ろに、文がある（`docs/check.md`「デコレータの本体」。`try` のブロックの中の後ろと、その `try` の文の後ろを含む。後ろの文が、評価されない）。位置は、適用。後ろの、最初の文を `Related` に示す
+     *
+     * 決めた所と、説明のある所: 決定 D392、D447: `docs/grammar.md`「デコレータの本体」、`docs/check.md`「デコレータ」。`docs/check.md`「デコレータの本体」
+     */
+    @severity(Severity.Error)
+    @adr.decided(hozo.decisions.Decision300.D392, hozo.decisions.Decision400.D447)
+    @checkedBy(hozo.compiler.verify)
+    DEC_25;
+
+    /**
+     * DEC-24: 本体のあるデコレータの本体が呼べるのは、付けた op の名前空間の配線が、呼べるものだけ
+     *
+     * 本体のあるデコレータを、宣言した名前空間のほかの op に付けていて、本体が、その op の名前空間の配線からは呼べないものに触れている: `export` のない op、`read`、効果、状態（`docs/check.md`「デコレータの本体」）。位置は、適用。本体の、当たった所を `Related` に示す
+     *
+     * 決めた所と、説明のある所: 決定 D392、D447: `docs/grammar.md`「デコレータの本体」、`docs/check.md`「デコレータ」。`docs/check.md`「デコレータの本体」
+     */
+    @severity(Severity.Error)
+    @adr.decided(hozo.decisions.Decision300.D392, hozo.decisions.Decision400.D447)
+    @checkedBy(hozo.compiler.verify)
+    DEC_24;
+
+    /**
+     * DEC-26: `@hint` は、振る舞いを言う節、本体、`@entry` を持つ宣言には、付けられない
+     *
+     * `@hint` を、付けられない宣言に付けた（`docs/grammar.md`「decorator の宣言」）: 振る舞いを言う節（`throws`、`outer throws`、`catches`、`reads`、`effects`）を持つ。本体を持つ。`@entry` を持つ。節は、検査の計算に効き、入口は、解釈されることを期待するので、「解釈されなくても、よい」とは、言えない。位置は、`@hint`
+     *
+     * 決めた所と、説明のある所: 決定 D420: `docs/grammar.md`「decorator の宣言」
+     */
+    @severity(Severity.Error)
+    @adr.decided(hozo.decisions.Decision400.D420)
+    @checkedBy(hozo.compiler.verify)
+    DEC_26;
+
+    /**
+     * DEC-27: 包んだ関数の呼び出しの例外を受けて、「返らない」でない `catch` を持つデコレータは、値を返す op には、付けられない
+     *
+     * 包んだ関数の呼び出し を `try` のブロックに持ち、`catch` のブロックが「返らない」でないデコレータを、`returns` が `null` でない op に付けた（`docs/check.md`「デコレータの本体」）。位置は、適用。その `catch` を Related に示す
+     *
+     * 決めた所と、説明のある所: 決定 D419: `docs/check.md`「デコレータの本体」
+     */
+    @severity(Severity.Error)
+    @adr.decided(hozo.decisions.Decision400.D419)
+    @checkedBy(hozo.compiler.verify)
+    DEC_27;
+
+    /**
+     * DEC-28: 本体のある `decorator fn` は、包んだ関数の引数（最初の引数。型の位置に `fn`）を持ち、本体のないものは、持たない。その名前は、ほかの引数と重ならない
+     *
+     * 包んだ関数の引数（`docs/grammar.md`「デコレータの本体」の `WrappedParam`）と、本体が、そろっていない: 本体のある `decorator fn` が、その引数を持たない（メッセージに、書き方 `decorator fn 名前(next: fn) { next(); … }` を示す。本体が、なくした書き方 `proceed()` を使っていれば、それも言う）。本体のない `decorator fn` が、その引数を持つ。その引数の名前が、ほかの引数と同じ。位置は、一つ目は宣言の名前、ほかは、その引数。一つ目のとき、DEC-20 は、出さない
+     *
+     * 決めた所と、説明のある所: 決定 D447: `docs/grammar.md`「デコレータの本体」、`docs/check.md`「デコレータ」
+     */
+    @severity(Severity.Error)
+    @adr.decided(hozo.decisions.Decision400.D447)
+    @checkedBy(hozo.compiler.verify)
+    DEC_28;
+
+    /**
+     * DEC-29: 説明のコメントの中に、タグとして書けるのは、`@hint` の付いた、文字列を一つ取るデコレータだけ
+     *
+     * 説明のコメントの中の、デコレータのタグが指すデコレータが、`@hint` の付いたものでない、または、文字列を一つ取るものでない（`docs/check.md`「コメントの中のタグ」）。メッセージは、宣言の前に `@名前(…)` と書くことを示す。位置は、タグの名前
+     *
+     * 決めた所と、説明のある所: 決定 D477、D478、D480: `docs/check.md`「コメントの中のタグ」
+     */
+    @severity(Severity.Error)
+    @adr.decided(hozo.decisions.Decision400.D477, hozo.decisions.Decision400.D478, hozo.decisions.Decision400.D480)
+    @checkedBy(hozo.compiler.verify)
+    DEC_29;
+
+    // docs/check.md「配線」が説明する規則
+
+    /**
+     * WIRE-1: 書けるのは、`val` の宣言、値を入れる文、集める文、`return`、`match`、値を返さない呼び出し（op か効果）、`disjoint`、`for`、例外を受ける文（`try`。`catch` のブロックの最後には `throw`）だけ
+     *
+     * 文法で閉じる
+     *
+     * 決めた所と、説明のある所: 効果の呼び出し: `docs/check.md`「配線からの呼び出し」。`val`、`disjoint`、`for`: `docs/grammar.md`「配線」
+     */
+    @severity(Severity.Silent)
+    @checkedBy(hozo.compiler.verify)
+    WIRE_1;
+
+    /**
+     * WIRE-2: 値を返す呼び出しを `val` に受けずに書く、値を返さない（か、決して返らない）呼び出しを `val` に受ける、はどちらもエラー
+     *
+     * `val x = 式`、`x = 式`、`xs collect 式` で、式が「値がない」か「返らない」。`式;` の行で式に値がある。`return 式` で式が「値がない」。式の型は `docs/types.md`「式の型」
+     *
+     * 決めた所と、説明のある所: S19: `docs/types.md`「式の型」
+     */
+    @severity(Severity.Error)
+    @adr.decided(hozo.decisions.DecisionS.S19)
+    @checkedBy(hozo.compiler.verify)
+    WIRE_2;
+
+    /**
+     * WIRE-3: 値を返さない配線の op は `return` を書かない
+     *
+     * O の `returns` が `null` なのに `return` がある。`returns` が `null` でないのに、本体（いちばん外のブロック）の最後の文が `return` でない。`return` が最後以外の文にある（下の行が評価されないため）
+     */
+    @severity(Severity.Error)
+    @checkedBy(hozo.compiler.verify)
+    WIRE_3;
+
+    /**
+     * WIRE-4: 見えている名前と、同じ名前の `val` は、宣言できない。名前は使う前に上で定義する
+     *
+     * `val` の宣言か、`for` の変数の名前が、そこで見えている名前（引数、外のブロックの `val`、同じブロックの上の `val`、囲んでいる `for` の変数）と同じ（`docs/check.md`「値の入れ物」の「見える範囲」）。宣言より上の行で使っている（RES-1 として出る）
+     *
+     * 決めた所と、説明のある所: ブロックの中の名前: `docs/check.md`「値の入れ物」
+     */
+    @severity(Severity.Error)
+    @checkedBy(hozo.compiler.verify)
+    WIRE_4;
+
+    /**
+     * WIRE-5: 呼び出しの引数に呼び出しは書けない（A 正規形）
+     *
+     * 文法で閉じる
+     */
+    @severity(Severity.Silent)
+    @checkedBy(hozo.compiler.verify)
+    WIRE_5;
+
+    /**
+     * WIRE-6: `val` の数が一定を超えたら警告
+     *
+     * 本体の `val` の名前の数（`for` のブロックと、`disjoint` のアームの中も数える。`for` の変数は、数えない）が `hozo.toml` の `[hozo].max_bindings`（`docs/config.md`「形」）を超える。既定は 5（ここで決めた値）
+     */
+    @severity(Severity.Warning)
+    @checkedBy(hozo.compiler.verify)
+    WIRE_6;
+
+    /**
+     * WIRE-7: 配線の呼び出しが循環している。循環上の op をすべて `Related` に示す
+     */
+    @severity(Severity.Error)
+    @checkedBy(hozo.compiler.verify)
+    WIRE_7;
+
+    /**
+     * WIRE-8: 代入の済んだ `val` が、どこからも読まれていない。`for` の変数には、掛けない
+     */
+    @severity(Severity.Warning)
+    @checkedBy(hozo.compiler.verify)
+    WIRE_8;
+
+    /**
+     * WIRE-9: 「返らない」式の文（`unauthorized();`、すべてのアームが返らない `match (…) { … }`）が、本体（いちばん外のブロック）の最後以外にある（下の行が評価されないため。WIRE-3 の `return` と同じ理由）。`for` のブロックと、`disjoint` のアームの中では、どこにあっても（繰り返しも、ほかのアームも、その先も、評価されないため）。`try` のブロックの中でも、どこにあっても。`catch` のブロックでは、最後の文にだけ書ける（`docs/check.md`「例外を受ける」）。位置はその文
+     */
+    @severity(Severity.Error)
+    @checkedBy(hozo.compiler.verify)
+    WIRE_9;
+
+    /**
+     * WIRE-10: 代入の済んでいない `val` を、読んでいる（`docs/check.md`「値の入れ物」の「代入が済んでいるか」）。位置は、読んだ `Atom`
+     */
+    @severity(Severity.Error)
+    @checkedBy(hozo.compiler.verify)
+    WIRE_10;
+
+    /**
+     * WIRE-11: 値を入れる文（`x = 式`）の `x` が、入れられるものでない（`docs/check.md`「値の入れ物」の「値を入れる文」）: 空で宣言した `val` でない。もう、代入が済んでいる（同じ `disjoint` の、別のアームが入れるか、集める `val` を含む）。宣言と、この文の間に、`for` がある
+     */
+    @severity(Severity.Error)
+    @checkedBy(hozo.compiler.verify)
+    WIRE_11;
+
+    /**
+     * WIRE-12: 空で宣言した `val` に、値を入れる文も、集める文も、一つもない。位置は、宣言の名前
+     */
+    @severity(Severity.Error)
+    @checkedBy(hozo.compiler.verify)
+    WIRE_12;
+
+    /**
+     * WIRE-13: `for` のブロック、`disjoint` のアーム、`try` と `catch` のブロックの中に、`return` がある
+     */
+    @severity(Severity.Error)
+    @checkedBy(hozo.compiler.verify)
+    WIRE_13;
+
+    /**
+     * WIRE-14: 集める文（`xs collect 式`）の `xs` が、集められるものでない（`docs/check.md`「繰り返し」の「集める」）: `for` の中にない。空で宣言した `val` でない。宣言と、この文の間に、`for` がない。もう、代入が済んでいる（同じ `disjoint` の、別のアームが値を入れる `val`、`try` か `catch` の片方だけが入れた `val` を含む）
+     */
+    @severity(Severity.Error)
+    @checkedBy(hozo.compiler.verify)
+    WIRE_14;
+
+    /**
+     * WIRE-15: `try` を、`disjoint` のアームの中に書いた（`docs/check.md`「例外を受ける」）。位置は `try` の語
+     */
+    @severity(Severity.Error)
+    @checkedBy(hozo.compiler.verify)
+    WIRE_15;
+
+    /**
+     * WIRE-16: `catch` が受けた例外の名前 `e` を、書けない所に書いた（`docs/check.md`「例外を受ける」）: 値の位置（呼び出しの引数、`val` に入れる式、`return` の式、`for` の並び、受けた例外のものでない `match` の対象）。`throw e` に引数を書いた。位置は、その名前
+     */
+    @severity(Severity.Error)
+    @checkedBy(hozo.compiler.verify)
+    WIRE_16;
+
+    // docs/check.md「disjoint」が説明する規則
+
+    /**
+     * DISJ-1: 例外を出しうるアームと、効果を持つ、別のアームが、同じ `disjoint` にある。`disjoint for` では、ブロックが、例外を出しうるのに、効果を持つ
+     */
+    @severity(Severity.Error)
+    @checkedBy(hozo.compiler.verify)
+    DISJ_1;
+
+    /**
+     * DISJ-2: あるアームが効果で書く状態を、別のアームが読む。`disjoint for` では、ブロックが効果で書く状態を、ブロックが読む
+     */
+    @severity(Severity.Error)
+    @checkedBy(hozo.compiler.verify)
+    DISJ_2;
+
+    /**
+     * DISJ-3: 二つのアームが、同じ状態に、効果を持ち、行で見て、通らない: 行を受け取らない呼び出しがある。渡した値が、同じ。`disjoint for` では、ブロックの、状態に書く呼び出しが、行を受け取らない。または、渡した値が、その `for` の変数から始まらない
+     */
+    @severity(Severity.Error)
+    @checkedBy(hozo.compiler.verify)
+    DISJ_3;
+
+    // docs/check.md「classify / match」が説明する規則
+
+    /**
+     * CLS-1: `classify` のケース名は重複しない。残りのケース（`対象 as else`）と、`as none` のケースは、それぞれ高々一つ
+     *
+     * `classify` のケース名が重複、または、残りのケース（`対象 as else`。`docs/check.md`「分類」の「残りのケース」）が二つ以上、または、`as none`（同「ない側のケース」）が二つ以上。位置は、二度目の名前か、二つ目以降の `else` / `none`
+     *
+     * 決めた所と、説明のある所: 残りのケース: `docs/check.md`「残りのケース」
+     */
+    @severity(Severity.Error)
+    @adr.decided(hozo.decisions.DecisionS.S29)
+    @checkedBy(hozo.compiler.verify)
+    CLS_1;
+
+    /**
+     * CLS-2: ケースが一つもない
+     */
+    @severity(Severity.Error)
+    @checkedBy(hozo.compiler.verify)
+    CLS_2;
+
+    /**
+     * CLS-3: `classify` の対象の並びが、`never`、型一つ、op 一つ、今の名前空間の基底の状態の並び（`docs/check.md`「分類」の「対象」）のどれでもない: 対象が二つ以上なのに状態でないもの（型、op）がある。型や op と状態が混ざっている。同じ状態が二度ある。対象が別の名前空間の状態、または状態の分類
+     */
+    @severity(Severity.Error)
+    @checkedBy(hozo.compiler.verify)
+    CLS_3;
+
+    /**
+     * CLS-4: 分類の対象の op が値を返さない（`returns` が `null` か `never`）。位置は対象の名前
+     */
+    @severity(Severity.Error)
+    @checkedBy(hozo.compiler.verify)
+    CLS_4;
+
+    /**
+     * CLS-5: ケースの `as` の前に書いたものが、その分類の対象でない（値の分類なら `subject` の型と等しい型、op の分類ならその op、状態の分類なら対象の状態のどれか）。または一つのケースに同じ対象の `as` が二度ある（`docs/check.md`「分類」の「ケースの型」）。位置は `as` の前の名前
+     */
+    @severity(Severity.Error)
+    @checkedBy(hozo.compiler.verify)
+    CLS_5;
+
+    /**
+     * CLS-6: ケースの `as` の後ろの型が、対象の型から絞り込める型でない（`docs/types.md`「絞り込める型」）。位置は `as` の後ろの型
+     */
+    @severity(Severity.Error)
+    @checkedBy(hozo.compiler.verify)
+    CLS_6;
+
+    /**
+     * CLS-7: 残りのケース（`対象 as else`）を、書けない分類に書いた（`docs/check.md`「分類」の「残りのケース」）: 残りのケースを除いたケースが、一つもないか、同 1（`docs/check.md`「ケースの判定」の条件 1〜3: 対象が二つ以上、`as` を持たないケース、述語の要る絞り込み、同じ型を書いたケース）も、同 2（値の分類か op の分類で、対象の型が `T?`、ほかのケースが、どれも `T? as T`）も満たさない。または、絞り込みが `variant` で、残りのアームがない。または、同じ分類に `as none` がある（残りがない）。位置は `else`
+     */
+    @severity(Severity.Error)
+    @adr.decided(hozo.decisions.Decision000.D1, hozo.decisions.Decision000.D2)
+    @checkedBy(hozo.compiler.verify)
+    CLS_7;
+
+    /**
+     * CLS-8: `as none` を、書けない分類に書いた（`docs/check.md`「分類」の「ない側のケース」）: 値の分類でも op の分類でもない。対象の型が `T?` でない。`as none` のケースを除いたケースが、一つもないか、`T? as T` を持たないものがある。位置は `none`
+     */
+    @severity(Severity.Error)
+    @checkedBy(hozo.compiler.verify)
+    CLS_8;
+
+    /**
+     * CLS-9: 対象のない分類（`of never`）のケースに、`as` を書いた（`docs/check.md`「分類」の「対象のない分類」）。位置は、その `as`
+     */
+    @severity(Severity.Error)
+    @checkedBy(hozo.compiler.verify)
+    CLS_9;
+
+    /**
+     * CLS-10: 例外の分類（`docs/check.md`「分類」の「例外の分類」）のケースの書き方が、合わない: `any exception as …` を持たない、二つ以上持つ、同じ例外が、二つのケースにある。または、ほかの分類のケースに `any exception as …` を書いた。位置は、そのケースか、二度目の例外
+     */
+    @severity(Severity.Error)
+    @checkedBy(hozo.compiler.verify)
+    CLS_10;
+
+    /**
+     * CLS-11: ケースの `as` の後ろに、リテラルの型を書いたが、対象の型が、その型で分けられる型でない（`docs/check.md`「分類」の「ケースの型」）: 対象の型（`optional` を外したもの）が `boolean` で、型が `true` か `false`、でも、その型と等しい型のアームを持つ union、でもない。位置は `as` の後ろの型
+     */
+    @severity(Severity.Error)
+    @checkedBy(hozo.compiler.verify)
+    CLS_11;
+
+    /**
+     * MATCH-1: `match` の対象は、値の分類・op の分類・標準の分類なら値一つ、状態の分類（`match (by C)`）なら書かない（文法で閉じる。形と分類の照合は MATCH-7）
+     *
+     * 文法で閉じる
+     *
+     * 決めた所と、説明のある所: S5、S16、S21: `docs/grammar.md`「配線」
+     */
+    @severity(Severity.Silent)
+    @adr.decided(hozo.decisions.DecisionS.S5, hozo.decisions.DecisionS.S16, hozo.decisions.DecisionS.S21)
+    @checkedBy(hozo.compiler.verify)
+    MATCH_1;
+
+    /**
+     * MATCH-2: 分類のどのケースも、ちょうど一つのアームが受ける: 名前で並べるか、最後の `else` のアームが、並べなかったケースのすべてを受ける
+     *
+     * アームが、分類のケース（標準の分類なら、`docs/check.md`「分類」の「標準の分類」の表のケース）を、ちょうど一度ずつ受けていない（`docs/check.md`「分類」の「アームが受けるケース」）: 名前で並べたケースが、その分類のケースでない、または二度並んでいる（`Data.extra`）。`else` のアームがなく、どのアームも並べていないケースがある（`Data.missing`）。位置は `by` の後ろの分類の名前
+     *
+     * 決めた所と、説明のある所: S29: `docs/check.md`「アームが受けるケース」
+     */
+    @severity(Severity.Error)
+    @adr.decided(hozo.decisions.DecisionS.S29)
+    @carries(CaseMismatch)
+    @checkedBy(hozo.compiler.verify)
+    MATCH_2;
+
+    /**
+     * MATCH-3: アームの本体は、呼び出し一つ（op、`read`、効果）、値一つ（`none` を含む）、`throw` 一つのどれか
+     *
+     * 文法で閉じる（アームの本体は、呼び出し一つ、値一つ、`throw` 一つのどれか。`docs/grammar.md`「配線」の `ArmBody`）
+     *
+     * 決めた所と、説明のある所: S20: `docs/grammar.md`「配線」
+     */
+    @severity(Severity.Silent)
+    @adr.decided(hozo.decisions.DecisionS.S20)
+    @checkedBy(hozo.compiler.verify)
+    MATCH_3;
+
+    /**
+     * MATCH-4: アームの中で対象は絞り込まれた型になる
+     *
+     * 値を対象にした `match` で、アームの本体の呼び出しに、対象と同じ `Atom` をそのまま渡している引数が、アームの中の対象の型（`docs/types.md`「アームの中の対象の型」。型を書かないケースなら `case(C, アームのケース, X)` で、「互換」の規則 4・5）では渡せない。対象を渡していない引数は TYPE-4
+     *
+     * 決めた所と、説明のある所: S16、S21: `docs/types.md`「アームの中の対象の型」
+     */
+    @severity(Severity.Error)
+    @adr.decided(hozo.decisions.DecisionS.S16, hozo.decisions.DecisionS.S21)
+    @checkedBy(hozo.compiler.verify)
+    MATCH_4;
+
+    /**
+     * MATCH-5: 全アームが値を返さない `match` は `val` に受けずに一行で書く
+     *
+     * 「値がない」型の `match` を `val` に受けている（`=`、`collect` も）（WIRE-2 と同じ条件。索引として残す）
+     */
+    @severity(Severity.Error)
+    @checkedBy(hozo.compiler.verify)
+    MATCH_5;
+
+    /**
+     * MATCH-6: 値の分類か op の分類での `match` で、対象の型が分類の対象の型（`docs/check.md`「分類」の「対象」の表）に渡せない
+     */
+    @severity(Severity.Error)
+    @checkedBy(hozo.compiler.verify)
+    MATCH_6;
+
+    /**
+     * MATCH-7: `match` の形と分類が合わない（`docs/grammar.md`「配線」の表）: 値の分類・op の分類・標準の分類なのに対象がない、対象のない分類（`docs/check.md`「分類」の「対象のない分類」）を `by` に書いた（対象があっても、なくても）、状態の分類なのに対象がある、`by list` の対象の型が `array` でない、`by nullable` の対象の型が `optional` でない、例外の分類（`docs/check.md`「分類」の「例外の分類」）を、受けた例外でない対象（か、対象なし）に書いた、受けた例外 `e` を対象にして、例外の分類でないもの（ほかの分類、`by list`、`by nullable`）を書いた
+     */
+    @severity(Severity.Error)
+    @checkedBy(hozo.compiler.verify)
+    MATCH_7;
+
+    /**
+     * MATCH-9: `else` のアームが受けるケースが一つもない（ほかのアームが、分類のすべてのケースを並べている。`docs/check.md`「分類」の「アームが受けるケース」）。位置は `else` のアーム
+     */
+    @severity(Severity.Error)
+    @checkedBy(hozo.compiler.verify)
+    MATCH_9;
+
+    /**
+     * MATCH-10: 受けた例外の `match (e by C)`（か `catch (e by C)`）で、`try` のブロックが投げうる例外に、分類 C のどのケースにも当たらないものがある（`docs/check.md`「分類」の「例外の分類」）。位置は、その `match`（`catch (e by C)` なら、`catch` の節）。デコレータの本体の `try` なら、適用（その `match` を Related に示す）。Data は、当たらない例外
+     */
+    @severity(Severity.Error)
+    @carries(Unclassified)
+    @checkedBy(hozo.compiler.verify)
+    MATCH_10;
+
+    // docs/check.md「bind」が説明する規則
+
+    /**
+     * BIND-1: 埋める位置は状態と同じ型を持つ入力の位置。位置がなければ何もしない。二つ以上ならエラー
+     *
+     * 計算`docs/check.md`「bind」5。位置は `Bind`。`Related` に各位置
+     */
+    @severity(Severity.Error)
+    @checkedBy(hozo.compiler.verify)
+    BIND_1;
+
+    /**
+     * BIND-2: 状態が空になりうる（形が `nullable`）のに、位置が省略できなければエラー
+     *
+     * 計算`docs/check.md`「bind」5。位置は `Bind`
+     *
+     * 決めた所と、説明のある所: S2: `docs/check.md`「bind」
+     */
+    @severity(Severity.Error)
+    @adr.decided(hozo.decisions.DecisionS.S2)
+    @checkedBy(hozo.compiler.verify)
+    BIND_2;
+
+    /**
+     * BIND-3: 明示して渡した値は `bind` より優先
+     *
+     * 計算`docs/check.md`「bind」の `Call.bound`。診断なし
+     */
+    @severity(Severity.Silent)
+    @checkedBy(hozo.compiler.verify)
+    BIND_3;
+
+    /**
+     * BIND-4: 必須の入力がすべての呼び出しで、明示か `bind` で埋まっている。呼び出しの引数の外のレコードリテラルも、必須のフィールドが埋まっている
+     *
+     * 計算「必須の入力」。位置は呼び出し（`throw` なら、その `throw`）。呼び出しの引数の外のレコードリテラルなら、そのリテラル。`Data.missing` にパス
+     *
+     * 決めた所と、説明のある所: 決定 D548: `docs/check.md`「必須の入力」
+     */
+    @severity(Severity.Error)
+    @adr.decided(hozo.decisions.Decision500.D548)
+    @carries(MissingPaths)
+    @checkedBy(hozo.compiler.verify)
+    BIND_4;
+
+    /**
+     * BIND-5: 計算`docs/check.md`「bind」6。位置は後の `Bind`
+     */
+    @severity(Severity.Error)
+    @checkedBy(hozo.compiler.verify)
+    BIND_5;
+
+    /**
+     * BIND-6: `list` の状態を `bind` に書いた（`bind` できるのは `single` と `nullable`）
+     */
+    @severity(Severity.Error)
+    @checkedBy(hozo.compiler.verify)
+    BIND_6;
+
+    // docs/resolve.md「診断」が説明する規則
+
+    /**
+     * RES-1: 名前が見つからない。同じ種類で編集距離 2 以内の名前、および修飾なしで別の名前空間に同じ名前があればその FQN を、候補として `Data.candidates` に入れメッセージに示す。位置: その名前
+     */
+    @severity(Severity.Error)
+    @carries(Candidates)
+    @checkedBy(hozo.compiler.verify)
+    RES_1;
+
+    /**
+     * RES-2: 名前空間の子と宣言の両方に当たって曖昧。位置: その名前
+     */
+    @severity(Severity.Error)
+    @checkedBy(hozo.compiler.verify)
+    RES_2;
+
+    /**
+     * RES-3: 直前のものから次のセグメントを辿れない。位置: 辿れなかったセグメント
+     */
+    @severity(Severity.Error)
+    @checkedBy(hozo.compiler.verify)
+    RES_3;
+
+    /**
+     * RES-4: その位置で受け付けない種類のものを指している。位置: その名前
+     */
+    @severity(Severity.Error)
+    @checkedBy(hozo.compiler.verify)
+    RES_4;
+
+    /**
+     * RES-5: 現在の名前空間の状態（か状態の分類）しか書けない位置が、別の名前空間のものを指している: `effect ... on`、`read ... on`、配線の値の位置の状態の名前、配線で直に呼ぶ `状態.操作(…)` の状態、`match by C` の状態の分類。値の位置と呼び出しなら、その名前空間の op を通すことをメッセージに示す。位置: その名前
+     */
+    @severity(Severity.Error)
+    @checkedBy(hozo.compiler.verify)
+    RES_5;
+
+    /**
+     * RES-6: 同じスコープに同じ名前の宣言が二つある。相手の位置を `Related` に示す。位置: ユーザーのファイルの側。両方ユーザーのファイルなら `docs/ir.md`「原則」の順で後の方
+     */
+    @severity(Severity.Error)
+    @checkedBy(hozo.compiler.verify)
+    RES_6;
+
+    /**
+     * RES-7: 核の型と形の名前（`string`、`time`、`list` など 13 語。予約語ではない）は、型と分類の宣言（`model`、`scalar`、`union`、`exception`、`classify`）の名前にできない
+     *
+     * `model`、`scalar`、`union`、`exception`、`classify` の名前が、核の型と形の名前（`string`、`boolean`、`int`、`float`、`datetime`、`date`、`time`、`duration`、`void`、`never`、`list`、`nullable`、`single`）と同じ（`docs/resolve.md`「名前空間の併合と重複」）。メッセージに、その語が、はじめから宣言されている型の名前であることを示す。位置: 宣言の名前
+     *
+     * 決めた所と、説明のある所: 決定 D448: `docs/resolve.md`「名前空間の併合と重複」、`docs/grammar.md`「予約語」「型」
+     */
+    @severity(Severity.Error)
+    @adr.decided(hozo.decisions.Decision400.D448)
+    @checkedBy(hozo.compiler.verify)
+    RES_7;
+
+    /**
+     * RES-8: 語彙の名前空間（語彙のファイルが宣言した名前空間）と、その下には、プロジェクトの仕様のファイルから、宣言も、名前空間も、足せない
+     *
+     * プロジェクトの仕様のファイルが、語彙の名前空間（語彙のファイルが宣言した名前空間）か、その下の名前空間を、`namespace` で書いた（宣言を足した、名前空間を足した）。メッセージに、どの語彙のものか（標準の語彙か、どのプラグインか）を示す。位置: 仕様の側の `namespace` の名前。ブロックごとに一つ（入れ子では、いちばん外側）
+     *
+     * 決めた所と、説明のある所: 決定 D456、D463。`docs/resolve.md`「名前空間の併合と重複」、`docs/vocab.md`「語彙の名前空間」
+     */
+    @severity(Severity.Error)
+    @adr.decided(hozo.decisions.Decision400.D456, hozo.decisions.Decision400.D463)
+    @checkedBy(hozo.compiler.verify)
+    RES_8;
+
+    // docs/types.md「診断」が説明する規則
+
+    /**
+     * TYPE-1: 核の型（リテラルを含む）の値を `scalar` の位置に渡した
+     */
+    @severity(Severity.Error)
+    @checkedBy(hozo.compiler.verify)
+    TYPE_1;
+
+    /**
+     * TYPE-2: `valid` の制約を `scalar` とフィールド以外に付けた（DEC-1 で検出されるので、ID は索引として残す）
+     */
+    @severity(Severity.Silent)
+    @checkedBy(hozo.compiler.verify)
+    TYPE_2;
+
+    /**
+     * TYPE-3: `return` の値の型が op の `returns` に渡せない。「返らない」式は渡せる（`docs/types.md`「式の型」）
+     */
+    @severity(Severity.Error)
+    @checkedBy(hozo.compiler.verify)
+    TYPE_3;
+
+    /**
+     * TYPE-4: 引数の値の型が引数の型に渡せない（どの規則で失敗したかを示す）。または、渡した値の数が引数の数を超える。op、`read`、効果の呼び出しと、`throw` の引数（`docs/types.md`「呼び出しの引数」）、デコレータの引数の値（`docs/types.md`「デコレータの引数」）
+     */
+    @severity(Severity.Error)
+    @checkedBy(hozo.compiler.verify)
+    TYPE_4;
+
+    /**
+     * TYPE-5: レコードリテラルに、当てはめる model にないフィールドがある
+     */
+    @severity(Severity.Error)
+    @checkedBy(hozo.compiler.verify)
+    TYPE_5;
+
+    /**
+     * TYPE-6: レコードリテラルに同じフィールドが二度ある
+     */
+    @severity(Severity.Error)
+    @checkedBy(hozo.compiler.verify)
+    TYPE_6;
+
+    /**
+     * TYPE-7: レコードリテラルの当てはめる先が決まらない
+     */
+    @severity(Severity.Error)
+    @checkedBy(hozo.compiler.verify)
+    TYPE_7;
+
+    /**
+     * TYPE-8: `match` のアームの型がそろわない（`docs/types.md`「match の型」の 4〜6）
+     */
+    @severity(Severity.Error)
+    @checkedBy(hozo.compiler.verify)
+    TYPE_8;
+
+    /**
+     * TYPE-9: `scalar X extends B` の `B` が核の型でも `scalar` でもない（リテラルの型も、書けない）。または `scalar` の継承が循環している
+     */
+    @severity(Severity.Error)
+    @checkedBy(hozo.compiler.verify)
+    TYPE_9;
+
+    /**
+     * TYPE-10: `override f` の `f` が元の model のフィールドにない（元の model を持たない model に書いた `override` を含む）。または model の `extends` が循環している（`docs/types.md`「継承した model」）。または、`extends` の元が、インデックスの model（`docs/types.md`「インデックスの model」）。（`model P is U omit f` をなくす前は、`omit` の名前が元にないことと `is` の循環だった。同じ規則の、今の書き方での形）
+     */
+    @severity(Severity.Error)
+    @checkedBy(hozo.compiler.verify)
+    TYPE_10;
+
+    /**
+     * TYPE-11: model のインデックス（`[名前: K]: V;`）のキーの型 `K` が、`string` でも、元が `string` の `scalar` でもない（`docs/types.md`「インデックスの model」）。位置は、キーの型
+     */
+    @severity(Severity.Error)
+    @checkedBy(hozo.compiler.verify)
+    TYPE_11;
+
+    /**
+     * TYPE-12: 絞り込んだ型 `T on C.Ks` が合わない（`docs/types.md`「型の種類」の「絞り込んだ型」）: `T` が `C` の対象の型（値の分類は `subject` の型、op の分類はその op の `returns`）に渡せない。並べたケースが、一つの分類のものでない。同じケースが、二度ある
+     */
+    @severity(Severity.Error)
+    @checkedBy(hozo.compiler.verify)
+    TYPE_12;
+
+    /**
+     * TYPE-14: 継承した model の本体に、元の model のフィールドと同じ名前のフィールドを `override` なしで書いた（`docs/types.md`「本体に書けるもの」）
+     */
+    @severity(Severity.Error)
+    @checkedBy(hozo.compiler.verify)
+    TYPE_14;
+
+    /**
+     * TYPE-15: `override f: T` の T が、元の型から変えられる型でない（`docs/types.md`「変えられる型」）。元の型と、変えられる形をメッセージに示す
+     */
+    @severity(Severity.Error)
+    @checkedBy(hozo.compiler.verify)
+    TYPE_15;
+
+    /**
+     * TYPE-16: `override` の形が合わない: 何も変えない（型を書かないか元と等しい型で、デコレータを足していない。説明だけを変えるのも含む）、`never` にデコレータか説明を付けた、同じフィールドへの `override` が二度ある（`docs/types.md`「本体に書けるもの」）
+     */
+    @severity(Severity.Error)
+    @checkedBy(hozo.compiler.verify)
+    TYPE_16;
+
+    /**
+     * TYPE-17: 配線の、値の入れ物と、繰り返しの型が合わない（`docs/types.md`「val の型」と、`docs/types.md`「式の型」の `for` の変数）: 型を書いた `val` に入れる式の型が、渡せない。集める先の `val` の型が `list` でない。集める式の型が、要素の型に渡せない。型を書かない `val` に集める式の型が、そろわない。`for` の頭の並びの型が `list<T>` でない
+     */
+    @severity(Severity.Error)
+    @checkedBy(hozo.compiler.verify)
+    TYPE_17;
+
+    /**
+     * TYPE-18: 関数の戻り値が、種類に合わない（`docs/grammar.md`「関数の宣言」）: 効果（`effect fn`）の戻り値が、`void` でも、省いた形でもない。`read fn` の戻り値を、省いた、または、`void` か `never`。位置は、書いた戻り値の型（省いた `read fn` は、名前）。`Signature` を要しないので `internal/sema` が出す
+     */
+    @severity(Severity.Error)
+    @checkedBy(hozo.compiler.verify)
+    TYPE_18;
+
+    /**
+     * TYPE-19: 有限の値を持てない型の宣言（`docs/types.md`「値を、有限に作れない型」）: 省略できないフィールドと、union のアームを辿って、自分に戻る。互いに辿り合える宣言のまとまりごとに、一つ。位置は、その中で、最初に現れる宣言の名前。`Related` に、示した輪の上の宣言
+     */
+    @severity(Severity.Error)
+    @checkedBy(hozo.compiler.verify)
+    TYPE_19;
+
+    /**
+     * TYPE-20: union（`arms`）の位置に渡した値が、アームの二つ以上の型に渡せる（`docs/types.md`「互換」の規則 14、`docs/types.md`「union に入れる」）。どのアームに入れるかを、値の型から決められない。メッセージに、当たったアームの名前を並べる。位置は、渡した値
+     */
+    @severity(Severity.Error)
+    @checkedBy(hozo.compiler.verify)
+    TYPE_20;
+
+    /**
+     * LIT-1: 整数リテラルが 64 ビット符号付きの範囲を超える。`duration` のリテラルがナノ秒で同じ範囲を超える
+     */
+    @severity(Severity.Error)
+    @checkedBy(hozo.compiler.verify)
+    LIT_1;
+
+    // docs/config.md「診断」が説明する規則
+
+    /**
+     * CFG-5: 二つ以上のトランスパイラが同じファイルに書こうとしたらエラー
+     *
+     * 書き出すファイルのパス（ルートからの相対パスに正規化したもの）が、二つ以上のトランスパイラから出た。出どころを `Related` 相当としてメッセージに示す。何も書き出さない。例外は `OutputConflict`
+     *
+     * 決めた所と、説明のある所: S14: `docs/config.md`「診断」
+     */
+    @severity(Severity.Error)
+    @adr.decided(hozo.decisions.DecisionS.S14)
+    @checkedBy(hozo.compiler.verify)
+    CFG_5;
+
+    /**
+     * CFG-6: 単位のトランスパイラの `unsupported` に当たる箇所は warning
+     *
+     * 単位のトランスパイラのマニフェストの `unsupported` にあるデコレータの FQN が、その単位の対象の宣言に付いている。付いた位置に出す
+     *
+     * 決めた所と、説明のある所: S14: `docs/config.md`「診断」
+     */
+    @severity(Severity.Warning)
+    @adr.decided(hozo.decisions.DecisionS.S14)
+    @checkedBy(hozo.compiler.verify)
+    CFG_6;
+
+    /**
+     * CFG-7: 知らないキー（`hozo` と `emit` 以外のトップレベルのキーを含む）、値の型違い（`options` がテーブルのテーブルでない、オプションの値が日時、を含む）、TOML の構文エラー、一つの単位の `transpilers` に同じ名前が二度ある、単位の `out` がルートの下のディレクトリでない（絶対パス、ルートの外、ルートそのもの。`docs/config.md`「形」）。`--config` か `HOZO_CONFIG` で指定されたファイルが読めないとき（`docs/config.md`「置き場と探し方」）と、設定なしで `hozoc build` したとき（`internal/app`（パッケージ `app` の説明））も CFG-7
+     */
+    @severity(Severity.Error)
+    @checkedBy(hozo.compiler.verify)
+    CFG_7;
+
+    /**
+     * CFG-10: 単位の `namespace` の名前空間も、その子孫も `.hozo` にない（語彙のファイルにもない）
+     */
+    @severity(Severity.Error)
+    @checkedBy(hozo.compiler.verify)
+    CFG_10;
+
+    /**
+     * CFG-12: 単位に `namespace` / `transpilers` / `out` のどれかがない、または空（空の文字列、空の配列）。その単位は使わない
+     */
+    @severity(Severity.Error)
+    @checkedBy(hozo.compiler.verify)
+    CFG_12;
+
+    /**
+     * CFG-13: 対象の手続き（`docs/config.md`「単位の対象」）。診断なし
+     */
+    @severity(Severity.Silent)
+    @checkedBy(hozo.compiler.verify)
+    CFG_13;
+
+    /**
+     * CFG-14: `transpilers` の名前のトランスパイラを、入っているどのプラグインも提供していない（探し方は `docs/plugin-protocol.md`「探索」）
+     */
+    @severity(Severity.Error)
+    @checkedBy(hozo.compiler.verify)
+    CFG_14;
+
+    /**
+     * CFG-15: `transpilers` の名前のトランスパイラを、二つ以上のプラグインが提供している（探し方は `docs/plugin-protocol.md`「探索」）。どのプラグインかをメッセージに示す
+     */
+    @severity(Severity.Error)
+    @checkedBy(hozo.compiler.verify)
+    CFG_15;
+
+    /**
+     * CFG-16: 一つの単位のトランスパイラの `language` がそろっていない。例外は `LanguageMismatch`
+     */
+    @severity(Severity.Error)
+    @checkedBy(hozo.compiler.verify)
+    CFG_16;
+
+    /**
+     * CFG-17: 二つの単位の `out` が同じか、一方が他方の下にある
+     */
+    @severity(Severity.Error)
+    @checkedBy(hozo.compiler.verify)
+    CFG_17;
+
+    /**
+     * CFG-18: 単位の `in` の glob が、読み込んだファイルのどれにも合わない
+     */
+    @severity(Severity.Error)
+    @checkedBy(hozo.compiler.verify)
+    CFG_18;
+
+    /**
+     * CFG-19: 単位のトランスパイラの `requires` にある名前が、その単位の `transpilers` にない（`docs/config.md`「基底と相乗り」）。足りない名前ごとに一つ。解決できなかった（CFG-14 / CFG-15 の）トランスパイラの `requires` は見ない
+     */
+    @severity(Severity.Error)
+    @checkedBy(hozo.compiler.verify)
+    CFG_19;
+
+    /**
+     * CFG-20: 単位の `transpilers` のうち、基底（`requires` が空のトランスパイラ）がちょうど一つでない（`docs/config.md`「基底と相乗り」）。CFG-14 / CFG-15 のある単位では出さない（解決できなかった名前が基底かもしれない）
+     */
+    @severity(Severity.Error)
+    @checkedBy(hozo.compiler.verify)
+    CFG_20;
+
+    /**
+     * CFG-21: `[emit.options.<名前>]` の `<名前>` が、その単位の `transpilers` にない（`docs/config.md`「オプション」）
+     */
+    @severity(Severity.Error)
+    @checkedBy(hozo.compiler.verify)
+    CFG_21;
+
+    /**
+     * CFG-22: 出力が使う宣言の名前空間が、その単位の基底の出力を持たない（`docs/config.md`「型の置き場」）。単位と、足りない名前空間の組ごとに一つ。CFG-20 のある単位では出さない（基底が決まらない）
+     */
+    @severity(Severity.Error)
+    @checkedBy(hozo.compiler.verify)
+    CFG_22;
+
+    /**
+     * CFG-23: 一つの単位の二つ以上のトランスパイラが、マニフェストの `seams` に同じデコレータを書いている（`docs/config.md`「継ぎ目」）。デコレータと、宣言したトランスパイラをメッセージに示す。単位とデコレータの組ごとに一つ。解決できなかった（CFG-14 / CFG-15 の）トランスパイラの `seams` は見ない
+     */
+    @severity(Severity.Error)
+    @checkedBy(hozo.compiler.verify)
+    CFG_23;
+
+    /**
+     * CFG-24: `[options.<名前>]` の `<名前>` が、どの単位の `transpilers` にもない（`docs/config.md`「プロジェクト全体のオプション」）
+     */
+    @severity(Severity.Error)
+    @adr.decided(hozo.decisions.Decision400.D425)
+    @checkedBy(hozo.compiler.verify)
+    CFG_24;
+
+    /**
+     * CFG-25: 単位のトランスパイラが、マニフェストの `requires_vocabulary` に書いた名前空間を読み解く、語彙のプラグインが、入っていない（`docs/plugin-protocol.md`「語彙のプラグイン」）。単位と名前空間の組ごとに一つ（要るトランスパイラを並べる）。解決できなかった（CFG-14 / CFG-15 の）トランスパイラの `requires_vocabulary` は見ない
+     */
+    @severity(Severity.Error)
+    @checkedBy(hozo.compiler.verify)
+    CFG_25;
+
+    /**
+     * CFG-26: 本体のない、`@hint` でないデコレータを、設定のどの単位のトランスパイラも解釈しなければ、付けた所に warning
+     *
+     * 本体のない、`@hint` でないデコレータが、単位の対象の宣言（フィールド、分類のケースを含む）に付いているが、設定のどの単位のトランスパイラも、それを解釈しない（`docs/config.md`「解釈するトランスパイラ」）。付いた位置に出す。同じ位置には、一度だけ
+     *
+     * 決めた所と、説明のある所: 決定 D420、D432: `docs/config.md`「解釈するトランスパイラ」
+     */
+    @severity(Severity.Warning)
+    @adr.decided(hozo.decisions.Decision400.D420, hozo.decisions.Decision400.D432)
+    @checkedBy(hozo.compiler.verify)
+    CFG_26;
+
+    // 文法か、語彙のプラグインが受け持つ規則（hozoc の検査は、診断を出さない）
+
+    /**
+     * SYN-1: アノテーションは宣言の上だけ（文法で閉じる。`docs/grammar.md`「ファイルと宣言」）
+     */
+    @severity(Severity.Silent)
+    @checkedBy(hozo.compiler.verify)
+    SYN_1;
+
+    /**
+     * SYN-2: ドキュメンテーションコメントはデコレータより上（文法で閉じる。`docs/grammar.md`「ファイルと宣言」）
+     */
+    @severity(Severity.Silent)
+    @checkedBy(hozo.compiler.verify)
+    SYN_2;
+
+    /**
+     * PAGE-1: `@browser.page.fallback` の `view` は、付けた op の出力のアームの型（語彙に固有。プラグインの `check` が検査する。`docs/plugin-protocol.md`「check」）
+     */
+    @severity(Severity.Silent)
+    PAGE_1;
+
+    /**
+     * PAGE-2: ルートのキャッチオールの有無とパターンの重複（語彙に固有。`docs/plugin-protocol.md`「check」）
+     */
+    @severity(Severity.Silent)
+    PAGE_2;
+
+    // 欠番: なくした ID。別の意味に、使い回さない（決定 D52）
+
+    /**
+     * CFG-1: 欠番（CFG-1〜CFG-4 を、まとめて、なくした）。§4.5 の名前空間ごとの設定・使えない名前・継承と、§4.6 の言語の照合。設定を単位の一覧に変えた（S14）ときになくなった。代わりの規則（単位の言語、対象の手続きなど）は `docs/config.md`「診断」が持つ
+     *
+     * 経緯のある所: `docs/config.md`「診断」
+     */
+    @retired
+    @adr.decided(hozo.decisions.DecisionS.S14)
+    CFG_1;
+
+    /**
+     * CFG-2: 欠番（CFG-1〜CFG-4 を、まとめて、なくした）。§4.5 の名前空間ごとの設定・使えない名前・継承と、§4.6 の言語の照合。設定を単位の一覧に変えた（S14）ときになくなった。代わりの規則（単位の言語、対象の手続きなど）は `docs/config.md`「診断」が持つ
+     *
+     * 経緯のある所: `docs/config.md`「診断」
+     */
+    @retired
+    @adr.decided(hozo.decisions.DecisionS.S14)
+    CFG_2;
+
+    /**
+     * CFG-3: 欠番（CFG-1〜CFG-4 を、まとめて、なくした）。§4.5 の名前空間ごとの設定・使えない名前・継承と、§4.6 の言語の照合。設定を単位の一覧に変えた（S14）ときになくなった。代わりの規則（単位の言語、対象の手続きなど）は `docs/config.md`「診断」が持つ
+     *
+     * 経緯のある所: `docs/config.md`「診断」
+     */
+    @retired
+    @adr.decided(hozo.decisions.DecisionS.S14)
+    CFG_3;
+
+    /**
+     * CFG-4: 欠番（CFG-1〜CFG-4 を、まとめて、なくした）。§4.5 の名前空間ごとの設定・使えない名前・継承と、§4.6 の言語の照合。設定を単位の一覧に変えた（S14）ときになくなった。代わりの規則（単位の言語、対象の手続きなど）は `docs/config.md`「診断」が持つ
+     *
+     * 経緯のある所: `docs/config.md`「診断」
+     */
+    @retired
+    @adr.decided(hozo.decisions.DecisionS.S14)
+    CFG_4;
+
+    /**
+     * CFG-9: 欠番。`plugins` の名前の探索。同じく S14 でなくなった
+     *
+     * 経緯のある所: `docs/config.md`「診断」
+     */
+    @retired
+    @adr.decided(hozo.decisions.DecisionS.S14)
+    CFG_9;
+
+    /**
+     * REL-3: 欠番（REL-3、REL-6 を、まとめて、なくした）。`prevents` / `keeps` の目的語に効果の名前を個別に書く形についての規則。目的語を `effects` だけにした（S9）ときになくなった
+     *
+     * 経緯のある所: `docs/check.md`「throws」
+     */
+    @retired
+    @adr.decided(hozo.decisions.DecisionS.S9)
+    REL_3;
+
+    /**
+     * REL-6: 欠番（REL-3、REL-6 を、まとめて、なくした）。`prevents` / `keeps` の目的語に効果の名前を個別に書く形についての規則。目的語を `effects` だけにした（S9）ときになくなった
+     *
+     * 経緯のある所: `docs/check.md`「throws」
+     */
+    @retired
+    @adr.decided(hozo.decisions.DecisionS.S9)
+    REL_6;
+
+    /**
+     * CFG-8: 欠番。単位の `namespace` が語彙の名前空間である、または `state` も `op` も持たないこと。型を基底ごとに一度だけ出力する形にした（決定 D67、D76）ときになくなった
+     *
+     * 経緯のある所: `docs/config.md`「診断」
+     */
+    @retired
+    @adr.decided(hozo.decisions.Decision000.D67, hozo.decisions.Decision000.D76)
+    CFG_8;
+
+    /**
+     * CFG-11: 欠番。単位の言語が `ts` だが、TS の既定の出力がないこと。出力をトランスパイラに任せた（決定 D68）ときになくなった
+     *
+     * 経緯のある所: `docs/config.md`「診断」
+     */
+    @retired
+    @adr.decided(hozo.decisions.Decision000.D68)
+    CFG_11;
+
+    /**
+     * NS-4: 欠番。`classify` は宣言した名前空間の中でだけ使える（§3.2、§10.1）。分類の置き場を自由にした（S18）ときになくなった
+     *
+     * 経緯のある所: `docs/check.md`「名前空間」
+     */
+    @retired
+    @adr.decided(hozo.decisions.DecisionS.S18)
+    NS_4;
+
+    /**
+     * TYPE-13: 欠番。既定値のリテラルが、フィールドの型（`scalar` なら元の型）に渡せないこと。フィールドの既定値を言語からなくしたときになくなった（値がないときに何を入れるかは、境界のデコレータが言う）
+     *
+     * 経緯のある所: `docs/types.md`「診断」、`docs/grammar.md`「決めたこと」
+     */
+    @retired
+    TYPE_13;
+
+    /**
+     * EFF-3: 欠番。葉の op が自分で書いた `effects` が二つ以上であること（§5.2、§7.3。S8）。葉の op が `reads` / `effects` の節を書けなくなった（STATE-5）ときになくなった
+     *
+     * 経緯のある所: `docs/check.md`「状態と効果」
+     */
+    @retired
+    @adr.decided(hozo.decisions.DecisionS.S8)
+    EFF_3;
+
+    /**
+     * MATCH-8: 欠番。アームの本体の `throw E` の `E` が、値を運ぶ例外であること。`throw` が例外の引数に値を渡せるようになったときになくなった
+     *
+     * 経緯のある所: `docs/check.md`「classify / match」
+     */
+    @retired
+    MATCH_8;
+
+    /**
+     * DEC-17: 欠番。`reads` か `effects` の節を持つデコレータが、配線の op に付いていること。運ぶ節を持つデコレータを、配線の op にも付けられるようにした（決定 D149）ときになくなった
+     *
+     * 経緯のある所: `docs/check.md`「デコレータ」
+     */
+    @retired
+    @adr.decided(hozo.decisions.Decision100.D149)
+    DEC_17;
+
+    /**
+     * DEC-14: 欠番。`external` なデコレータが `throws` を持たないこと（warning）。`@external` をなくした（決定 D407）ときになくなった
+     *
+     * 経緯のある所: `docs/check.md`「デコレータ」
+     */
+    @retired
+    @adr.decided(hozo.decisions.Decision400.D407)
+    DEC_14;
+
+    /**
+     * DEC-15: 欠番。`@external` がデコレータの宣言以外に付いていること。同じく、`@external` をなくしたときになくなった
+     *
+     * 経緯のある所: `docs/check.md`「デコレータ」
+     */
+    @retired
+    DEC_15;
+
+    /**
+     * DEC-18: 欠番。デコレータの宣言の、分類のケースで、名前と `of never` の両方を書いたのに、その名前の分類が、対象のない分類でないこと。両方を書く形を、なくした（決定 D346）ときになくなった
+     *
+     * 経緯のある所: `docs/check.md`「デコレータ」
+     */
+    @retired
+    @adr.decided(hozo.decisions.Decision300.D346)
+    DEC_18;
+
+    /**
+     * STATE-9: 欠番。配線が、矢印の前にケースを並べた行の遷移を持つ効果を、そのケースにあると分かっていない行で呼んだこと。前のケースを、行の引数の型で言うようにした（決定 D369）ときに、型の検査（TYPE-4、MATCH-4）にまとまった
+     *
+     * 経緯のある所: `docs/check.md`「状態と効果」
+     */
+    @retired
+    @adr.decided(hozo.decisions.Decision300.D369)
+    STATE_9;
+
+    /**
+     * THROWS-1: 欠番。`throws` の節を書いた配線の op が、呼び出し先の例外と、アームの `throw` の例外を、その節に書いていないこと（§7.2、§16 の「配線の `throws` は、すべて書かせる」。379 で、節を書いた op だけの規則になっていた）。節を、その関数が足すものにした（決定 D381）ときになくなった
+     *
+     * 経緯のある所: `docs/check.md`「throws」
+     */
+    @retired
+    @adr.decided(hozo.decisions.Decision300.D381)
+    THROWS_1;
+
+    /**
+     * THROWS-2: 欠番。配線の op が、`throws` の節に、多めに書いた例外を、許すこと（§7.2。診断なし）。節を、その関数が足すものにしたとき（決定 D381）、同じ ID のまま、意味を「書いていない例外も、エラーにしない」に広げていた。番号を、別の意味に使い回さないために、欠番にして、広げた意味には THROWS-4 を振った（同 466）
+     *
+     * 経緯のある所: `docs/check.md`「throws」
+     */
+    @retired(Rule.THROWS_4)
+    @adr.decided(hozo.decisions.Decision300.D381, hozo.decisions.Decision400.D466)
+    THROWS_2;
+
+    /**
+     * EFF-2: 欠番。配線の op に書いた `effects` が、本体の呼び出しから決まる効果と、付いたデコレータが運ぶ効果を合わせたものと、食い違うこと（§7.2）。同じく 381 でなくなった: 書いた効果は、計算した効果に、足す
+     *
+     * 経緯のある所: `docs/check.md`「状態と効果」
+     */
+    @retired
+    EFF_2;
+
+    /**
+     * READS-2: 欠番。配線の op に書いた `reads` が、計算した読む状態と、食い違うこと（S15）。同じく 381 でなくなった: 書いた状態は、計算した読む状態に、足す
+     *
+     * 経緯のある所: `docs/check.md`「状態と効果」
+     */
+    @retired
+    @adr.decided(hozo.decisions.DecisionS.S15)
+    READS_2;
+  }
+}

@@ -140,18 +140,18 @@ func TestVerifyAndReplace(t *testing.T) {
 	}
 }
 
-// TestSpecFiles は、写す仕様のファイルが、spec/*.hozo と spec/decisions/*.hozo で、ほかのディレクトリの .hozo を含まないこと
+// TestSpecFiles は、写す仕様のファイルが、spec/ の下の、すべての .hozo で、ほかのディレクトリの .hozo を含まないこと
 // （docs/packages.md「自己生成の手順」の 2）。
 func TestSpecFiles(t *testing.T) {
 	repo := t.TempDir()
-	for _, name := range []string{"spec/cli.hozo", "spec/ir.hozo", "spec/decisions/adr.hozo", "spec/decisions/d000.hozo", "tests/x.hozo", "vocab/v.hozo", "spec/decisions/note.md"} {
+	for _, name := range []string{"spec/cli.hozo", "spec/ir.hozo", "spec/decisions/adr.hozo", "spec/decisions/d000.hozo", "spec/diagnostics/rule.hozo", "tests/x.hozo", "vocab/v.hozo", "spec/decisions/note.md"} {
 		writeFile(t, filepath.Join(repo, name), "")
 	}
 	got, err := specFiles(repo)
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := []string{"spec/cli.hozo", "spec/decisions/adr.hozo", "spec/decisions/d000.hozo", "spec/ir.hozo"}
+	want := []string{"spec/cli.hozo", "spec/decisions/adr.hozo", "spec/decisions/d000.hozo", "spec/diagnostics/rule.hozo", "spec/ir.hozo"}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("specFiles = %v, want %v", got, want)
 	}

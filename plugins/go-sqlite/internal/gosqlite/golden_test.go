@@ -207,7 +207,7 @@ func TestOtherDir(t *testing.T) {
 }
 
 // diagnosticFixtures は、診断を返す入力（testdata/<名前>/）。期待する診断は testdata/<名前>/expected/errors.txt
-// （一行に、コード、位置、メッセージをタブで区切って。View の順、その中は返した順）。docs/plugin-go-sqlite.md「診断」の表の行ごとに一つ。
+// （一行に、コード、位置、メッセージをタブで区切って。View の順、その中は返した順）。spec/diagnostics/go-sqlite.hozo のケースの説明の行ごとに一つ。
 // db の語彙の、言語にも保存先にも依らない検査（DB-*。前は、GOSQL の 19 個）の入力は、plugin/dbvocab/testdata に移した
 // （同「診断」の「欠番」）。
 var diagnosticFixtures = []struct{ name, code string }{
@@ -222,7 +222,7 @@ var diagnosticFixtures = []struct{ name, code string }{
 	{"gosql34", codeSQLLiteral},     // リテラルの型のフィールドを持つ model を中に持つ型のフィールドがある
 }
 
-// TestDiagnostics は docs/plugin-go-sqlite.md「診断」の表の各行: 診断のコード・位置・メッセージがゴールデンと同じで、
+// TestDiagnostics は spec/diagnostics/go-sqlite.hozo のケースの説明の各行: 診断のコード・位置・メッセージがゴールデンと同じで、
 // 診断を返した出力がファイルを返さないこと（emitViews が確かめる）。入力は、そのコードの診断だけを返す。
 func TestDiagnostics(t *testing.T) {
 	for _, fx := range diagnosticFixtures {

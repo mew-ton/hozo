@@ -186,29 +186,9 @@ op を呼ぶ前の失敗は、`http` の語彙の例外 `http.BadRequest`（`doc
 
 ## 診断
 
-`read` の応答の `errors` で返す（`docs/plugin-protocol.md`「read」）。位置は、表に書いた宣言の FQN。warning は、返さない。
+`read` の応答の `errors` で返す（`docs/plugin-protocol.md`「read」）。位置は、ケースの説明に書いた宣言の FQN。warning は、返さない。
 
-| ID | 重さ | 意味 |
-|---|---|---|
-| HTTP-1 | error | `@http.get` / `@http.post` の付いた op に `export` がない。位置は op |
-| HTTP-2 | error | 経路の op の引数が、0 個でも、フィールドを持つ model 一つでもない（インデックスの model は、入力の model にできない）。位置は op |
-| HTTP-3 | error | 入力の model のフィールドが、要求のどこから読むかを言う六つのデコレータ（`@http.header` / `@http.query` / `@http.body` / `@http.headerObj` / `@http.queryObj` / `@http.bodyObj`）のどれも持たない、または二つ以上持つ。位置は model |
-| HTTP-4 | error | ヘッダかクエリから読むフィールド（全体の形なら、その model のフィールド）の型が受け付けられない（「対象」の表）。位置は、そのフィールドを持つ model（全体の形なら、全体の形で受け取る model） |
-| HTTP-5 | error | 本文、結果、`@http.status` を持つ例外の引数の型（の中）に、通信に出せない union がある（「通信の形」の「union」の三つの条件）。メッセージに、union と、満たさないアームと、理由（アームの型が、フィールドを持つ model でも、リテラルの型でもない。リテラルの型の二つのアームの、JSON の値が同じ。印も、決め手もない）を示す。位置は op |
-| HTTP-6 | error | `@http.get` の op の入力が、本文のデコレータ（`@http.body`、`@http.bodyObj`）のフィールドを持つ。位置は op |
-| HTTP-7 | error | パスが `/` で始まらない、または `{` か `}` を含む。位置は op |
-| HTTP-8 | error | 一つの名前空間の中に、同じメソッドとパスの経路が二つある。位置は後ろの op |
-| HTTP-9 | error | 全体の形（`@http.headerObj` / `@http.queryObj` / `@http.bodyObj`）を付けたフィールドの型が、フィールドを持つ model でない（省略可能な model、配列、インデックスの model を含む。「対象」）。位置は model |
-| HTTP-10 | error | 入力の model の一つの場所に、全体の形が二つ以上ある、または、全体の形と項目の形の両方がある（「対象」）。位置は model |
-| HTTP-11 | error | `@http.required` か `@http.default` の付いたフィールドが、項目の形（`@http.header` / `@http.query` / `@http.body`）を持たない。入力の model のフィールドと、全体の形で受け取る model のフィールドを見る（「対象」）。位置は、そのフィールドを持つ model |
-| HTTP-12 | error | `@http.required` か `@http.default` の付いたフィールドの型が、省略可能（`T?`）。見るフィールドと位置は HTTP-11 と同じ |
-| HTTP-13 | error | 一つのフィールドに、`@http.required` と `@http.default` の両方がある。見るフィールドと位置は HTTP-11 と同じ |
-| HTTP-14 | error | `@http.default` のリテラルが、フィールドの型（scalar は元の核の型）に渡せない（「対象」）。メッセージに、フィールド、リテラル、型を示す。見るフィールドと位置は HTTP-11 と同じ |
-| HTTP-15 | error | `@http.default` の値が、フィールドの制約（`@valid.*`）に合わない（「補う値と制約」）。メッセージに、フィールド名と、合わなかった制約を入れる。リテラルが型に渡せないフィールド（HTTP-14）は、見ない。見るフィールドと位置は HTTP-11 と同じ |
-| HTTP-16 | error | 本文の項目（`@http.body`）のフィールドの型が、リテラルの型そのもの（「対象」: 項目を、リテラルの型で読む形を、まだ決めていない）。メッセージに、そのフィールドと、リテラルの型を示す。位置は op |
-| HTTP-17 | error | 一つの例外に、`@http.status` と `@http.badRequest` の両方がある（「対象」）。位置は例外 |
-| HTTP-18 | error | `@http.badRequest` のステータスが、400 から 499 までにない（「対象」）。メッセージに、その値を示す。位置は例外 |
-| HTTP-19 | error | `@http.badRequest` の文言の中の `{<名前>}` が、例外の、型が `string` の引数を指していない。または、`{` が閉じていない、`}` が開いていない（「対象」）。メッセージに、その名前か、閉じていない括弧の位置を示す。位置は例外 |
+この見出しの診断の、ID と条件と重さの持ち主は、`spec/diagnostics/http.hozo` の分類 `hozo.diagnostics.Http` のケース。
 
 - **どの診断も、書いたものの整合の検査**: デコレータが言ったことと、model と op の宣言が食い違っていれば、error にする。出し方を、型に合わせて変える言語のトランスパイラは、ない（`docs/requirements.md`「出力を推論しない」）。
 - **HTTP-* は、`go-http` の診断から移したもの。** どの GOHTTP-n が、どの HTTP-n になったかの表は `docs/plugin-go-http.md`「診断」の「欠番」。

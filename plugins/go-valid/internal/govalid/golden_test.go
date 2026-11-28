@@ -197,7 +197,7 @@ var diagnosticFixtures = []struct{ name, code string }{
 	{"govalid7", codeValidOption}, // [emit.options.go-valid] に、知らないキーがある
 }
 
-// TestDiagnosticCodes は、「診断」の表の ID（GOVALID-3〜GOVALID-7。GOVALID-1 と GOVALID-2 は欠番）のどれもが、入力を一つ持つこと。
+// TestDiagnosticCodes は、spec/diagnostics/go-valid.hozo の ID（GOVALID-3〜GOVALID-7。GOVALID-1 と GOVALID-2 は欠番）のどれもが、入力を一つ持つこと。
 func TestDiagnosticCodes(t *testing.T) {
 	seen := map[string]bool{}
 	for _, fx := range diagnosticFixtures {
@@ -239,7 +239,7 @@ func TestDiagnostics(t *testing.T) {
 	}
 }
 
-// TestDiagnosticPositions は、診断の位置（docs/plugin-go-valid.md「診断」の表）: 付いた scalar か model の FQN。GOVALID-7 は位置なし。
+// TestDiagnosticPositions は、診断の位置（spec/diagnostics/go-valid.hozo のケースの説明）: 付いた scalar か model の FQN。GOVALID-7 は位置なし。
 func TestDiagnosticPositions(t *testing.T) {
 	at := func(name string) map[string]bool {
 		_, diags := emitViews(t, newRoot(t), loadViews(t, name))

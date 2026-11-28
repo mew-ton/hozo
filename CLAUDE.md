@@ -45,7 +45,7 @@ Hozo は、アプリの設計の、ただ一つの正（SSOT）になる、仕�
 
 ### 番号は使い回さない
 
-規則と診断の ID（`STATE-9`、`GOSQL-30` など）は、なくしても、別の意味に使い回さない。なくした ID は欠番にする（`docs/requirements.md`「検査の規則の一覧」の欠番の表）。
+規則と診断の ID（`STATE-9`、`GOSQL-30` など）は、なくしても、別の意味に使い回さない。なくした ID は欠番にする: 仕様のケースを消さずに、`@retired` を付ける（`spec/diagnostics.hozo` の `retired`）。
 
 ### 決定は、spec/decisions/ に足す
 

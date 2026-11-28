@@ -418,21 +418,11 @@ enabled = false                 # true なら hozoc tests で direction "coverag
 
 ## 診断
 
-| ID | 重さ | 意味 |
-|---|---|---|
-| MAN-2 | error | `protocol` が合わない（マニフェストの `protocol` が、「版の合わせ方」の決まりに合わない。または起動したプラグインが `code: "protocol"` で断った） |
-| MAN-3 | error | マニフェストの `name` がディレクトリ名と違う |
-| MAN-4 | error | マニフェストを読めない: ファイルを開けない、TOML の構文の誤り、値の型違い、知らないキー、`name` がない、`wasm` がない・空・文字列でない・相対パスでない・ディレクトリの外に出る、`[[transpiler]]` に `name` か `language` がない、`language` が空、`requires` に自分の名前か同じ名前が二度ある、`seams` に空の文字列か同じ FQN が二度ある、`interprets` に空の文字列か同じ FQN が二度ある、同じ FQN が `seams` と `interprets` の両方にある、`requires_vocabulary` に空の文字列か同じ名前が二度ある、同じ名前の `[[transpiler]]` が二つある、`[read]` の `namespaces` がない・空・空の文字列がある・同じ名前が二度ある。使うプラグインの `vocabulary` のファイルを読めないときも MAN-4 |
-| MAN-5 | error | プラグインがその `direction`（`[read]` を書いたプラグインの `read` を含む）か、頼まれたトランスパイラを実装していない（マニフェストに書いてあるのに。起動したプラグインが `code: "unsupported"` で断った） |
-| MAN-6 | error | マニフェストに `command` がある（子プロセスで起動するコマンド。なくした書き方: 「マニフェスト」の `wasm`）。メッセージは、`wasm` に、WASM のファイルの場所を書くことを、示す。使っていないプラグインにも、報告する（MAN-4 と同じ） |
-| PLG-1 | — | 応答の `files` の `path` が、その出力の Dir(U, N) の下にない（「emit」） |
-| PLG-2 | — | トランスパイラ一つの答えの中で同じ `path` が二度 |
-| PLG-4 | — | 応答の `files` の、テストの対応表の、名前か中身が、約束の形でない（「テストの対応表」） |
-| PLUGIN | warning | トランスパイラの `warnings`（「emit」）と、語彙のプラグインの `warnings`（「read」） |
+この見出しの診断の、ID と条件と重さの持ち主は、`spec/diagnostics/hozoc.hozo` の分類 `hozo.diagnostics.Hozoc` のケース。
 
 - MAN-1 は欠番。マニフェストの `[emit]` の `entry` も `decorate` も空であることを報告していた規則で、`[emit]` を `[[transpiler]]` に替えたときになくなった。
 - PLG-3 は欠番。応答の `select` が、対象の名前空間にない宣言、種類の違う宣言、単位の対象でない宣言、付いていないデコレータを指していることを報告していた規則で、`select` をなくした（「選択をなくしたこと」）ときになくなった。
-- 番号は別の意味に使い回さない（`docs/config.md`「診断」と同じ。欠番の一覧は `docs/requirements.md`「検査の規則の一覧」）。
+- 番号は別の意味に使い回さない（`docs/config.md`「診断」と同じ。欠番は、`spec/diagnostics/` のケースの `@retired`）。
 - MAN-4 の「`language` が `"go"` でも `"ts"` でもない」という条件はなくした（言語の名前は基底が決める。「マニフェスト」）。
 - MAN-* は診断で、例外は `ConfigInvalid`。
 - PLG-* は診断にならない（重さが「—」）。応答そのものが信用できないので、診断の一覧に足して続けることはせず、例外 `MalformedOutput` で終わる。ID は、その例外のメッセージの頭に書く（`プラグイン fake の出力が約束した形でない: PLG-1: …`）。`--format json` でも `diagnostics` には現れず、`{"error": "MalformedOutput"}` になる（`plugins/go-cli/spec/go-cli.hozo` の `Requirement.Run` の `JSONPresenter`）。「応答の形」の誤りも同じ例外で、ID は持たない。

@@ -1,0 +1,182 @@
+// Hozo 自身の仕様: 診断の分類 hozo.diagnostics.GoHttp（決定 D812。持ち主は、このファイル）。印の意味は spec/diagnostics.hozo。
+// ケースの名前は、ID の - を _ に替えたもの。もとの綴りは、説明の頭に書く。どの単位の対象でもない: コードには、ならない。
+
+namespace hozo.diagnostics {
+  /** トランスパイラ go-http が返す診断（docs/plugin-go-http.md） */
+  classify GoHttp of never {
+    // docs/plugin-go-http.md「診断」が説明する規則
+
+    /**
+     * GOHTTP-9: `[emit.options.go-http]` に、知らないキーか、型の違う値がある。位置なし
+     */
+    @severity(Severity.Error)
+    GOHTTP_9;
+
+    /**
+     * GOHTTP-10: 入口のパッケージに足す公開の名前（`HandlerOption`、`WithInternalError`、`NewHandler`）が、N の定義のパッケージの名前（model `NewHandler` など。`docs/plugin-go.md`「名前」）と当たる。位置は当たった宣言
+     */
+    @severity(Severity.Error)
+    GOHTTP_10;
+
+    /**
+     * GOHTTP-11: `validate = true` で、`Validate` を持つ入力の model が別の名前空間のもので、その名前空間の型の置き場の単位が `go-valid` を並べていない（`docs/plugin-go-http.md`「制約の検査」）。メッセージに、その単位（何番目の `[[emit]]` か）を示す。位置は op
+     */
+    @severity(Severity.Error)
+    GOHTTP_11;
+
+    /**
+     * GOHTTP-16: 経路の op の結果の型が、省略可能な配列か、省略可能な、インデックスの model（`T[]?`、`Attrs?`。`docs/plugin-go-http.md`「対象」）。位置は op
+     */
+    @severity(Severity.Error)
+    GOHTTP_16;
+
+    /**
+     * GOHTTP-20: テストのパッケージに足す公開の名前（`<Op>HTTPCases`、`<Op>HTTPCase`、`HTTPCases`、`RunHTTP`）が、そのパッケージの、基底の公開の名前か、自分のほかの名前と当たる。`<Op>HTTPCases` のメソッドの名前どうしが当たるときも（名前空間を前に付けても、同じ名前になる二つの例外。例外の名前と、出どころの名前をつないだものが、同じになる二つのケース。`docs/plugin-go-http.md`「インテグレーションテストの口」）。位置は、当たった自分の名前を生んだ経路の op。決まった名前（`HTTPCases`、`RunHTTP`）が当たったなら、相手の名前を生んだ宣言（葉の op か、分類）
+     */
+    @severity(Severity.Error)
+    GOHTTP_20;
+
+    /**
+     * GOHTTP-21: テストのパッケージのディレクトリが、同じ単位が出力する、子の名前空間 `N.<N のパッケージ名>test` の出力先と重なる（`docs/plugin-go-http.md`「インテグレーションテストの口」の「置き場と名前」）。基底が、同じことを GO-4 で返す出力（基底も、テストのパッケージを作る）では、返さない。置き場が要るので、`go.mod` がないときも、返さない。位置は、最初の経路の op
+     */
+    @severity(Severity.Error)
+    GOHTTP_21;
+
+    // 欠番: なくした ID。別の意味に、使い回さない（決定 D52）
+
+    /**
+     * GOHTTP-1: 欠番（GOHTTP-1〜GOHTTP-8、GOHTTP-12〜GOHTTP-15、GOHTTP-17〜GOHTTP-19 を、まとめて、なくした）。`go-http` が返していた、`http` の語彙の使い方の検査のうち、言語に依らないもの。語彙のプラグイン `http` に移した（決定 D410）ときになくなった。行き先（HTTP-1〜HTTP-15）の対応は、持ち主の文書
+     *
+     * 経緯のある所: `docs/plugin-go-http.md`「診断」の「欠番」
+     */
+    @retired
+    @adr.decided(hozo.decisions.Decision400.D410)
+    GOHTTP_1;
+
+    /**
+     * GOHTTP-2: 欠番（GOHTTP-1〜GOHTTP-8、GOHTTP-12〜GOHTTP-15、GOHTTP-17〜GOHTTP-19 を、まとめて、なくした）。`go-http` が返していた、`http` の語彙の使い方の検査のうち、言語に依らないもの。語彙のプラグイン `http` に移した（決定 D410）ときになくなった。行き先（HTTP-1〜HTTP-15）の対応は、持ち主の文書
+     *
+     * 経緯のある所: `docs/plugin-go-http.md`「診断」の「欠番」
+     */
+    @retired
+    @adr.decided(hozo.decisions.Decision400.D410)
+    GOHTTP_2;
+
+    /**
+     * GOHTTP-3: 欠番（GOHTTP-1〜GOHTTP-8、GOHTTP-12〜GOHTTP-15、GOHTTP-17〜GOHTTP-19 を、まとめて、なくした）。`go-http` が返していた、`http` の語彙の使い方の検査のうち、言語に依らないもの。語彙のプラグイン `http` に移した（決定 D410）ときになくなった。行き先（HTTP-1〜HTTP-15）の対応は、持ち主の文書
+     *
+     * 経緯のある所: `docs/plugin-go-http.md`「診断」の「欠番」
+     */
+    @retired
+    @adr.decided(hozo.decisions.Decision400.D410)
+    GOHTTP_3;
+
+    /**
+     * GOHTTP-4: 欠番（GOHTTP-1〜GOHTTP-8、GOHTTP-12〜GOHTTP-15、GOHTTP-17〜GOHTTP-19 を、まとめて、なくした）。`go-http` が返していた、`http` の語彙の使い方の検査のうち、言語に依らないもの。語彙のプラグイン `http` に移した（決定 D410）ときになくなった。行き先（HTTP-1〜HTTP-15）の対応は、持ち主の文書
+     *
+     * 経緯のある所: `docs/plugin-go-http.md`「診断」の「欠番」
+     */
+    @retired
+    @adr.decided(hozo.decisions.Decision400.D410)
+    GOHTTP_4;
+
+    /**
+     * GOHTTP-5: 欠番（GOHTTP-1〜GOHTTP-8、GOHTTP-12〜GOHTTP-15、GOHTTP-17〜GOHTTP-19 を、まとめて、なくした）。`go-http` が返していた、`http` の語彙の使い方の検査のうち、言語に依らないもの。語彙のプラグイン `http` に移した（決定 D410）ときになくなった。行き先（HTTP-1〜HTTP-15）の対応は、持ち主の文書
+     *
+     * 経緯のある所: `docs/plugin-go-http.md`「診断」の「欠番」
+     */
+    @retired
+    @adr.decided(hozo.decisions.Decision400.D410)
+    GOHTTP_5;
+
+    /**
+     * GOHTTP-6: 欠番（GOHTTP-1〜GOHTTP-8、GOHTTP-12〜GOHTTP-15、GOHTTP-17〜GOHTTP-19 を、まとめて、なくした）。`go-http` が返していた、`http` の語彙の使い方の検査のうち、言語に依らないもの。語彙のプラグイン `http` に移した（決定 D410）ときになくなった。行き先（HTTP-1〜HTTP-15）の対応は、持ち主の文書
+     *
+     * 経緯のある所: `docs/plugin-go-http.md`「診断」の「欠番」
+     */
+    @retired
+    @adr.decided(hozo.decisions.Decision400.D410)
+    GOHTTP_6;
+
+    /**
+     * GOHTTP-7: 欠番（GOHTTP-1〜GOHTTP-8、GOHTTP-12〜GOHTTP-15、GOHTTP-17〜GOHTTP-19 を、まとめて、なくした）。`go-http` が返していた、`http` の語彙の使い方の検査のうち、言語に依らないもの。語彙のプラグイン `http` に移した（決定 D410）ときになくなった。行き先（HTTP-1〜HTTP-15）の対応は、持ち主の文書
+     *
+     * 経緯のある所: `docs/plugin-go-http.md`「診断」の「欠番」
+     */
+    @retired
+    @adr.decided(hozo.decisions.Decision400.D410)
+    GOHTTP_7;
+
+    /**
+     * GOHTTP-8: 欠番（GOHTTP-1〜GOHTTP-8、GOHTTP-12〜GOHTTP-15、GOHTTP-17〜GOHTTP-19 を、まとめて、なくした）。`go-http` が返していた、`http` の語彙の使い方の検査のうち、言語に依らないもの。語彙のプラグイン `http` に移した（決定 D410）ときになくなった。行き先（HTTP-1〜HTTP-15）の対応は、持ち主の文書
+     *
+     * 経緯のある所: `docs/plugin-go-http.md`「診断」の「欠番」
+     */
+    @retired
+    @adr.decided(hozo.decisions.Decision400.D410)
+    GOHTTP_8;
+
+    /**
+     * GOHTTP-12: 欠番（GOHTTP-1〜GOHTTP-8、GOHTTP-12〜GOHTTP-15、GOHTTP-17〜GOHTTP-19 を、まとめて、なくした）。`go-http` が返していた、`http` の語彙の使い方の検査のうち、言語に依らないもの。語彙のプラグイン `http` に移した（決定 D410）ときになくなった。行き先（HTTP-1〜HTTP-15）の対応は、持ち主の文書
+     *
+     * 経緯のある所: `docs/plugin-go-http.md`「診断」の「欠番」
+     */
+    @retired
+    @adr.decided(hozo.decisions.Decision400.D410)
+    GOHTTP_12;
+
+    /**
+     * GOHTTP-13: 欠番（GOHTTP-1〜GOHTTP-8、GOHTTP-12〜GOHTTP-15、GOHTTP-17〜GOHTTP-19 を、まとめて、なくした）。`go-http` が返していた、`http` の語彙の使い方の検査のうち、言語に依らないもの。語彙のプラグイン `http` に移した（決定 D410）ときになくなった。行き先（HTTP-1〜HTTP-15）の対応は、持ち主の文書
+     *
+     * 経緯のある所: `docs/plugin-go-http.md`「診断」の「欠番」
+     */
+    @retired
+    @adr.decided(hozo.decisions.Decision400.D410)
+    GOHTTP_13;
+
+    /**
+     * GOHTTP-14: 欠番（GOHTTP-1〜GOHTTP-8、GOHTTP-12〜GOHTTP-15、GOHTTP-17〜GOHTTP-19 を、まとめて、なくした）。`go-http` が返していた、`http` の語彙の使い方の検査のうち、言語に依らないもの。語彙のプラグイン `http` に移した（決定 D410）ときになくなった。行き先（HTTP-1〜HTTP-15）の対応は、持ち主の文書
+     *
+     * 経緯のある所: `docs/plugin-go-http.md`「診断」の「欠番」
+     */
+    @retired
+    @adr.decided(hozo.decisions.Decision400.D410)
+    GOHTTP_14;
+
+    /**
+     * GOHTTP-15: 欠番（GOHTTP-1〜GOHTTP-8、GOHTTP-12〜GOHTTP-15、GOHTTP-17〜GOHTTP-19 を、まとめて、なくした）。`go-http` が返していた、`http` の語彙の使い方の検査のうち、言語に依らないもの。語彙のプラグイン `http` に移した（決定 D410）ときになくなった。行き先（HTTP-1〜HTTP-15）の対応は、持ち主の文書
+     *
+     * 経緯のある所: `docs/plugin-go-http.md`「診断」の「欠番」
+     */
+    @retired
+    @adr.decided(hozo.decisions.Decision400.D410)
+    GOHTTP_15;
+
+    /**
+     * GOHTTP-17: 欠番（GOHTTP-1〜GOHTTP-8、GOHTTP-12〜GOHTTP-15、GOHTTP-17〜GOHTTP-19 を、まとめて、なくした）。`go-http` が返していた、`http` の語彙の使い方の検査のうち、言語に依らないもの。語彙のプラグイン `http` に移した（決定 D410）ときになくなった。行き先（HTTP-1〜HTTP-15）の対応は、持ち主の文書
+     *
+     * 経緯のある所: `docs/plugin-go-http.md`「診断」の「欠番」
+     */
+    @retired
+    @adr.decided(hozo.decisions.Decision400.D410)
+    GOHTTP_17;
+
+    /**
+     * GOHTTP-18: 欠番（GOHTTP-1〜GOHTTP-8、GOHTTP-12〜GOHTTP-15、GOHTTP-17〜GOHTTP-19 を、まとめて、なくした）。`go-http` が返していた、`http` の語彙の使い方の検査のうち、言語に依らないもの。語彙のプラグイン `http` に移した（決定 D410）ときになくなった。行き先（HTTP-1〜HTTP-15）の対応は、持ち主の文書
+     *
+     * 経緯のある所: `docs/plugin-go-http.md`「診断」の「欠番」
+     */
+    @retired
+    @adr.decided(hozo.decisions.Decision400.D410)
+    GOHTTP_18;
+
+    /**
+     * GOHTTP-19: 欠番（GOHTTP-1〜GOHTTP-8、GOHTTP-12〜GOHTTP-15、GOHTTP-17〜GOHTTP-19 を、まとめて、なくした）。`go-http` が返していた、`http` の語彙の使い方の検査のうち、言語に依らないもの。語彙のプラグイン `http` に移した（決定 D410）ときになくなった。行き先（HTTP-1〜HTTP-15）の対応は、持ち主の文書
+     *
+     * 経緯のある所: `docs/plugin-go-http.md`「診断」の「欠番」
+     */
+    @retired
+    @adr.decided(hozo.decisions.Decision400.D410)
+    GOHTTP_19;
+  }
+}

@@ -25,7 +25,7 @@ type Position struct {
 	Col  int64 `json:"col"`
 }
 
-// DiagnosticData は指摘の、機械が読む補足（docs/check.md「Data」）。項目の名前から、値の並びを引く
+// DiagnosticData は指摘の、機械が読む補足（spec/diagnostics.hozo の、Data の model）。項目の名前から、値の並びを引く
 type DiagnosticData map[string][]string
 
 // Diagnostic は検査やプラグインが報告する一件の指摘（docs/diagnostics.md）
@@ -39,7 +39,7 @@ type Diagnostic struct {
 	Start   *Position     `json:"start,omitempty"`
 	End     *Position     `json:"end,omitempty"`
 	Related []RelatedInfo `json:"related"`
-	// 機械が読む補足（docs/check.md「Data」）。json にだけ出す
+	// 機械が読む補足（spec/diagnostics.hozo の、Data の model）。json にだけ出す
 	Data DiagnosticData `json:"data,omitempty"`
 }
 

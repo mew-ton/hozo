@@ -1,4 +1,4 @@
-// Package check は検査器（docs/check.md）。規則の ID は docs/requirements.md「検査の規則の一覧」のもので、
+// Package check は検査器（docs/check.md）。規則の ID は、仕様の分類 hozo.diagnostics.Rule（spec/diagnostics/rule.hozo）のケースのもので、
 // 規則を実装する関数とテストはその ID を書く。hozoc と言語サーバーの両方がこのパッケージを呼び、結果は同じになる。
 //
 // 入口は三つ。

@@ -123,27 +123,7 @@ namespaces = ["db"]
 
 `read` の応答の `errors` で返す（`docs/plugin-protocol.md`「read」）。順は、名前空間の IR の順。一つの名前空間の中は、表の状態（宣言順）、`@db.ref`（表の model の順、フィールドの順）、`read`（宣言順）、効果（宣言順）。同じ診断（ID、位置、メッセージが同じ）は、一度だけ。warning は、返さない。
 
-| ID | 重さ | 意味 |
-|---|---|---|
-| DB-1 | error | `@db.table` の付いた状態の要素の型が、model でないか、インデックスの model（「表」）。位置は状態 |
-| DB-2 | error | `@db.table` の付いた状態の形が `list` でない（`nullable`、`single`）。位置は状態 |
-| DB-3 | error | `db` のデコレータを付けた `read` の `reads` の状態か、効果の宛先の状態が、N の表の状態でない（`@db.table` が付いていない）。位置は、その `read` か効果 |
-| DB-4 | error | 列を名指しするもの（`read` と `@db.delete` の効果の引数の名前、`@db.where` と `@db.latest` の `column`）が、表の model のフィールドにない。位置は、その `read` か効果 |
-| DB-5 | error | 引数が、デコレータの言うものと合わない: 条件の引数（`read` と、`@db.delete` の効果）の型が、列に合わない（「列と引数の型」）。`@db.insert` / `@db.update` の効果の引数が、表の model の行一つでない。位置は、その `read` か効果 |
-| DB-6 | error | `read` の結果の型が、デコレータの言うものと合わない: `@db.find` は `M?`、`@db.list` は `M[]`（M は表の model）。位置は `read` |
-| DB-7 | error | 効果のデコレータが、効果の宛先と合わない（「効果」）: 宛先が組み込みの効果でない（分類の遷移）か、操作が合わない（`@db.insert` は `post`、`@db.update` は `put`、`@db.delete` は `delete`）。位置は効果 |
-| DB-8 | error | 一つの効果が、`@db.insert` / `@db.update` / `@db.delete` のうち二つ以上を持つ。位置は効果 |
-| DB-9 | error | `@db.find` の `read` が、一行に決まらない: 条件の列が、表の model の `@db.key` のすべても、`@db.unique` の列も含まず、`@db.latest` もない（「read」）。位置は `read` |
-| DB-10 | error | `@db.update` の表の model が、`@db.key` を一つも持たないか、キーでない列を一つも持たない。位置は効果 |
-| DB-11 | error | 表の model のフィールドの `@db.ref(M2)` の指す先が、一つに決まらない: 要素の型が M2 の表の状態が、N にないか、二つ以上ある。または、M2 の `@db.key` が一つでない（「キーと参照」）。位置は model |
-| DB-12 | error | 一つの `read` が、`@db.find` と `@db.list` の両方を持つ。位置は `read` |
-| DB-13 | error | `@db.where` か `@db.latest` の付いた `read` が、`@db.find` も `@db.list` も持たない。位置は `read` |
-| DB-14 | error | 一つの `read` の条件が、同じ列を二度名指ししている（引数と `@db.where`、二つの `@db.where`）。位置は `read` |
-| DB-15 | error | `@db.where` のリテラルが、列の型に渡せない（「read」）。メッセージに、列、リテラル、型を示す。位置は `read` |
-| DB-16 | error | `@db.delete` の効果が、引数を一つも持たない。まだ決めていない形（「効果」の未決）。位置は効果 |
-| DB-17 | error | `@db.update` を付けた効果の行の遷移（`Effect.row`）の、行の引数の型が、同じ分類で絞り込んだ型（`case`）で、後のケース（`to`）が、その `cases` にない（「効果」）。位置は効果 |
-| DB-18 | error | `@db.conflict` を付けた効果が、`@db.insert` も `@db.update` も持たない（「効果」）。位置は効果 |
-| DB-19 | error | `@db.conflict` の例外が、使えない: その効果の `throws` にない。引数を持つ。メッセージに、どちらかを示す。位置は効果 |
+この見出しの診断の、ID と条件と重さの持ち主は、`spec/diagnostics/db.hozo` の分類 `hozo.diagnostics.Db` のケース。
 
 - **どの診断も、書いたものの整合の検査**: デコレータと宣言が食い違っていれば、error にする（`docs/requirements.md`「出力を推論しない」）。
 - **一つの食い違いを、重ねて報告しない**: 表にならなかった状態（DB-1 か DB-2 を返した）を `reads` の状態か宛先にする `read` と効果に、DB-3 は出さない。DB-8、DB-12、DB-13 を返した宣言と、宛先が分類の遷移の効果（DB-7）は、ほかの検査をしない（デコレータが何を言っているのかが、決まらない）。DB-18 を返した効果も、同じ。条件の列がフィールドになかった（DB-4）`@db.find` に、DB-9 は出さない（一行に決まるかどうかを、言えない）。一つの `read` が同じ列を三度名指ししていても、DB-14 は、列ごとに一つ。
