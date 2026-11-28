@@ -21,7 +21,7 @@ import (
 //   - 古い名前: hozoc check と hozoc emit は、なくした。その名前で呼ばれたら、何もせずに、新しい書き方を標準エラーに示して、使い方の誤りの
 //     終了コード（64。docs/diagnostics.md「終了コード」）で終わる。示すのは、残りの引数を付けたもの: hozoc check --format json には
 //     hozoc build --no-emit --format json、hozoc emit --dry-run server には hozoc build --dry-run server。仕様にないコマンドの名前は、
-//     go-cli の Main には、知らないコマンドとしか見えないので、cmd/hozoc が、Main の前に受ける（internal/app の Renamed）。
+//     go-cli の Main には、知らないコマンドとしか見えないので、この案内は、Main の前で、手で書く。
 //
 // 引数:
 //   - in: コマンドの入力

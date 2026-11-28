@@ -397,7 +397,7 @@ classify Gathered of Shipment { Complete; Awaiting: not Complete; }
 済んだもの:
 
 - `cli.md`「cli.hozo」（決定 D808）。
-- `cli.md` の、ほかの節（決定 D809）。残したのは「診断」の表（下の、検査の規則と診断と一緒に移す）。
+- `cli.md` の、ほかの節（決定 D809）。残したのは「診断」の表（この見出しの「残り」の、検査の規則と診断と一緒に移す）。
 
 残り（持ち主が、まだ文書のもの）:
 

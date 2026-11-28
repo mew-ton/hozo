@@ -14,7 +14,7 @@ type Ops interface {
 	//
 	// 1. hozo.toml を読み、入っているプラグインのマニフェストを探して読み、各単位の transpilers の名前をトランスパイラに解決する
 	//    （docs/config.md「置き場と探し方」「単位」、docs/plugin-protocol.md「探索」）。探索が見るプロジェクトの外の場所は、入力の
-	//    pluginPath（HOZO_PLUGIN_PATH）と、cmd/hozoc が渡すホームディレクトリ。hozo.toml がなければ、設定なしで進む（作業ディレクトリを
+	//    pluginPath（HOZO_PLUGIN_PATH）と、ホームディレクトリ（入力にはない。実装が、プロセスから受け取って渡す）。hozo.toml がなければ、設定なしで進む（作業ディレクトリを
 	//    ルートにし、sources は既定。プラグインは探さない）。設定とマニフェストの error は、CFG-16 なら LanguageMismatch、それ以外は
 	//    ConfigInvalid（docs/config.md「診断」、docs/plugin-protocol.md「診断」）。
 	// 2. 標準の語彙、使うプラグイン（docs/plugin-protocol.md「探索」）の語彙、sources のファイルの順に読み、解析する（docs/grammar.md）。
@@ -196,7 +196,7 @@ type Ops interface {
 
 	// RunEmit はプラグインを一つ、hozoc の中の WASM の実行環境で動かして、受け持つ出力のすべてを、まとめて展開させる
 	// （docs/plugin-protocol.md「起動」）。入力は、標準入力に JSON で渡し、標準出力の JSON を、出力として受け取る。
-	// どの配線からも呼ばれないが、プラグインとの境界の記述として残す（実装は internal/app の RunEmit）。動かすプラグインは、引数 plugin で
+	// どの配線からも呼ばれないが、プラグインとの境界の記述として残す。動かすプラグインは、引数 plugin で
 	// 渡す: デコレータの引数に、実行時の値は書けない。
 	//
 	// 引数:
@@ -218,7 +218,7 @@ type Leaves interface {
 	//
 	// 1. hozo.toml を読み、入っているプラグインのマニフェストを探して読み、各単位の transpilers の名前をトランスパイラに解決する
 	//    （docs/config.md「置き場と探し方」「単位」、docs/plugin-protocol.md「探索」）。探索が見るプロジェクトの外の場所は、入力の
-	//    pluginPath（HOZO_PLUGIN_PATH）と、cmd/hozoc が渡すホームディレクトリ。hozo.toml がなければ、設定なしで進む（作業ディレクトリを
+	//    pluginPath（HOZO_PLUGIN_PATH）と、ホームディレクトリ（入力にはない。実装が、プロセスから受け取って渡す）。hozo.toml がなければ、設定なしで進む（作業ディレクトリを
 	//    ルートにし、sources は既定。プラグインは探さない）。設定とマニフェストの error は、CFG-16 なら LanguageMismatch、それ以外は
 	//    ConfigInvalid（docs/config.md「診断」、docs/plugin-protocol.md「診断」）。
 	// 2. 標準の語彙、使うプラグイン（docs/plugin-protocol.md「探索」）の語彙、sources のファイルの順に読み、解析する（docs/grammar.md）。
@@ -290,7 +290,7 @@ type Leaves interface {
 
 	// RunEmit はプラグインを一つ、hozoc の中の WASM の実行環境で動かして、受け持つ出力のすべてを、まとめて展開させる
 	// （docs/plugin-protocol.md「起動」）。入力は、標準入力に JSON で渡し、標準出力の JSON を、出力として受け取る。
-	// どの配線からも呼ばれないが、プラグインとの境界の記述として残す（実装は internal/app の RunEmit）。動かすプラグインは、引数 plugin で
+	// どの配線からも呼ばれないが、プラグインとの境界の記述として残す。動かすプラグインは、引数 plugin で
 	// 渡す: デコレータの引数に、実行時の値は書けない。
 	//
 	// 引数:
