@@ -1,5 +1,5 @@
 // 生成したコードの振る舞いのテスト（docs/testing.md「単体テスト」の `plugins/go`）: 残りのケース（対象 as else。
-// docs/check.md「残りのケース」）を持つ、型で決まる分類で分ける配線（docs/plugin-go.md「match」）。presence は、値がなければ
+// docs/check.md「残りのケース」）を持つ、型で決まる分類で分ける配線（plugins/go/spec/go.hozo の Requirement.Wiring の「match」）。presence は、値がなければ
 // 残りのケースの枝。variant は、残りのアームなら残りのケースの節。plugins/go の TestBehavior が、生成したコードのモジュールの
 // ルートに置いて走らせる。
 package behavior

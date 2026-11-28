@@ -9,11 +9,11 @@ import (
 	"github.com/mew-ton/hozo/plugin/golang"
 )
 
-// このファイルは states.go（docs/plugin-go.md「状態の単位」）: 状態の単位（基底の状態と、述語で決まる状態の分類を、宣言順に）。
+// このファイルは states.go（plugins/go/spec/go.hozo の Requirement.Ports の「状態の単位」）: 状態の単位（基底の状態と、述語で決まる状態の分類を、宣言順に）。
 // 単位は、その状態に触れるもののすべて: 形で決まるメソッドと、その状態の read と、その状態を宛先にする効果。
 // 定義のパッケージのもの（genStates）と、分けた出力の入口の再公開（genEntryStates）。
 
-// unitComment は、状態の単位の型のコメント（docs/plugin-go.md「コメント」）。
+// unitComment は、状態の単位の型のコメント（plugins/go/spec/go.hozo の Requirement.Comments）。
 func (e *emitter) unitComment(u golang.StateUnit) string {
 	var first string
 	switch d := e.lookup(u.FQN).(type) {
@@ -26,7 +26,7 @@ func (e *emitter) unitComment(u golang.StateUnit) string {
 	return comment(first + "実装は New の引数 " + u.Param + " に渡す。\n" + commentMissing)
 }
 
-// unitMethodComment は、状態の単位の read と効果のメソッドのコメント（docs/plugin-go.md「コメント」の「状態の単位のメソッド」）:
+// unitMethodComment は、状態の単位の read と効果のメソッドのコメント（plugins/go/spec/go.hozo の Requirement.Comments の「状態の単位のメソッド」）:
 // 「<head>: <説明>」。説明がなければ「<head>。」。説明が二行以上なら、二行目から先は、行ごとに続ける。
 // 「は」の後ろの空白の規則は、ここでは使わない（説明の前は `: `）。
 func unitMethodComment(head string, d *ir.Doc) string {
@@ -42,7 +42,7 @@ func readComment(r *ir.Read) string {
 }
 
 // effectMethodComment は、効果のメソッドのコメント: 「<メソッド名> は命令（効果 <効果の FQN>、effects <宛先>）: <説明>」。
-// 例外を投げる効果（Effect.throws）は、effects の前に「throws <例外の FQN を「, 」で>、」を置く（docs/plugin-go.md「コメント」の
+// 例外を投げる効果（Effect.throws）は、effects の前に「throws <例外の FQN を「, 」で>、」を置く（plugins/go/spec/go.hozo の Requirement.Comments の
 // 「状態の単位のメソッド」）。
 func effectMethodComment(x *ir.Effect) string {
 	throws := ""
@@ -109,7 +109,7 @@ func (e *emitter) genStates() *fileGen {
 	return f
 }
 
-// checkedEffects は、単位 u の効果のうち、入口で確かめる引数を持つもの（宣言順。docs/plugin-go.md「効果の入口の確かめ」）。
+// checkedEffects は、単位 u の効果のうち、入口で確かめる引数を持つもの（宣言順。plugins/go/spec/go.hozo の Requirement.Ports の「効果の入口の確かめ」）。
 func (e *emitter) checkedEffects(u golang.StateUnit) []*ir.Effect {
 	var out []*ir.Effect
 	for _, fqn := range u.Effects {
@@ -147,7 +147,7 @@ func caseNames(c *ir.Classify) string {
 }
 
 // classifyArg は、分類 c の判定関数に渡す式: 値 v（Go の型が vType）を、分類の対象の型にそろえたもの。対象の型が optional(T) で、
-// v の型が T なら `&v`（docs/plugin-go.md「効果の入口の確かめ」）。at は診断の位置。
+// v の型が T なら `&v`（plugins/go/spec/go.hozo の Requirement.Ports の「効果の入口の確かめ」）。at は診断の位置。
 func (e *emitter) classifyArg(f *fileGen, c *ir.Classify, v, vType, at string) string {
 	subject := f.goType(c.SubjectType())
 	switch {
@@ -160,7 +160,7 @@ func (e *emitter) classifyArg(f *fileGen, c *ir.Classify, v, vType, at string) s
 	return v
 }
 
-// genChecked は、単位 u を包む型と、そのメソッド（docs/plugin-go.md「効果の入口の確かめ」）: 絞り込んだ引数を持つ効果の入口で、
+// genChecked は、単位 u を包む型と、そのメソッド（plugins/go/spec/go.hozo の Requirement.Ports の「効果の入口の確かめ」）: 絞り込んだ引数を持つ効果の入口で、
 // 引数が、言ったとおりのケースにあるかを確かめてから、包んだ単位を呼ぶ。確かめる効果がなければ、何も出さない。
 func (e *emitter) genChecked(f *fileGen, u golang.StateUnit) {
 	effects := e.checkedEffects(u)

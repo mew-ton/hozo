@@ -2,7 +2,7 @@ package golang
 
 import "github.com/mew-ton/hozo/ir"
 
-// このファイルは、定義のパッケージの公開の名前（docs/plugin-go.md「名前」の「名前が当たれば GO-2」が並べるもの）の写し。
+// このファイルは、定義のパッケージの公開の名前（plugins/go/spec/go.hozo の Requirement.Names の「名前が当たれば GO-2」が並べるもの）の写し。
 // 基底は、この一覧の中で名前が当たれば GO-2 を返し、入口か定義のパッケージに公開の名前を足す相乗りは、自分の名前がこの一覧の
 // 名前と当たれば、自分の診断で報告する（同「相乗りのファイル」）。入口のパッケージは、定義のすべての名前を再公開するので、
 // どちらのパッケージに足す名前も、当たる相手はこの一覧。
@@ -51,7 +51,7 @@ type PublicName struct {
 	What string
 }
 
-// PublicNames は、view の出力 (U, N) の定義のパッケージの公開の名前のすべて（docs/plugin-go.md「名前」の「名前が当たれば GO-2」）。
+// PublicNames は、view の出力 (U, N) の定義のパッケージの公開の名前のすべて（plugins/go/spec/go.hozo の Requirement.Names の「名前が当たれば GO-2」）。
 // 並びは、N の宣言順（宣言ごとに、型、アームを包む型。分類は、列挙の型、ケースの定数、判定関数、述語の
 // インターフェース）、状態の単位（宣言順）、`Ops`、`New`、`Leaves`、`Seams`、別の名前空間の口（FQN の辞書順）。
 // 当たる名前も、そのまま二つ返す（当たっているかを見るのは呼ぶ側）。View が見る側のために合成した model、`set` の union、
@@ -90,10 +90,10 @@ func PublicNames(view *ir.View) []PublicName {
 		case *ir.Model:
 			if x.SynthesizedFrom != "" {
 				if _, fromOp := p.Lookup(x.SynthesizedFrom).(*ir.Op); fromOp {
-					continue // View が見る側のために合成した model は、基底が出さない（docs/plugin-go.md「出力の対象」）
+					continue // View が見る側のために合成した model は、基底が出さない（plugins/go/spec/go.hozo の Requirement.Targets）
 				}
 			}
-			// model から出す名前は、構造体の型だけ（docs/plugin-go.md「model」: 値を作る関数は出さない）
+			// model から出す名前は、構造体の型だけ（plugins/go/spec/go.hozo の Requirement.Types の「model」: 値を作る関数は出さない）
 			add(typeName(name), PublicType, name, "", "model "+name)
 		case *ir.Scalar, *ir.Exception:
 			add(typeName(name), PublicType, name, "", d.Kind()+" "+name)
@@ -149,7 +149,7 @@ func PublicNames(view *ir.View) []PublicName {
 	return out
 }
 
-// TestName は、テストのパッケージ（docs/plugin-go.md「単体テストの口」の「テストのパッケージ」）の、基底の公開の名前一つ。
+// TestName は、テストのパッケージ（plugins/go/spec/go.hozo の Requirement.UnitTestPort の「テストのパッケージ」）の、基底の公開の名前一つ。
 type TestName struct {
 	// Name は Go の名前。
 	Name string
@@ -159,7 +159,7 @@ type TestName struct {
 	What string
 }
 
-// PublicTestNames は、view の出力 (U, N) の、テストのパッケージに、基底が出す公開の名前のすべて（docs/plugin-go.md「単体テストの口」
+// PublicTestNames は、view の出力 (U, N) の、テストのパッケージに、基底が出す公開の名前のすべて（plugins/go/spec/go.hozo の Requirement.UnitTestPort
 // 「テストのにせもの」）。並びは、まとめの `LeafCases` と `RunLeaves`（葉が一つでもあれば）、葉ごとの `<Op>Cases` と `<Op>Case`
 // （Leaves の並び）、判定の口を出す分類（N が宣言した、述語で決まる値の分類と op の分類。宣言順）ごとの `<C>Examples` と `Run<C>`、
 // fakes.go の名前（TestFakeNames: にせものの型、`Fakes`、`NewOps`）。

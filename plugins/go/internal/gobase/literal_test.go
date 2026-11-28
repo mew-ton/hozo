@@ -5,10 +5,10 @@ import (
 	"testing"
 )
 
-// TestLiteralMatchBodies は docs/plugin-go.md「match」の、絞り込みが literal の分け方（`if <対象>`。真の側が if の枝）: testdata/matchliteral の
+// literalMatchBodies は plugins/go/spec/go.hozo の Requirement.Wiring の「match」の、絞り込みが literal の分け方（`if <対象>`。真の側が if の枝）: testdata/matchliteral の
 // op の本体が、文書から、手で書いた、下のコードと同じこと。ゴールデン（expected/）は、ファイルの全体を比べる。ここは、分け方だけを、
 // 実装より先に書いた期待と比べる。
-func TestLiteralMatchBodies(t *testing.T) {
+func literalMatchBodies(t *testing.T) {
 	_, files := emitFixture(t, "matchliteral")
 	wiring, ok := files["gen/app/wiring.go"]
 	if !ok {
@@ -66,10 +66,10 @@ func TestLiteralMatchBodies(t *testing.T) {
 	}
 }
 
-// TestLiteralPredicateGuard は docs/plugin-go.md「分類」の「型で決まる絞り込みの as を持つケースは、値がその型に当たらなければ、
+// literalPredicateGuard は plugins/go/spec/go.hozo の Requirement.Wiring の「分類」の「型で決まる絞り込みの as を持つケースは、値がその型に当たらなければ、
 // 述語を呼ばずに偽とする」の literal: 判定関数の中で、as true のケースの述語は `if v`、as false のケースの述語は `if !v` で包む。
 // 期待は、文書から、手で書いた。
-func TestLiteralPredicateGuard(t *testing.T) {
+func literalPredicateGuard(t *testing.T) {
 	_, files := emitFixture(t, "matchliteral")
 	src, ok := files["gen/app/types/classify.go"]
 	if !ok {

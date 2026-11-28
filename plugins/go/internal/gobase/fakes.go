@@ -7,17 +7,17 @@ import (
 	"github.com/mew-ton/hozo/plugin/golang"
 )
 
-// このファイルは、テストのパッケージの fakes.go（docs/plugin-go.md「テストのにせもの」）: 実装を受け取る口のにせものと、
+// このファイルは、テストのパッケージの fakes.go（plugins/go/spec/go.hozo の Requirement.Fakes）: 実装を受け取る口のにせものと、
 // にせものの上に、この名前空間の Ops を組み立てる NewOps。形（何を、にせものにし、何を、本物で通すか）は、golang.TestKitOf が
 // 決める（その組み立てを使う相乗りと、同じ値）。
 
 const fileFakes = "fakes.go"
 
-// fakeBodyNames は、fakes.go の本体が、決まった名前で使う識別子（docs/plugin-go.md「テストのにせもの」の「出すとき」）。
+// fakeBodyNames は、fakes.go の本体が、決まった名前で使う識別子（plugins/go/spec/go.hozo の Requirement.Fakes の「出すとき」）。
 // import の名前に使わない。
 var fakeBodyNames = []string{"f", "o", "ctx", "k", "body"}
 
-// hasFakes は、fakes.go を出すか（docs/plugin-go.md「テストのにせもの」の「出すとき」）。
+// hasFakes は、fakes.go を出すか（plugins/go/spec/go.hozo の Requirement.Fakes の「出すとき」）。
 func (e *emitter) hasFakes() bool { return e.kit.HasFakes() }
 
 // fakeMethod は、にせものにする口のメソッド一つ: 名前、引数（ctx を除く。フィールドの名前、局所の名前、Go の型）、戻り値の型
@@ -70,7 +70,7 @@ func (e *emitter) opMethod(f *fileGen, o *ir.Op, reserved map[string]bool) fakeM
 	return m
 }
 
-// unitMethods は、状態の単位 u のメソッド（docs/plugin-go.md「状態の単位」の並び）。
+// unitMethods は、状態の単位 u のメソッド（plugins/go/spec/go.hozo の Requirement.Ports の「状態の単位」の並び）。
 func (e *emitter) unitMethods(f *fileGen, u golang.StateUnit, reserved map[string]bool) []fakeMethod {
 	ctx := "ctx " + f.im.Add("context", "context") + ".Context"
 	var out []fakeMethod
@@ -147,7 +147,7 @@ func (e *emitter) genFakeType(f *fileGen, fake, thing, iface, fields, unsaid str
 	}
 }
 
-// genTestFakes はテストのパッケージの fakes.go。出さない出力（docs/plugin-go.md「テストのにせもの」の「出すとき」）なら nil。
+// genTestFakes はテストのパッケージの fakes.go。出さない出力（plugins/go/spec/go.hozo の Requirement.Fakes の「出すとき」）なら nil。
 func (e *emitter) genTestFakes() *fileGen {
 	if !e.hasFakes() {
 		return nil
@@ -295,7 +295,7 @@ func (e *emitter) genTestFakes() *fileGen {
 	return f
 }
 
-// genCasesFake は、分類の述語のにせもの（docs/plugin-go.md「テストのにせもの」の <C>CasesFake）: メソッド Is と、本物を包む、口を満たす型。
+// genCasesFake は、分類の述語のにせもの（plugins/go/spec/go.hozo の Requirement.Fakes の <C>CasesFake）: メソッド Is と、本物を包む、口を満たす型。
 func (e *emitter) genCasesFake(f *fileGen, p golang.KitParam) {
 	c, _ := e.lookup(p.FQN).(*ir.Classify)
 	q := f.im.Qualifier(e.declNS[p.FQN])

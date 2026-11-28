@@ -8,8 +8,8 @@ import (
 	"example.com/shop-server/gen/server/servertest"
 )
 
-// このファイルは、デコレータのテスト（docs/ide-chain.md「テストの規約」の「デコレータのテスト」。Go の口は docs/plugin-go.md
-// 「デコレータのテストの口」）: 継ぎ目 @rate.limited の実装（go-ratelimit が出した server.RateSeams と、人が書いた数え方 Limiter）
+// このファイルは、デコレータのテスト（docs/ide-chain.md「テストの規約」の「デコレータのテスト」。Go の口は plugins/go/spec/go.hozo の Requirement.UnitTestPort の「デコレータのテストの口」
+// ）: 継ぎ目 @rate.limited の実装（go-ratelimit が出した server.RateSeams と、人が書いた数え方 Limiter）
 // を、結果ごとに確かめる。書いてあるのは、その結果になる状態の、継ぎ目の実装だけ: 継ぎ目を呼ぶ所と、結果の見分け（正常か、
 // どの例外か。op の中身が、呼ばれたか）は、生成したコード（servertest.RunSeams）が持つ。ケースは、デコレータの宣言ごとに一組で、
 // @rate.limited を、ほかの op に付けても、ここに足すものは、ない。

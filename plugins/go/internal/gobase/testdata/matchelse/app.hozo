@@ -1,4 +1,4 @@
-// docs/plugin-go.md「match」「分類」の、残りのケース（対象 as else。docs/check.md「残りのケース」）を持つ、型で決まる分類を、
+// plugins/go/spec/go.hozo の Requirement.Wiring の「match」、Requirement.Wiring の「分類」の、残りのケース（対象 as else。docs/check.md「残りのケース」）を持つ、型で決まる分類を、
 // 一か所ずつ使う: 二つに分ける形（presence）の、もう一方の枝。switch の形（variant）の、残りのアームを並べた case。
 // 絞り込んだ値（残りのアームがちょうど一つのとき）。各 op の上のコメントが、その op が確かめる行。
 // op はどれも export（出力は一つのパッケージ）。

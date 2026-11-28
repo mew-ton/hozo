@@ -2,7 +2,7 @@
 
 ## この文書が決めること
 
-トランスパイラ `go-design`（プラグインは `plugins/go-design/`）が受け付けない書き方。`go-design` は、設計の図の語彙（`docs/vocab.md`「設計の図の語彙」）を読んで、テストを受け取る口を出し、Go の基底 `go`（`docs/plugin-go.md`）に相乗りする。
+トランスパイラ `go-design`（プラグインは `plugins/go-design/`）が受け付けない書き方。`go-design` は、設計の図の語彙（`docs/vocab.md`「設計の図の語彙」）を読んで、テストを受け取る口を出し、Go の基底 `go`（`plugins/go/spec/go.hozo`）に相乗りする。
 
 ほかのことの持ち主は、プラグインのファイル（決定 D813）:
 

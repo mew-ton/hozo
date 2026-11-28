@@ -278,5 +278,26 @@ namespace hozo.decisions {
      */
     @adr.proposed
     D813;
+
+    /**
+     * Go の基底 go の持ち主を、文書 docs/plugin-go.md から、プラグインのファイルに移した（D807、D810。形は、go-cli の D811 と同じ）。
+     * どんな仕様に対しても何を出すかは、go 自身の仕様 plugins/go/spec/go.hozo の要求 hozo.gobase.Requirement のケース: 文書の
+     * 大きな見出し一つが、ケース一つで、説明は、見出しの本文を、そのまま移した（小見出しは、説明の中の見出しのまま）。マニフェストと
+     * オプション module は plugins/go/hozo-plugin.toml、生成したコードが import するパッケージ runtime は、そのパッケージの説明
+     * （runtime/doc.go）。plugins/go を、一つの Hozo のプロジェクトにし、go-design が作る要求ごとの口（gobasetest.RunRequirements）を、
+     * go の単体テストが満たす。docs/plugin-go.md に残したのは、診断の補足と、形を変えてきた経緯だけ。
+     *
+     * @adr.context 文書は、およそ 1,750 行で、生成するコードの形を、見出しごとに言い、単体テストの入力（testdata/<名前>/）と、七百ほどの
+     * コメントが、その見出しを名指ししていた。
+     * @adr.consequence 単体テストの入力は、どれも、要求のケースを一つ持ち、そのケースから、ゴールデンとの比較、go vet、振る舞いのテストが
+     * 走る（ほかのケースにも関わる入力は、そのケースからも、ゴールデンとの比較だけが走る）。名指しは、「plugins/go/spec/go.hozo の
+     * Requirement.Wiring の「match」」の形になる。要求の説明の全文が、生成した口（gobasetest の design.go）のコメントに写る。
+     * @adr.alternative 小見出しごとに、ケースを分ける（45 ほど）: 単体テストの入力は、いくつもの小見出しにまたがっていて、入力とケースの
+     *   対応を、作り直すことになる
+     * @adr.alternative パッケージ runtime の説明も、要求のケースにする: runtime のテストは、別のパッケージ（runtime/）にあり、go の
+     *   単体テストからは、満たせない
+     */
+    @adr.proposed
+    D814;
   }
 }

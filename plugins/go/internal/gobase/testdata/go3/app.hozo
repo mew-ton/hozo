@@ -1,4 +1,4 @@
-// GO-3（docs/plugin-go.md「パッケージと import パス」）: a の出力は b の型を、b の出力は a の型を import する。
+// GO-3（plugins/go/spec/go.hozo の Requirement.Layout の「パッケージと import パス」）: a の出力は b の型を、b の出力は a の型を import する。
 // 輪に入る出力ごとに出る。c は a を import するだけで、輪に入らない。
 
 namespace a {

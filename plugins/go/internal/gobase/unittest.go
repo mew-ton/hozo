@@ -9,14 +9,14 @@ import (
 	"github.com/mew-ton/hozo/plugin/golang"
 )
 
-// このファイルは、テストのパッケージ（docs/plugin-go.md「単体テストの口」）: 人か AI が中身を書く関数に出す、結果ごとの単体テストを
+// このファイルは、テストのパッケージ（plugins/go/spec/go.hozo の Requirement.UnitTestPort）: 人か AI が中身を書く関数に出す、結果ごとの単体テストを
 // 受け取る口と、それを走らせる関数。葉の op（leaves.go）と、述語で決まる値の分類・op の分類の判定（classify.go）。
 // テストのパッケージは、N の入口のパッケージを import する。
 
-// テストのパッケージのファイル名（docs/plugin-go.md「ファイル」）。doc.go と classify.go は、定義のパッケージと同じ名前。
+// テストのパッケージのファイル名（plugins/go/spec/go.hozo の Requirement.Layout の「ファイル」）。doc.go と classify.go は、定義のパッケージと同じ名前。
 const fileLeaves = "leaves.go"
 
-// testBodyNames は、テストのパッケージの関数の本体が、決まった名前で使う識別子（docs/plugin-go.md「単体テストの口」の
+// testBodyNames は、テストのパッケージの関数の本体が、決まった名前で使う識別子（plugins/go/spec/go.hozo の Requirement.UnitTestPort の
 // 「テストのパッケージ」）。import の名前に使わない。
 var testBodyNames = []string{"t", "c", "x", "k", "cases", "leaves", "got", "err", "want", "kind", "none"}
 
@@ -50,7 +50,7 @@ func (e *emitter) hasTests() bool {
 	return len(e.shape.Leaves) > 0 || len(e.testClassifies()) > 0 || len(e.shape.Seams) > 0 || e.hasFakes()
 }
 
-// leafResult は、葉の結果一つ（docs/plugin-go.md「単体テストの口」の「葉の op」）: 正常か、例外一つ。name は、<Op>Cases の
+// leafResult は、葉の結果一つ（plugins/go/spec/go.hozo の Requirement.UnitTestPort の「葉の op」）: 正常か、例外一つ。name は、<Op>Cases の
 // メソッドの名前で、テストの名前の <結果> でもある。exception は、例外の FQN（正常なら ""）。
 type leafResult struct {
 	name, exception string
@@ -119,7 +119,7 @@ func (e *emitter) genTestDoc() *fileGen {
 	}
 	f := e.newTestFile(fileDoc, testBodyNames)
 	f.doc = comment("Package " + e.layout.TestName + " は、名前空間 " + e.view.Viewer +
-		" の、テストのためのもの: 単体テストの口と、にせもの（docs/plugin-go.md「単体テストの口」「テストのにせもの」）。")
+		" の、テストのためのもの: 単体テストの口と、にせもの（plugins/go/spec/go.hozo の Requirement.UnitTestPort、Requirement.Fakes）。")
 	return f
 }
 

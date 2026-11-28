@@ -19,7 +19,7 @@ import (
 // TranspilerName は、このプラグインが提供するただ一つのトランスパイラの名前（マニフェストの [[transpiler]] の name）。
 const TranspilerName = "go-ratelimit"
 
-// FileName は、このトランスパイラが、入口のパッケージに置くファイルの名前（docs/plugin-go.md「相乗りのファイル」）。
+// FileName は、このトランスパイラが、入口のパッケージに置くファイルの名前（plugins/go/spec/go.hozo の Requirement.Layout の「相乗りのファイル」）。
 const FileName = "ratelimit.go"
 
 // 読む語彙（rate.hozo）: 継ぎ目を宣言したデコレータと、制限を超えたときの例外の FQN。
@@ -132,7 +132,7 @@ func (e *emitter) errorf(code, at, format string, args ...any) {
 }
 
 // generate は ratelimit.go の内容を作る。import の名前と、局所の名前が避ける名前を決めるために、二度作る（基底と同じ。
-// docs/plugin-go.md「パッケージと import パス」の「import の名前」）。go/format で整形する。
+// plugins/go/spec/go.hozo の Requirement.Layout の「パッケージと import パス」の「import の名前」）。go/format で整形する。
 func (e *emitter) generate() (string, error) {
 	im := golang.NewImports(e.view, e.layout, false)
 	e.build(im)
@@ -211,7 +211,7 @@ type owned struct {
 	at   string // 診断の位置にする宣言の FQN（宣言が生んだ名前でなければ ""）
 }
 
-// baseNames は、基底 go が N の定義のパッケージに出す公開の名前（docs/plugin-go.md「名前」の「名前が当たれば GO-2」が並べるもの。
+// baseNames は、基底 go が N の定義のパッケージに出す公開の名前（plugins/go/spec/go.hozo の Requirement.Names の「名前が当たれば GO-2」が並べるもの。
 // 一覧は、基底と共有する golang.PublicNames）。入口のパッケージは、定義のすべての名前を再公開する。同じ名前が二つあれば、先のもの。
 func (e *emitter) baseNames() map[string]owned {
 	names := map[string]owned{}

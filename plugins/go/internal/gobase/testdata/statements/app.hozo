@@ -1,4 +1,4 @@
-// docs/plugin-go.md「呼び出し」「文」の表の各行を、一か所ずつ使う。各 op の上のコメントが、その op が確かめる行。
+// plugins/go/spec/go.hozo の Requirement.Wiring の「呼び出し」、Requirement.Wiring の「文」の表の各行を、一か所ずつ使う。各 op の上のコメントが、その op が確かめる行。
 // op はどれも export（内部の op がなければ、出力は一つのパッケージ。「内側のフォルダと入口」は、入力 layout が確かめる）。
 
 /** 文と呼び出しの形 */
@@ -18,7 +18,7 @@ namespace app {
   @mark export fn save(item: Item);
   @mark export fn touch();
   @mark export fn find(id: Id, limit: int?, tag: string?): Item?;
-  // 葉: 純粋で throws がない（それでも、メソッドは ctx を取り、error を返す。docs/plugin-go.md「op の形」）
+  // 葉: 純粋で throws がない（それでも、メソッドは ctx を取り、error を返す。plugins/go/spec/go.hozo の Requirement.OpShape）
   export fn make(id: Id): Item;
   export fn note(item: Item);
   export fn pick(a: Item?, b: Item?): Item?;

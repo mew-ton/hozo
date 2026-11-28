@@ -87,7 +87,7 @@ func (e *emitter) collectReads() {
 	}
 }
 
-// goLiteral は、@db.where のリテラル lit の Go での書き方（docs/plugin-go.md「値」の表の literal の行と同じ）。@db.float の列に
+// goLiteral は、@db.where のリテラル lit の Go での書き方（plugins/go/spec/go.hozo の Requirement.Wiring の「値」の表の literal の行と同じ）。@db.float の列に
 // 渡した整数のリテラルは、小数のリテラルで書く（`1.0`）。
 func goLiteral(lit ir.Literal, c *column) string {
 	float := func(v float64) string {

@@ -42,7 +42,7 @@ func (f *file) use(path string) string {
 }
 
 // render は、design.go の全体を作り、go/format で整形する。import の名前を文書の決まりの順で決めるために、二度描く
-// （docs/plugin-go.md「パッケージと import パス」の「import の名前」。基底と同じ手順）。
+// （plugins/go/spec/go.hozo の Requirement.Layout の「パッケージと import パス」の「import の名前」。基底と同じ手順）。
 func (g *generator) render(flows []flow, classes []class) (string, error) {
 	where := g.layout.TestName + "/" + FileName
 	im := golang.NewTestImports(g.view, g.layout)

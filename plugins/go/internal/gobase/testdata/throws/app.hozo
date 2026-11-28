@@ -1,7 +1,7 @@
-// docs/plugin-go.md「exception」（引数ごとにフィールド一つの構造体）と、「match」の「アームの本体」の `throw E`、`throw E(<値>, …)` の
+// plugins/go/spec/go.hozo の Requirement.Types の「exception」（引数ごとにフィールド一つの構造体）と、「match」の「アームの本体」の `throw E`、`throw E(<値>, …)` の
 // 行を、使われ方（return / const / 文）ごとに、一か所ずつ使う。各 op の上のコメントが、その op が確かめる行。
 // op はどれも export（出力は一つのパッケージ）。
-// 例外を投げる効果（docs/plugin-go.md「状態の単位」「コメント」）: 単位のメソッドのコメントに throws。配線は、失敗を、そのまま返す。
+// 例外を投げる効果（plugins/go/spec/go.hozo の Requirement.Ports の「状態の単位」、Requirement.Comments）: 単位のメソッドのコメントに throws。配線は、失敗を、そのまま返す。
 
 /** 別の名前空間の例外 */
 namespace limits {

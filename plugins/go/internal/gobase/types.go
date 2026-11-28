@@ -8,14 +8,14 @@ import (
 	"github.com/mew-ton/hozo/plugin/golang"
 )
 
-// このファイルは types.go（docs/plugin-go.md「型」）: model、scalar、union、exception、effect を、宣言の順に一つずつ。
+// このファイルは types.go（plugins/go/spec/go.hozo の Requirement.Types）: model、scalar、union、exception、effect を、宣言の順に一つずつ。
 // 定義のパッケージのもの（genTypes）と、分けた出力の入口の再公開（genEntryTypes）。
 
 // typeDecl は、types.go に出す宣言か: N の model（見る側のために合成したものを除く）、scalar、union（arms）、exception、effect。
 func (e *emitter) typeDecl(d ir.Decl) bool {
 	switch x := d.(type) {
 	case *ir.Model:
-		// View が見る側のために合成した model（synthesizedFrom が op の FQN）は出さない（docs/plugin-go.md「出力の対象」）
+		// View が見る側のために合成した model（synthesizedFrom が op の FQN）は出さない（plugins/go/spec/go.hozo の Requirement.Targets）
 		return x.SynthesizedFrom == "" || e.op(x.SynthesizedFrom) == nil
 	case *ir.Union:
 		return x.Variant == ir.UnionArms
@@ -25,7 +25,7 @@ func (e *emitter) typeDecl(d ir.Decl) bool {
 	return false
 }
 
-// modelComment は model のコメント: 「<型名> は<説明>」と、継承した model なら、継承の一行（docs/plugin-go.md「コメント」）。
+// modelComment は model のコメント: 「<型名> は<説明>」と、継承した model なら、継承の一行（plugins/go/spec/go.hozo の Requirement.Comments）。
 func (e *emitter) modelComment(m *ir.Model) string {
 	text := describe(e.typeName(m.Name), m.Description, "model "+m.Name+"。")
 	if x := m.Extends; x != nil {
@@ -101,7 +101,7 @@ type armType struct {
 	literal ir.Literal
 }
 
-// armTypes は union u のアームの Go の型（docs/plugin-go.md「union」）: アームの型が、u を宣言した名前空間の model への ref なら、
+// armTypes は union u のアームの Go の型（plugins/go/spec/go.hozo の Requirement.Types の「union」）: アームの型が、u を宣言した名前空間の model への ref なら、
 // その構造体。それ以外（別の名前空間の model、scalar、核の型、optional、array、union）は、包む型 `<Union><アーム名>`。
 // リテラルの型のアームは、値を持たない、包む型（armType.literal）。
 func (e *emitter) armTypes(u *ir.Union) []armType {
@@ -169,7 +169,7 @@ func (e *emitter) genTypes() *fileGen {
 	return f
 }
 
-// genModel は model 一つ: 構造体だけ（docs/plugin-go.md「model」: 値を作る関数は出さない。フィールドの既定値は、言語にない）。
+// genModel は model 一つ: 構造体だけ（plugins/go/spec/go.hozo の Requirement.Types の「model」: 値を作る関数は出さない。フィールドの既定値は、言語にない）。
 // インデックスの model は、名前付きのマップの型。リテラルの型のフィールドは、項目を持たず、コメントの行になる（同「model」）。
 func (e *emitter) genModel(f *fileGen, m *ir.Model) {
 	name := e.typeName(m.Name)
@@ -211,12 +211,12 @@ func isLiteralType(t ir.Type) bool {
 	return ok
 }
 
-// literalFieldComment は、リテラルの型のフィールド fd の、項目の代わりの、コメントの行（docs/plugin-go.md「model」）。
+// literalFieldComment は、リテラルの型のフィールド fd の、項目の代わりの、コメントの行（plugins/go/spec/go.hozo の Requirement.Types の「model」）。
 func literalFieldComment(fd ir.Field) string {
 	return comment(fd.Name + " は、いつも " + golang.TypeDisplay(fd.Type) + "（Go の項目は、ない）")
 }
 
-// structField は、構造体のフィールド一つ（model のフィールドと、例外の引数。docs/plugin-go.md「名前」）: 名前は先頭を大文字に、
+// structField は、構造体のフィールド一つ（model のフィールドと、例外の引数。plugins/go/spec/go.hozo の Requirement.Names）: 名前は先頭を大文字に、
 // タグは `json:"<元の名前>"`。型が省略可能なら `,omitempty`。
 func (f *fileGen) structField(name string, t ir.Type) string {
 	tag := name
@@ -256,7 +256,7 @@ func wrapperComment(goName, union, arm string, t ir.Type) string {
 	return comment(goName + " は union " + union + " のアーム " + arm + "（" + golang.TypeDisplay(t) + "）を包む型。")
 }
 
-// genEntryTypes は、分けた出力の入口の types.go: 内側の型の別名と、effect の定数（docs/plugin-go.md「内側のフォルダと入口」の
+// genEntryTypes は、分けた出力の入口の types.go: 内側の型の別名と、effect の定数（plugins/go/spec/go.hozo の Requirement.Layout の「内側のフォルダと入口」の
 // 再公開の表）。コメントは定義と同じ。再公開するものがなければ nil。
 // toDef なら、定義のパッケージの types.go: 型のパッケージの再公開（同「型のパッケージ」。型のパッケージを分ける出力だけ）。
 func (e *emitter) genReexportTypes(toDef bool) *fileGen {

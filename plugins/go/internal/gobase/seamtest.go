@@ -8,7 +8,7 @@ import (
 	"github.com/mew-ton/hozo/plugin/golang"
 )
 
-// このファイルは、デコレータのテストの口（docs/plugin-go.md「デコレータのテストの口」）: 単位の継ぎ目にあるデコレータの、結果ごとの
+// このファイルは、デコレータのテストの口（plugins/go/spec/go.hozo の Requirement.UnitTestPort の「デコレータのテストの口」）: 単位の継ぎ目にあるデコレータの、結果ごとの
 // ケース（<D>Cases、<D>Case）、まとめの SeamCases、走らせる RunSeams。例外を受けるデコレータ（catches）の継ぎ目には、RunSeams が、
 // 受ける例外ごとのテストを足す（同「受けるケース」）。
 
@@ -92,7 +92,7 @@ func argTargets(v ir.ArgValue) []string {
 // seamCatches は、op o への、デコレータ d（FQN は fqn）の適用のすべてについて、受ける例外（catches の節の例外。節の順。
 // 同じ例外は、一度だけで、扱いは、最初に出てきた節のもの）と、デコレータが投げうる例外（throws の節の例外。書かれた順。
 // 同じ例外は、一度だけ）。デコレータの引数の名前（"$param:名前"）は、その適用が渡した例外で置き換える
-// （docs/plugin-go.md「デコレータのテストの口」の「受けるケース」）。Program にない例外は、入れない。
+// （plugins/go/spec/go.hozo の Requirement.UnitTestPort の「デコレータのテストの口」の「受けるケース」）。Program にない例外は、入れない。
 func (e *emitter) seamCatches(o *ir.Op, fqn string, d *ir.Decorator) (catches []seamCatch, throws []string) {
 	seenCatch, seenThrow := map[string]bool{}, map[string]bool{}
 	for _, app := range o.Decorators {
@@ -260,7 +260,7 @@ func (e *emitter) genTestSeams() *fileGen {
 	return f
 }
 
-// genSeamCatches は、継ぎ目一つの、受ける例外ごとのテスト（docs/plugin-go.md「デコレータのテストの口」の「受けるケース」）:
+// genSeamCatches は、継ぎ目一つの、受ける例外ごとのテスト（plugins/go/spec/go.hozo の Requirement.UnitTestPort の「デコレータのテストの口」の「受けるケース」）:
 // t.Run("catches", …) の中に、例外ごとの t.Run。受ける例外がなければ、何も出さない。head は、継ぎ目を呼ぶ式の、にせものの中身の
 // return の手前まで。
 func (e *emitter) genSeamCatches(f *fileGen, o *ir.Op, fqn string, d *ir.Decorator, head, testing string) {

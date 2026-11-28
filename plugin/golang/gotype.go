@@ -9,10 +9,10 @@ import (
 	"github.com/mew-ton/hozo/ir"
 )
 
-// RuntimePath は、生成したコードが import する runtime パッケージ（docs/plugin-go.md「runtime パッケージ」）。
+// RuntimePath は、生成したコードが import する runtime パッケージ（パッケージ runtime の説明（runtime/doc.go））。
 const RuntimePath = "github.com/mew-ton/hozo/runtime"
 
-// GoType は IR の型を Go の型の文字列にする（docs/plugin-go.md「型」の表）。必要な import を imports に足す。
+// GoType は IR の型を Go の型の文字列にする（plugins/go/spec/go.hozo の Requirement.Types の表）。必要な import を imports に足す。
 //
 //	string / boolean / int / float   → string / bool / int64 / float64
 //	datetime / duration              → time.Time / time.Duration（"time" を import）
@@ -70,7 +70,7 @@ func GoType(t ir.Type, imports *Imports) string {
 	panic(fmt.Sprintf("golang: unknown ir.Type %T", t))
 }
 
-// IsNillable は、その型の Go の零値 nil が「なし」を表せるか（docs/plugin-go.md「型」の optional の行）: array、
+// IsNillable は、その型の Go の零値 nil が「なし」を表せるか（plugins/go/spec/go.hozo の Requirement.Types の optional の行）: array、
 // インデックスの model への ref、union（arms）への ref。case は of を見る。optional(T) が *T にならず T のままになるのは、
 // T がこれに当たるとき。p は ref が何の宣言かを引くための Program（nil なら、ref はどれも当たらないとする）。
 func IsNillable(t ir.Type, p *ir.Program) bool {
@@ -94,7 +94,7 @@ func IsNillable(t ir.Type, p *ir.Program) bool {
 	return false
 }
 
-// Zero は型の零値の Go の式（docs/plugin-go.md「呼び出し」の「零値」）: ポインタ・インターフェース・スライス・マップ（インデックスの model）は nil、
+// Zero は型の零値の Go の式（plugins/go/spec/go.hozo の Requirement.Wiring の「呼び出し」の「零値」）: ポインタ・インターフェース・スライス・マップ（インデックスの model）は nil、
 // 構造体は `<型>{}`、time.Time、runtime.Date、runtime.TimeOfDay は `<型>{}`、文字列が元の型は `""`、数が元の型は `0`、真偽値は `false`。
 // 必要な import を imports に足す。nil の型（void）と never は ""。
 func Zero(t ir.Type, imports *Imports) string {
@@ -154,7 +154,7 @@ func coreZero(c ir.CoreType, goType string) string {
 	return "0"
 }
 
-// RowDisplay は、コメントの中の行の遷移の書き方（docs/plugin-go.md「コメント」の「行の遷移の表示」）: 仕様の書き方で、
+// RowDisplay は、コメントの中の行の遷移の書き方（plugins/go/spec/go.hozo の Requirement.Comments の「行の遷移の表示」）: 仕様の書き方で、
 // IR（Effect.row）から組み立てる。後のケースがあれば `as <分類の FQN>.<ケース名>`、なければ `as else`。
 // 行の遷移を持たない効果（と、宛先が組み込みの効果でない効果）は ""。
 func RowDisplay(e *ir.Effect) string {
@@ -167,7 +167,7 @@ func RowDisplay(e *ir.Effect) string {
 	return "as " + e.Row.Classify + "." + e.Row.To
 }
 
-// NarrowedParamsDisplay は、コメントの中の、絞り込んだ引数の書き方（docs/plugin-go.md「コメント」の「絞り込んだ引数の表示」）:
+// NarrowedParamsDisplay は、コメントの中の、絞り込んだ引数の書き方（plugins/go/spec/go.hozo の Requirement.Comments の「絞り込んだ引数の表示」）:
 // 効果の引数のうち、型が case のものを、宣言の順に、「、」でつなぐ。一つは `<引数名> on <分類の FQN>.<ケース名>`
 // （いくつかのケースは " | " でつなぐ）。なければ ""。行の引数なら、これが、効果の前のケース。
 func NarrowedParamsDisplay(e *ir.Effect) string {
@@ -186,7 +186,7 @@ func NarrowedParamsDisplay(e *ir.Effect) string {
 	return strings.Join(parts, "、")
 }
 
-// TypeDisplay は、コメントの中の型の書き方（docs/plugin-go.md「コメント」の「型の表示」）: 核の型は名前、ref は FQN、
+// TypeDisplay は、コメントの中の型の書き方（plugins/go/spec/go.hozo の Requirement.Comments の「型の表示」）: 核の型は名前、ref は FQN、
 // optional(T) は `T?`、array(T) は `T[]`、case はその of、リテラルの型は、仕様の綴り（`"error"`、`3`、`true`）。
 func TypeDisplay(t ir.Type) string {
 	switch x := t.(type) {

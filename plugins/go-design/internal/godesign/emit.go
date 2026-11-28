@@ -24,7 +24,7 @@ const (
 	codeTestDir    = "GODESIGN-7" // テストのパッケージのディレクトリが、同じ単位が出力する子の名前空間の出力先と重なる
 )
 
-// FileName は、このトランスパイラが、N のテストのパッケージに出すファイルの名前（docs/plugin-go.md「相乗りのファイル」）。
+// FileName は、このトランスパイラが、N のテストのパッケージに出すファイルの名前（plugins/go/spec/go.hozo の Requirement.Layout の「相乗りのファイル」）。
 const FileName = "design.go"
 
 // 読む語彙（標準の business、usecase、prd。plugins/go-design/hozo-plugin.toml）。actor の語彙は読まない（印）。

@@ -1,4 +1,4 @@
-// docs/plugin-go.md「例外を受ける文」の各行を、一か所ずつ使う。各 op の上のコメントが、その op が確かめる行。
+// plugins/go/spec/go.hozo の Requirement.Wiring の「例外を受ける文」の各行を、一か所ずつ使う。各 op の上のコメントが、その op が確かめる行。
 // op はどれも export（出力は一つのパッケージ）。
 
 /** 例外を受ける配線 */

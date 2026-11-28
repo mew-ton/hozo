@@ -15,7 +15,7 @@
 
 完成したコードを持たないサンプルも置ける。その形と、二つの役目のうちどちらを持つかは「仕様だけのサンプル」。
 
-生成するコードの規則の持ち主は、トランスパイラごとの設計文書（`docs/plugin-go.md` など）。サンプルは、その規則を当てはめた実物で、規則を自分では持たない。文書とサンプルが食い違ったら、どちらが正しいかを決めてから、正しくない方を直す。
+生成するコードの規則の持ち主は、トランスパイラごとの設計文書（`plugins/go/spec/go.hozo` など）。サンプルは、その規則を当てはめた実物で、規則を自分では持たない。文書とサンプルが食い違ったら、どちらが正しいかを決めてから、正しくない方を直す。
 
 ## 仕様だけのサンプル
 
@@ -155,7 +155,7 @@ tests/samples/<名前>/
 | サンプル | 中身 |
 |---|---|
 | [`order-app`](order-app/README.md) | **仕様だけのサンプル。** 注文を受けて、作って、そろえて、送る店のアプリ（サーバーの概念、HTTP の入口、外部の仕組み、客の画面、担当者の画面）を、27 の名前空間で書いたもの。三つの種類の商品（ダウンロード、受注製作、在庫）が一つの注文に混ざり、箱と送料が、品目がそろうまで決まらない。「仕様は、どこまで書くか」の事例と、言語と語彙で書けなかったものを、`README.md` に持つ |
-| [`shop-server`](shop-server/README.md) | 共有の型 `type`、保存 `store`、サーバー `server`、外部の配送 `mailer` の四つの名前空間を、基底 `go`（`docs/plugin-go.md`）と、それに相乗りする `go-valid`（`docs/plugin-go-valid.md`）、`go-sqlite`（`docs/plugin-go-sqlite.md`。`database/sql` の上の表と、`db` の語彙のデコレータを付けた `store` の `read` と効果の中身と、二つの効果を呼ぶ op を一つのトランザクションにする継ぎ目）、`go-http`（`docs/plugin-go-http.md`。`net/http` のハンドラ）が Go に出力する。同じ `server` を、SQLite の上とメモリの上に組み立てる。サンプルの中のプラグイン `go-ratelimit` が、語彙 `rate` と、デコレータ `@rate.limited` の継ぎ目（`docs/plugin-go.md`「継ぎ目」）の中身を出す |
+| [`shop-server`](shop-server/README.md) | 共有の型 `type`、保存 `store`、サーバー `server`、外部の配送 `mailer` の四つの名前空間を、基底 `go`（`plugins/go/spec/go.hozo`）と、それに相乗りする `go-valid`（`docs/plugin-go-valid.md`）、`go-sqlite`（`docs/plugin-go-sqlite.md`。`database/sql` の上の表と、`db` の語彙のデコレータを付けた `store` の `read` と効果の中身と、二つの効果を呼ぶ op を一つのトランザクションにする継ぎ目）、`go-http`（`docs/plugin-go-http.md`。`net/http` のハンドラ）が Go に出力する。同じ `server` を、SQLite の上とメモリの上に組み立てる。サンプルの中のプラグイン `go-ratelimit` が、語彙 `rate` と、デコレータ `@rate.limited` の継ぎ目（`plugins/go/spec/go.hozo` の `Requirement.Seams`）の中身を出す |
 
 ## P の番号との対応
 

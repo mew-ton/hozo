@@ -23,7 +23,7 @@ var goldenFixtures = []struct {
 	behavior bool
 }{
 	{name: "constraints", covers: "「制約」の表の各行、「scalar」「model」（省略可能、array、record）、「出力」の置き場と補助の関数、「Validate を持つ型」（その場で書いた model、union と exception）", behavior: true},
-	{name: "locals", covers: "元の scalar のパッケージの名前が、生成したコードの局所の名前や、標準ライブラリのパッケージの名前と当たるとき（docs/plugin-go.md「パッケージと import パス」の import の名前）"},
+	{name: "locals", covers: "元の scalar のパッケージの名前が、生成したコードの局所の名前や、標準ライブラリのパッケージの名前と当たるとき（plugins/go/spec/go.hozo の Requirement.Layout の「パッケージと import パス」の import の名前）"},
 }
 
 // TestGolden は、入力ごとに、出力がゴールデン testdata/<名前>/expected/ とバイト単位で同じこと、go/format を通した形で
@@ -79,7 +79,7 @@ func TestBehavior(t *testing.T) {
 	}
 }
 
-// TestPlacement は「出力」の置き場: validate.go は、N の、型のパッケージに一つ（docs/plugin-go.md「型のパッケージ」）。関数を持つ
+// TestPlacement は「出力」の置き場: validate.go は、N の、型のパッケージに一つ（plugins/go/spec/go.hozo の Requirement.Layout の「型のパッケージ」）。関数を持つ
 // 名前空間では <Dir>/types/（パッケージ types）、持たない名前空間では入口と同じパッケージ。
 func TestPlacement(t *testing.T) {
 	_, files := emitFixture(t, "constraints")

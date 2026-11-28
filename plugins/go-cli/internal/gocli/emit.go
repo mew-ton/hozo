@@ -32,7 +32,7 @@ const (
 	codeCLIDefault     = "CLI-14" // @cli.default の値が、フィールドの制約（@valid.*）に合わない
 )
 
-// このトランスパイラが出すただ一つのファイルの置き場（docs/plugin-go.md「相乗りのファイル」）: Dir(U, N) の下のディレクトリ DirName
+// このトランスパイラが出すただ一つのファイルの置き場（plugins/go/spec/go.hozo の Requirement.Layout の「相乗りのファイル」）: Dir(U, N) の下のディレクトリ DirName
 // （パッケージの名前でもある）の FileName。OutputPath は、Dir(U, N) からの相対パス。
 const (
 	DirName    = "cli"
@@ -159,7 +159,7 @@ type command struct {
 	method  string // Ops のメソッドの名前
 	summary string // Op.description.summary を一行にしたもの
 	input   *model // 入力の model。引数のない op なら nil
-	// void は、呼ぶ相手の、基底のメソッドの形: 結果の値がないか（returns が null か never。docs/plugin-go.md「op の形」）。
+	// void は、呼ぶ相手の、基底のメソッドの形: 結果の値がないか（returns が null か never。plugins/go/spec/go.hozo の Requirement.OpShape）。
 	void       bool
 	exceptions []exception
 }
@@ -601,7 +601,7 @@ func nameArg(app *ir.Application, fieldName string) string {
 	return fieldName
 }
 
-// goLiteral は、リテラル l の Go での書き方。基底と同じ（docs/plugin-go.md「値」の表の literal の行）: 文字列は strconv.Quote、
+// goLiteral は、リテラル l の Go での書き方。基底と同じ（plugins/go/spec/go.hozo の Requirement.Wiring の「値」の表の literal の行）: 文字列は strconv.Quote、
 // 整数は 10 進、小数は strconv.FormatFloat(v, 'g', -1, 64)（`.` も `e` も含まなければ `.0` を足す）、真偽値は true / false。
 // フィールドの型への変換は書かない（補助が、実行時に、読む先の型に変える）。
 func goLiteral(l ir.Literal) string {

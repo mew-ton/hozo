@@ -446,7 +446,7 @@ func TestCoverage(t *testing.T) {
 	}
 }
 
-// テストの対応表のファイル（docs/plugin-protocol.md「テストの対応表」、docs/plugin-go.md「テストの対応表」の並びと字下げ）。
+// テストの対応表のファイル（docs/plugin-protocol.md「テストの対応表」、plugins/go/spec/go.hozo の Requirement.UnitTestPort の「テストの対応表」の並びと字下げ）。
 func TestTestMapFile(t *testing.T) {
 	f := TestMapFile("gen/server/servertest", "go-http", []TestEntry{
 		{Name: "server.login/OK", File: "gen/server/servertest/http.go", Lines: [2]int{216, 222}},

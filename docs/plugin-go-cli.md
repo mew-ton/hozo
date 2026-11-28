@@ -2,7 +2,7 @@
 
 ## この文書が決めること
 
-トランスパイラ `go-cli`（プラグインは `plugins/go-cli/`）が受け付けない書き方。`go-cli` は、語彙 `cli` を Go の CLI の骨組みにし、Go の基底 `go`（`docs/plugin-go.md`）と、検証の `go-valid`（`docs/plugin-go-valid.md`）に相乗りする。hozoc 自身の骨組みも、これで生成する（`docs/requirements.md`「自己展開」）。
+トランスパイラ `go-cli`（プラグインは `plugins/go-cli/`）が受け付けない書き方。`go-cli` は、語彙 `cli` を Go の CLI の骨組みにし、Go の基底 `go`（`plugins/go/spec/go.hozo`）と、検証の `go-valid`（`docs/plugin-go-valid.md`）に相乗りする。hozoc 自身の骨組みも、これで生成する（`docs/requirements.md`「自己展開」）。
 
 ほかのことの持ち主は、プラグインのファイル（決定 D811）:
 

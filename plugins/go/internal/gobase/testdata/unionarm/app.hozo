@@ -1,4 +1,4 @@
-// docs/plugin-go.md「値」の「union に入れる」: 値を置く位置（引数、レコードリテラルのフィールド、return、val、値を入れる文、集める文、
+// plugins/go/spec/go.hozo の Requirement.Wiring の「値」の「union に入れる」: 値を置く位置（引数、レコードリテラルのフィールド、return、val、値を入れる文、集める文、
 // throw の引数）ごとに、アームの Go の型（マーカーを生やした構造体、包む型）ごとに、一か所ずつ。各 op の上のコメントが、その op が確かめる行。
 // op はどれも export（出力は一つのパッケージ）。
 

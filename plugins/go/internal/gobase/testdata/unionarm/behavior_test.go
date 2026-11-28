@@ -1,5 +1,5 @@
 // 生成したコードの振る舞いのテスト（docs/testing.md「単体テスト」の `plugins/go`）: union の位置に、アームの型の値を入れる配線
-// （docs/plugin-go.md「値」の「union に入れる」）。構造体のアームは、その構造体の値のまま、包む型のアームは、包む型の値で、
+// （plugins/go/spec/go.hozo の Requirement.Wiring の「値」の「union に入れる」）。構造体のアームは、その構造体の値のまま、包む型のアームは、包む型の値で、
 // 呼び先と、呼び元に届くこと。
 // plugins/go の TestBehavior が、生成したコードのモジュールのルートに置いて走らせる。
 package behavior

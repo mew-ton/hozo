@@ -169,8 +169,8 @@ func requireGo(t *testing.T) {
 // copyCorpusAsModule はコーパス name を一時ディレクトリに写し、そこを Go のモジュールのルートにする:
 // リポジトリの go.mod と go.sum を複製し、ir/、plugin/、plugins/、tests/ をシンボリックリンクで足す（tests/generated_test.go と
 // 同じやり方。コーパスが自分の plugins/ を持つなら、そちらを使い、リポジトリの plugins/ は足さない）。
-// こうすると、生成したコード（import パスは、hozo.toml の [options.go] の module から決まる。docs/plugin-go.md「パッケージと
-// import パス」）を、リポジトリと同じモジュールのパッケージとして、go の道具で確かめられる。プラグインは、マニフェストの
+// こうすると、生成したコード（import パスは、hozo.toml の [options.go] の module から決まる。plugins/go/spec/go.hozo の
+// Requirement.Layout の「パッケージと import パス」）を、リポジトリと同じモジュールのパッケージとして、go の道具で確かめられる。プラグインは、マニフェストの
 // wasm（TestMain がビルドしたもの）を動かすので、作業ディレクトリにも、go.mod にも、依らない。
 // `testdata/`（ゴールデン）は写さない。戻り値は一時ディレクトリと、emit の前にあったファイル（readTree の形）。
 func copyCorpusAsModule(t *testing.T, name string) (string, map[string][]byte) {

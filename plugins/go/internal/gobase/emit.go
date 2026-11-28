@@ -27,10 +27,10 @@ const (
 	codeInternal    = "GO-INTERNAL" // 生成器の不具合
 )
 
-// runtimePath は、生成したコードが import する runtime パッケージ（docs/plugin-go.md「runtime パッケージ」）。
+// runtimePath は、生成したコードが import する runtime パッケージ（パッケージ runtime の説明（runtime/doc.go））。
 const runtimePath = "github.com/mew-ton/hozo/runtime"
 
-// 基底のファイル名（docs/plugin-go.md「ファイル」）。
+// 基底のファイル名（plugins/go/spec/go.hozo の Requirement.Layout の「ファイル」）。
 const (
 	fileDoc      = "doc.go"
 	fileTypes    = "types.go"
@@ -40,7 +40,7 @@ const (
 	fileWiring   = "wiring.go"
 )
 
-// Emit は、要求の View の出力 (U, N) のファイルを作る（docs/plugin-go.md）。読むのは、要求だけ（ファイルも、環境変数も、読まない）。
+// Emit は、要求の View の出力 (U, N) のファイルを作る（plugins/go/spec/go.hozo）。読むのは、要求だけ（ファイルも、環境変数も、読まない）。
 // stderr は、整形に失敗したときに整形前の内容を書く先。診断があれば、ファイルは返さない。ファイルはパスの辞書順。
 func Emit(req *plugin.EmitRequest, stderr io.Writer) ([]plugin.File, []plugin.Diagnostic) {
 	view := req.View
@@ -101,7 +101,7 @@ type emitter struct {
 	stderr io.Writer
 	layout *golang.Layout
 	shape  *golang.Shape
-	// kit は、テストのにせものと、テストの中の組み立ての形（docs/plugin-go.md「テストのにせもの」）。
+	// kit は、テストのにせものと、テストの中の組み立ての形（plugins/go/spec/go.hozo の Requirement.Fakes）。
 	kit *golang.TestKit
 	p   *ir.Program
 	ns  *ir.Namespace // N
@@ -113,7 +113,7 @@ type emitter struct {
 	unitOf map[string]golang.StateUnit
 	fields fieldNames // New の引数（= 構造体 ops のフィールド）の名前
 
-	// reserved は、局所の名前が避ける名前（docs/plugin-go.md「名前」の「局所の名前」）: o、ctx、err、ptr と、定義のパッケージの
+	// reserved は、局所の名前が避ける名前（plugins/go/spec/go.hozo の Requirement.Names の「局所の名前」）: o、ctx、err、ptr と、定義のパッケージの
 	// ops.go と wiring.go が import するパッケージの名前。
 	reserved map[string]bool
 	// imports は、ファイル（"def/ops.go"、"entry/ops.go" の形のキー）ごとの、名前を決めた import（一度目の生成の後で作る）。
@@ -174,7 +174,7 @@ func (e *emitter) prepare() {
 			e.unitOf[fqn] = u
 		}
 	}
-	// N の read と効果は、どれも、N の状態の単位のメソッド（docs/plugin-go.md「状態の単位」）。単位が決まらないものは、検査を通った
+	// N の read と効果は、どれも、N の状態の単位のメソッド（plugins/go/spec/go.hozo の Requirement.Ports の「状態の単位」）。単位が決まらないものは、検査を通った
 	// IR には来ない（read の宛先も、効果の宛先も、宣言した名前空間の状態）
 	for _, d := range e.ns.Decls {
 		switch d.(type) {
@@ -203,7 +203,7 @@ func (e *emitter) prepare() {
 	}
 	e.reserved = baseReserved()
 	e.imports = map[string]*golang.Imports{}
-	// GO-7: 単位の継ぎ目にあるデコレータが、本体を持つ（docs/plugin-go.md「本体のあるデコレータ」）。デコレータの FQN の辞書順
+	// GO-7: 単位の継ぎ目にあるデコレータが、本体を持つ（plugins/go/spec/go.hozo の Requirement.Wraps）。デコレータの FQN の辞書順
 	var seamed []string
 	for fqn := range e.view.Config.Seams {
 		seamed = append(seamed, fqn)
@@ -216,7 +216,7 @@ func (e *emitter) prepare() {
 	}
 }
 
-// baseReserved は、生成したコードがメソッドの中で使う名前（docs/plugin-go.md「名前」の「局所の名前」）。
+// baseReserved は、生成したコードがメソッドの中で使う名前（plugins/go/spec/go.hozo の Requirement.Names の「局所の名前」）。
 func baseReserved() map[string]bool {
 	return map[string]bool{"o": true, "ctx": true, "err": true, "ptr": true}
 }
@@ -267,7 +267,7 @@ func (e *emitter) typeName(fqn string) string { return golang.TypeName(fqn, e.de
 // 位置は、名前空間の最初の内部の op。
 func (e *emitter) checkInnerDir() {
 	if e.layout.HasTypes {
-		// 型のパッケージ types と、子の名前空間 N.types（docs/plugin-go.md「型のパッケージ」）
+		// 型のパッケージ types と、子の名前空間 N.types（plugins/go/spec/go.hozo の Requirement.Layout の「型のパッケージ」）
 		child := e.view.Viewer + ".types"
 		for _, c := range e.view.Namespaces[child] {
 			if c.Index == e.view.Config.Index {
@@ -299,7 +299,7 @@ func (e *emitter) checkInnerDir() {
 }
 
 // generate は、すべてのファイルを作る。import の名前と、局所の名前が避ける名前を決めるために、二度走らせる
-// （docs/plugin-go.md「パッケージと import パス」の「import の名前」、「名前」の「局所の名前」）: 一度目で、ファイルごとの import の集まりを
+// （plugins/go/spec/go.hozo の Requirement.Layout の「パッケージと import パス」の「import の名前」、「名前」の「局所の名前」）: 一度目で、ファイルごとの import の集まりを
 // 知り、名前を文書の順で決め直す（golang.Imports.Canonical）。二度目は、その名前で作る。
 func (e *emitter) generate() []plugin.File {
 	e.build()
@@ -336,7 +336,7 @@ func (e *emitter) build() []plugin.File {
 	def := e.layout.DefDir
 	add(def, e.genDoc(true))
 	if e.layout.HasTypes {
-		// 型のパッケージ（docs/plugin-go.md「型のパッケージ」）と、定義のパッケージの、その再公開
+		// 型のパッケージ（plugins/go/spec/go.hozo の Requirement.Layout の「型のパッケージ」）と、定義のパッケージの、その再公開
 		types, classify := e.genTypes(), e.genClassify(classifyTypes)
 		if types != nil || classify != nil {
 			add(e.layout.TypesDir, e.genTypesDoc())
@@ -362,14 +362,14 @@ func (e *emitter) build() []plugin.File {
 		add(entry, e.genEntryStates())
 		add(entry, e.genEntryClassify())
 	}
-	// テストのパッケージ（docs/plugin-go.md「単体テストの口」）
+	// テストのパッケージ（plugins/go/spec/go.hozo の Requirement.UnitTestPort）
 	test := e.layout.TestDir
 	add(test, e.genTestDoc())
 	add(test, e.genTestLeaves())
 	add(test, e.genTestClassify())
 	add(test, e.genTestSeams())
 	add(test, e.genTestFakes())
-	// テストの対応表（docs/plugin-go.md「テストの対応表」）: 出したテキストから作る
+	// テストの対応表（plugins/go/spec/go.hozo の Requirement.UnitTestPort の「テストの対応表」）: 出したテキストから作る
 	var tests []plugin.TestEntry
 	for _, f := range files {
 		if path.Dir(f.Path) != test {
@@ -394,15 +394,15 @@ type fileGen struct {
 	name  string
 	key   string // "def/<name>" か "entry/<name>" か "test/<name>"
 	inDef bool
-	// inTest は、テストのパッケージのファイルか（docs/plugin-go.md「単体テストの口」）。
+	// inTest は、テストのパッケージのファイルか（plugins/go/spec/go.hozo の Requirement.UnitTestPort）。
 	inTest bool
-	// inTypes は、型のパッケージのファイルか（docs/plugin-go.md「型のパッケージ」）。
+	// inTypes は、型のパッケージのファイルか（plugins/go/spec/go.hozo の Requirement.Layout の「型のパッケージ」）。
 	inTypes bool
 	pkg     string
 	doc     string // パッケージのコメント（doc.go だけ）
 	im      *golang.Imports
 	body    strings.Builder
-	// usesPtr は、このファイルが補助 ptr を使ったか（wiring.go だけが使う。docs/plugin-go.md「値」）。
+	// usesPtr は、このファイルが補助 ptr を使ったか（wiring.go だけが使う。plugins/go/spec/go.hozo の Requirement.Wiring の「値」）。
 	usesPtr bool
 }
 
@@ -438,7 +438,7 @@ func (e *emitter) newTypesFile(name string) *fileGen {
 	return f
 }
 
-// genTypesDoc は、型のパッケージの doc.go（docs/plugin-go.md「型のパッケージ」）。
+// genTypesDoc は、型のパッケージの doc.go（plugins/go/spec/go.hozo の Requirement.Layout の「型のパッケージ」）。
 func (e *emitter) genTypesDoc() *fileGen {
 	f := e.newTypesFile(fileDoc)
 	f.doc = fmt.Sprintf("// Package types は名前空間 %s の型: 別の名前空間の出力は、ここを import する。使う側は入口のパッケージ %s を import する（入口は、同じ型を、同じ名前で持つ）。\n",
@@ -448,7 +448,7 @@ func (e *emitter) genTypesDoc() *fileGen {
 
 // bodyNames は、基底が、関数の本体の中で決まった名前で使う識別子のうち、本体が名前空間のパッケージの型を書きうるもの: メソッドの
 // レシーバ o と、ctx、err。その名前の局所の変数が、同じ名前のパッケージを隠すので、基底のファイルでは、import の名前に使わない
-// （docs/plugin-go.md「パッケージと import パス」の「import の名前」）。パッケージに宣言する ops と ptr は、plugin/golang が、
+// （plugins/go/spec/go.hozo の Requirement.Layout の「パッケージと import パス」の「import の名前」）。パッケージに宣言する ops と ptr は、plugin/golang が、
 // どのファイルでも避ける。
 var bodyNames = []string{"o", "ctx", "err"}
 
@@ -461,13 +461,13 @@ func (f *fileGen) goType(t ir.Type) string { return golang.GoType(t, f.im) }
 // zero は型 t の零値の式。
 func (f *fileGen) zero(t ir.Type) string { return golang.Zero(t, f.im) }
 
-// ptr は、式 expr を補助 ptr で包み、このファイルが ptr を使ったことを覚える（docs/plugin-go.md「値」）。
+// ptr は、式 expr を補助 ptr で包み、このファイルが ptr を使ったことを覚える（plugins/go/spec/go.hozo の Requirement.Wiring の「値」）。
 func (f *fileGen) ptr(expr string) string {
 	f.usesPtr = true
 	return "ptr(" + expr + ")"
 }
 
-// render は、ヘッダ、package 節、import、本体をつなぎ、go/format で整形する（docs/plugin-go.md「ファイル」）。
+// render は、ヘッダ、package 節、import、本体をつなぎ、go/format で整形する（plugins/go/spec/go.hozo の Requirement.Layout の「ファイル」）。
 // 整形に失敗したら GO-INTERNAL で、整形前の内容を標準エラーに出す。
 func (f *fileGen) render() (string, bool) {
 	if len(f.e.errs) > 0 {
@@ -512,7 +512,7 @@ func (f *fileGen) dir() string {
 	return f.e.layout.Dir
 }
 
-// genDoc は doc.go（docs/plugin-go.md「コメント」のパッケージの行）。def は、定義のパッケージのものか。
+// genDoc は doc.go（plugins/go/spec/go.hozo の Requirement.Comments のパッケージの行）。def は、定義のパッケージのものか。
 func (e *emitter) genDoc(def bool) *fileGen {
 	f := e.newFile(fileDoc, def)
 	if def && e.layout.HasInner {

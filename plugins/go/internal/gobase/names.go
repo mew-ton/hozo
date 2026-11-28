@@ -7,7 +7,7 @@ import (
 	"github.com/mew-ton/hozo/plugin/golang"
 )
 
-// このファイルは GO-2（docs/plugin-go.md「名前」の「名前が当たれば GO-2」）: 生成する名前が当たる。当たった二つの宣言を
+// このファイルは GO-2（plugins/go/spec/go.hozo の Requirement.Names の「名前が当たれば GO-2」）: 生成する名前が当たる。当たった二つの宣言を
 // メッセージに示し、位置は後ろの宣言。直すのは仕様の名前。
 
 // nameSet は、一つの場所（パッケージ、構造体、インターフェース）の名前と、それを生んだ宣言。
@@ -77,8 +77,8 @@ func (e *emitter) checkNames() {
 	for _, o := range s.Ops {
 		ops.add(o.Method, "op "+o.FQN, o.FQN)
 	}
-	// 構造体 ops の、非公開のメソッドどうし: 中身の名前（<op>Body）と、本体のあるデコレータの外側（docs/plugin-go.md
-	// 「本体のあるデコレータ」）
+	// 構造体 ops の、非公開のメソッドどうし: 中身の名前（<op>Body）と、本体のあるデコレータの外側（plugins/go/spec/go.hozo の Requirement.Wraps
+	// ）
 	private := e.names("構造体 ops の、非公開のメソッド")
 	for _, o := range s.Ops {
 		if o.Body != "" {

@@ -1,4 +1,4 @@
-// docs/plugin-go.md「型」の、リテラルの型の行: 「model」のリテラルの型のフィールド、「union」のリテラルの型のアーム、「値」の、
+// plugins/go/spec/go.hozo の Requirement.Types の、リテラルの型の行: 「model」のリテラルの型のフィールド、「union」のリテラルの型のアーム、「値」の、
 // リテラルの型のアームに入れる式とリテラルの型のフィールドを読む式、「match」の variant（リテラルの型のアーム）と、
 // 三つに分ける形（対象が boolean?）、「分類」の、対象が boolean? の literal の確かめ。
 // op はどれも export（出力は一つのパッケージ）。

@@ -7,7 +7,7 @@ import (
 	"github.com/mew-ton/hozo/ir"
 )
 
-// docs/plugin-go.md「パッケージと import パス」: import パスは、オプション module に、Dir(U, N) を `/` でつないだもの
+// plugins/go/spec/go.hozo の Requirement.Layout の「パッケージと import パス」: import パスは、オプション module に、Dir(U, N) を `/` でつないだもの
 // （Dir が `.` なら、module そのもの）。ファイル（go.mod）は、読まない。
 func TestImportPath(t *testing.T) {
 	for dir, want := range map[string]string{
@@ -20,7 +20,7 @@ func TestImportPath(t *testing.T) {
 	}
 }
 
-// docs/plugin-go.md「マニフェスト」のオプション module: 出力の設定の、基底へのオプションから取る。書かれていない、文字列でない、
+// plugins/go/hozo-plugin.tomlのオプション module: 出力の設定の、基底へのオプションから取る。書かれていない、文字列でない、
 // 空なら ErrNoModule（GO-8）。
 func TestModuleOf(t *testing.T) {
 	c := conf(1, "gen/a")
@@ -46,7 +46,7 @@ func TestModuleOf(t *testing.T) {
 	}
 }
 
-// docs/plugin-go.md「内側のフォルダと入口」: N の op に内部の op が一つでもある出力は、内側（<Dir>/inner、パッケージ inner）と
+// plugins/go/spec/go.hozo の Requirement.Layout の「内側のフォルダと入口」: N の op に内部の op が一つでもある出力は、内側（<Dir>/inner、パッケージ inner）と
 // 入口に分ける。一つもない出力（op を持たない、型だけの名前空間を含む）は分けない。
 // テストのパッケージ（同「単体テストの口」の「テストのパッケージ」）は、分けても分けなくても、<Dir>/<入口のパッケージ名>test。
 func TestLayoutOf(t *testing.T) {
@@ -58,7 +58,7 @@ func TestLayoutOf(t *testing.T) {
 	}
 	want := Layout{Namespace: "type", Dir: "gen/type", EntryPath: "example.com/app/gen/type", EntryName: "pkgtype",
 		DefDir: "gen/type", DefPath: "example.com/app/gen/type", DefName: "pkgtype",
-		// 型だけの名前空間は、型のパッケージを、分けない（docs/plugin-go.md「型のパッケージ」）: 入口と同じ
+		// 型だけの名前空間は、型のパッケージを、分けない（plugins/go/spec/go.hozo の Requirement.Layout の「型のパッケージ」）: 入口と同じ
 		TypesDir: "gen/type", TypesPath: "example.com/app/gen/type", TypesName: "pkgtype",
 		TestDir: "gen/type/pkgtypetest", TestPath: "example.com/app/gen/type/pkgtypetest", TestName: "pkgtypetest"}
 	if *l != want {

@@ -1,4 +1,4 @@
-// docs/plugin-go.md「match」の switch の形（絞り込みが variant の型で決まる分類、述語で決まる値の分類・op の分類・状態の分類）と、
+// plugins/go/spec/go.hozo の Requirement.Wiring の「match」の switch の形（絞り込みが variant の型で決まる分類、述語で決まる値の分類・op の分類・状態の分類）と、
 // 「絞り込んだ値」「分類」を、一か所ずつ使う。各 op の上のコメントが、その op が確かめる行。
 // op はどれも export（出力は一つのパッケージ）。
 

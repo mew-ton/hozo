@@ -23,7 +23,7 @@ func typesView() *ir.View {
 	return v
 }
 
-// docs/plugin-go.md「型」の表の行に一つずつ。
+// plugins/go/spec/go.hozo の Requirement.Types の表の行に一つずつ。
 func TestGoType(t *testing.T) {
 	v := typesView()
 	l, err := LayoutOf(v)
@@ -103,7 +103,7 @@ func TestIsNillable(t *testing.T) {
 	}
 }
 
-// docs/plugin-go.md「呼び出し」の「零値」。
+// plugins/go/spec/go.hozo の Requirement.Wiring の「呼び出し」の「零値」。
 func TestZero(t *testing.T) {
 	v := typesView()
 	l, _ := LayoutOf(v)
@@ -129,8 +129,8 @@ func TestZero(t *testing.T) {
 	}
 }
 
-// docs/plugin-go.md「コメント」の「型の表示」。
-// TestRowDisplay は、コメントの中の行の遷移の書き方（docs/plugin-go.md「コメント」の「行の遷移の表示」）。
+// plugins/go/spec/go.hozo の Requirement.Comments の「型の表示」。
+// TestRowDisplay は、コメントの中の行の遷移の書き方（plugins/go/spec/go.hozo の Requirement.Comments の「行の遷移の表示」）。
 func TestRowDisplay(t *testing.T) {
 	effect := func(op ir.Operation, row *ir.RowTransition) *ir.Effect {
 		return &ir.Effect{Target: ir.BuiltinTarget{State: "shop.orders", Operation: op}, Row: row}
@@ -153,7 +153,7 @@ func TestRowDisplay(t *testing.T) {
 	}
 }
 
-// TestNarrowedParamsDisplay は、コメントの中の、絞り込んだ引数の書き方（docs/plugin-go.md「コメント」の「絞り込んだ引数の表示」）。
+// TestNarrowedParamsDisplay は、コメントの中の、絞り込んだ引数の書き方（plugins/go/spec/go.hozo の Requirement.Comments の「絞り込んだ引数の表示」）。
 func TestNarrowedParamsDisplay(t *testing.T) {
 	order := ir.Ref("shop.Order")
 	param := func(name string, t ir.Type) ir.OpParam { return ir.OpParam{Name: name, Type: t} }

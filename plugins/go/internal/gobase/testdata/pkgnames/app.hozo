@@ -1,4 +1,4 @@
-// docs/plugin-go.md「パッケージと import パス」の「import の名前」: 名前空間のパッケージ名が、基底が定義のパッケージに宣言する
+// plugins/go/spec/go.hozo の Requirement.Layout の「パッケージと import パス」の「import の名前」: 名前空間のパッケージ名が、基底が定義のパッケージに宣言する
 // 非公開の名前（New が返す構造体 ops、値をポインタにする補助 ptr）と同じとき。Go では、パッケージの宣言と、そのパッケージの
 // どのファイルの import の名前も、同じ名前ならコンパイルできないので、名前空間のパッケージの方を ops2、ptr2 で import する。
 

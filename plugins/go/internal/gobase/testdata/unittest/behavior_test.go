@@ -1,5 +1,5 @@
-// 生成したコードの振る舞いのテスト（docs/testing.md「単体テスト」の `plugins/go`）: 単体テストの口（docs/plugin-go.md
-// 「単体テストの口」）と、効果の入口の確かめ（同「効果の入口の確かめ」）。口を満たす型を、RunLeaves と Run<C> に渡して、すべての
+// 生成したコードの振る舞いのテスト（docs/testing.md「単体テスト」の `plugins/go`）: 単体テストの口（plugins/go/spec/go.hozo の Requirement.UnitTestPort
+// ）と、効果の入口の確かめ（同「効果の入口の確かめ」）。口を満たす型を、RunLeaves と Run<C> に渡して、すべての
 // ケースが通ること。絞り込んだ引数を持つ効果は、引数が、言ったケースになければ、*runtime.CaseError を返して、単位を呼ばないこと。
 // plugins/go の TestBehavior が、生成したコードのモジュールのルートに置いて走らせる。口が落とすこと（葉の結果が、ケースのものと
 // 違う。例が、ケースに当たらない）は、plugins/go の TestUnitTestSeamFails が、このファイルの型を使って確かめる。

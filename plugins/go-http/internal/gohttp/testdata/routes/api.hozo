@@ -260,7 +260,7 @@ namespace flow {
     }
   }
 
-  // 本体のあるデコレータ（docs/plugin-go.md「本体のあるデコレータ」）を付けた入口: 本体は、本物を通すので、本体の中の、例外の出どころ
+  // 本体のあるデコレータ（plugins/go/spec/go.hozo の Requirement.Wraps）を付けた入口: 本体は、本物を通すので、本体の中の、例外の出どころ
   // （throw のアームと、本体が呼ぶ葉）も、Hozo が、ケースを作る。next() のアームの先（op の中身）の出どころも、同じ
   @http.status(503)
   exception Shut;

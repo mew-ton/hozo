@@ -1,4 +1,4 @@
-// Package gobase は Go の基底のプラグイン go の中身（docs/plugin-go.md）。
+// Package gobase は Go の基底のプラグイン go の中身（plugins/go/spec/go.hozo）。
 //
 // Handler が plugin.Handler を実装し、View（出力ごとに一つ。見る側は出力する名前空間 N）から、View.config.dir の下の
 // ファイルを作る。形（置き場、名前、型、op の置き場と形、継ぎ目）は公開の SDK plugin/golang で求め、ここでは、
@@ -12,7 +12,7 @@ import (
 	"github.com/mew-ton/hozo/plugin"
 )
 
-// TranspilerName は、このプラグインが提供するただ一つのトランスパイラの名前（docs/plugin-go.md「マニフェスト」）。
+// TranspilerName は、このプラグインが提供するただ一つのトランスパイラの名前（plugins/go/hozo-plugin.toml）。
 const TranspilerName = "go"
 
 // Handler は go の plugin.Handler。emit と coverage を実装する。
@@ -23,7 +23,7 @@ type Handler struct {
 
 var _ plugin.Handler = Handler{}
 
-// Emit は View.viewer の名前空間の出力を作る（docs/plugin-go.md）。診断（GO-*）があれば Files は空で、Errors にそれを入れる。
+// Emit は View.viewer の名前空間の出力を作る（plugins/go/spec/go.hozo）。診断（GO-*）があれば Files は空で、Errors にそれを入れる。
 // 要求の transpiler が [TranspilerName] でなければ plugin.ErrUnsupported（code "unsupported"）。
 func (h Handler) Emit(req *plugin.EmitRequest) (*plugin.EmitResponse, error) {
 	if req == nil || req.View == nil {
@@ -49,7 +49,7 @@ func (Handler) Import(*plugin.ImportRequest) (*plugin.ImportResponse, error) {
 }
 
 // Coverage は、go test -coverprofile の形のカバレッジから、要求のファイルの、実行された行を取り出す
-// （docs/plugin-go.md「カバレッジを読む」）。
+// （plugins/go/spec/go.hozo の Requirement.UnitTestPort の「カバレッジを読む」）。
 func (h Handler) Coverage(req *plugin.CoverageRequest) (*plugin.CoverageResponse, error) {
 	if req == nil {
 		return nil, fmt.Errorf("coverage: no request")

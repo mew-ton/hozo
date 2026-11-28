@@ -1,5 +1,5 @@
 // 生成したコードの振る舞いのテスト（docs/testing.md「単体テスト」の `plugins/go`）: 例外を受ける文
-// （docs/plugin-go.md「例外を受ける文」、docs/check.md「例外を受ける」）。受けるのは、仕様の例外だけで、仕様にない失敗は、
+// （plugins/go/spec/go.hozo の Requirement.Wiring の「例外を受ける文」、docs/check.md「例外を受ける」）。受けるのは、仕様の例外だけで、仕様にない失敗は、
 // そのまま返る。throw e は、受けた失敗を、包み直さずに返す。plugins/go の TestBehavior が、生成したコードのモジュールのルートに
 // 置いて走らせる。
 package behavior

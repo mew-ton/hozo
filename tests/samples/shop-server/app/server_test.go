@@ -22,7 +22,7 @@ import (
 //   - ctx: どの op も、最初の引数に取る。
 //   - error: どの op も、最後の戻り値に返す。
 //
-// 形は一通り（docs/plugin-go.md「op の形」）: 純粋かどうか（デコレータ、reads、effects の有無）でも、throws の有無でも、
+// 形は一通り（plugins/go/spec/go.hozo の Requirement.OpShape）: 純粋かどうか（デコレータ、reads、effects の有無）でも、throws の有無でも、
 // 葉か配線かでも、自分の名前空間の op か別の名前空間の op（MailerOps、StoreOps）かでも、変わらない。
 //
 // 入口のパッケージ（gen/server）から形を書けるのは、export を付けた op（server.Ops）、人が実装する葉（server.Leaves）、
@@ -187,7 +187,7 @@ func (l noToken) NewSession(context.Context, pkgtype.User) (pkgtype.Session, err
 
 // TestLeafErrorIsReturned は、throws を持たない葉（newSession）が返した error が、配線 issueSession を通って、包まれずに
 // 呼び出し元に届くこと。その後ろの行（store.addSession）は呼ばれない。葉は、仕様の上で純粋でも、error を返す形を持つ
-// （docs/plugin-go.md「op の形」）ので、失敗を panic にしなくてよい。
+// （plugins/go/spec/go.hozo の Requirement.OpShape）ので、失敗を panic にしなくてよい。
 func TestLeafErrorIsReturned(t *testing.T) {
 	t.Parallel()
 	f := &handlertest.Fixture{}
@@ -324,7 +324,7 @@ func threeOrders() []pkgtype.Order {
 }
 
 // TestGetMyPageGathers は、配線 getMyPage（disjoint と、disjoint for）: 三つの読みの結果が、葉 myPage に渡り、
-// 注文ごとの要約は、注文の並びの順に、集まる。基底 go は、disjoint を、書いた順に、直列に出す（docs/plugin-go.md「文」）ので、
+// 注文ごとの要約は、注文の並びの順に、集まる。基底 go は、disjoint を、書いた順に、直列に出す（plugins/go/spec/go.hozo の Requirement.Wiring の「文」）ので、
 // 呼ばれる順も、仕様に書いた順。
 func TestGetMyPageGathers(t *testing.T) {
 	t.Parallel()

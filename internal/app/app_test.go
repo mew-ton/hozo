@@ -130,7 +130,7 @@ func runHome(t *testing.T, dir, home string, env map[string]string, args ...stri
 }
 
 // innerOps は、a の実装で、ユースケース（名前空間 hozo.compiler）の、内側のパッケージの Ops（内部の op check、collectOutputs、runEmit
-// なども持つ）を組み立てる。内部の op のテストは、ここから呼ぶ（パッケージの説明、docs/plugin-go.md「内側のフォルダと入口」）。
+// なども持つ）を組み立てる。内部の op のテストは、ここから呼ぶ（パッケージの説明、plugins/go/spec/go.hozo の Requirement.Layout の「内側のフォルダと入口」）。
 // 引数は App.Usecases と同じ。
 func innerOps(a *App) inner.Ops {
 	return inner.New(a, a.Sources(), a.Config(), a.Outputs(), a.OutputsSync())

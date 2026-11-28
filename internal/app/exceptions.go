@@ -8,7 +8,7 @@ import (
 
 // このファイルは、診断を運ぶ例外（spec/cli.hozo の CheckFailed、ConfigInvalid、LanguageMismatch、OutputConflict、TestsNotRun、
 // CoverageUnusable）の作り方と読み方。六つとも、引数は一つ（error と warning のすべて。`Diagnostic[]`）で、生成した構造体は、その引数の名前のフィールドを一つ持つ
-// （docs/plugin-go.md「exception」）。
+// （plugins/go/spec/go.hozo の Requirement.Types の「exception」）。
 //
 // **引数の名前（= 生成した構造体のフィールドの名前）を書くのは、carried の宣言と、carriedBy の最後の行の二か所だけ**で、
 // internal/app のほかのコードとテストは、下の関数を通す。spec/cli.hozo の引数の名前を変えたら、carried のフィールドの名前を合わせる:

@@ -25,7 +25,7 @@ func opShape(s *Shape, fqn string) OpShape {
 	return OpShape{}
 }
 
-// docs/plugin-go.md「op の置き場」の表の三つの行（上から順に、最初に当たる行）: 配線、never を返す op、Leaves。
+// plugins/go/spec/go.hozo の Requirement.Ports の「op の置き場」の表の三つの行（上から順に、最初に当たる行）: 配線、never を返す op、Leaves。
 // 葉に付いたデコレータが reads / effects を運んでいても（Op.carried）、置き場は Leaves のまま。
 func TestShapePlaces(t *testing.T) {
 	v := viewOf("shop", namespace("shop",
@@ -80,7 +80,7 @@ func TestShapePlaces(t *testing.T) {
 	}
 }
 
-// docs/plugin-go.md「状態の単位」: N の read と効果は、配線が呼んでいるかによらず、すべて、読む状態の単位と、宛先の単位の
+// plugins/go/spec/go.hozo の Requirement.Ports の「状態の単位」: N の read と効果は、配線が呼んでいるかによらず、すべて、読む状態の単位と、宛先の単位の
 // メソッド（宣言順）。形で決まる命令は、単位の対象の配線が直に呼んでいる操作だけ（post、put、delete の順）。
 // 「効果の宛先の単位」の四つの行。
 func TestShapeStateUnits(t *testing.T) {
@@ -141,7 +141,7 @@ func TestShapeStateUnits(t *testing.T) {
 	}
 }
 
-// docs/plugin-go.md「状態の単位」のメソッドの形: read は (<結果の型>, error)、効果は error、形で決まる命令は value 一つか、なし。
+// plugins/go/spec/go.hozo の Requirement.Ports の「状態の単位」のメソッドの形: read は (<結果の型>, error)、効果は error、形で決まる命令は value 一つか、なし。
 // どれも ctx を取る。
 func TestUnitSignatures(t *testing.T) {
 	v := typesView()
@@ -193,7 +193,7 @@ func TestUnitSignatures(t *testing.T) {
 	}
 }
 
-// docs/plugin-go.md「op の形」: どの op も、最初の引数に ctx を取り、最後の戻り値に error を返す。純粋かどうか
+// plugins/go/spec/go.hozo の Requirement.OpShape: どの op も、最初の引数に ctx を取り、最後の戻り値に error を返す。純粋かどうか
 // （Op.signature.pure）でも、throws の有無でも、形は変わらない。
 func TestSignature(t *testing.T) {
 	v := typesView()
@@ -241,7 +241,7 @@ func TestSignature(t *testing.T) {
 	}
 }
 
-// docs/plugin-go.md「op の形」: 形は op の宣言だけで決まる。純粋さ（Signature.pure）と、計算した例外（Signature.exceptions）を
+// plugins/go/spec/go.hozo の Requirement.OpShape: 形は op の宣言だけで決まる。純粋さ（Signature.pure）と、計算した例外（Signature.exceptions）を
 // 変えても、メソッドのテキストは一バイトも変わらない。
 func TestSignatureIgnoresPurity(t *testing.T) {
 	v := typesView()
@@ -266,7 +266,7 @@ func TestSignatureIgnoresPurity(t *testing.T) {
 	}
 }
 
-// docs/plugin-go.md「別の名前空間の op」「New」: 単位の対象の配線が呼ぶ別の名前空間ごとに口が一つ。メソッドは、呼ぶものだけを
+// plugins/go/spec/go.hozo の Requirement.Ports の「別の名前空間の op」、Requirement.Ports の「New」: 単位の対象の配線が呼ぶ別の名前空間ごとに口が一つ。メソッドは、呼ぶものだけを
 // 相手の宣言順に。New の引数は、leaves、状態の単位、分類の述語（FQN の辞書順）、別の名前空間（FQN の辞書順）、seams。
 func TestShapeDepsAndNew(t *testing.T) {
 	kind := classify("type.Kind", ir.TypeSubject{Type: ir.String()}, ir.DecidedByPredicate, "A")
@@ -338,7 +338,7 @@ func TestShapeDepsAndNew(t *testing.T) {
 	}
 }
 
-// docs/plugin-go.md「継ぎ目」: 継ぎ目を持つ op は、N の単位の対象の op のうち、単位の継ぎ目にあるデコレータが付いたもの。
+// plugins/go/spec/go.hozo の Requirement.Seams: 継ぎ目を持つ op は、N の単位の対象の op のうち、単位の継ぎ目にあるデコレータが付いたもの。
 // Seams のメソッドは、op の宣言順、その中はデコレータの書かれた順。中身の名前を持つのは、配線と never を返す op だけ。
 func TestShapeSeams(t *testing.T) {
 	v := viewOf("server",
@@ -402,7 +402,7 @@ func TestShapeSeams(t *testing.T) {
 	}
 }
 
-// docs/plugin-go.md「Seams」のメソッドの形: 引数は、op の形の引数の後ろに body func(<op の形の引数>) <op の形の戻り値>。
+// plugins/go/spec/go.hozo の Requirement.Seams の「Seams」のメソッドの形: 引数は、op の形の引数の後ろに body func(<op の形の引数>) <op の形の戻り値>。
 // body という名前が op の引数の局所の名前と当たれば、当たらなくなるまで、body の方の末尾に _ を足す。
 func TestSeamSignature(t *testing.T) {
 	v := typesView()
@@ -426,7 +426,7 @@ func TestSeamSignature(t *testing.T) {
 	}
 }
 
-// docs/plugin-go.md「効果の入口の確かめ」: 確かめる引数は、効果の引数のうち、型が、そのまま、述語で決まる値の分類か op の分類で
+// plugins/go/spec/go.hozo の Requirement.Ports の「効果の入口の確かめ」: 確かめる引数は、効果の引数のうち、型が、そのまま、述語で決まる値の分類か op の分類で
 // 絞り込んだ型のもの。型で決まる分類、状態の分類、optional や array の中の絞り込みは、確かめない。
 func TestCheckedParams(t *testing.T) {
 	order := ir.Ref("app.Order")

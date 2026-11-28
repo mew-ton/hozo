@@ -1,4 +1,4 @@
-// GO-5（docs/plugin-go.md「マニフェスト」）: go にオプションはない。
+// GO-5（plugins/go/hozo-plugin.toml）: go にオプションはない。
 
 namespace a {
   model Thing { x: int; }

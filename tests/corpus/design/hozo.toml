@@ -1,13 +1,13 @@
 # 設計書 §5〜§11 の例のコーパス（docs/testing.md「コーパス」）。
 # 設計書 §4.5 では、ブラウザの側の名前空間（設計書では browser。ここでは client: README.md の 24）は TS だが、TS の基底はまだないので、今は両方とも Go の基底 go で出力する（README.md）。
 # go は、リポジトリの plugins/ のプラグイン。テストが HOZO_PLUGIN_PATH として渡す（docs/testing.md「コーパス」）。
-# 設計書のプラグイン（http のサーバー、ルーター、db）は並べないので、語彙のデコレータは、出力では、印のまま（docs/plugin-go.md「デコレータ」）。
+# 設計書のプラグイン（http のサーバー、ルーター、db）は並べないので、語彙のデコレータは、出力では、印のまま（plugins/go/spec/go.hozo の Requirement.Decorators）。
 # http、valid、db の語彙の検査は、語彙のプラグイン http、valid、db が、単位に依らず、行う（docs/plugin-http.md、docs/plugin-valid.md、docs/plugin-db.md）。
 
 [hozo]
 sources = ["**/*.hozo"]
 
-# Go のモジュールの名前（go.mod の module と同じもの。docs/plugin-go.md「マニフェスト」）。プロジェクト全体のオプション
+# Go のモジュールの名前（go.mod の module と同じもの。plugins/go/hozo-plugin.toml）。プロジェクト全体のオプション
 [options.go]
 module = "github.com/mew-ton/hozo"
 

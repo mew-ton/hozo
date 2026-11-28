@@ -239,7 +239,7 @@ func isTestMap(p string) bool { return path.Base(p) == plugin.TestMapName(Transp
 
 // scanTestRuns は、Go のソース src（置き場は file）の、いちばん内側の `t.Run(<名前>, func(t *testing.T) {` … `})` を、
 // 字下げだけを頼りに探す（go/parser を使う golang.TestMap とは、別の読み方）: 名前は、外の段から / でつなぎ、行は、
-// 開く行の次の行から、閉じる行の前の行まで（docs/plugin-go.md「テストの対応表」）。
+// 開く行の次の行から、閉じる行の前の行まで（plugins/go/spec/go.hozo の Requirement.UnitTestPort の「テストの対応表」）。
 func scanTestRuns(t *testing.T, file, src string) []plugin.TestEntry {
 	t.Helper()
 	type run struct {
@@ -288,7 +288,7 @@ func scanTestRuns(t *testing.T, file, src string) []plugin.TestEntry {
 
 // checkTestMaps は、出力のテストの対応表を、出力の Go のテキストに当てて確かめる: テストのパッケージのファイル（http.go）が
 // あるディレクトリにだけ、一つあり、中身は、そのファイルの、いちばん内側の t.Run を、行の順に、テスト一つを一行で並べたもの
-// （docs/plugin-go.md「テストの対応表」）。
+// （plugins/go/spec/go.hozo の Requirement.UnitTestPort の「テストの対応表」）。
 func checkTestMaps(t *testing.T, files map[string]string) {
 	t.Helper()
 	want := map[string]string{} // 対応表のパス → 中身

@@ -10,7 +10,7 @@ import (
 	"github.com/mew-ton/hozo/plugin/golang"
 )
 
-// Coverage は direction "coverage" の中身（docs/plugin-go.md「カバレッジを読む」）。カバレッジが go test -coverprofile の形で
+// Coverage は direction "coverage" の中身（plugins/go/spec/go.hozo の Requirement.UnitTestPort の「カバレッジを読む」）。カバレッジが go test -coverprofile の形で
 // なければ Recognized が false。形の違う行があれば error。応答の Files は、要求の Files のうち、カバレッジに行があるもの
 // （要求の順）。モジュールの名前は、要求の Outputs から取る（ファイルは、読まない）: ファイルのディレクトリか、その上にある dir の
 // うち、いちばん深い出力の、オプション module。そういう出力がない、module がないファイルは、測られていないものとして、出さない。

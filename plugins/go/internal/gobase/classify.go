@@ -7,7 +7,7 @@ import (
 	"github.com/mew-ton/hozo/plugin/golang"
 )
 
-// このファイルは classify.go（docs/plugin-go.md「分類」）: 述語で決まる分類の、列挙の型と定数、述語のインターフェース、判定関数
+// このファイルは classify.go（plugins/go/spec/go.hozo の Requirement.Wiring の「分類」）: 述語で決まる分類の、列挙の型と定数、述語のインターフェース、判定関数
 // （宣言順）。型で決まる分類は、何も出さない。定義のパッケージのもの（genClassify）と、分けた出力の入口の再公開（genEntryClassify）。
 // 述語も判定関数も、op と同じに、最初の引数に ctx を取り、最後の戻り値に error を返す（同「op の形」）。
 
@@ -125,7 +125,7 @@ const (
 
 // genClassify は定義のパッケージの classify.go。述語で決まる分類がなければ nil。
 //
-// part は、どの分を出すか（docs/plugin-go.md「型のパッケージ」）: classifyAll は、すべての定義（型のパッケージを分けない出力）。
+// part は、どの分を出すか（plugins/go/spec/go.hozo の Requirement.Layout の「型のパッケージ」）: classifyAll は、すべての定義（型のパッケージを分けない出力）。
 // classifyTypes は、型のパッケージの分（値の分類・op の分類の定義）。classifyDef は、型のパッケージを分ける出力の、定義の
 // パッケージの分（値の分類・op の分類の再公開と、状態の分類の定義）。
 func (e *emitter) genClassify(part classifyPart) *fileGen {
@@ -172,7 +172,7 @@ func (e *emitter) genClassify(part classifyPart) *fileGen {
 			f.printf("type %sCases interface {\n", name)
 			for _, cs := range c.Cases {
 				if cs.Name == c.Absent {
-					continue // ない側のケースは、述語を持たない（docs/plugin-go.md「分類」）
+					continue // ない側のケースは、述語を持たない（plugins/go/spec/go.hozo の Requirement.Wiring の「分類」）
 				}
 				f.printf("\t// %s はケース %s の述語。\n\t%s(ctx %s.Context, v %s) (bool, error)\n", golang.Capitalize(cs.Name), cs.Name, golang.Capitalize(cs.Name), ctx, f.goType(subject))
 			}
@@ -244,7 +244,7 @@ func classifyCase(call, caseName, caseConst string) string {
 		"hits = append(hits, " + strconv.Quote(caseName) + ")\nkind = " + caseConst + "\n}\n"
 }
 
-// classifyTail は、判定関数の終わり（docs/plugin-go.md「分類」）: 述語が error を返していれば、最初のもの。そうでなければ、
+// classifyTail は、判定関数の終わり（plugins/go/spec/go.hozo の Requirement.Wiring の「分類」）: 述語が error を返していれば、最初のもの。そうでなければ、
 // 真がちょうど一つなら、そのケース。0（値が、宣言したケースの外にある）か、二つ以上（述語が排他でない）なら、
 // *runtime.ClassificationError。
 func (e *emitter) classifyTail(f *fileGen, c *ir.Classify, rt string) {

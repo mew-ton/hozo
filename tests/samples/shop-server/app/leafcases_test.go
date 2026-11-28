@@ -10,7 +10,7 @@ import (
 	pkgtype "example.com/shop-server/gen/type"
 )
 
-// このファイルは、葉の op の、結果ごとの単体テスト（docs/plugin-go.md「単体テストの口」）。基底が出した口（servertest.LeafCases）を
+// このファイルは、葉の op の、結果ごとの単体テスト（plugins/go/spec/go.hozo の Requirement.UnitTestPort）。基底が出した口（servertest.LeafCases）を
 // 満たす型を書き、servertest.RunLeaves に渡す。葉を呼ぶ所と、結果の見分け（正常か、どの例外か）は、生成したコードが持つ。
 // ここに書くのは、引数の値と、返り値の確かめだけ。葉に、例外を一つ足せば、足りないメソッドで、この型はコンパイルできなくなる。
 

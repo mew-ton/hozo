@@ -1,5 +1,5 @@
 // 生成したコードの振る舞いのテスト（docs/testing.md「単体テスト」の `plugins/go`）: 引数を持つ throw が作る例外の値
-// （docs/plugin-go.md「exception」と、「match」の「アームの本体」の throw E(<値>, …)）。例外は値で返り、errors.As で、値の型で
+// （plugins/go/spec/go.hozo の Requirement.Types の「exception」と、「match」の「アームの本体」の throw E(<値>, …)）。例外は値で返り、errors.As で、値の型で
 // 見分けて、引数ごとのフィールドを読める。plugins/go の TestBehavior が、生成したコードのモジュールのルートに置いて走らせる。
 package behavior
 

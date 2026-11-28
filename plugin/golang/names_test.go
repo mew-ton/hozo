@@ -39,7 +39,7 @@ func TestFieldName(t *testing.T) {
 	}
 }
 
-// docs/plugin-go.md「名前」の「op 名」「read 名」「effect 名」: どれも、先頭を大文字にしたメソッド名。
+// plugins/go/spec/go.hozo の Requirement.Names の「op 名」「read 名」「effect 名」: どれも、先頭を大文字にしたメソッド名。
 func TestMethodName(t *testing.T) {
 	tests := []struct{ in, want string }{{"login", "Login"}, {"openOrders", "OpenOrders"}, {"go", "Go"}, {"Login", "Login"}, {"server.login", "Login"},
 		{"store.userByEmail", "UserByEmail"}, {"store.createSession", "CreateSession"}}
@@ -50,7 +50,7 @@ func TestMethodName(t *testing.T) {
 	}
 }
 
-// docs/plugin-go.md「名前」の「直に呼ぶ組み込みの効果の操作」: 状態の単位のメソッド名は、先頭を大文字に。
+// plugins/go/spec/go.hozo の Requirement.Names の「直に呼ぶ組み込みの効果の操作」: 状態の単位のメソッド名は、先頭を大文字に。
 func TestBuiltinMethod(t *testing.T) {
 	for in, want := range map[string]string{"post": "Post", "put": "Put", "delete": "Delete"} {
 		if got := BuiltinMethod(in); got != want {
@@ -63,7 +63,7 @@ func TestLocalName(t *testing.T) {
 	tests := []struct{ in, want string }{
 		{"in", "in"}, {"query", "query"}, {"type", "type_"}, {"range", "range_"}, {"func", "func_"},
 		{"default", "default_"}, {"select", "select_"}, {"Type", "Type"}, {"types", "types"},
-		// 事前宣言の識別子（docs/plugin-go.md「名前」の「局所の名前」）
+		// 事前宣言の識別子（plugins/go/spec/go.hozo の Requirement.Names の「局所の名前」）
 		{"error", "error_"}, {"nil", "nil_"}, {"len", "len_"}, {"new", "new_"}, {"int64", "int64_"},
 		{"errors", "errors"}, {"Error", "Error"},
 		// 生成したコードが使う名前（呼ぶ側が reserved で渡す）: o、ctx、err、ptr、import するパッケージの名前
@@ -130,7 +130,7 @@ func TestPackageName(t *testing.T) {
 	}
 }
 
-// docs/plugin-go.md「名前」の「状態の単位」。
+// plugins/go/spec/go.hozo の Requirement.Names の「状態の単位」。
 func TestStateUnitName(t *testing.T) {
 	tests := []struct{ in, want string }{{"users", "UsersState"}, {"store.users", "UsersState"}, {"hozoc.OutputsSync", "OutputsSyncState"}, {"loginBody", "LoginBodyState"}}
 	for _, tt := range tests {
@@ -140,7 +140,7 @@ func TestStateUnitName(t *testing.T) {
 	}
 }
 
-// docs/plugin-go.md「名前」の「別の名前空間の口」と「New」の引数の名前。
+// plugins/go/spec/go.hozo の Requirement.Names の「別の名前空間の口」と「New」の引数の名前。
 func TestDepName(t *testing.T) {
 	tests := []struct{ ns, typ, param string }{
 		{"store", "StoreOps", "store"},
@@ -157,7 +157,7 @@ func TestDepName(t *testing.T) {
 	}
 }
 
-// docs/plugin-go.md「名前」の「継ぎ目のメソッド」と「継ぎ目を持つ op の、中身のメソッド」。
+// plugins/go/spec/go.hozo の Requirement.Names の「継ぎ目のメソッド」と「継ぎ目を持つ op の、中身のメソッド」。
 func TestSeamNames(t *testing.T) {
 	for _, tt := range []struct{ op, decorator, want string }{
 		{"login", "rate.limited", "LoginRateLimited"},

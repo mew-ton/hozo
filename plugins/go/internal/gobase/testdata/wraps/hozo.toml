@@ -1,4 +1,4 @@
-# plugins/go の単体テストの入力（docs/testing.md「単体テスト」）: docs/plugin-go.md「本体のあるデコレータ」の各行。
+# plugins/go の単体テストの入力（docs/testing.md「単体テスト」）: plugins/go/spec/go.hozo の Requirement.Wraps の各行。
 [hozo]
 plugin_dirs = ["plugins"]
 

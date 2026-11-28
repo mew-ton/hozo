@@ -19,7 +19,7 @@ import (
 // メソッドの形（引数と戻り値を持つか）だけ（「出力」のハンドラの中の 4）。
 
 // runtimePath は、生成したコードが import する runtime パッケージ（*runtime.ValidationError、runtime.Exception。
-// docs/plugin-go-valid.md「runtime」、docs/plugin-go.md「runtime パッケージ」）。
+// docs/plugin-go-valid.md「runtime」、パッケージ runtime の説明（runtime/doc.go））。
 const runtimePath = "github.com/mew-ton/hozo/runtime"
 
 // file は、描いている途中の http.go。
@@ -33,7 +33,7 @@ type file struct {
 }
 
 // local は、関数の中の局所の名前。このファイルが import するパッケージの名前と当たれば、当たらなくなるまで末尾に _ を足す
-// （docs/plugin-go-http.md「出力」。docs/plugin-go.md「名前」の「局所の名前」と同じ扱い）。
+// （docs/plugin-go-http.md「出力」。plugins/go/spec/go.hozo の Requirement.Names の「局所の名前」と同じ扱い）。
 func (f *file) local(name string) string {
 	for f.reserved[name] {
 		name += "_"
@@ -54,7 +54,7 @@ func (f *file) use(path string) string {
 func (f *file) http() string { return f.use("net/http") }
 
 // render は http.go の全体を作り、go/format で整形する。import の名前を文書の決まりの順で決めるために、二度描く
-// （docs/plugin-go.md「パッケージと import パス」の「import の名前」。基底と同じ手順）。
+// （plugins/go/spec/go.hozo の Requirement.Layout の「パッケージと import パス」の「import の名前」。基底と同じ手順）。
 func (g *generator) render(routes []route) (string, error) {
 	first := &file{g: g, im: golang.NewImports(g.view, g.layout, false)}
 	first.draw(routes)
@@ -202,7 +202,7 @@ func (f *file) read(x *input, l *locals) string {
 	return fmt.Sprintf("%s.%s(%s)\n", l.req, method, strings.Join(args, ", "))
 }
 
-// literal は、@http.default のリテラルの、Go での書き方（docs/plugin-go.md「値」の表の literal の行。基底と同じ）。
+// literal は、@http.default のリテラルの、Go での書き方（plugins/go/spec/go.hozo の Requirement.Wiring の「値」の表の literal の行。基底と同じ）。
 // Duration は time.Duration(<ナノ秒>)。フィールドの型への変換は書かない（補助が、実行時に、読む先の型に変える）。
 func (f *file) literal(lit ir.Literal) string {
 	if _, ok := lit.(ir.DurationLiteral); ok {

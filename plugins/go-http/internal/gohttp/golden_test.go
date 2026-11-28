@@ -21,7 +21,7 @@ var goldenFixtures = []struct {
 	behavior bool
 }{
 	{name: "routes", covers: "「出力」のハンドラの中の 1〜5、「入力の読み方」の二つの表の各行（三つの場所の二つの形、名前を書いた項目と省いた項目、項目がないときの三つの扱い）、「補助」（使うものだけ）、「通信の形」、「制約の検査」", behavior: true},
-	{name: "locals", covers: "名前空間のパッケージの名前が、NewHandler とハンドラの中の局所の名前や、標準ライブラリのパッケージの名前と当たるとき（「出力」。docs/plugin-go.md「パッケージと import パス」の import の名前）"},
+	{name: "locals", covers: "名前空間のパッケージの名前が、NewHandler とハンドラの中の局所の名前や、標準ライブラリのパッケージの名前と当たるとき（「出力」。plugins/go/spec/go.hozo の Requirement.Layout の「パッケージと import パス」の import の名前）"},
 	{name: "uniforma", covers: "型に依らない形の確かめ（docs/testing.md「単体テスト」）の一つ目: 核の型、省略可能でないフィールド、引数のない例外、戻り値のある op"},
 	{name: "uniformb", covers: "同、二つ目: scalar、省略可能なフィールド、引数を持つ例外（一つと、二つ以上。省略可能な引数）、省略可能な戻り値の op。uniforma と同じテキストになる（TestUniform）"},
 	{name: "unions", covers: "「通信の形」の「union」（印を書かない。決め手のキーで、アームを決める。包む型は、その Value）と、「補助」の「union の読み書き」（表 httpUnions と、読み書きの補助を、二つの http.go に）", behavior: true},
@@ -347,7 +347,7 @@ func TestThrown(t *testing.T) {
 			t.Errorf("httpThrown に、%q がない", line)
 		}
 	}
-	// 例外の構造体のフィールドを、名前で引かない（値を一つに包むフィールド Value は、もうない。docs/plugin-go.md「exception」）
+	// 例外の構造体のフィールドを、名前で引かない（値を一つに包むフィールド Value は、もうない。plugins/go/spec/go.hozo の Requirement.Types の「exception」）
 	for _, banned := range []string{"FieldByName", `"Value"`, ".Field("} {
 		if strings.Contains(thrown(api), banned) {
 			t.Errorf("httpThrown が、%q を書いている（例外の値は、そのまま JSON にする）", banned)

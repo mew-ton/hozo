@@ -393,7 +393,7 @@ func TestStatesFromTwoImplementations(t *testing.T) {
 }
 
 // dbSeamCases は、デコレータ @db.transaction の継ぎ目の実装（go-sqlite が出した store.DbSeams）の、結果ごとのケース
-// （docs/ide-chain.md「テストの規約」の「デコレータのテスト」。Go の口は docs/plugin-go.md「デコレータのテストの口」）。
+// （docs/ide-chain.md「テストの規約」の「デコレータのテスト」。Go の口は plugins/go/spec/go.hozo の Requirement.UnitTestPort の「デコレータのテストの口」）。
 // 結果は、正常だけ（宣言が、throws を持たない）。書いてあるのは、継ぎ目の実装だけ: 継ぎ目を呼ぶ所と、op の中身が、ちょうど
 // 一度、呼ばれたことの確かめは、生成したコード（RunSeams）が持つ。
 type dbSeamCases struct{ db *sql.DB }

@@ -1,5 +1,5 @@
 // 生成したコードの振る舞いのテスト（docs/testing.md「単体テスト」の `plugins/go`）: 述語で決まる分類の判定
-// （docs/plugin-go.md「分類」）と、それで分ける配線、型で決まる分類の「分類の誤りの枝」（同「match」）。
+// （plugins/go/spec/go.hozo の Requirement.Wiring の「分類」）と、それで分ける配線、型で決まる分類の「分類の誤りの枝」（同「match」）。
 // plugins/go の TestBehavior が、生成したコードのモジュールのルートに置いて走らせる。
 package behavior
 
@@ -171,7 +171,7 @@ func TestClassifyPredicateError(t *testing.T) {
 }
 
 // 二つに分かれる分類の判定関数: どちらのケースも、その述語が真のとき。基底は「ほかのどれでもない」ケースを導かないので、
-// どの述語も真でない値は、ClassificationError（宣言したケースの外の値。docs/plugin-go.md「分類」）
+// どの述語も真でない値は、ClassificationError（宣言したケースの外の値。plugins/go/spec/go.hozo の Requirement.Wiring の「分類」）
 func TestClassifyTwoSided(t *testing.T) {
 	if got, err := app.ClassifyAddress(context.Background(), addresses{}, "a@example.com"); err != nil || got != app.AddressValid {
 		t.Errorf("Valid: %v, %v", got, err)
@@ -309,7 +309,7 @@ func TestWiring(t *testing.T) {
 	}
 }
 
-// 純粋で throws のない配線（pureLabel、outcome）も、error を返す形を持つ（docs/plugin-go.md「op の形」）。どのケースにも
+// 純粋で throws のない配線（pureLabel、outcome）も、error を返す形を持つ（plugins/go/spec/go.hozo の Requirement.OpShape）。どのケースにも
 // 当たらない判定の誤りは、panic ではなく、その error として返る（同「分類」）
 func TestPureWiringReturnsClassificationError(t *testing.T) {
 	ctx := context.Background()
@@ -336,8 +336,8 @@ func TestPureWiringReturnsClassificationError(t *testing.T) {
 	}
 }
 
-// 型で決まる分類は判定関数を持たないので、宣言したケースの外の値は、match のコードが分類の誤りにする（docs/plugin-go.md
-// 「match」の「分類の誤りの枝」）: 型の switch の default: の節。return / const / 文のどの match でも、通り抜けない
+// 型で決まる分類は判定関数を持たないので、宣言したケースの外の値は、match のコードが分類の誤りにする（plugins/go/spec/go.hozo の Requirement.Wiring の「match」
+// の「分類の誤りの枝」）: 型の switch の default: の節。return / const / 文のどの match でも、通り抜けない
 func TestTypeSwitchClassificationError(t *testing.T) {
 	ctx := context.Background()
 	l := &leaves{}

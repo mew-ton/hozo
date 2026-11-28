@@ -9,7 +9,7 @@ import (
 	"github.com/mew-ton/hozo/plugin/golang"
 )
 
-// このファイルは GO-3（docs/plugin-go.md「パッケージと import パス」）: 出力（単位と名前空間の組）が、import を辿って自分に戻る。
+// このファイルは GO-3（plugins/go/spec/go.hozo の Requirement.Layout の「パッケージと import パス」）: 出力（単位と名前空間の組）が、import を辿って自分に戻る。
 // import する相手は、docs/config.md「型の置き場」の表の 1〜6 が数える宣言の置き場で、どの出力についても View だけから求める。
 // 7（葉の戻り値の絞り込みの分類）は、テストのパッケージだけが import する。テストのパッケージは、どの出力からも import されないので、輪に入らない。
 
@@ -84,7 +84,7 @@ func (e *emitter) uses(nsName string, inUnit func(*ir.Op) bool, typesOnly bool) 
 			}
 		}
 		if typesOnly {
-			// 型のパッケージが使うのは、ここまで（docs/plugin-go.md「型のパッケージ」）: 関数の側が使う型は、輪にならない
+			// 型のパッケージが使うのは、ここまで（plugins/go/spec/go.hozo の Requirement.Layout の「型のパッケージ」）: 関数の側が使う型は、輪にならない
 			continue
 		}
 		switch x := d.(type) {

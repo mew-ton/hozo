@@ -1,6 +1,6 @@
 // 生成したコードの振る舞いのテスト（docs/testing.md「単体テスト」の `plugins/go`）: 本体のあるデコレータの外側が、本体の順に
 // 動くこと、next() が、内側の層を、op の引数のまま呼ぶこと、op の結果が、そのまま返ること、継ぎ目との入れ子の順
-// （docs/plugin-go.md「本体のあるデコレータ」）。plugins/go の TestBehavior が、生成したコードのモジュールのルートに置いて走らせる。
+// （plugins/go/spec/go.hozo の Requirement.Wraps）。plugins/go の TestBehavior が、生成したコードのモジュールのルートに置いて走らせる。
 package behavior
 
 import (
@@ -205,7 +205,7 @@ func (x outcome) CloseTraceTraced(ctx context.Context, body func(ctx context.Con
 	return x.run(ctx, body)
 }
 
-// traceCases は、デコレータ trace.traced の、結果ごとのケース（docs/plugin-go.md「デコレータのテストの口」）。
+// traceCases は、デコレータ trace.traced の、結果ごとのケース（plugins/go/spec/go.hozo の Requirement.UnitTestPort の「デコレータのテストの口」）。
 type traceCases struct{}
 
 func seamsOf(x outcome) shoptest.TraceTracedCase {
@@ -404,7 +404,7 @@ func (c echoedCases) Down() desktest.TraceEchoedCase {
 }
 
 // TestCatchCases は、生成した RunSeams が、例外を受けるデコレータの継ぎ目に、受ける例外ごとのテストを足し
-// （docs/plugin-go.md「デコレータのテストの口」の「受けるケース」）、宣言どおりの実装で、どれも通ること。
+// （plugins/go/spec/go.hozo の Requirement.UnitTestPort の「デコレータのテストの口」の「受けるケース」）、宣言どおりの実装で、どれも通ること。
 // 宣言に反する実装で落ちることは、plugins/go の TestCatchCasesFail。
 func TestCatchCases(t *testing.T) {
 	desktest.RunSeams(t, deskCases{deskSeams{}})

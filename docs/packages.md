@@ -39,7 +39,7 @@ internal/gen/hozo/compiler/    spec/cli.hozo からの生成物（名前空間 h
 internal/gen/hozo/cli/         spec/cli.hozo からの生成物（名前空間 hozo.cli: コマンドの行）: 入口のパッケージ（go）。inner/ は内側のパッケージ（go）、types/ は型のパッケージ（go と go-valid）、clitest/ はテストのパッケージ（go）、cli/ は go-cli の出力
 internal/tools/        生成の道具: irschema/ と tmgrammar/（go generate）、selfgen/（make generate）
 plugins/<name>/        プラグイン。一つのディレクトリが、一つの WASM（main パッケージをビルドした plugin.wasm。リポジトリには入れない）と hozo-plugin.toml（提供するトランスパイラの一覧を持つ）
-plugins/go/            Go の基底のプラグイン（main。中身は internal/gobase/）
+plugins/go/            Go の基底のプラグイン（main。中身は internal/gobase/）。go-http と同じく、それ自体が一つの Hozo のプロジェクト（hozo.toml と spec/go.hozo: go 自身の要求）で、internal/spec/ はその生成物（テストのパッケージ gobasetest の、要求のテストの入れ物の口）
 plugins/go-valid/      go-valid プラグイン（main。中身は internal/govalid/）
 plugins/go-sqlite/     go-sqlite プラグイン（main。中身は internal/gosqlite/）。go-http と同じく、それ自体が一つの Hozo のプロジェクト（spec/go-sqlite.hozo: go-sqlite 自身の要求）で、internal/spec/ はその生成物
 plugins/go-http/       go-http プラグイン（main。中身は internal/gohttp/）。それ自体が一つの Hozo のプロジェクト（hozo.toml と spec/go-http.hozo: go-http 自身の要求。spec/runtime.hozo は補助の設計）で、internal/spec/ はその生成物（テストのパッケージ gohttptest の、要求のテストの入れ物の口。docs/plugin-go-http.md「go-http 自身の要求」）
@@ -112,6 +112,8 @@ Go のパッケージごとの、このモジュールの中で import してい
 | `vocab` | — |
 | `plugins/go` | `plugin`、`plugins/go/internal/gobase` |
 | `plugins/go/internal/gobase` | `ir`、`plugin`、`plugin/golang` |
+| `plugins/go/internal/spec` | — |
+| `plugins/go/internal/spec/gobasetest` | — |
 | `plugins/go-valid` | `plugin`、`plugins/go-valid/internal/govalid` |
 | `plugins/go-valid/internal/govalid` | `ir`、`plugin`、`plugin/golang`、`plugin/govalid`、`plugin/validvocab` |
 | `plugins/go-sqlite` | `plugin`、`plugins/go-sqlite/internal/gosqlite` |
@@ -204,7 +206,7 @@ func OpsWith(view *ir.View, decorator string) []string             // view.viewe
 func Options(req *EmitRequest, into any) ([]string, error)         // req.View.Config.Options[req.Transpiler] を into（構造体へのポインタ。フィールドは json タグで結ぶ）に読む。
                                                                    // 書かれていなければ into はそのまま。戻り値は、into にないキー（辞書順）。型の違う値は error。
                                                                    // 知らないキーと error を診断にするのは呼ぶ側（docs/config.md「オプション」）
-const Version = "0.0.0-dev"                                         // このリポジトリのプラグインの版。生成したファイルのヘッダに書く（docs/plugin-go.md「ファイル」）
+const Version = "0.0.0-dev"                                         // このリポジトリのプラグインの版。生成したファイルのヘッダに書く（`plugins/go/spec/go.hozo` の `Requirement.Layout` の「ファイル」）
 // ImportRequest / ImportResponse / File / Warning / Diagnostic も同じ形
 // 語彙のプラグイン（docs/plugin-protocol.md「語彙のプラグイン」「read」）。Handler が、Reader も満たしていれば、Run が、direction "read" で呼ぶ
 type Reader interface { Read(req *ReadRequest) (*ReadResponse, error) }
@@ -220,7 +222,7 @@ type TestMap struct { Tests []TestEntry }
 type TestEntry struct { Name string; File string; Lines [2]int }
 func TestMapName(transpiler string) string                          // "hozo-tests.<transpiler>.json"
 func TestMapTranspiler(path string) (string, bool)                  // path の名前が、対応表のもの（hozo-tests.<名前>.json）なら、その <名前>
-func TestMapFile(dir, transpiler string, tests []TestEntry) File     // dir の下の、対応表のファイル。テスト一つを一行に書く（docs/plugin-go.md「テストの対応表」の並びと字下げ）
+func TestMapFile(dir, transpiler string, tests []TestEntry) File     // dir の下の、対応表のファイル。テスト一つを一行に書く（`plugins/go/spec/go.hozo` の `Requirement.UnitTestPort` の「テストの対応表」の並びと字下げ）
 
 // Main は標準入力の要求を読み、protocol を確かめ、h を呼び、標準出力に応答を書く。終了コードを返す
 // （docs/plugin-protocol.md「要求と応答」「起動」。文字列でない protocol も「合わない」で code "protocol"）。
@@ -236,10 +238,10 @@ var ErrUnsupported error
 
 ### `plugin/golang`（公開）
 
-`docs/plugin-go.md` の形の規則の写し。基底 `go` と、それに相乗りする Go のトランスパイラが共有する: 相乗りは、基底の出力を見ずに、ここの関数で基底の置き場と名前を求める（`docs/plugin-protocol.md`「相乗りが基底の形を知る方法」）。規則の持ち主は `docs/plugin-go.md` で、このパッケージは、どの見出しを写したかをコメントに書く。公開の関数はここに並べたものがすべて。
+`plugins/go/spec/go.hozo` の形の規則の写し。基底 `go` と、それに相乗りする Go のトランスパイラが共有する: 相乗りは、基底の出力を見ずに、ここの関数で基底の置き場と名前を求める（`docs/plugin-protocol.md`「相乗りが基底の形を知る方法」）。規則の持ち主は `plugins/go/spec/go.hozo` で、このパッケージは、どの見出しを写したかをコメントに書く。公開の関数はここに並べたものがすべて。
 
 ```go
-// 名前（docs/plugin-go.md「名前」）
+// 名前（`plugins/go/spec/go.hozo` の `Requirement.Names`）
 func TypeName(fqn, namespace string) string       // namespace は宣言した名前空間。合成 model（`.`）の連結を含む
 func FieldName(name string) string                // model のフィールドと、例外の引数（例外の構造体のフィールド。同「exception」）の名前
 func MethodName(name string) string               // op、read、効果の名前から、メソッドの名前。export の有無によらず、先頭を大文字に
@@ -285,7 +287,7 @@ func LayoutOf(view *ir.View) (*Layout, error)                               // �
 func HomeOf(view *ir.View, namespace string) (*Layout, bool, error)         // view の単位から見た、別の名前空間の型の置き場（docs/config.md「型の置き場」）。なければ false
 type Imports struct{ … }                          // 一つのファイルの import。名前の決め方は同「パッケージと import パス」
 func NewImports(view *ir.View, layout *Layout, inDef bool) *Imports   // inDef は、書くファイルが定義のパッケージのものか（入口のものなら、N の型は入口の名前で修飾なし）
-func NewTypesImports(view *ir.View, layout *Layout) *Imports          // 型のパッケージ（docs/plugin-go.md「型のパッケージ」）のファイルの import。N の型は、修飾なし
+func NewTypesImports(view *ir.View, layout *Layout) *Imports          // 型のパッケージ（`plugins/go/spec/go.hozo` の `Requirement.Layout` の「型のパッケージ」）のファイルの import。N の型は、修飾なし
 func NewTestImports(view *ir.View, layout *Layout) *Imports           // テストのパッケージのファイルの import。N の宣言も、入口のパッケージの名前で修飾し、その import は、いつも名前を書く
 func (*Imports) Reserve(names ...string)              // このファイルの import の名前に使わせない名前を足す（ファイルを書くトランスパイラが、関数の本体の中で決まった名前で使う識別子。
                                                       // 基底の o、ctx、err）。基底の非公開の名前 ops と ptr は、Reserve しなくても、どのファイルでも使わせない
@@ -367,7 +369,7 @@ type TestName struct {
 }
 func PublicTestNames(view *ir.View) []TestName    // 出力 (U, N) の、テストのパッケージに、基底が出す公開の名前のすべて。口も、にせものも、ない出力では、空
 func TestFakeNames(view *ir.View) []TestName      // そのうち、fakes.go の名前: にせものの型（New の引数の順）、Fakes、NewOps。fakes.go を持たない出力では、空
-func TestKitOf(view *ir.View) (*TestKit, error)   // 出力 (U, N) の、テストのにせものと、テストの中の組み立ての形（docs/plugin-go.md「テストのにせもの」）。module のない出力の Layout は nil で、そのときは、TestKit と一緒に、ErrNoModule を返す
+func TestKitOf(view *ir.View) (*TestKit, error)   // 出力 (U, N) の、テストのにせものと、テストの中の組み立ての形（`plugins/go/spec/go.hozo` の `Requirement.Fakes`）。module のない出力の Layout は nil で、そのときは、TestKit と一緒に、ErrNoModule を返す
 type TestKit struct {
     Namespace, Dir string                         // 出力する名前空間と、Dir(U, N)
     Shape  *Shape                                 // その出力の、op と口（別の単位の出力なら、その単位の in を省いたものとして求めた形）
@@ -384,9 +386,9 @@ type KitParam struct {
     FQN   string                                  // 状態、分類、別の名前空間の FQN
     Fake  string                                  // にせものの型の名前（KitUnit なら ""）
     Unit  *TestKit                                // KitUnit のとき、本物を通す出力
-    Entry bool                                    // KitExternal が、通す出力のある名前空間の、入口の op の並びか（docs/plugin-go.md「テストのにせもの」の「別の名前空間」）
+    Entry bool                                    // KitExternal が、通す出力のある名前空間の、入口の op の並びか（`plugins/go/spec/go.hozo` の `Requirement.Fakes` の「別の名前空間」）
 }
-func ThrowSources(view *ir.View, kit *TestKit, entry string) []ThrowSource   // view の出力の入口 entry の、例外の出どころ（View.entries の、その入口の sources の順）を、kit のにせものに当てたもの（docs/plugin-go.md「テストのにせもの」の「求めるケースを、にせものに当てる」）。入口が View.entries になければ nil
+func ThrowSources(view *ir.View, kit *TestKit, entry string) []ThrowSource   // view の出力の入口 entry の、例外の出どころ（View.entries の、その入口の sources の順）を、kit のにせものに当てたもの（`plugins/go/spec/go.hozo` の `Requirement.Fakes` の「求めるケースを、にせものに当てる」）。入口が View.entries になければ nil
 func CaughtSources(view *ir.View, kit *TestKit, entry string) []ThrowSource  // 同じ入口の、受ける道（View.entries の caught の順）
 type ThrowSource struct {
     Exception string                              // 例外の FQN（受ける道なら、受けられる例外）
@@ -406,7 +408,7 @@ type KitReal struct {
     Kind KitKind                                  // KitLeaves か KitClassify
     Namespace, Classify string                    // その口を持つ出力の名前空間と、分類の FQN（葉なら ""）
 }
-func TestMap(path, src string) ([]plugin.TestEntry, error)   // 整形した後の Go のソース src（置き場は path）の、走らせる関数の中のテスト（docs/plugin-go.md「テストの対応表」）。行の順。約束の形でない t.Run があれば error
+func TestMap(path, src string) ([]plugin.TestEntry, error)   // 整形した後の Go のソース src（置き場は path）の、走らせる関数の中のテスト（`plugins/go/spec/go.hozo` の `Requirement.UnitTestPort` の「テストの対応表」）。行の順。約束の形でない t.Run があれば error
 func ReadCoverProfile(content string) (profile *CoverProfile, recognized bool, err error)   // go test -coverprofile の形を読む（同「カバレッジを読む」）。頭の行が違えば recognized が false
 func (p *CoverProfile) Lines(name string) (lines [][2]int, measured bool)   // <import パス>/<ファイル名> の、実行された行の範囲。一行もなければ measured が false
 ```
@@ -414,15 +416,15 @@ func (p *CoverProfile) Lines(name string) (lines [][2]int, measured bool)   // <
 - `HomeOf` が返す、別の単位の出力の `HasInner` と `DefDir` / `DefPath` / `DefName` は、その単位の `in` を省いたものとして求めた値（`View` は、ほかの単位の `in` を持たない）。別の名前空間の型を import するのは、型のパッケージ（`Layout` の `TypesDir` / `TypesPath`。`HasTypes` が偽なら、入口と同じ）で、それは、名前空間の宣言だけから決まる（`in` に依らない）ので、import には効かない。
 - `Param.Type` は、定義のパッケージの中での書き方。別の名前空間の分類の述語（`<C>Cases`）は修飾なしの名前で、書く側が `Imports.Qualifier` で修飾する。
 - 継ぎ目を宣言した相乗りは、`ShapeOf(view).Seams` のうち `Transpiler` が自分の名前のものについて、メソッドを出す。基底も同じ値から `Seams` を出すので、二つは合う。
-- 状態の単位を満たす型を出す相乗り（`go-sqlite`）は、`ShapeOf(view).States` の `Builtins`、`Reads`、`Effects` から、単位のメソッドの並びを、`ReadSignature`、`EffectSignature`、`BuiltinSignature` から、その形を求める。メソッドの名前は、`read` と効果が `MethodName(<FQN>)`、形で決まる命令が `BuiltinMethod(<操作>)`。N の `read` と効果は、どれも、ちょうど一つの単位の `Reads` / `Effects` にある（`read` は `Read.state` の単位、効果は宛先の単位。`docs/plugin-go.md`「状態の単位」の「効果の宛先の単位」）ので、ある `read` か効果がどの単位のメソッドかは、`States` を走査して求める。`Reads` と `Effects` は、単位の対象（`in`）によらず、配線が呼んでいるかにもよらない。`Builtins` だけが、単位の対象の配線が直に呼ぶ操作で決まる。
-- op のメソッドは、どれも、最初に `ctx` を取り、最後に `error` を返す（`docs/plugin-go.md`「op の形」）。op を呼ぶ相乗りは、op ごとに確かめずに、`ctx` を渡し、`error` を受ける。これまでの `OpShape.Ctx` / `OpShape.Err`（op ごとに、取るか、返すか）は、いつも真なので、なくした。
+- 状態の単位を満たす型を出す相乗り（`go-sqlite`）は、`ShapeOf(view).States` の `Builtins`、`Reads`、`Effects` から、単位のメソッドの並びを、`ReadSignature`、`EffectSignature`、`BuiltinSignature` から、その形を求める。メソッドの名前は、`read` と効果が `MethodName(<FQN>)`、形で決まる命令が `BuiltinMethod(<操作>)`。N の `read` と効果は、どれも、ちょうど一つの単位の `Reads` / `Effects` にある（`read` は `Read.state` の単位、効果は宛先の単位。`plugins/go/spec/go.hozo` の `Requirement.Ports` の「状態の単位」の「効果の宛先の単位」）ので、ある `read` か効果がどの単位のメソッドかは、`States` を走査して求める。`Reads` と `Effects` は、単位の対象（`in`）によらず、配線が呼んでいるかにもよらない。`Builtins` だけが、単位の対象の配線が直に呼ぶ操作で決まる。
+- op のメソッドは、どれも、最初に `ctx` を取り、最後に `error` を返す（`plugins/go/spec/go.hozo` の `Requirement.OpShape`）。op を呼ぶ相乗りは、op ごとに確かめずに、`ctx` を渡し、`error` を受ける。これまでの `OpShape.Ctx` / `OpShape.Err`（op ごとに、取るか、返すか）は、いつも真なので、なくした。
 - op の置き場（`OpShape.Place`）は三つだけで、状態の単位に op のメソッドはない: `Shape.Leaves` は、置き場が `Leaf` の op のすべて。これまでの、状態の単位の `Queries` / `Commands`、`Shape.Shared`（`SharedState`）、`OpShape.Unit`、置き場 `StateCommand` / `SharedCommand` / `StateQuery` / `SharedQuery`、`PublicShared` は、なくした（決定 D139）。
 - 例外の値を作るか読む相乗り（`go-http`、`go-cli`、サンプルの `go-ratelimit`）は、例外の構造体のフィールドを、`Exception.params` の順に、`FieldName(<引数名>)` で求める（型は `GoType(<引数の型>)`、タグは `json:"<引数名>"`、省略可能なら `,omitempty`）。引数のない例外は `struct{}`。値を一つに包むフィールド `Value` は、もうない。
 - これまでの `Resolver`（複製した型をローカルにする判断）はなくした。別の名前空間の型は、いつも置き場の入口のパッケージ。
 - 当たる名前（GO-2）と import の循環（GO-3）を見つけるのは基底のプラグイン（`plugins/go/internal/gobase`）で、このパッケージは、当たらない前提で名前を返す。
-- `PublicNames` は、`docs/plugin-go.md`「名前」の「名前が当たれば GO-2」が並べる、定義のパッケージの公開の名前の、ただ一つの写し。並びは、N の宣言順（宣言ごとに、型、アームを包む型。分類は、列挙の型、ケースの定数、判定関数、述語のインターフェース）、状態の単位（宣言順）、`Ops`、`New`、`Leaves`、`Seams`、別の名前空間の口（FQN の辞書順）。基底は、この一覧の中で名前が当たれば GO-2 を返す。入口か定義のパッケージに公開の名前を足す相乗り（`go-sqlite` の GOSQL-4、`go-http` の GOHTTP-10、サンプルの `go-ratelimit` の GORATE-2）は、自分の名前がこの一覧の名前と当たるかを確かめる（入口のパッケージは、定義のすべての名前を再公開するので、どちらに足す名前も、当たる相手はこの一覧）。一覧を自分で書き写さない。
-- `PublicTestNames` は、テストのパッケージの、基底の公開の名前（`docs/plugin-go.md`「単体テストの口」: `LeafCases`、`RunLeaves`、葉ごとの `<Op>Cases` と `<Op>Case`、分類ごとの `<C>Examples` と `Run<C>`。同「テストのにせもの」: にせものの型、`Fakes`、`NewOps`）の、ただ一つの写し。基底は、この一覧の中で名前が当たれば GO-2 を返す。テストのパッケージにファイルを足す相乗り（`go-http` の GOHTTP-20）は、自分の名前が、この一覧の名前と当たるかを確かめる。空かどうかは、基底が、テストのパッケージを作るかどうか。
-- `TestKitOf` は、テストのにせものと、テストの中の組み立て（`docs/plugin-go.md`「テストのにせもの」）の、ただ一つの写し。基底は、ここから `fakes.go` を作り、組み立てを使う相乗り（`go-http` の `RunHTTP`）は、同じ値から、`Fakes` のフィールドの名前と、`NewOps` の引数を求める。別の単位の出力の形は、`HomeOf` と同じに、その単位の `in` を省いたものとして求める。
+- `PublicNames` は、`plugins/go/spec/go.hozo` の `Requirement.Names` の「名前が当たれば GO-2」が並べる、定義のパッケージの公開の名前の、ただ一つの写し。並びは、N の宣言順（宣言ごとに、型、アームを包む型。分類は、列挙の型、ケースの定数、判定関数、述語のインターフェース）、状態の単位（宣言順）、`Ops`、`New`、`Leaves`、`Seams`、別の名前空間の口（FQN の辞書順）。基底は、この一覧の中で名前が当たれば GO-2 を返す。入口か定義のパッケージに公開の名前を足す相乗り（`go-sqlite` の GOSQL-4、`go-http` の GOHTTP-10、サンプルの `go-ratelimit` の GORATE-2）は、自分の名前がこの一覧の名前と当たるかを確かめる（入口のパッケージは、定義のすべての名前を再公開するので、どちらに足す名前も、当たる相手はこの一覧）。一覧を自分で書き写さない。
+- `PublicTestNames` は、テストのパッケージの、基底の公開の名前（`plugins/go/spec/go.hozo` の `Requirement.UnitTestPort`: `LeafCases`、`RunLeaves`、葉ごとの `<Op>Cases` と `<Op>Case`、分類ごとの `<C>Examples` と `Run<C>`。同「テストのにせもの」: にせものの型、`Fakes`、`NewOps`）の、ただ一つの写し。基底は、この一覧の中で名前が当たれば GO-2 を返す。テストのパッケージにファイルを足す相乗り（`go-http` の GOHTTP-20）は、自分の名前が、この一覧の名前と当たるかを確かめる。空かどうかは、基底が、テストのパッケージを作るかどうか。
+- `TestKitOf` は、テストのにせものと、テストの中の組み立て（`plugins/go/spec/go.hozo` の `Requirement.Fakes`）の、ただ一つの写し。基底は、ここから `fakes.go` を作り、組み立てを使う相乗り（`go-http` の `RunHTTP`）は、同じ値から、`Fakes` のフィールドの名前と、`NewOps` の引数を求める。別の単位の出力の形は、`HomeOf` と同じに、その単位の `in` を省いたものとして求める。
 
 ### `plugin/httpvocab`（公開）
 
@@ -531,7 +533,7 @@ func Unlisted(view *ir.View, namespace string) (unit int, ok bool)   // view の
 
 ### `runtime`（公開）
 
-`docs/plugin-go.md`「runtime パッケージ」と `docs/plugin-go-valid.md`「runtime」、`docs/plugin-go-sqlite.md`「トランザクション」。`MissingError` はなくした。公開の名前はここに並べたものがすべて。
+パッケージ `runtime` の説明（`runtime/doc.go`）と `docs/plugin-go-valid.md`「runtime」、`docs/plugin-go-sqlite.md`「トランザクション」。`MissingError` はなくした。公開の名前はここに並べたものがすべて。
 
 ```go
 type Effect string                                // 効果の名前（FQN）
@@ -761,7 +763,7 @@ Go のプラグインは、どれも同じ形: `main` パッケージが `plugin
 
 | プラグイン | 文書 | 中身 |
 |---|---|---|
-| `plugins/go` | `docs/plugin-go.md` | `internal/gobase`: 形は `plugin/golang` で求め、ファイルのテキストを作る。GO-* |
+| `plugins/go` | `plugins/go/spec/go.hozo` | `internal/gobase`: 形は `plugin/golang` で求め、ファイルのテキストを作る。GO-* |
 | `plugins/go-valid` | `docs/plugin-go-valid.md` | `internal/govalid`: `validate.go`。GOVALID-* |
 | `plugins/go-sqlite` | `docs/plugin-go-sqlite.md` | `internal/gosqlite`: `db.go`。表、列、`read` と効果は、`plugin/dbvocab` の `ReadNamespace` で読む。GOSQL-* |
 | `plugins/go-http` | `docs/plugin-go-http.md` | `internal/gohttp`: 入口のパッケージの `http.go` と、テストのパッケージの `http.go`。GOHTTP-* |
@@ -778,6 +780,7 @@ Go のプラグインは、どれも同じ形: `main` パッケージが `plugin
 | `ir` と `plugin` の型 | `schema/ir.schema.json`（`Program` / `View` と、`$defs` にプロトコルの要求と応答） | `internal/tools/irschema`（`go generate ./schema/...`。構造体は reflect で写し、`kind` のユニオンと列挙は道具の表で持つ） |
 | `token.Keywords` | `editors/vscode/syntaxes/hozo.tmLanguage.json`（予約語の部分は `token.Keywords` から、それ以外は道具の中の表から） | `internal/tools/tmgrammar`（`go generate ./editors/...`） |
 | `spec/cli.hozo`（と、それが指す、`spec/` の `*.hozo`） | `internal/gen/hozo/compiler/**`、`internal/gen/hozo/cli/**` | `internal/tools/selfgen`（`make generate`。下の「自己生成の手順」） |
+| `plugins/go/spec/go.hozo`（go 自身の要求。`plugins/go/hozo.toml` のプロジェクト。決定 D814） | `plugins/go/internal/spec/**` | 同じ |
 | `plugins/go-cli/spec/go-cli.hozo`（go-cli 自身の要求。`plugins/go-cli/hozo.toml` のプロジェクト。決定 D811） | `plugins/go-cli/internal/spec/**` | 同じ |
 | `plugins/go-design/spec/go-design.hozo`（go-design 自身の要求。`plugins/go-design/hozo.toml` のプロジェクト。決定 D813） | `plugins/go-design/internal/spec/**` | 同じ |
 | `plugins/go-http/spec/go-http.hozo`（go-http 自身の要求。`plugins/go-http/hozo.toml` のプロジェクト。`docs/plugin-go-http.md`「go-http 自身の要求」） | `plugins/go-http/internal/spec/**` | 同じ |

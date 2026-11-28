@@ -1,5 +1,5 @@
 // 生成したコードの振る舞いのテスト（docs/testing.md「単体テスト」の `plugins/go`）: 継ぎ目を通ることと、入れ子の順
-// （docs/plugin-go.md「継ぎ目」）、内側のフォルダから内部の op を呼べること、入口の Ops が export の op だけを持つこと
+// （plugins/go/spec/go.hozo の Requirement.Seams）、内側のフォルダから内部の op を呼べること、入口の Ops が export の op だけを持つこと
 // （同「内側のフォルダと入口」）。plugins/go の TestBehavior が、生成したコードのモジュールのルートに置いて走らせる。
 package behavior
 

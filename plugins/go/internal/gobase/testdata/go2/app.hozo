@@ -1,4 +1,4 @@
-// GO-2（docs/plugin-go.md「名前」の「名前が当たれば GO-2」）の条件を、名前空間ごとに一つずつ。どれも hozoc の検査は通る
+// GO-2（plugins/go/spec/go.hozo の Requirement.Names の「名前が当たれば GO-2」）の条件を、名前空間ごとに一つずつ。どれも hozoc の検査は通る
 // （NAME-1 は warning）。直すのは仕様の名前。
 
 // 葉の op は reads / effects の節を書けない（docs/check.md「葉の op」）ので、葉が状態に触れることは、運ぶ節を持つデコレータで言う

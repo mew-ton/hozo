@@ -1,10 +1,22 @@
+# Go の基底 go のマニフェスト（決定 D719、D814。持ち主は、このファイル。形は docs/plugin-protocol.md「マニフェスト `hozo-plugin.toml`」）
 name     = "go"
+# このディレクトリの main パッケージを、WASM（GOOS=wasip1 GOARCH=wasm）にビルドしたもの。リポジトリには、入れない: テストと
+# make generate が、自分でビルドする（docs/testing.md「プラグインの WASM」）。利用者への配り方は、決めていない（docs/open.md「文書と道具」）。
+# このリポジトリのほかの Go のプラグインも同じ
 wasm     = "plugin.wasm"
 protocol = "0.27"
 
+# 提供するトランスパイラは go の一つ。requires を持たない（基底）。言語 go を定める。語彙は提供せず、どの語彙も読まない。seams も
+# 持たない: デコレータの適用が基底の出力に効く道（plugins/go/spec/go.hozo の Requirement.Decorators）は、どちらも、hozoc が計算して
+# IR と View に置いたもの（Signature、View.config.seams）を通る。
+#
+# オプションは module の一つ: Go のモジュールの名前（文字列。go.mod の module の行と、同じもの）。ふつうは、プロジェクト全体の
+# オプション [options.go] に書く（docs/config.md「プロジェクト全体のオプション」）。出力の import パスを作るのに使う
+# （plugins/go/spec/go.hozo の Requirement.Layout の「パッケージと import パス」）。書かれていなければ GO-8。ほかのキーがあれば GO-5
 [[transpiler]]
 name     = "go"
 language = "go"
 
+# hozoc tests が渡すカバレッジのファイルを読む（plugins/go/spec/go.hozo の Requirement.UnitTestPort の「カバレッジを読む」）
 [coverage]
 enabled = true

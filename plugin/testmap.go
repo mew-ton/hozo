@@ -41,7 +41,7 @@ func TestMapTranspiler(p string) (string, bool) {
 }
 
 // TestMapFile は、dir の下に置く、トランスパイラ transpiler の対応表のファイル。テスト一つを一行に書く
-// （並びと字下げは docs/plugin-go.md「テストの対応表」）。tests は空でないこと（口を出さない応答は、対応表を出さない）。
+// （並びと字下げは plugins/go/spec/go.hozo の Requirement.UnitTestPort の「テストの対応表」）。tests は空でないこと（口を出さない応答は、対応表を出さない）。
 func TestMapFile(dir, transpiler string, tests []TestEntry) File {
 	var b bytes.Buffer
 	b.WriteString("{\n  \"tests\": [\n")

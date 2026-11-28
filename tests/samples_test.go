@@ -449,7 +449,7 @@ func (s *sampleProject) expected(t *testing.T) map[string][]byte {
 
 // copyInputs は、サンプルの入力を root に写す: hozo.toml、.hozo、go.mod、go.sum と、サンプルの中のプラグイン（hozo.toml の
 // plugin_dirs の下のすべて）。期待する出力（単位の out の下）と、人が書いたコードは写さない。
-// go.mod は、基底が import パスを決めるのに要る（docs/plugin-go.md「パッケージと import パス」。なければ GO-1）。その replace は
+// go.mod は、基底が import パスを決めるのに要る（plugins/go/spec/go.hozo の Requirement.Layout の「パッケージと import パス」。なければ GO-1）。その replace は
 // リポジトリへの相対パスなので、絶対パスに書き換える（root で、生成したコードを、go の道具で確かめられるように）。
 func (s *sampleProject) copyInputs(t *testing.T, root string) {
 	t.Helper()
@@ -814,7 +814,7 @@ func (s *sampleProject) testTests(t *testing.T) {
 	}
 	sort.Strings(want)
 	// cover は、サンプルのモジュールで、カバレッジを取りながらテストを走らせ、カバレッジのファイルを返す。skip が空でなければ、
-	// そのパターンの Go のテストを除く。-coverpkg が要る理由は docs/plugin-go.md「カバレッジを読む」。
+	// そのパターンの Go のテストを除く。-coverpkg が要る理由は plugins/go/spec/go.hozo の Requirement.UnitTestPort の「カバレッジを読む」。
 	cover := func(t *testing.T, skip string) string {
 		t.Helper()
 		file := filepath.Join(t.TempDir(), "cover.out")

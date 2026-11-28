@@ -1,7 +1,7 @@
 # 単位のコーパス（docs/testing.md「コーパス」、README.md）: hozo.toml は出力の単位の一覧（docs/config.md「単位」）。
 # 四つの単位とも、トランスパイラは Go の基底 go（リポジトリの plugins/ のプラグイン。テストが HOZO_PLUGIN_PATH として渡す）。
 
-# Go のモジュールの名前（go.mod の module と同じもの。docs/plugin-go.md「マニフェスト」）。プロジェクト全体のオプション
+# Go のモジュールの名前（go.mod の module と同じもの。plugins/go/hozo-plugin.toml）。プロジェクト全体のオプション
 [options.go]
 module = "github.com/mew-ton/hozo"
 

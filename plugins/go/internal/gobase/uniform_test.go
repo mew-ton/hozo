@@ -11,7 +11,7 @@ import (
 	"github.com/mew-ton/hozo/ir"
 )
 
-// このファイルは、docs/plugin-go.md「op の形」が一通りであること: 基底が出す、仕様の宣言を写した関数（op のメソッド、状態の単位の
+// このファイルは、plugins/go/spec/go.hozo の Requirement.OpShape が一通りであること: 基底が出す、仕様の宣言を写した関数（op のメソッド、状態の単位の
 // メソッド、分類の述語と判定関数、継ぎ目のメソッドと body）は、どれも、最初の引数に ctx context.Context を取り、最後の戻り値に
 // error を返す。純粋かどうか（Op.signature.pure）でも、throws の有無でも、形は変わらない。テストのパッケージ（同「単体テストの口」）の
 // 関数は、仕様の宣言を写したものではなく、testing がその形を決めているので、確かめない。
@@ -50,10 +50,10 @@ func uniform(ft *ast.FuncType) bool {
 	return ok && last.Name == "error"
 }
 
-// TestEveryFunctionTakesCtxAndReturnsError は、すべての入力の出力を Go として読み、関数とメソッドの宣言、インターフェースの
+// everyFunctionTakesCtxAndReturnsError は、すべての入力の出力を Go として読み、関数とメソッドの宣言、インターフェースの
 // メソッド、引数の関数の型（継ぎ目の body）と関数リテラル（入れ子の継ぎ目）の、すべての形を確かめる。入力には、純粋な葉と
 // 純粋な配線（statements の make、bothPure、endQuiet。matchswitch の pureLabel）、述語で決まる値の分類が入っている。
-func TestEveryFunctionTakesCtxAndReturnsError(t *testing.T) {
+func everyFunctionTakesCtxAndReturnsError(t *testing.T) {
 	for _, fx := range goldenFixtures {
 		_, files := emitFixture(t, fx.name)
 		for path, content := range goFiles(files) {
@@ -107,10 +107,10 @@ func TestEveryFunctionTakesCtxAndReturnsError(t *testing.T) {
 	}
 }
 
-// TestPureOpsHaveTheSameShape は、同じ入力の、すべての op を純粋にした View と、すべての op を純粋でなくした View から、
+// pureOpsHaveTheSameShape は、同じ入力の、すべての op を純粋にした View と、すべての op を純粋でなくした View から、
 // 同じバイト列が出ること: 基底は Op.signature.pure を読まない（同「op の形」）。入力は、純粋な葉・純粋な配線・純粋でない
 // 葉・純粋でない配線を持つ statements と、純粋な配線が述語で決まる分類を使う matchswitch。
-func TestPureOpsHaveTheSameShape(t *testing.T) {
+func pureOpsHaveTheSameShape(t *testing.T) {
 	for _, name := range []string{"statements", "matchswitch"} {
 		emitWith := func(pure bool) map[string]string {
 			views := loadViews(t, name)
@@ -151,8 +151,8 @@ func TestPureOpsHaveTheSameShape(t *testing.T) {
 	}
 }
 
-// TestNoGeneratedPanic は、基底が panic を呼ぶコードを出さないこと（同「分類」: 判定の誤りは、配線が error として返す）。
-func TestNoGeneratedPanic(t *testing.T) {
+// noGeneratedPanic は、基底が panic を呼ぶコードを出さないこと（同「分類」: 判定の誤りは、配線が error として返す）。
+func noGeneratedPanic(t *testing.T) {
 	for _, fx := range goldenFixtures {
 		_, files := emitFixture(t, fx.name)
 		for path, content := range goFiles(files) {

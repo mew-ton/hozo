@@ -23,7 +23,7 @@ const (
 	codeHTTPTestDir  = "GOHTTP-21" // テストのパッケージのディレクトリが、同じ単位が出力する子の名前空間の出力先と重なる
 )
 
-// FileName は、このトランスパイラが、入口のパッケージに出すファイルの名前（docs/plugin-go.md「相乗りのファイル」）。
+// FileName は、このトランスパイラが、入口のパッケージに出すファイルの名前（plugins/go/spec/go.hozo の Requirement.Layout の「相乗りのファイル」）。
 // テストのパッケージに出すファイルの名前は TestFileName（testfile.go）。
 const FileName = "http.go"
 
@@ -162,7 +162,7 @@ type generator struct {
 	ns     *ir.Namespace // N
 	opts   options
 	layout *golang.Layout
-	// kit は、N の出力の、テストのにせものと、テストの中の組み立て（docs/plugin-go.md「テストのにせもの」）。
+	// kit は、N の出力の、テストのにせものと、テストの中の組み立て（plugins/go/spec/go.hozo の Requirement.Fakes）。
 	kit *golang.TestKit
 
 	declNS map[string]string // 宣言の FQN → 宣言した名前空間
@@ -336,7 +336,7 @@ func (g *generator) statuses(routes []route) []status {
 	return out
 }
 
-// checkName は GOHTTP-10: 入口のパッケージに足す公開の名前（publicNames）が、N の定義のパッケージの公開の名前（docs/plugin-go.md「名前」。入口のパッケージは、その
+// checkName は GOHTTP-10: 入口のパッケージに足す公開の名前（publicNames）が、N の定義のパッケージの公開の名前（plugins/go/spec/go.hozo の Requirement.Names。入口のパッケージは、その
 // すべてを再公開する）と当たる。位置は、当たった宣言。名前の一覧は、基底と共有する golang.PublicNames。
 func (g *generator) checkName() {
 	for _, n := range golang.PublicNames(g.view) {

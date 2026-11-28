@@ -11,7 +11,7 @@
 //     ビルドして、それぞれのディレクトリの plugin.wasm に置く（docs/testing.md「プラグインの WASM」）。
 //  2. 一時ディレクトリに仕様と設定（spec/cli.hozo、hozo.toml、go.mod、go.sum）を写し、プラグインの置き場 plugins と、3 の vet が
 //     要るディレクトリ（ir、plugin、runtime）をシンボリックリンクで足して、そこで hozoc build を走らせる。
-//     生成されるコードの import パスは、hozo.toml の [options.go] の module から決まる（docs/plugin-go.md「パッケージと import パス」）
+//     生成されるコードの import パスは、hozo.toml の [options.go] の module から決まる（plugins/go/spec/go.hozo の Requirement.Layout の「パッケージと import パス」）
 //     ので、リポジトリで生成したときと同じになる。go.mod は、3 の vet とビルドのために写す。
 //     プラグインのプロジェクトは、プロジェクトごとに、別の一時ディレクトリに、リポジトリの中身を、置き場への道の上のディレクトリ
 //     だけを本物にし、仕様の置き場 plugins/<名前>/spec は複製し、ほかをシンボリックリンクで足して（mirror）、その plugins/<名前> で hozoc build を走らせる。
@@ -49,15 +49,15 @@ var (
 	// links は一時ディレクトリにシンボリックリンクで足すディレクトリ（プラグインの置き場と、生成物の vet が要るパッケージ）。
 	links = []string{"ir", "plugin", "plugins", "runtime"}
 	// plugins は、spec/cli.hozo の出力に使うプラグイン（hozo.toml の単位の transpilers。plugins/ の下の名前）。生成の前に、WASM に
-	// ビルドする: マニフェストの wasm は plugin.wasm（docs/plugin-go.md「マニフェスト」）。
+	// ビルドする: マニフェストの wasm は plugin.wasm（plugins/go/hozo-plugin.toml）。
 	plugins = []string{"go", "go-valid", "go-cli", "go-design"}
 	// users は、生成物を置き換えたつもりでビルドするパッケージ: 生成物そのものと、それを import するもの。
 	users = []string{"./internal/gen/...", "./internal/app/...", "./cmd/hozoc"}
 
 	// pluginProjects は、プラグインのプロジェクト（plugins/ の下の名前。docs/plugin-go-http.md「go-http 自身の要求」、
-	// docs/plugin-go-sqlite.md「go-sqlite 自身の要求」、plugins/go-cli/spec/go-cli.hozo、plugins/go-design/spec/go-design.hozo）。置き場は plugins/<名前>/internal/spec で、置き換えたつもりでビルドするのは
+	// docs/plugin-go-sqlite.md「go-sqlite 自身の要求」、plugins/go/spec/go.hozo、plugins/go-cli/spec/go-cli.hozo、plugins/go-design/spec/go-design.hozo）。置き場は plugins/<名前>/internal/spec で、置き換えたつもりでビルドするのは
 	// plugins/<名前>/... 。
-	pluginProjects = []string{"go-cli", "go-design", "go-http", "go-sqlite"}
+	pluginProjects = []string{"go", "go-cli", "go-design", "go-http", "go-sqlite"}
 )
 
 func main() {

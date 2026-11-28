@@ -23,7 +23,7 @@ func kitView() *ir.View {
 	)
 }
 
-// docs/plugin-go.md「テストのにせもの」の「別の名前空間」: 別の名前空間に渡すものは、それを出力する、同じ基底の単位の数で決まる。
+// plugins/go/spec/go.hozo の Requirement.Fakes の「別の名前空間」: 別の名前空間に渡すものは、それを出力する、同じ基底の単位の数で決まる。
 func TestTestKitDeps(t *testing.T) {
 	// 単位がない（外の仕組み）: どちらも、にせもの
 	k, err := TestKitOf(kitView())

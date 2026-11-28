@@ -7,10 +7,10 @@ import (
 	"github.com/mew-ton/hozo/plugin/golang"
 )
 
-// このファイルは ops.go（docs/plugin-go.md「実装を受け取る口」「継ぎ目」）: Ops、Leaves、<Ns>Ops、Seams、New、構造体 ops、
+// このファイルは ops.go（plugins/go/spec/go.hozo の Requirement.Ports、Requirement.Seams）: Ops、Leaves、<Ns>Ops、Seams、New、構造体 ops、
 // ops のメソッドのうち配線の本体でないもの。定義のパッケージのもの（genOps）と、分けた出力の入口の再公開（genEntryOps）。
 
-// コメントの決まった文（docs/plugin-go.md「コメント」）。
+// コメントの決まった文（plugins/go/spec/go.hozo の Requirement.Comments）。
 const (
 	commentOpsEntry = "Ops は、この名前空間の外から呼べる op: 仕様で export を付けた op。宣言順。New が返す。"
 	commentOpsInner = "Ops は、この名前空間のすべての op（export の有無によらない）。宣言順。New が返す。テストは、内部の op をここから呼ぶ。"
@@ -19,7 +19,7 @@ const (
 	commentMissing = "メソッドが一つでも足りない値は、渡すところでコンパイルできない。"
 	commentSeams   = "Seams は、継ぎ目: 単位のトランスパイラが継ぎ目を宣言したデコレータの、op への適用ごとに、メソッド一つ。実装は New の引数 %s に渡す。\n" + commentMissing
 	commentOps     = "ops は New が返す非公開の構造体。フィールドは New の引数そのまま。メソッドは、この名前空間の op のすべて。"
-	// 入口の確かめを持つ単位が、一つでもあるとき（docs/plugin-go.md「New」）
+	// 入口の確かめを持つ単位が、一つでもあるとき（plugins/go/spec/go.hozo の Requirement.Ports の「New」）
 	commentOpsChecked = "ops は New が返す非公開の構造体。フィールドは New の引数（入口の確かめを持つ状態の単位は、New が包んだもの）。メソッドは、この名前空間の op のすべて。"
 )
 
@@ -76,7 +76,7 @@ func method(name, params, results string) string {
 }
 
 // args は、op o を呼ぶときの引数の並び（ctx と、局所の名前）。メソッドの引数を、そのまま実装に渡すのに使う。
-// どの op も、最初の引数に ctx を取る（docs/plugin-go.md「op の形」）。
+// どの op も、最初の引数に ctx を取る（plugins/go/spec/go.hozo の Requirement.OpShape）。
 func (e *emitter) args(o *ir.Op) string {
 	as := []string{"ctx"}
 	for _, p := range o.Params {
@@ -192,7 +192,7 @@ func (e *emitter) genOps() *fileGen {
 	// New と、構造体 ops
 	params, _ := e.newParams(f)
 	f.print(e.newComment())
-	// 入口の確かめを持つ単位は、包んで入れる（docs/plugin-go.md「効果の入口の確かめ」）
+	// 入口の確かめを持つ単位は、包んで入れる（plugins/go/spec/go.hozo の Requirement.Ports の「効果の入口の確かめ」）
 	wrapped := map[string]string{} // New の引数の名前 → 包んだ式
 	for _, u := range s.States {
 		cs := e.checkedClassifies(u)
@@ -254,7 +254,7 @@ func (e *emitter) genOps() *fileGen {
 	return f
 }
 
-// implExpr は、op の実装（中身）を指す式（docs/plugin-go.md「継ぎ目」の「中身」の表の「外側が渡す式」）: 配線と never を返す op は
+// implExpr は、op の実装（中身）を指す式（plugins/go/spec/go.hozo の Requirement.Seams の「中身」の表の「外側が渡す式」）: 配線と never を返す op は
 // `o.<op>Body`（継ぎ目を持つときだけ使う）、葉は、Leaves のメソッドの値（名前は op 名のまま）。
 func (e *emitter) implExpr(os golang.OpShape) string {
 	switch os.Place {
@@ -287,8 +287,8 @@ func (e *emitter) neverValue(f *fileGen, o *ir.Op) string {
 	return f.goType(ir.Ref(x)) + "{}"
 }
 
-// genOuter は、包むデコレータ（継ぎ目か、本体のあるデコレータ）を持つ op の外側: ops の公開のメソッド（docs/plugin-go.md
-// 「外側」「本体のあるデコレータ」）。層が二つ以上なら入れ子にする: Op.decorators の最後（op に最も近い）のものが最も内側で、
+// genOuter は、包むデコレータ（継ぎ目か、本体のあるデコレータ）を持つ op の外側: ops の公開のメソッド（plugins/go/spec/go.hozo の Requirement.Seams の「外側」
+// 「本体のあるデコレータ」）。層が二つ以上なら入れ子にする: Op.decorators の最後（op に最も近い）のものが最も内側で、
 // 中身を直に受け取る。
 func (e *emitter) genOuter(f *fileGen, os golang.OpShape, o *ir.Op) {
 	var decorators []string
@@ -339,7 +339,7 @@ func (e *emitter) exportedOps() []golang.OpShape {
 }
 
 // genEntryOps は、分けた出力の入口の ops.go: 入口の Ops（export の op だけ）、Leaves と <Ns>Ops と Seams の別名、
-// 内側の New を呼ぶ New（docs/plugin-go.md「内側のフォルダと入口」）。export の op が一つもなくても、空の Ops と New を出す。
+// 内側の New を呼ぶ New（plugins/go/spec/go.hozo の Requirement.Layout の「内側のフォルダと入口」）。export の op が一つもなくても、空の Ops と New を出す。
 func (e *emitter) genEntryOps() *fileGen {
 	f := e.newFile(fileOps, false)
 	inner := f.im.Add(e.layout.DefPath, e.layout.DefName)

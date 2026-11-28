@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
 
@@ -12,91 +13,104 @@ import (
 	"github.com/mew-ton/hozo/plugin"
 )
 
-// goldenFixtures は、出力をゴールデンと比べる入力（testdata/<名前>/）と、それが確かめる docs/plugin-go.md の見出し。
+// goldenFixtures は、出力をゴールデンと比べる入力（testdata/<名前>/）と、それが確かめる plugins/go/spec/go.hozo の見出し。
 // behavior は、生成したコードを動かすテスト testdata/<名前>/behavior_test.go を持つもの。
 var goldenFixtures = []struct {
-	name     string
+	name string
+	// req は、この入力を、ゴールデンとの比較、go vet、振る舞いのテストまで走らせる、要求のケース（hozo.gobase.Requirement）。
+	req string
+	// also は、この入力を、ゴールデンとの比較だけ走らせる、ほかの要求のケース。
+	also     []string
 	covers   string
 	behavior bool
 }{
-	{name: "matchliteral", covers: "「match」の、絞り込みが literal の分け方（if <対象>）と、ケースのない側の、分類の誤りの枝", behavior: true},
-	{name: "literals", covers: "「型」の、リテラルの型の行: 「model」のリテラルの型のフィールド、「union」のリテラルの型のアーム、「値」の、リテラルの型のアームに入れる式とフィールドを読む式、「match」の variant（リテラルの型のアーム）と三つに分ける形（対象が boolean?）、「分類」の、対象が boolean? の literal の確かめ", behavior: true},
-	{name: "types", covers: "「型」（model、scalar、union、exception、effect）と「コメント」、予約語の名前空間のパッケージ名、op のない名前空間の状態の単位、「分類」の、対象のない分類（何も出さない）"},
-	{name: "names", covers: "「名前」の局所の名前、「パッケージと import パス」の import の名前、「New」の引数の名前、「別の名前空間の op」"},
-	{name: "pkgnames", covers: "「パッケージと import パス」の import の名前のうち、名前空間のパッケージ名が、基底が決まった名前で使う識別子（ops、ptr、o、ctx、err）や、途中の値（v0、k0）と同じとき。「New」の引数の名前 ops"},
-	{name: "statements", covers: "「呼び出し」「文」の表の各行（空の val、値を入れる文、集める文、for、disjoint を含む）、「match」の x = match と xs collect match、失敗の扱いの零値"},
-	{name: "values", covers: "「値」の表の各行、「型をそろえる」、「省略可能を通るパス」"},
-	{name: "unionarm", covers: "「値」の「union に入れる」（引数、レコードリテラルのフィールド、return、val、値を入れる文、集める文、throw の引数。構造体のアームと、包む型のアーム）", behavior: true},
-	{name: "states", covers: "「op の置き場」（デコレータが reads と effects を運ぶ葉も Leaves）、「コメント」の Reads / Effects（配線に運ばれたものを含む）、「状態の単位」（read、効果、形で決まる命令）、「呼び出し」の read・効果・直に呼ぶ組み込みの効果、「状態の参照」", behavior: true},
-	{name: "bind", covers: "「bind で埋まる位置」の 1〜4、「別の名前空間の op」"},
-	{name: "matchif", covers: "「match」の二つに分ける形（nullable、list、presence）と、アームの本体の組"},
-	{name: "matchswitch", covers: "「match」の switch の形（variant、述語で決まる分類）と、その「分類の誤りの枝」（型の switch の default:）、else のアーム、「絞り込んだ値」、「分類」", behavior: true},
-	{name: "matchelse", covers: "「match」の、残りのケース（対象 as else）を持つ型で決まる分類: 二つに分ける形のもう一方の枝（presence）、残りのアームを並べた case と絞り込んだ値（variant）。「分類」（何も出さない）", behavior: true},
-	{name: "matchclosed", covers: "「match」の、二つに分ける形の「分類の誤りの枝」（残りのケースを書かない presence の分類）と、else のアーム（受けるケースを名前で並べたアームと同じコード）", behavior: true},
-	{name: "rowstate", covers: "「effect」「状態の単位」「コメント」の、行の遷移を持つ効果（メソッドの形は変わらず、コメントに行の遷移の表示。行の引数を絞り込んだ効果は「効果の入口の確かめ」）と、「分類」の、ない側のケース（述語を持たない。判定関数が、値がないことで決める）、「match」の、ない側のケースを as none で書いた presence の分類", behavior: true},
-	{name: "throws", covers: "「exception」（引数ごとにフィールド一つ）と、「match」のアームの本体の throw E(<値>, …)、例外を投げる効果（「状態の単位」と、単位のメソッドのコメントの throws）", behavior: true},
-	{name: "try", covers: "「例外を受ける文」の各行（try のブロックの関数、catch (e)、throw e、throw 例外(値)、空の catch、catch (e by 分類) の型の switch と default、try と catch が入れる val、for の中の try、入れ子、本体のあるデコレータの try { next(); }）", behavior: true},
-	{name: "seams", covers: "「継ぎ目」の各行、「内側のフォルダと入口」", behavior: true},
-	{name: "wraps", covers: "「本体のあるデコレータ」の各行（外側のメソッド、包んだ関数の呼び出しの式、値を返す op の result、値の引数、別の名前空間の op と分類の述語、継ぎ目との入れ子、包んだ関数の呼び出しのアームを持つ match の後ろの文、never を返す op）と、「デコレータのテストの口」の、関係ごとの確かめと、「受けるケース」（名前空間 desk: ignores、recovers、halts、引数で渡した例外、残りの引数、ユニオン、同じデコレータを二度、当たる名前、受けた例外が throws にもあるもの、op の例外にない例外）", behavior: true},
-	{name: "typespkg", covers: "「型のパッケージ」（関数を持つ名前空間の型を、types/ に置く。定義のパッケージの再公開。別の名前空間は、型のパッケージを import する。型だけの名前空間は、分けない）と、「パッケージと import パス」（互いの型を使う二つの名前空間が、輪にならない）", behavior: true},
-	{name: "unittest", covers: "「単体テストの口」（葉の op の結果ごとのケース、当たる結果の名前、Then_、絞り込んだ戻り値の確かめ、分類の判定の例、口を持たないもの）と、「効果の入口の確かめ」（包む型、New が包むこと、別の名前空間の分類の述語）", behavior: true},
+	{name: "matchliteral", req: "Wiring", covers: "「match」の、絞り込みが literal の分け方（if <対象>）と、ケースのない側の、分類の誤りの枝", behavior: true},
+	{name: "literals", req: "Types", covers: "「型」の、リテラルの型の行: 「model」のリテラルの型のフィールド、「union」のリテラルの型のアーム、「値」の、リテラルの型のアームに入れる式とフィールドを読む式、「match」の variant（リテラルの型のアーム）と三つに分ける形（対象が boolean?）、「分類」の、対象が boolean? の literal の確かめ", behavior: true},
+	{name: "types", req: "Types", also: []string{"Targets", "Comments"}, covers: "「型」（model、scalar、union、exception、effect）と「コメント」、予約語の名前空間のパッケージ名、op のない名前空間の状態の単位、「分類」の、対象のない分類（何も出さない）"},
+	{name: "names", req: "Names", also: []string{"Fakes"}, covers: "「名前」の局所の名前、「パッケージと import パス」の import の名前、「New」の引数の名前、「別の名前空間の op」"},
+	{name: "pkgnames", req: "Layout", also: []string{"Fakes"}, covers: "「パッケージと import パス」の import の名前のうち、名前空間のパッケージ名が、基底が決まった名前で使う識別子（ops、ptr、o、ctx、err）や、途中の値（v0、k0）と同じとき。「New」の引数の名前 ops"},
+	{name: "statements", req: "Wiring", covers: "「呼び出し」「文」の表の各行（空の val、値を入れる文、集める文、for、disjoint を含む）、「match」の x = match と xs collect match、失敗の扱いの零値"},
+	{name: "values", req: "Wiring", covers: "「値」の表の各行、「型をそろえる」、「省略可能を通るパス」"},
+	{name: "unionarm", req: "Wiring", covers: "「値」の「union に入れる」（引数、レコードリテラルのフィールド、return、val、値を入れる文、集める文、throw の引数。構造体のアームと、包む型のアーム）", behavior: true},
+	{name: "states", req: "Ports", also: []string{"Comments"}, covers: "「op の置き場」（デコレータが reads と effects を運ぶ葉も Leaves）、「コメント」の Reads / Effects（配線に運ばれたものを含む）、「状態の単位」（read、効果、形で決まる命令）、「呼び出し」の read・効果・直に呼ぶ組み込みの効果、「状態の参照」", behavior: true},
+	{name: "bind", req: "Wiring", also: []string{"Targets", "Ports"}, covers: "「bind で埋まる位置」の 1〜4、「別の名前空間の op」"},
+	{name: "matchif", req: "Wiring", covers: "「match」の二つに分ける形（nullable、list、presence）と、アームの本体の組"},
+	{name: "matchswitch", req: "Wiring", covers: "「match」の switch の形（variant、述語で決まる分類）と、その「分類の誤りの枝」（型の switch の default:）、else のアーム、「絞り込んだ値」、「分類」", behavior: true},
+	{name: "matchelse", req: "Wiring", covers: "「match」の、残りのケース（対象 as else）を持つ型で決まる分類: 二つに分ける形のもう一方の枝（presence）、残りのアームを並べた case と絞り込んだ値（variant）。「分類」（何も出さない）", behavior: true},
+	{name: "matchclosed", req: "Wiring", covers: "「match」の、二つに分ける形の「分類の誤りの枝」（残りのケースを書かない presence の分類）と、else のアーム（受けるケースを名前で並べたアームと同じコード）", behavior: true},
+	{name: "rowstate", req: "Ports", also: []string{"Comments"}, covers: "「effect」「状態の単位」「コメント」の、行の遷移を持つ効果（メソッドの形は変わらず、コメントに行の遷移の表示。行の引数を絞り込んだ効果は「効果の入口の確かめ」）と、「分類」の、ない側のケース（述語を持たない。判定関数が、値がないことで決める）、「match」の、ない側のケースを as none で書いた presence の分類", behavior: true},
+	{name: "throws", req: "Wiring", covers: "「exception」（引数ごとにフィールド一つ）と、「match」のアームの本体の throw E(<値>, …)、例外を投げる効果（「状態の単位」と、単位のメソッドのコメントの throws）", behavior: true},
+	{name: "try", req: "Wiring", covers: "「例外を受ける文」の各行（try のブロックの関数、catch (e)、throw e、throw 例外(値)、空の catch、catch (e by 分類) の型の switch と default、try と catch が入れる val、for の中の try、入れ子、本体のあるデコレータの try { next(); }）", behavior: true},
+	{name: "seams", req: "Seams", also: []string{"Layout", "Decorators"}, covers: "「継ぎ目」の各行、「内側のフォルダと入口」", behavior: true},
+	{name: "wraps", req: "Wraps", also: []string{"Decorators", "UnitTestPort"}, covers: "「本体のあるデコレータ」の各行（外側のメソッド、包んだ関数の呼び出しの式、値を返す op の result、値の引数、別の名前空間の op と分類の述語、継ぎ目との入れ子、包んだ関数の呼び出しのアームを持つ match の後ろの文、never を返す op）と、「デコレータのテストの口」の、関係ごとの確かめと、「受けるケース」（名前空間 desk: ignores、recovers、halts、引数で渡した例外、残りの引数、ユニオン、同じデコレータを二度、当たる名前、受けた例外が throws にもあるもの、op の例外にない例外）", behavior: true},
+	{name: "typespkg", req: "Layout", also: []string{"Fakes"}, covers: "「型のパッケージ」（関数を持つ名前空間の型を、types/ に置く。定義のパッケージの再公開。別の名前空間は、型のパッケージを import する。型だけの名前空間は、分けない）と、「パッケージと import パス」（互いの型を使う二つの名前空間が、輪にならない）", behavior: true},
+	{name: "unittest", req: "UnitTestPort", also: []string{"Ports"}, covers: "「単体テストの口」（葉の op の結果ごとのケース、当たる結果の名前、Then_、絞り込んだ戻り値の確かめ、分類の判定の例、口を持たないもの）と、「効果の入口の確かめ」（包む型、New が包むこと、別の名前空間の分類の述語）", behavior: true},
 }
 
-// TestGolden は、入力ごとに、出力がゴールデン testdata/<名前>/expected/ とバイト単位で同じこと、go/format を通した形で
-// あること、同じ View から同じバイト列を返すこと（docs/plugin-go.md「決定性」）、生成したコードがコンパイルできる
-// （一時のモジュールで go vet を通る）ことを確かめる。
-func TestGolden(t *testing.T) {
+// runFixtures は、要求のケース req の入力を走らせる: req を持つ入力は、ゴールデンとの比較、go vet、あれば振る舞いのテスト。
+// also に req を持つ入力は、ゴールデンとの比較だけ。
+func runFixtures(t *testing.T, req string) {
 	for _, fx := range goldenFixtures {
-		t.Run(fx.name, func(t *testing.T) {
-			t.Parallel()
-			root, files := emitFixture(t, fx.name)
-			checkFormatted(t, files)
-			compareTree(t, fx.name, files)
-			// 決定性: もう一度、別のルート（同じモジュールのパス）で出力しても、同じバイト列
-			again, _ := emitViews(t, newRoot(t), loadViews(t, fx.name))
-			if len(again) != len(files) {
-				t.Errorf("二度目の出力のファイルの数が違う: %d と %d", len(files), len(again))
-			}
-			for p, content := range files {
-				if again[p] != content {
-					t.Errorf("%s が、二度目の出力で変わった", p)
-				}
-			}
-			vet(t, root, files)
-		})
-	}
-}
-
-// TestBehavior は、生成したコードを一時のモジュールで実際に動かす（docs/testing.md「単体テスト」）: 入力の
-// behavior_test.go を、生成したコードのモジュールのルートに置いて、go test を走らせる。確かめることは、それぞれのファイルの頭。
-func TestBehavior(t *testing.T) {
-	for _, fx := range goldenFixtures {
-		if !fx.behavior {
+		primary := fx.req == req
+		if !primary && !slices.Contains(fx.also, req) {
 			continue
 		}
 		t.Run(fx.name, func(t *testing.T) {
 			t.Parallel()
-			root, files := emitFixture(t, fx.name)
-			writeFiles(t, root, files)
-			test, err := os.ReadFile(filepath.Join("testdata", fx.name, "behavior_test.go"))
-			if err != nil {
-				t.Fatal(err)
-			}
-			writeFile(t, filepath.Join(root, "behavior_test.go"), string(test))
-			out, err := runGo(t, root, "test", "-count=1", "-v", ".")
-			if err != nil {
-				t.Fatalf("生成したコードのテストが落ちた: %v\n%s", err, out)
-			}
-			if !strings.Contains(out, "--- PASS: Test") {
-				t.Fatalf("生成したコードのテストが一つも走らなかった:\n%s", out)
+			golden(t, fx.name, primary)
+			if primary && fx.behavior {
+				behave(t, fx.name)
 			}
 		})
 	}
 }
 
-// TestSameNamespaceOtherDir は、同じ名前空間の二つの単位の基底のファイルが、in と単位の継ぎ目が同じなら、import パスに
-// 現れる自分のディレクトリを除いて、バイト単位で同じこと（docs/plugin-go.md「決定性」）。
-func TestSameNamespaceOtherDir(t *testing.T) {
+// golden は、入力 name の出力がゴールデン testdata/<名前>/expected/ とバイト単位で同じこと、go/format を通した形であること、
+// 同じ View から同じバイト列を返すこと（hozo.gobase.Requirement.Determinism）を確かめる。compile なら、生成したコードがコンパイルできる
+// （一時のモジュールで go vet を通る）ことも確かめる。
+func golden(t *testing.T, name string, compile bool) {
+	t.Helper()
+	root, files := emitFixture(t, name)
+	checkFormatted(t, files)
+	compareTree(t, name, files)
+	// 決定性: もう一度、別のルート（同じモジュールのパス）で出力しても、同じバイト列
+	again, _ := emitViews(t, newRoot(t), loadViews(t, name))
+	if len(again) != len(files) {
+		t.Errorf("二度目の出力のファイルの数が違う: %d と %d", len(files), len(again))
+	}
+	for p, content := range files {
+		if again[p] != content {
+			t.Errorf("%s が、二度目の出力で変わった", p)
+		}
+	}
+	if compile {
+		vet(t, root, files)
+	}
+}
+
+// behave は、生成したコードを一時のモジュールで実際に動かす（docs/testing.md「単体テスト」）: 入力 name の
+// behavior_test.go を、生成したコードのモジュールのルートに置いて、go test を走らせる。確かめることは、それぞれのファイルの頭。
+func behave(t *testing.T, name string) {
+	t.Helper()
+	root, files := emitFixture(t, name)
+	writeFiles(t, root, files)
+	test, err := os.ReadFile(filepath.Join("testdata", name, "behavior_test.go"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	writeFile(t, filepath.Join(root, "behavior_test.go"), string(test))
+	out, err := runGo(t, root, "test", "-count=1", "-v", ".")
+	if err != nil {
+		t.Fatalf("生成したコードのテストが落ちた: %v\n%s", err, out)
+	}
+	if !strings.Contains(out, "--- PASS: Test") {
+		t.Fatalf("生成したコードのテストが一つも走らなかった:\n%s", out)
+	}
+}
+
+// sameNamespaceOtherDir は、同じ名前空間の二つの単位の基底のファイルが、in と単位の継ぎ目が同じなら、import パスに
+// 現れる自分のディレクトリを除いて、バイト単位で同じこと（plugins/go/spec/go.hozo の Requirement.Determinism）。
+func sameNamespaceOtherDir(t *testing.T) {
 	for _, name := range []string{"statements", "seams"} {
 		view := loadViews(t, name)[0]
 		root := newRoot(t)
@@ -208,9 +222,9 @@ func TestNoModule(t *testing.T) {
 	}
 }
 
-// TestReadsNothing は、プラグインが、ファイルも、環境変数も、読まないこと（決定 D425、
-// docs/plugin-go.md「パッケージと import パス」）: go.mod のない、空の作業ディレクトリで、環境変数を空にしても、出力が同じ。
-func TestReadsNothing(t *testing.T) {
+// readsNothing は、プラグインが、ファイルも、環境変数も、読まないこと（決定 D425、
+// plugins/go/spec/go.hozo の Requirement.Layout の「パッケージと import パス」）: go.mod のない、空の作業ディレクトリで、環境変数を空にしても、出力が同じ。
+func readsNothing(t *testing.T) {
 	views := loadViews(t, "statements")
 	want, diags := emitViews(t, "", views)
 	if len(diags) != 0 {
@@ -279,9 +293,9 @@ func TestHandler(t *testing.T) {
 	}
 }
 
-// TestTypesPackageText は「型のパッケージ」の、出力のテキストを、文書から手で書いたものと比べる: 型のパッケージの types.go、
+// typesPackageText は「型のパッケージ」の、出力のテキストを、文書から手で書いたものと比べる: 型のパッケージの types.go、
 // 定義のパッケージ（内側）の再公開、別の名前空間の型のパッケージを import する行、型だけの名前空間（分けない）。
-func TestTypesPackageText(t *testing.T) {
+func typesPackageText(t *testing.T) {
 	_, files := emitFixture(t, "typespkg")
 	want := map[string]string{
 		"gen/carry/types/types.go": `// Code generated by hozoc go 0.0.0-dev; DO NOT EDIT.

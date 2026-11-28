@@ -1,5 +1,5 @@
 // 生成したコードの振る舞いのテスト（docs/testing.md「単体テスト」の `plugins/go`）: 絞り込みが literal の、型で決まる分類
-// （docs/plugin-go.md「match」）で分ける配線。真と偽が、それぞれのケースのアームに届くことと、ケースのない側の値が、
+// （plugins/go/spec/go.hozo の Requirement.Wiring の「match」）で分ける配線。真と偽が、それぞれのケースのアームに届くことと、ケースのない側の値が、
 // 分類の誤り（*runtime.ClassificationError）になること。述語で決まる分類（同「分類」）では、as の型に当たらない値で、
 // そのケースの述語が呼ばれないこと。
 // plugins/go の TestBehavior が、生成したコードのモジュールのルートに置いて走らせる。

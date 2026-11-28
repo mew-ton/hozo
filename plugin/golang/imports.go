@@ -10,7 +10,7 @@ import (
 	"github.com/mew-ton/hozo/ir"
 )
 
-// Imports は、生成する一つのファイルの import の集まり（docs/plugin-go.md「パッケージと import パス」の「import の名前」）。
+// Imports は、生成する一つのファイルの import の集まり（plugins/go/spec/go.hozo の Requirement.Layout の「パッケージと import パス」の「import の名前」）。
 // GoType / Zero / Signature が、必要な import を足す。Render が import のブロックを出す。
 //
 // 名前の決め方: パッケージは、その `package` 節の名前で import する。名前が import パスの最後の要素と違えば、名前を書く
@@ -22,7 +22,7 @@ type Imports struct {
 	view   *ir.View
 	layout *Layout
 	inDef  bool
-	// inTypes は、書くファイルが、型のパッケージ（docs/plugin-go.md「型のパッケージ」）のものか。
+	// inTypes は、書くファイルが、型のパッケージ（plugins/go/spec/go.hozo の Requirement.Layout の「型のパッケージ」）のものか。
 	inTypes bool
 	// outside は、書くファイルが、出力の外のパッケージ（テストのパッケージ）のものか。そのとき、N の宣言も、入口のパッケージで修飾する。
 	outside bool
@@ -39,7 +39,7 @@ type Imports struct {
 }
 
 // basePrivateNames は、基底が定義のパッケージに宣言する非公開の名前のうち、パッケージ名になりうるもの（小文字と数字だけの名前）:
-// New が返す構造体 ops と、値をポインタにする補助 ptr（docs/plugin-go.md「New」「値」）。Go では、パッケージの宣言と、その
+// New が返す構造体 ops と、値をポインタにする補助 ptr（plugins/go/spec/go.hozo の Requirement.Ports の「New」、Requirement.Wiring の「値」）。Go では、パッケージの宣言と、その
 // パッケージのどのファイルの import の名前も、同じ名前ならコンパイルできないので、どのファイルの import も、この名前を使わない
 // （同「パッケージと import パス」の「import の名前」）。
 var basePrivateNames = []string{"ops", "ptr"}
@@ -52,13 +52,13 @@ func NewImports(view *ir.View, layout *Layout, inDef bool) *Imports {
 	return &Imports{view: view, layout: layout, inDef: inDef}
 }
 
-// NewTypesImports は、view の出力の、型のパッケージ（docs/plugin-go.md「型のパッケージ」）の、一つのファイルの import を作る。
+// NewTypesImports は、view の出力の、型のパッケージ（plugins/go/spec/go.hozo の Requirement.Layout の「型のパッケージ」）の、一つのファイルの import を作る。
 // N の型は、修飾なしの名前になる。型のパッケージを分けない出力（Layout.HasTypes が偽）では、NewImports(…, true) と同じ。
 func NewTypesImports(view *ir.View, layout *Layout) *Imports {
 	return &Imports{view: view, layout: layout, inDef: true, inTypes: true}
 }
 
-// NewTestImports は、view の出力の、テストのパッケージ（docs/plugin-go.md「単体テストの口」の「テストのパッケージ」）の、一つの
+// NewTestImports は、view の出力の、テストのパッケージ（plugins/go/spec/go.hozo の Requirement.UnitTestPort の「テストのパッケージ」）の、一つの
 // ファイルの import を作る。テストのパッケージは、N の入口のパッケージを import するので、N の型も、入口のパッケージの名前で
 // 修飾する（Qualifier(N) が、入口を import して `<名前>.` を返す）。その import は、名前がパスの最後の要素と同じでも、名前を書く
 // （出力先のディレクトリの名前で、ファイルの中身が変わらないように: 同「決定性」）。
@@ -90,7 +90,7 @@ func (im *Imports) init() {
 }
 
 // Reserve は、names を、このファイルの import の名前に使わせない名前に足す: パッケージ名がそれと同じ名前空間は、2、3、… を付けて
-// import される（docs/plugin-go.md「パッケージと import パス」の「import の名前」）。ファイルを書くトランスパイラが、関数の本体の
+// import される（plugins/go/spec/go.hozo の Requirement.Layout の「パッケージと import パス」の「import の名前」）。ファイルを書くトランスパイラが、関数の本体の
 // 中で決まった名前で使う識別子（基底の、メソッドのレシーバ o、ctx、err など）を渡す。その名前の局所の変数が、同じ名前のパッケージを
 // 隠して、本体がそのパッケージの型を書けなくなるのを防ぐ。import を一つも足していないうちに呼ぶ。Canonical にも引き継ぐ。
 func (im *Imports) Reserve(names ...string) {
@@ -146,7 +146,7 @@ func (im *Imports) Paths() []string {
 }
 
 // Names は、このファイルが import するパッケージを修飾するのに使う名前（辞書順）。局所の名前が避ける名前
-// （docs/plugin-go.md「名前」の「局所の名前」）を作るのに使う。
+// （plugins/go/spec/go.hozo の Requirement.Names の「局所の名前」）を作るのに使う。
 func (im *Imports) Names() []string {
 	if im == nil {
 		return nil
@@ -198,7 +198,7 @@ func (im *Imports) Render() string {
 	return b.String()
 }
 
-// Canonical は、同じ import の集まりを、文書の決まりの順で足し直した Imports を返す（docs/plugin-go.md「パッケージと import パス」の
+// Canonical は、同じ import の集まりを、文書の決まりの順で足し直した Imports を返す（plugins/go/spec/go.hozo の Requirement.Layout の「パッケージと import パス」の
 // 「import の名前」）: 名前空間のパッケージでないもの（標準ライブラリ、runtime、内側のパッケージなど）をパスの辞書順に、
 // その後に、名前空間のパッケージを、名前空間の FQN の辞書順に。名前が当たれば、後の方に 2、3、… が付く。
 // ファイルを一度作って import の集まりを知り、返った Imports で作り直せば、名前は、足した順（型を書いた順）によらない。
@@ -250,7 +250,7 @@ func (im *Imports) Qualifier(namespace string) string {
 		return ""
 	}
 	im.init()
-	// 別の名前空間の型と分類は、型のパッケージから（docs/plugin-go.md「パッケージと import パス」）。テストのパッケージのファイルは、
+	// 別の名前空間の型と分類は、型のパッケージから（plugins/go/spec/go.hozo の Requirement.Layout の「パッケージと import パス」）。テストのパッケージのファイルは、
 	// 入口から（入口は、型のすべての別名を持つ）
 	pkgPath := home.TypesPath
 	if im.outside {
